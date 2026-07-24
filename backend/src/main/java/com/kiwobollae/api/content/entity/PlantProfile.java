@@ -54,4 +54,29 @@ public class PlantProfile extends BaseEntity {
 
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
+
+	public static PlantProfile create(User user, PlantSpecies species,
+			String plantName, LocalDate startDate, String plantImage) {
+		return PlantProfile.builder()
+				.user(user)
+				.species(species)
+				.plantName(plantName)
+				.startDate(startDate)
+				.plantImage(plantImage)
+				.status(PlantStatus.GROWING)
+				.createdAt(LocalDateTime.now())
+				.build();
+	}
+
+	public void updateProfile(String plantName, String plantImage, PlantStatus status) {
+		if (plantName != null) {
+			this.plantName = plantName;
+		}
+		if (plantImage != null) {
+			this.plantImage = plantImage;
+		}
+		if (status != null) {
+			this.status = status;
+		}
+	}
 }
