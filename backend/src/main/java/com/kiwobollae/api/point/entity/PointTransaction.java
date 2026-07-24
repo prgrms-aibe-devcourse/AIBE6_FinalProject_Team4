@@ -1,6 +1,5 @@
 package com.kiwobollae.api.point.entity;
 
-import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.common.BaseEntity;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
@@ -20,23 +19,19 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
+// 불변 원장(append-only). 멱등은 공통 idempotency_keys 테이블 + (ref_type, ref_id) 조회로 처리 → 자체 멱등 컬럼 없음.
 @Getter
 @Entity
 @Table(name = "point_transactions", indexes = {
 		@Index(name = "idx_point_transaction_wallet_id_created_at", columnList = "wallet_id, created_at"),
-		@Index(name = "idx_point_transaction_user_id_created_at", columnList = "user_id, created_at"),
-		@Index(name = "idx_point_transaction_ref_type_ref_id", columnList = "ref_type, ref_id"),
-		@Index(name = "idx_point_transaction_idempotency_key_currency_type", columnList = "idempotency_key, currency_type", unique = true)
+		@Index(name = "idx_point_transaction_ref_type_ref_id", columnList = "ref_type, ref_id")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 public class PointTransaction extends BaseEntity {
-
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id", nullable = false)
-	private User user;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "wallet_id", nullable = false)
@@ -53,30 +48,18 @@ public class PointTransaction extends BaseEntity {
 	@Column(nullable = false)
 	private Long amount;
 
-	@Column(name = "balance_before", nullable = false)
-	private Long balanceBefore;
-
 	@Column(name = "balance_after", nullable = false)
 	private Long balanceAfter;
 
 	@Enumerated(EnumType.STRING)
-	@Column(name = "ref_type", nullable = false, length = 30)
+	@Column(name = "ref_type", length = 20)
 	private PointRefType refType;
 
-	/** Polymorphic reference — target table determined by refType. */
+	/** Polymorphic reference — target table determined by refType (ADMIN 조정 시 null). */
 	@Column(name = "ref_id")
 	private Long refId;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "actor_user_id")
-	private User actorUser;
-
-	@Column(length = 200)
-	private String reason;
-
-	@Column(name = "idempotency_key", nullable = false, length = 100)
-	private String idempotencyKey;
-
-	@Column(name = "created_at", nullable = false)
+	@CreationTimestamp
+	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 }

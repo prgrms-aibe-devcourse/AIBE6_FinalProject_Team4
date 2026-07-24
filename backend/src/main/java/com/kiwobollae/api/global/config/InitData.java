@@ -57,7 +57,6 @@ public class InitData implements ApplicationRunner {
 				.user(user)
 				.freePoint(freePoint)
 				.paidPoint(paidPoint)
-				.version(0L)
 				.build();
 		walletRepository.save(wallet);
 	}

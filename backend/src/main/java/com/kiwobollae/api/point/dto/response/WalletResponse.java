@@ -8,7 +8,6 @@ public record WalletResponse(
 		Long userId,
 		Long paidPoint,
 		Long freePoint,
-		Long version,
 		LocalDateTime createdAt,
 		LocalDateTime updatedAt
 ) {
@@ -18,7 +17,6 @@ public record WalletResponse(
 				wallet.getUser().getId(),
 				wallet.getPaidPoint(),
 				wallet.getFreePoint(),
-				wallet.getVersion(),
 				wallet.getCreatedAt(),
 				wallet.getUpdatedAt()
 		);
