@@ -14,4 +14,5 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlantController {
 
 	private final PlantProfileService plantProfileService;
+	private final PlantProfileService plantProfileService2;
 }
