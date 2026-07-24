@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "plant_profile", indexes = {
-		@Index(name = "idx_plant_profile_user_id_archived_at", columnList = "user_id, archived_at"),
+		@Index(name = "idx_plant_profile_user_id", columnList = "user_id"),
 		@Index(name = "idx_plant_profile_species_id", columnList = "specie_id")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -54,7 +54,4 @@ public class PlantProfile extends BaseEntity {
 
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
-
-	@Column(name = "archived_at")
-	private LocalDateTime archivedAt;
 }

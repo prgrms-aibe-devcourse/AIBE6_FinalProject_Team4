@@ -31,13 +31,16 @@ public class JournalCompletionLog extends BaseEntity {
 	private User user;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "plant_profile_id", nullable = false)
+	@JoinColumn(name = "plant_profile_id")
 	private PlantProfile plantProfile;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "plant_journal_id", nullable = false)
+	@JoinColumn(name = "plant_journal_id")
 	private PlantJournal plantJournal;
 
 	@Column(name = "completion_date", nullable = false)
 	private LocalDate completionDate;
+
+	@Column(name = "plant_nickname_snapshot", length = 50)
+	private String plantNicknameSnapshot;
 }
