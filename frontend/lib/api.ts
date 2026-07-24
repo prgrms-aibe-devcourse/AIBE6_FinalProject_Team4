@@ -13,12 +13,18 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+interface ApiRequestOptions extends RequestInit {
+  accessToken?: string | null;
+}
+
+export async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  const { accessToken, ...requestOptions } = options;
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
+    ...requestOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...requestOptions.headers,
     },
   });
 
