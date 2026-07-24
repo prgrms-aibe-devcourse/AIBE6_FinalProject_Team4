@@ -1,7 +1,7 @@
 package com.kiwobollae.api.commerce.entity;
 
-import com.kiwobollae.api.commerce.entity.enums.ActiveStatus;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
+import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
 import jakarta.persistence.Column;
@@ -36,7 +36,7 @@ public class Product extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private ProductCategory category;
 
-	@Column(name = "point_price", nullable = false)
+	@Column(name = "point_price")
 	private Long pointPrice;
 
 	@Column(nullable = false)
@@ -54,5 +54,5 @@ public class Product extends BaseTimeEntity {
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private ActiveStatus status;
+	private ProductStatus status;
 }
