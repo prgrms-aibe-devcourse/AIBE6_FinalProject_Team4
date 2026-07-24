@@ -44,4 +44,21 @@ public class Wallet extends BaseTimeEntity {
 
 	@Column(name = "free_point", nullable = false)
 	private Long freePoint;
+
+	/** Applies a signed delta to the paid balance and returns the new balance. paid는 음수 불가(호출부가 검증). */
+	public long increasePaidPoint(long delta) {
+		this.paidPoint += delta;
+		return this.paidPoint;
+	}
+
+	/** Applies a signed delta to the free balance and returns the new balance. free는 회수(CLAWBACK)로 음수 허용. */
+	public long increaseFreePoint(long delta) {
+		this.freePoint += delta;
+		return this.freePoint;
+	}
+
+	/** 화면 표시용 합산 잔액(정책 #2: paid+free 합산만 노출). */
+	public long totalBalance() {
+		return this.paidPoint + this.freePoint;
+	}
 }
