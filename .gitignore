@@ -1,2 +1,14 @@
 .claude/
 docs/
+
+# Local development files
+.DS_Store
+.idea/
+/AGENTS.md
+/error-codes.md
+
+# Environment secrets (templates remain shareable)
+.env
+.env.*
+!.env.example
+!.env.*.example
