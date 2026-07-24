@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  a {
+    @apply text-brand-dark no-underline;
+  }
+  a:hover {
+    @apply text-brand;
+  }
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+
+  /* Generic hover feedback for every clickable control across all pages */
+  .cursor-pointer {
+    transition: filter 150ms ease, transform 100ms ease, box-shadow 150ms ease;
+  }
+  .cursor-pointer:hover {
+    filter: brightness(0.96);
+  }
+  .cursor-pointer:active {
+    transform: scale(0.97);
+  }
+
+  /* Card-style links (product/plant/journal/card lists) lift on hover */
+  a.shadow-card {
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+  a.shadow-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 32px rgba(124, 179, 66, 0.2);
+    filter: none;
+  }
+}
+
+@layer components {
+  .container {
+    @apply mx-auto max-w-[1080px] px-5 pb-[70px] pt-[26px];
+  }
+
+  /* Google Material Symbols — loaded via <link> in app/layout.jsx */
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    @apply align-middle leading-none;
+  }
+}

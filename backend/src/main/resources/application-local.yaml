@@ -1,0 +1,8 @@
+spring:
+  jpa:
+    # ddl-auto is already "update" by default (see application.yaml) — nothing to override here.
+    show-sql: true
+
+logging:
+  level:
+    com.kiwobollae.api: DEBUG

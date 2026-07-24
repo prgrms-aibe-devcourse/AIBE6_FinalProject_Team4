@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: api
+  # Default active profile so a plain `bootRun`/IDE run works without extra setup.
+  # Real deployments override this via the SPRING_PROFILES_ACTIVE env var (env vars win
+  # over values in this file), so this default never leaks into prod.
+  profiles:
+    active: local
+  # Local secrets file (gitignored). Copy application-secret.yaml.example -> application-secret.yaml
+  # and fill in real values; if the file doesn't exist this import is silently skipped and the
+  # ${ENV_VAR:default} placeholders below (or actual env vars, e.g. in CI/prod) are used instead.
+  config:
+    import: optional:classpath:application-secret.yaml
+  datasource:
+    url: jdbc:mysql://localhost:3306/kiwobollae?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+  jpa:
+    hibernate:
+      # Default to "update" for convenience while there's no migration tool yet (see
+      # docs/erd.dbml for the schema this should eventually match exactly). The prod profile
+      # (application-prod.yaml) overrides this back to "validate" so a real deployment never
+      # silently alters the schema. Follow-up: introduce Flyway or Liquibase and drop ddl-auto
+      # entirely.
+      ddl-auto: create
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:CHANGE_ME_dev_only_placeholder_secret}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
