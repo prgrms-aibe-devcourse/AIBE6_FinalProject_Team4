@@ -72,7 +72,7 @@ public class ReportService {
 	}
 
 	private Report findPending(Long reportId) {
-		Report report = reportRepository.findById(reportId)
+		Report report = reportRepository.findByIdWithReporter(reportId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
 		if (report.getStatus() != ReportStatus.PENDING) {
 			throw new BusinessException(ErrorCode.REPORT_INVALID_STATE);

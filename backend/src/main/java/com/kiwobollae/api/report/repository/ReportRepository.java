@@ -16,9 +16,12 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 			countQuery = "select count(r) from Report r where r.reporter.id = :reporterId")
 	Page<Report> findAllByReporterId(@Param("reporterId") Long reporterId, Pageable pageable);
 
-	@Query("select r from Report r left join fetch r.processedAdmin "
+	@Query("select r from Report r join fetch r.reporter left join fetch r.processedAdmin "
 			+ "where r.id = :id and r.reporter.id = :reporterId")
 	Optional<Report> findByIdAndReporterId(@Param("id") Long id, @Param("reporterId") Long reporterId);
+
+	@Query("select r from Report r join fetch r.reporter left join fetch r.processedAdmin where r.id = :id")
+	Optional<Report> findByIdWithReporter(@Param("id") Long id);
 
 	// 관리자 전체 목록 조회: 신고자가 행마다 달라 N+1 방지를 위해 reporter도 join fetch
 	@Query(value = "select r from Report r join fetch r.reporter left join fetch r.processedAdmin "
