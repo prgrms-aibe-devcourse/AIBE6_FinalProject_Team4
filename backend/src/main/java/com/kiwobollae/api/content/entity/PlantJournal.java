@@ -64,7 +64,9 @@ public class PlantJournal extends BaseEntity {
 	}
 
 	public void updateContent(String content) {
-		this.content = content;
+		if (content != null) {
+			this.content = content;
+		}
 		this.updatedAt = LocalDateTime.now();
 	}
 

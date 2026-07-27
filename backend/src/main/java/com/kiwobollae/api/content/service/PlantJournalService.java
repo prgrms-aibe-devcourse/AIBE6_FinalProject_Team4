@@ -165,7 +165,6 @@ public class PlantJournalService {
 		}
 	}
 
-	// 같은 날 동일 사진 재사용 차단: 요청 내부 중복과 기존 저장분과의 중복을 모두 검사한다.
 	private void checkDuplicateImages(Long userId, List<JournalImageRequest> images, LocalDate writtenDate) {
 		Set<String> seenHashes = new HashSet<>();
 		for (JournalImageRequest image : images) {
