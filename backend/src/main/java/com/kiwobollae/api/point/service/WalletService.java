@@ -46,8 +46,9 @@ public class WalletService {
 	 * 부호 있는 delta를 적용하고, 불변 원장(balance_after 스냅샷)을 같은 트랜잭션에 기록한다.
 	 * deduct/credit/reward/clawback 등 상위 흐름(POINT-03~08)이 이 메서드를 조합해 사용한다.
 	 *
-	 * <p>정책: paid_point는 음수 불가(부족 시 {@code POINT_INSUFFICIENT_BALANCE}),
-	 * free_point는 회수(CLAWBACK)로 음수 허용.
+	 * <p>정책: paid_point는 항상 음수 불가. free_point는 CLAWBACK·ADMIN_ADJUST만 음수(부채)
+	 * 허용하고, 그 외(PURCHASE 등)의 무상 차감은 하한 0을 지킨다. 하한 위반 시
+	 * {@code POINT_INSUFFICIENT_BALANCE}.
 	 */
 	@Transactional
 	public PointTransaction applyDelta(Long userId, PointTxType type, CurrencyType currency,
@@ -63,6 +64,11 @@ public class WalletService {
 			}
 		} else {
 			balanceAfter = wallet.increaseFreePoint(amount);
+			// CLAWBACK·ADMIN_ADJUST만 free_point 음수(부채) 허용. 그 외(PURCHASE 등)의
+			// 무상 차감은 잔액 하한(0)을 지켜야 하므로 부족하면 거절한다.
+			if (balanceAfter < 0 && !type.allowsNegativeFree()) {
+				throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
+			}
 		}
 
 		PointTransaction tx = PointTransaction.builder()
