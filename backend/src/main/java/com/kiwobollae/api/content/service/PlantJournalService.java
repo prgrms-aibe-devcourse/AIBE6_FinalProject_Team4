@@ -79,6 +79,10 @@ public class PlantJournalService {
 				PlantJournalResponse.from(journal, imagesByJournal.getOrDefault(journal.getId(), List.of())));
 	}
 
+	public boolean existsActive(Long journalId) {
+		return plantJournalRepository.existsByIdAndDeletedAtIsNull(journalId);
+	}
+
 	public PlantJournalResponse getJournal(Long userId, Long journalId) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));

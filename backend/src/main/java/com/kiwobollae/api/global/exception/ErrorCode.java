@@ -60,7 +60,13 @@ public enum ErrorCode {
 	PLANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 프로필을 찾을 수 없습니다."),
 	PLANT_SPECIES_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 종을 찾을 수 없습니다."),
 	JOURNAL_NOT_FOUND(HttpStatus.NOT_FOUND, "성장 일지를 찾을 수 없습니다."),
-	JOURNAL_DUPLICATE_IMAGE(HttpStatus.UNPROCESSABLE_CONTENT, "같은 날 이미 사용한 사진입니다.");
+	JOURNAL_DUPLICATE_IMAGE(HttpStatus.UNPROCESSABLE_CONTENT, "같은 날 이미 사용한 사진입니다."),
+
+	// --- 문의 / 신고 도메인 ---
+	INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "문의를 찾을 수 없습니다."),
+	INQUIRY_INVALID_STATE(HttpStatus.CONFLICT, "이미 답변이 완료된 문의입니다."),
+	REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
+	REPORT_INVALID_STATE(HttpStatus.CONFLICT, "이미 처리가 완료된 신고입니다.");
 
 	private final HttpStatus httpStatus;
 	private final String defaultMessage;

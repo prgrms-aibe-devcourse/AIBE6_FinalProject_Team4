@@ -34,4 +34,6 @@ public interface PlantJournalRepository extends JpaRepository<PlantJournal, Long
 	@Query("select j from PlantJournal j join fetch j.plantProfile "
 			+ "where j.id = :id and j.user.id = :userId and j.deletedAt is null")
 	Optional<PlantJournal> findOwnedActive(@Param("id") Long id, @Param("userId") Long userId);
+
+	boolean existsByIdAndDeletedAtIsNull(Long id);
 }
