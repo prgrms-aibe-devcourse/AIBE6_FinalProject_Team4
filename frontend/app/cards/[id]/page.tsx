@@ -92,7 +92,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
   )}deg,#eef0e6 0)`;
 
   const buy = () => {
-    if (!hydrated || !state.accessToken) {
+    if (!hydrated || !state.accessToken || owned === null) {
       showToast('카드 구매는 로그인 후 이용할 수 있어요.', 'err');
       return;
     }

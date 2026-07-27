@@ -24,7 +24,7 @@ export function getCards(
   accessToken?: string | null,
   signal?: AbortSignal,
 ): Promise<CardData[]> {
-  return request<CardData[]>('/api/v1/cards', {
+  return request<CardData[]>('/api/v1/card', {
     accessToken,
     signal,
   });
@@ -35,7 +35,7 @@ export function getCard(
   accessToken?: string | null,
   signal?: AbortSignal,
 ): Promise<CardData> {
-  return request<CardData>(`/api/v1/cards/${cardId}`, {
+  return request<CardData>(`/api/v1/card/${cardId}`, {
     accessToken,
     signal,
   });
