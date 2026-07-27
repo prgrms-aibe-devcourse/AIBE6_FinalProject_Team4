@@ -65,4 +65,31 @@ public class Report extends BaseEntity {
 
 	@Column(name = "processed_at")
 	private LocalDateTime processedAt;
+
+	public static Report create(User reporter, ReportTargetType targetType, Long targetId, String reason) {
+		return Report.builder()
+				.reporter(reporter)
+				.targetType(targetType)
+				.targetId(targetId)
+				.reason(reason)
+				.status(ReportStatus.PENDING)
+				.createdAt(LocalDateTime.now())
+				.build();
+	}
+
+	public void complete(User admin, String actionType, String actionDetail) {
+		this.processedAdmin = admin;
+		this.actionType = actionType;
+		this.actionDetail = actionDetail;
+		this.processedAt = LocalDateTime.now();
+		this.status = ReportStatus.COMPLETED;
+	}
+
+	public void reject(User admin, String actionType, String actionDetail) {
+		this.processedAdmin = admin;
+		this.actionType = actionType;
+		this.actionDetail = actionDetail;
+		this.processedAt = LocalDateTime.now();
+		this.status = ReportStatus.REJECTED;
+	}
 }

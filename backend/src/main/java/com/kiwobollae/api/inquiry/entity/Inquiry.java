@@ -61,4 +61,22 @@ public class Inquiry extends BaseEntity {
 
 	@Column(name = "answer_created_at")
 	private LocalDateTime answeredAt;
+
+	public static Inquiry create(User user, InquiryCategory category, String title, String content) {
+		return Inquiry.builder()
+				.user(user)
+				.category(category)
+				.title(title)
+				.content(content)
+				.status(InquiryStatus.OPEN)
+				.createdAt(LocalDateTime.now())
+				.build();
+	}
+
+	public void answer(User admin, String answerContent) {
+		this.answerAdmin = admin;
+		this.answerContent = answerContent;
+		this.answeredAt = LocalDateTime.now();
+		this.status = InquiryStatus.ANSWERED;
+	}
 }
