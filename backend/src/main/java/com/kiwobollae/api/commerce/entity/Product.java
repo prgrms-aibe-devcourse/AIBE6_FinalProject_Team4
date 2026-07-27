@@ -4,6 +4,7 @@ import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,9 +22,15 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "products", indexes = {
-		@Index(name = "idx_products_status_category_created_at", columnList = "status, category, created_at")
-})
+@Table(name = "products",
+		indexes = {
+				@Index(name = "idx_products_status_category_created_at", columnList = "status, category, created_at")
+		},
+		check = {
+				@CheckConstraint(name = "chk_products_point_price_by_category",
+						constraint = "((category IN ('KIT', 'SEEDLING') AND point_price IS NOT NULL AND point_price >= 0) "
+								+ "OR (category = 'EXCHANGE' AND point_price IS NULL))")
+		})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
