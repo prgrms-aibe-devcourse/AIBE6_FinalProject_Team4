@@ -2,7 +2,7 @@ package com.kiwobollae.api.payment.entity;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
-import com.kiwobollae.api.payment.entity.enums.PaymentProvider;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
@@ -61,7 +61,7 @@ public class Payment extends BaseTimeEntity {
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private PaymentProvider provider;
+	private PaymentProviderType provider;
 
 	@Column(name = "provider_order_id", nullable = false, length = 100)
 	private String providerOrderId;
