@@ -34,7 +34,7 @@ public class PlantProfileService {
 	@Transactional
 	public PlantProfileResponse createProfile(Long userId, PlantProfileRequest request) {
 		PlantSpecies species = plantSpeciesRepository.findById(request.speciesId())
-				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND, "식물 종을 찾을 수 없습니다."));
+				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
 		User user = userRepository.getReferenceById(userId);
 		PlantProfile saved = plantProfileRepository.save(
 				PlantProfile.create(user, species, request.nickname(), request.startDate(), request.thumbnailUrl()));
@@ -70,6 +70,6 @@ public class PlantProfileService {
 
 	private PlantProfile findOwned(Long userId, Long profileId) {
 		return plantProfileRepository.findByIdAndUserId(profileId, userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND, "식물 프로필을 찾을 수 없습니다."));
+				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 	}
 }

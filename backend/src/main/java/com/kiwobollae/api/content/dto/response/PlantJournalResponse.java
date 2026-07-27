@@ -1,8 +1,10 @@
 package com.kiwobollae.api.content.dto.response;
 
+import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantJournal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record PlantJournalResponse(
 		Long id,
@@ -10,26 +12,24 @@ public record PlantJournalResponse(
 		String plantProfileNickname,
 		Long userId,
 		String content,
-		String imageUrl,
-		String imageHash,
 		LocalDate writtenDate,
 		LocalDateTime createdAt,
 		LocalDateTime updatedAt,
-		LocalDateTime deletedAt
+		LocalDateTime deletedAt,
+		List<JournalImageResponse> images
 ) {
-	public static PlantJournalResponse from(PlantJournal plantJournal) {
+	public static PlantJournalResponse from(PlantJournal plantJournal, List<JournalImage> images) {
 		return new PlantJournalResponse(
 				plantJournal.getId(),
 				plantJournal.getPlantProfile().getId(),
 				plantJournal.getPlantProfile().getPlantName(),
 				plantJournal.getUser().getId(),
 				plantJournal.getContent(),
-				plantJournal.getImageUrl(),
-				plantJournal.getImageHash(),
 				plantJournal.getWrittenDate(),
 				plantJournal.getCreatedAt(),
 				plantJournal.getUpdatedAt(),
-				plantJournal.getDeletedAt()
+				plantJournal.getDeletedAt(),
+				images.stream().map(JournalImageResponse::from).toList()
 		);
 	}
 }

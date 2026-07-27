@@ -21,8 +21,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(name = "plant_journals", indexes = {
 		@Index(name = "idx_plant_journal_user_id_written_date", columnList = "user_id, written_date"),
-		@Index(name = "idx_plant_journal_profile_id_written_date", columnList = "plant_profile_id, written_date"),
-		@Index(name = "idx_plant_journal_user_id_image_hash_written_date", columnList = "user_id, image_hash, written_date")
+		@Index(name = "idx_plant_journal_profile_id_written_date", columnList = "plant_profile_id, written_date")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -37,14 +36,8 @@ public class PlantJournal extends BaseEntity {
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
-	@Column(nullable = false, length = 2000)
+	@Column(length = 2000)
 	private String content;
-
-	@Column(name = "image_url", nullable = false, length = 500)
-	private String imageUrl;
-
-	@Column(name = "image_hash", nullable = false, length = 64)
-	private String imageHash;
 
 	@Column(name = "written_date", nullable = false)
 	private LocalDate writtenDate;
@@ -57,4 +50,27 @@ public class PlantJournal extends BaseEntity {
 
 	@Column(name = "deleted_at")
 	private LocalDateTime deletedAt;
+
+	public static PlantJournal create(User user, PlantProfile plantProfile, String content, LocalDate writtenDate) {
+		LocalDateTime now = LocalDateTime.now();
+		return PlantJournal.builder()
+				.user(user)
+				.plantProfile(plantProfile)
+				.content(content)
+				.writtenDate(writtenDate)
+				.createdAt(now)
+				.updatedAt(now)
+				.build();
+	}
+
+	public void updateContent(String content) {
+		if (content != null) {
+			this.content = content;
+		}
+		this.updatedAt = LocalDateTime.now();
+	}
+
+	public void softDelete(LocalDateTime now) {
+		this.deletedAt = now;
+	}
 }
