@@ -41,7 +41,7 @@ class CardControllerTest {
 	void anonymousCardListReturnsCardsWithoutOwnedCount() throws Exception {
 		given(cardService.getCards(null)).willReturn(List.of(cardResponse(null)));
 
-		mockMvc.perform(get("/api/v1/cards"))
+		mockMvc.perform(get("/api/v1/card"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.success").value(true))
 				.andExpect(jsonPath("$.data[0].id").value(1))
@@ -57,7 +57,7 @@ class CardControllerTest {
 		given(cardService.getCard(404L, null))
 				.willThrow(new BusinessException(ErrorCode.CARD_NOT_FOUND));
 
-		mockMvc.perform(get("/api/v1/cards/404"))
+		mockMvc.perform(get("/api/v1/card/404"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("CARD_NOT_FOUND"))
 				.andExpect(jsonPath("$.message").value("카드를 찾을 수 없습니다."));
@@ -65,14 +65,14 @@ class CardControllerTest {
 
 	@Test
 	void cardDetailRejectsNonNumericCardId() throws Exception {
-		mockMvc.perform(get("/api/v1/cards/not-a-number"))
+		mockMvc.perform(get("/api/v1/card/not-a-number"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
 	}
 
 	@Test
 	void cardDetailRejectsNonPositiveCardId() throws Exception {
-		mockMvc.perform(get("/api/v1/cards/0"))
+		mockMvc.perform(get("/api/v1/card/0"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
 	}
