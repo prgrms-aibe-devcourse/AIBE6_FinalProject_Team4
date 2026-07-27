@@ -49,6 +49,7 @@ public enum ErrorCode {
 	EXCHANGE_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 처리할 수 없는 교환 신청입니다."),
 
 	POINT_INSUFFICIENT_BALANCE(HttpStatus.UNPROCESSABLE_CONTENT, "사용 가능한 포인트가 부족합니다."),
+	POINT_WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "포인트 지갑을 찾을 수 없습니다."),
 
 	PAYMENT_DECLINED(HttpStatus.UNPROCESSABLE_CONTENT, "결제가 거절되었습니다."),
 	PAYMENT_PROVIDER_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "결제 대행사로부터 올바르지 않은 응답을 받았습니다."),

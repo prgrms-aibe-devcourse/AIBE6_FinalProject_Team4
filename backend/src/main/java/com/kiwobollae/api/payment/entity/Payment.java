@@ -4,6 +4,7 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
 import com.kiwobollae.api.payment.entity.enums.PaymentProvider;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +14,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -22,10 +24,18 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "payments", indexes = {
-		@Index(name = "idx_payment_user_id_created_at", columnList = "user_id, created_at"),
-		@Index(name = "idx_payment_status", columnList = "status")
-})
+@Table(name = "payments",
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uq_payments_provider_order_id", columnNames = "provider_order_id"),
+				@UniqueConstraint(name = "uq_payments_payment_key", columnNames = "payment_key")
+		},
+		indexes = {
+				@Index(name = "idx_payment_user_id_created_at", columnList = "user_id, created_at"),
+				@Index(name = "idx_payment_status", columnList = "status")
+		})
+// JPA Auditing에 더해 DB 레벨 ON UPDATE 안전망(공용 BaseTimeEntity는 건드리지 않고 override).
+@AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
+		columnDefinition = "datetime default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -53,24 +63,13 @@ public class Payment extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private PaymentProvider provider;
 
-	@Column(name = "provider_order_id", nullable = false, unique = true, length = 100)
+	@Column(name = "provider_order_id", nullable = false, length = 100)
 	private String providerOrderId;
 
-	@Column(name = "payment_key", unique = true, length = 200)
+	// 승인 전에는 null(다건 허용). UNIQUE는 @Table에서 명명 제약으로 관리.
+	@Column(name = "payment_key", length = 200)
 	private String providerPaymentKey;
-
-	@Column(name = "failure_code", length = 100)
-	private String failureCode;
-
-	@Column(name = "failure_message", length = 500)
-	private String failureMessage;
 
 	@Column(name = "approved_at")
 	private LocalDateTime approvedAt;
-
-	@Column(name = "failed_at")
-	private LocalDateTime failedAt;
-
-	@Column(name = "canceled_at")
-	private LocalDateTime canceledAt;
 }

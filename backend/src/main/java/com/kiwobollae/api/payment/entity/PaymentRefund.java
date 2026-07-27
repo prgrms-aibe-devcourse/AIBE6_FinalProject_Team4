@@ -11,20 +11,26 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
-/** Has richer timestamp semantics (requested_at/completed_at/failed_at) so it does not extend BaseTimeEntity. */
+// 최종 ERD 기준 로그성 레코드: created_at/completed_at만(updated_at 없음). 환불 멱등은 공통 idempotency_keys 테이블로.
 @Getter
 @Entity
-@Table(name = "payment_refunds", indexes = {
-		@Index(name = "idx_payment_refund_payment_id_requested_at", columnList = "payment_id, requested_at"),
-		@Index(name = "idx_payment_refund_status", columnList = "status")
-})
+@Table(name = "payment_refunds",
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uq_payment_refunds_refund_key", columnNames = "refund_key")
+		},
+		indexes = {
+				@Index(name = "idx_payment_refund_payment_id_created_at", columnList = "payment_id, created_at"),
+				@Index(name = "idx_payment_refund_status", columnList = "status")
+		})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -44,27 +50,17 @@ public class PaymentRefund extends BaseEntity {
 	@Column(nullable = false, length = 20)
 	private PaymentRefundStatus status;
 
-	@Column(name = "provider_refund_key", unique = true, length = 200)
-	private String providerRefundKey;
-
-	@Column(name = "idempotency_key", nullable = false, unique = true, length = 100)
-	private String idempotencyKey;
-
 	@Column(length = 200)
 	private String reason;
 
-	@Column(name = "failure_code", length = 100)
-	private String failureCode;
+	// PG 환불키. UNIQUE는 @Table에서 명명 제약으로 관리(승인 전 null 다건 허용).
+	@Column(name = "refund_key", length = 200)
+	private String refundKey;
 
-	@Column(name = "failure_message", length = 500)
-	private String failureMessage;
-
-	@Column(name = "requested_at", nullable = false)
-	private LocalDateTime requestedAt;
+	@CreationTimestamp
+	@Column(name = "created_at", nullable = false, updatable = false)
+	private LocalDateTime createdAt;
 
 	@Column(name = "completed_at")
 	private LocalDateTime completedAt;
-
-	@Column(name = "failed_at")
-	private LocalDateTime failedAt;
 }

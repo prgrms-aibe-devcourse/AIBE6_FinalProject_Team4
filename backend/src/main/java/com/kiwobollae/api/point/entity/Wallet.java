@@ -2,12 +2,15 @@ package com.kiwobollae.api.point.entity;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,14 +19,24 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "wallets")
+// 유상(paid_point)은 실결제 자산이라 음수 불가. free_point는 CLAWBACK으로 음수 허용 → CHECK 없음.
+@Table(name = "wallets",
+		uniqueConstraints = {
+				@UniqueConstraint(name = "uq_wallets_user_id", columnNames = "user_id")
+		},
+		check = {
+				@CheckConstraint(name = "chk_wallets_paid_point", constraint = "paid_point >= 0")
+		})
+// JPA Auditing(@LastModifiedDate)에 더해 DB 레벨 ON UPDATE 안전망까지 둔다(공용 BaseTimeEntity는 건드리지 않고 override).
+@AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
+		columnDefinition = "datetime default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
 public class Wallet extends BaseTimeEntity {
 
 	@OneToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id", nullable = false, unique = true)
+	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
 	@Column(name = "paid_point", nullable = false)
@@ -32,6 +45,20 @@ public class Wallet extends BaseTimeEntity {
 	@Column(name = "free_point", nullable = false)
 	private Long freePoint;
 
-	@Column(nullable = false)
-	private Long version;
+	/** Applies a signed delta to the paid balance and returns the new balance. paid는 음수 불가(호출부가 검증). */
+	public long increasePaidPoint(long delta) {
+		this.paidPoint += delta;
+		return this.paidPoint;
+	}
+
+	/** Applies a signed delta to the free balance and returns the new balance. free는 회수(CLAWBACK)로 음수 허용. */
+	public long increaseFreePoint(long delta) {
+		this.freePoint += delta;
+		return this.freePoint;
+	}
+
+	/** 화면 표시용 합산 잔액(정책 #2: paid+free 합산만 노출). */
+	public long totalBalance() {
+		return this.paidPoint + this.freePoint;
+	}
 }

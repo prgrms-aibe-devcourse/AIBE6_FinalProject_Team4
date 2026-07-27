@@ -12,6 +12,7 @@ import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
+import com.kiwobollae.api.point.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class AuthService {
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider jwtTokenProvider;
+	private final WalletService walletService;
 
 	@Transactional
 	public UserResponse signup(SignupRequest request) {
@@ -47,7 +49,9 @@ public class AuthService {
 				.status(UserStatus.ACTIVE)
 				.build();
 
-		return UserResponse.from(userRepository.save(user));
+		User savedUser = userRepository.save(user);
+		walletService.createWallet(savedUser); // POINT-10: 가입 트랜잭션에서 지갑 자동 생성
+		return UserResponse.from(savedUser);
 	}
 
 	public LoginResponse login(LoginRequest request) {

@@ -16,11 +16,7 @@ public record PaymentResponse(
 		PaymentProvider provider,
 		String providerOrderId,
 		String providerPaymentKey,
-		String failureCode,
-		String failureMessage,
 		LocalDateTime approvedAt,
-		LocalDateTime failedAt,
-		LocalDateTime canceledAt,
 		LocalDateTime createdAt
 ) {
 	public static PaymentResponse from(Payment payment) {
@@ -35,11 +31,7 @@ public record PaymentResponse(
 				payment.getProvider(),
 				payment.getProviderOrderId(),
 				payment.getProviderPaymentKey(),
-				payment.getFailureCode(),
-				payment.getFailureMessage(),
 				payment.getApprovedAt(),
-				payment.getFailedAt(),
-				payment.getCanceledAt(),
 				payment.getCreatedAt()
 		);
 	}
