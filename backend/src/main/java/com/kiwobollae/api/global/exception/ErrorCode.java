@@ -52,7 +52,13 @@ public enum ErrorCode {
 
 	PAYMENT_DECLINED(HttpStatus.UNPROCESSABLE_CONTENT, "결제가 거절되었습니다."),
 	PAYMENT_PROVIDER_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "결제 대행사로부터 올바르지 않은 응답을 받았습니다."),
-	PAYMENT_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "결제 대행사를 일시적으로 사용할 수 없습니다.");
+	PAYMENT_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "결제 대행사를 일시적으로 사용할 수 없습니다."),
+
+	// --- Content 도메인: 식물 프로필 / 성장 일지 (팀 컨벤션에 따라 메시지 구분 대신 전용 코드 사용) ---
+	PLANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 프로필을 찾을 수 없습니다."),
+	PLANT_SPECIES_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 종을 찾을 수 없습니다."),
+	JOURNAL_NOT_FOUND(HttpStatus.NOT_FOUND, "성장 일지를 찾을 수 없습니다."),
+	JOURNAL_DUPLICATE_IMAGE(HttpStatus.UNPROCESSABLE_CONTENT, "같은 날 이미 사용한 사진입니다.");
 
 	private final HttpStatus httpStatus;
 	private final String defaultMessage;
