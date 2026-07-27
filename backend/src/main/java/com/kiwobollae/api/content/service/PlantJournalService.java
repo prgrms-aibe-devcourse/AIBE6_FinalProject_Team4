@@ -4,6 +4,7 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
+import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.content.entity.JournalCompletionLog;
 import com.kiwobollae.api.content.entity.JournalImage;
@@ -16,6 +17,7 @@ import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
@@ -82,6 +84,42 @@ public class PlantJournalService {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
 		return PlantJournalResponse.from(journal, journalImageRepository.findByJournalId(journalId));
+	}
+
+	@Transactional
+	public PlantJournalResponse updateJournal(Long userId, Long journalId, PlantJournalUpdateRequest request) {
+		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		validateRepresentative(request.images());
+		journal.updateContent(request.content());
+
+		// 이미지 전체 교체: 기존 이미지를 먼저 지우고(같은 사진 유지 시 자기 자신과의 중복 오탐 방지),
+		// 원래 작성일 기준으로 중복검사한 뒤 새 이미지를 저장한다. 사진은 수정 불가가 아니라 전체 교체한다.
+		journalImageRepository.deleteByJournalId(journalId);
+		LocalDate writtenDate = journal.getWrittenDate();
+		checkDuplicateImages(userId, request.images(), writtenDate);
+
+		User user = userRepository.getReferenceById(userId);
+		List<JournalImage> images = request.images().stream()
+				.map(img -> JournalImage.create(journal, user, img.imageUrl(), img.imageHash(),
+						img.representative(), writtenDate))
+				.toList();
+		journalImageRepository.saveAll(images);
+		return PlantJournalResponse.from(journal, images);
+	}
+
+	@Transactional
+	public void deleteJournal(Long userId, Long journalId) {
+		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		journal.softDelete(LocalDateTime.now(KST));
+
+		// 자정 기준 회수: 완료 일지를 같은 날(KST)에 삭제하면 보상 마커를 REVOKED로 전환한다.
+		// 완료 로그 자체는 남기며, 실제 포인트 회수와 재획득 가능 여부는 point 도메인이 판단한다.
+		if (journal.getWrittenDate().equals(LocalDate.now(KST))) {
+			journalCompletionLogRepository.findByJournalId(journalId)
+					.ifPresent(JournalCompletionLog::markRevoked);
+		}
 	}
 
 	// 페이지에 담긴 일지들의 이미지를 한 번에 로딩해 journalId로 묶는다 (개별 조회로 인한 N+1 방지).
