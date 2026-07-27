@@ -22,7 +22,6 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -166,13 +165,12 @@ public class PlantJournalService {
 	}
 
 	private void checkDuplicateImages(Long userId, List<JournalImageRequest> images, LocalDate writtenDate) {
-		Set<String> seenHashes = new HashSet<>();
-		for (JournalImageRequest image : images) {
-			boolean duplicatedInRequest = !seenHashes.add(image.imageHash());
-			if (duplicatedInRequest
-					|| journalImageRepository.existsDuplicate(userId, image.imageHash(), writtenDate)) {
-				throw new BusinessException(ErrorCode.JOURNAL_DUPLICATE_IMAGE);
-			}
+		List<String> hashes = images.stream().map(JournalImageRequest::imageHash).toList();
+		boolean duplicatedInRequest = new HashSet<>(hashes).size() != hashes.size();
+		// 건당 조회 대신 해시 리스트를 한 번에 IN 조회해 이미 저장된 것이 있는지 확인한다.
+		boolean duplicatedInStorage = !journalImageRepository.findExistingHashes(userId, hashes, writtenDate).isEmpty();
+		if (duplicatedInRequest || duplicatedInStorage) {
+			throw new BusinessException(ErrorCode.JOURNAL_DUPLICATE_IMAGE);
 		}
 	}
 }

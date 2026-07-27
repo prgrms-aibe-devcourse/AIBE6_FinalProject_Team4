@@ -16,9 +16,10 @@ public interface JournalImageRepository extends JpaRepository<JournalImage, Long
 			+ "(select j.id from PlantJournal j where j.plantProfile.id = :profileId)")
 	int deleteAllByProfileId(@Param("profileId") Long profileId);
 
-	@Query("select (count(i) > 0) from JournalImage i "
-			+ "where i.user.id = :userId and i.imageHash = :imageHash and i.writtenDate = :writtenDate")
-	boolean existsDuplicate(@Param("userId") Long userId, @Param("imageHash") String imageHash,
+	// 요청에 담긴 해시들 중 이미 저장된 것만 골라 반환한다 (건당 조회 대신 한 번에 IN 조회).
+	@Query("select i.imageHash from JournalImage i "
+			+ "where i.user.id = :userId and i.imageHash in :imageHashes and i.writtenDate = :writtenDate")
+	List<String> findExistingHashes(@Param("userId") Long userId, @Param("imageHashes") Collection<String> imageHashes,
 			@Param("writtenDate") LocalDate writtenDate);
 
 	List<JournalImage> findByJournalId(Long journalId);
