@@ -50,4 +50,25 @@ public class PlantJournal extends BaseEntity {
 
 	@Column(name = "deleted_at")
 	private LocalDateTime deletedAt;
+
+	public static PlantJournal create(User user, PlantProfile plantProfile, String content, LocalDate writtenDate) {
+		LocalDateTime now = LocalDateTime.now();
+		return PlantJournal.builder()
+				.user(user)
+				.plantProfile(plantProfile)
+				.content(content)
+				.writtenDate(writtenDate)
+				.createdAt(now)
+				.updatedAt(now)
+				.build();
+	}
+
+	public void updateContent(String content) {
+		this.content = content;
+		this.updatedAt = LocalDateTime.now();
+	}
+
+	public void softDelete(LocalDateTime now) {
+		this.deletedAt = now;
+	}
 }

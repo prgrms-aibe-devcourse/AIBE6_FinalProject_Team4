@@ -54,4 +54,17 @@ public class JournalImage extends BaseEntity {
 
 	@Column(name = "updated_at")
 	private LocalDateTime updatedAt;
+
+	public static JournalImage create(PlantJournal journal, User user, String imageUrl,
+			String imageHash, boolean representative, LocalDate writtenDate) {
+		return JournalImage.builder()
+				.journal(journal)
+				.user(user)
+				.imageUrl(imageUrl)
+				.imageHash(imageHash)
+				.representative(representative)
+				.writtenDate(writtenDate)
+				.createdAt(LocalDateTime.now())
+				.build();
+	}
 }
