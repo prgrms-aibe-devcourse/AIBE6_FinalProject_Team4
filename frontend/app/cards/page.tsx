@@ -153,7 +153,10 @@ export default function Cards() {
                         보유 {card.ownedCount} / 필요 {card.requiredCountForExchange}
                       </span>
                     )}
-                    <PointPrice value={card.pointPrice} size="sm" />
+                    <span className="flex items-center gap-1 text-xs font-bold text-sub">
+                      1장당
+                      <PointPrice value={card.pointPrice} size="sm" />
+                    </span>
                   </div>
                   {card.ownedCount !== null && (
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0e6]">

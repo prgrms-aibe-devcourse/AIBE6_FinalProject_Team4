@@ -128,7 +128,10 @@ export default function CardDetail({ params }: { params: { id: string } }) {
         </div>
         <div>
           <h1 className="mb-1.5 text-[28px] font-extrabold">{card.name}</h1>
-          <PointPrice value={card.pointPrice} size="lg" className="mb-3" />
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-sm font-bold text-sub">1장당</span>
+            <PointPrice value={card.pointPrice} size="lg" />
+          </div>
           <p className="mb-5 text-[14.5px] leading-[1.7] text-[#6d7a68]">
             {card.description || '카드 설명을 준비하고 있어요.'}
           </p>
