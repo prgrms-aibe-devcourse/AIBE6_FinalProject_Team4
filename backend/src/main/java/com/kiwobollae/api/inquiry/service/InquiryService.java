@@ -1,6 +1,6 @@
-package com.kiwobollae.api.content.service;
+package com.kiwobollae.api.inquiry.service;
 
-import com.kiwobollae.api.content.repository.InquiryRepository;
+import com.kiwobollae.api.inquiry.repository.InquiryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

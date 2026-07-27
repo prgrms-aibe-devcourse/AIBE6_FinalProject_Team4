@@ -1,6 +1,6 @@
-package com.kiwobollae.api.content.dto.request;
+package com.kiwobollae.api.inquiry.dto.request;
 
-import com.kiwobollae.api.content.entity.enums.InquiryCategory;
+import com.kiwobollae.api.inquiry.entity.enums.InquiryCategory;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

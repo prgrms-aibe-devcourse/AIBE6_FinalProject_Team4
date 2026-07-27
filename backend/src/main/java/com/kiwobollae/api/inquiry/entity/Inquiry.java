@@ -1,8 +1,8 @@
-package com.kiwobollae.api.content.entity;
+package com.kiwobollae.api.inquiry.entity;
 
+import com.kiwobollae.api.inquiry.entity.enums.InquiryCategory;
+import com.kiwobollae.api.inquiry.entity.enums.InquiryStatus;
 import com.kiwobollae.api.auth.entity.User;
-import com.kiwobollae.api.content.entity.enums.InquiryCategory;
-import com.kiwobollae.api.content.entity.enums.InquiryStatus;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

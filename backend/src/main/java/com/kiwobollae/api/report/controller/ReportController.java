@@ -1,6 +1,6 @@
-package com.kiwobollae.api.content.controller;
+package com.kiwobollae.api.report.controller;
 
-import com.kiwobollae.api.content.service.ReportService;
+import com.kiwobollae.api.report.service.ReportService;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

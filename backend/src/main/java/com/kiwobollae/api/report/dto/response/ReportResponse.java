@@ -1,8 +1,8 @@
-package com.kiwobollae.api.content.dto.response;
+package com.kiwobollae.api.report.dto.response;
 
-import com.kiwobollae.api.content.entity.Report;
-import com.kiwobollae.api.content.entity.enums.ReportStatus;
-import com.kiwobollae.api.content.entity.enums.ReportTargetType;
+import com.kiwobollae.api.report.entity.Report;
+import com.kiwobollae.api.report.entity.enums.ReportStatus;
+import com.kiwobollae.api.report.entity.enums.ReportTargetType;
 import java.time.LocalDateTime;
 
 public record ReportResponse(

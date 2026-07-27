@@ -1,6 +1,6 @@
-package com.kiwobollae.api.content.controller;
+package com.kiwobollae.api.inquiry.controller;
 
-import com.kiwobollae.api.content.service.InquiryService;
+import com.kiwobollae.api.inquiry.service.InquiryService;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

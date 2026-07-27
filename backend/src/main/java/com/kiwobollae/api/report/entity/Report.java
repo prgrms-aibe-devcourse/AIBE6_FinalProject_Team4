@@ -1,8 +1,8 @@
-package com.kiwobollae.api.content.entity;
+package com.kiwobollae.api.report.entity;
 
+import com.kiwobollae.api.report.entity.enums.ReportStatus;
+import com.kiwobollae.api.report.entity.enums.ReportTargetType;
 import com.kiwobollae.api.auth.entity.User;
-import com.kiwobollae.api.content.entity.enums.ReportStatus;
-import com.kiwobollae.api.content.entity.enums.ReportTargetType;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

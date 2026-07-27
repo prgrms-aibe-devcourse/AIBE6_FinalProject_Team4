@@ -1,6 +1,6 @@
-package com.kiwobollae.api.content.service;
+package com.kiwobollae.api.report.service;
 
-import com.kiwobollae.api.content.repository.ReportRepository;
+import com.kiwobollae.api.report.repository.ReportRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

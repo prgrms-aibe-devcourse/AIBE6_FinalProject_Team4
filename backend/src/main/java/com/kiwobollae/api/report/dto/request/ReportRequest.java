@@ -1,6 +1,6 @@
-package com.kiwobollae.api.content.dto.request;
+package com.kiwobollae.api.report.dto.request;
 
-import com.kiwobollae.api.content.entity.enums.ReportTargetType;
+import com.kiwobollae.api.report.entity.enums.ReportTargetType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
