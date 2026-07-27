@@ -7,6 +7,7 @@ import com.kiwobollae.api.global.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -34,6 +35,10 @@ public class SecurityConfig {
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(ApiVersion.V1 + "/auth/**").permitAll()
+						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/product").permitAll()
+						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/product/**").permitAll()
+						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/cards").permitAll()
+						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/cards/**").permitAll()
 						.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
 						.anyRequest().authenticated()
 				)
