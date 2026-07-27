@@ -8,15 +8,17 @@ public record JournalCompletionLogResponse(
 		Long userId,
 		Long plantProfileId,
 		Long plantJournalId,
-		LocalDate completionDate
+		LocalDate completionDate,
+		String plantNicknameSnapshot
 ) {
 	public static JournalCompletionLogResponse from(JournalCompletionLog journalCompletionLog) {
 		return new JournalCompletionLogResponse(
 				journalCompletionLog.getId(),
 				journalCompletionLog.getUser().getId(),
-				journalCompletionLog.getPlantProfile().getId(),
-				journalCompletionLog.getPlantJournal().getId(),
-				journalCompletionLog.getCompletionDate()
+				journalCompletionLog.getPlantProfile() != null ? journalCompletionLog.getPlantProfile().getId() : null,
+				journalCompletionLog.getPlantJournal() != null ? journalCompletionLog.getPlantJournal().getId() : null,
+				journalCompletionLog.getCompletionDate(),
+				journalCompletionLog.getPlantNicknameSnapshot()
 		);
 	}
 }

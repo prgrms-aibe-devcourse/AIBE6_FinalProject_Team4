@@ -19,7 +19,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "journal_completion_log", indexes = {
-		@Index(name = "idx_journal_completion_log_user_id_completion_date", columnList = "user_id, completion_date", unique = true)
+		@Index(name = "idx_journal_completion_log_user_id_completion_date", columnList = "user_id, completion_date", unique = true),
+		@Index(name = "idx_journal_completion_log_plant_profile_id", columnList = "plant_profile_id")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -31,13 +32,16 @@ public class JournalCompletionLog extends BaseEntity {
 	private User user;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "plant_profile_id", nullable = false)
+	@JoinColumn(name = "plant_profile_id")
 	private PlantProfile plantProfile;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "plant_journal_id", nullable = false)
+	@JoinColumn(name = "plant_journal_id")
 	private PlantJournal plantJournal;
 
 	@Column(name = "completion_date", nullable = false)
 	private LocalDate completionDate;
+
+	@Column(name = "plant_nickname_snapshot", length = 50)
+	private String plantNicknameSnapshot;
 }

@@ -14,8 +14,7 @@ public record PlantProfileResponse(
 		LocalDate startDate,
 		String thumbnailUrl,
 		PlantStatus status,
-		LocalDateTime createdAt,
-		LocalDateTime archivedAt
+		LocalDateTime createdAt
 ) {
 	public static PlantProfileResponse from(PlantProfile plantProfile) {
 		return new PlantProfileResponse(
@@ -27,8 +26,7 @@ public record PlantProfileResponse(
 				plantProfile.getStartDate(),
 				plantProfile.getPlantImage(),
 				plantProfile.getStatus(),
-				plantProfile.getCreatedAt(),
-				plantProfile.getArchivedAt()
+				plantProfile.getCreatedAt()
 		);
 	}
 }
