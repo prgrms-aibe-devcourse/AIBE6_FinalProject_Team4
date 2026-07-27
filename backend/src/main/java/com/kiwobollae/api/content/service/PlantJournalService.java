@@ -19,8 +19,12 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +66,53 @@ public class PlantJournalService {
 			journalCompletionLogRepository.save(JournalCompletionLog.create(user, profile, journal, today));
 		}
 		return PlantJournalResponse.from(journal, images);
+	}
+
+	public Page<PlantJournalResponse> getJournals(Long userId, Long profileId, Integer year, Integer month,
+			Pageable pageable) {
+		DateRange range = resolveDateRange(year, month);
+		Page<PlantJournal> journalPage =
+				plantJournalRepository.search(userId, profileId, range.start(), range.end(), pageable);
+		Map<Long, List<JournalImage>> imagesByJournal = loadImagesByJournal(journalPage.getContent());
+		return journalPage.map(journal ->
+				PlantJournalResponse.from(journal, imagesByJournal.getOrDefault(journal.getId(), List.of())));
+	}
+
+	public PlantJournalResponse getJournal(Long userId, Long journalId) {
+		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		return PlantJournalResponse.from(journal, journalImageRepository.findByJournalId(journalId));
+	}
+
+	// 페이지에 담긴 일지들의 이미지를 한 번에 로딩해 journalId로 묶는다 (개별 조회로 인한 N+1 방지).
+	private Map<Long, List<JournalImage>> loadImagesByJournal(List<PlantJournal> journals) {
+		if (journals.isEmpty()) {
+			return Map.of();
+		}
+		List<Long> journalIds = journals.stream().map(PlantJournal::getId).toList();
+		return journalImageRepository.findByJournalIdIn(journalIds).stream()
+				.collect(Collectors.groupingBy(image -> image.getJournal().getId()));
+	}
+
+	// 날짜 필터를 조회 기간으로 변환한다. year 없으면 전체, year만 있으면 그 해, year+month면 그 달.
+	private DateRange resolveDateRange(Integer year, Integer month) {
+		if (year == null) {
+			if (month != null) {
+				throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "월 필터는 연도와 함께 사용해야 합니다.");
+			}
+			return new DateRange(null, null);
+		}
+		if (month == null) {
+			return new DateRange(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+		}
+		if (month < 1 || month > 12) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "월은 1~12 사이여야 합니다.");
+		}
+		LocalDate start = LocalDate.of(year, month, 1);
+		return new DateRange(start, start.withDayOfMonth(start.lengthOfMonth()));
+	}
+
+	private record DateRange(LocalDate start, LocalDate end) {
 	}
 
 	// 대표 이미지는 정확히 1장이어야 한다.
