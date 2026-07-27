@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -56,6 +57,19 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(AccessDeniedException.class)
 	public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException e, HttpServletRequest request) {
 		return respond(ErrorCode.AUTH_ACCESS_DENIED, null, null, null, request);
+	}
+
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e, HttpServletRequest request) {
+		// 유니크 제약 위반 등 DB 무결성 충돌. 대개 check-then-act 동시성 경쟁에서 발생하므로
+		// 클라이언트에는 재시도 가능한 409로 응답한다. 다만 코드 결함으로 인한 위반도 여기로 올 수
+		// 있으므로 원인 파악을 위해 traceId와 함께 로그를 남긴다.
+		String traceId = ErrorResponse.newTraceId();
+		log.warn("Data integrity violation [traceId={}] at {}", traceId, request.getRequestURI(), e);
+		ErrorResponse response = ErrorResponse.of(
+				ErrorCode.COMMON_DATA_CONFLICT, ErrorCode.COMMON_DATA_CONFLICT.getDefaultMessage(),
+				null, null, traceId, request.getRequestURI());
+		return ResponseEntity.status(ErrorCode.COMMON_DATA_CONFLICT.getHttpStatus()).body(response);
 	}
 
 	@ExceptionHandler(Exception.class)

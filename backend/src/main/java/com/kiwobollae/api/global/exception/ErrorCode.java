@@ -16,6 +16,7 @@ public enum ErrorCode {
 	COMMON_VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
 	COMMON_RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
 	COMMON_OPTIMISTIC_LOCK_CONFLICT(HttpStatus.CONFLICT, "다른 요청에 의해 데이터가 변경되었습니다. 최신 상태를 다시 조회해 주세요."),
+	COMMON_DATA_CONFLICT(HttpStatus.CONFLICT, "데이터 제약 조건에 의해 요청이 충돌했습니다. 잠시 후 다시 시도해 주세요."),
 	COMMON_IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "동일한 키로 다른 내용의 요청이 이미 존재합니다."),
 	COMMON_UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type입니다."),
 	COMMON_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),

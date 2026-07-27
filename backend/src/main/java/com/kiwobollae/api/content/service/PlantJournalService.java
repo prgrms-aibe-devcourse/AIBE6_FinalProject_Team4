@@ -112,11 +112,12 @@ public class PlantJournalService {
 	public void deleteJournal(Long userId, Long journalId) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
-		journal.softDelete(LocalDateTime.now(KST));
+		LocalDateTime now = LocalDateTime.now(KST);
+		journal.softDelete(now);
 
 		// 자정 기준 회수: 완료 일지를 같은 날(KST)에 삭제하면 보상 마커를 REVOKED로 전환한다.
 		// 완료 로그 자체는 남기며, 실제 포인트 회수와 재획득 가능 여부는 point 도메인이 판단한다.
-		if (journal.getWrittenDate().equals(LocalDate.now(KST))) {
+		if (journal.getWrittenDate().equals(now.toLocalDate())) {
 			journalCompletionLogRepository.findByJournalId(journalId)
 					.ifPresent(JournalCompletionLog::markRevoked);
 		}
@@ -139,6 +140,9 @@ public class PlantJournalService {
 				throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "월 필터는 연도와 함께 사용해야 합니다.");
 			}
 			return new DateRange(null, null);
+		}
+		if (year < 1970 || year > 9999) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "연도가 올바르지 않습니다.");
 		}
 		if (month == null) {
 			return new DateRange(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
