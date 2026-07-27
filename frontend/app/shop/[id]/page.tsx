@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api';
+import { withTopicParticle } from '@/lib/korean';
 import { getProduct, ProductDetail as ProductDetailData } from '@/lib/product-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
@@ -19,12 +20,6 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (!state.accessToken) {
-      setError('상품을 보려면 먼저 로그인해 주세요.');
-      setLoading(false);
-      return;
-    }
     if (!Number.isInteger(productId) || productId < 1) {
       setError('잘못된 상품 주소예요.');
       setLoading(false);
@@ -35,7 +30,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
     setLoading(true);
     setError('');
 
-    getProduct(productId, state.accessToken, controller.signal)
+    getProduct(productId, undefined, controller.signal)
       .then(setProduct)
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
@@ -51,7 +46,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
       });
 
     return () => controller.abort();
-  }, [hydrated, productId, state.accessToken]);
+  }, [productId]);
 
   if (loading) {
     return (
@@ -69,10 +64,10 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
           <p>{error || '상품을 찾을 수 없어요.'}</p>
           <Link
-            href={state.accessToken ? '/shop' : '/auth?view=login'}
+            href="/shop"
             className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white"
           >
-            {state.accessToken ? '상점으로 돌아가기' : '로그인하기'}
+            상점으로 돌아가기
           </Link>
         </div>
       </div>
@@ -80,11 +75,17 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
   }
 
   const addToCart = () => {
+    if (!hydrated || !state.accessToken) {
+      showToast('장바구니와 구매 기능은 로그인 후 이용할 수 있어요.', 'err');
+      return false;
+    }
     if (qty > product.stock) {
-      return showToast(`지금은 최대 ${product.stock}개까지 담을 수 있어요.`, 'err');
+      showToast(`지금은 최대 ${product.stock}개까지 담을 수 있어요.`, 'err');
+      return false;
     }
     set((storeState) => ({ cartCount: storeState.cartCount + 1 }));
     showToast('장바구니에 담았어요 🛒');
+    return true;
   };
 
   return (
@@ -123,7 +124,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           {product.category === 'SEEDLING' && product.plantGuide && (
             <div className="mb-5 rounded-2xl bg-[#F6F9EF] px-[18px] py-4">
               <div className="mb-1.5 font-extrabold">
-                {product.plantGuide.name}는 이렇게 키워요 🌿
+                {withTopicParticle(product.plantGuide.name)} 이렇게 키워요 🌿
               </div>
               <p className="text-[13.5px] leading-[1.65] text-[#6d7a68]">
                 {product.plantGuide.careGuide || '식물 가이드를 준비하고 있어요.'}
@@ -172,8 +173,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
                 <button
                   type="button"
                   onClick={() => {
-                    addToCart();
-                    router.push('/checkout');
+                    if (addToCart()) router.push('/checkout');
                   }}
                   className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white"
                 >

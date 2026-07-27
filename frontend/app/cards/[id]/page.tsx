@@ -15,7 +15,7 @@ const CONFETTI = [
 
 export default function CardDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { balance, spend, set } = useStore();
+  const { state, hydrated, balance, spend, set } = useStore();
   const { showToast, askConfirm } = useUI();
   const id = Number(params.id);
   const base = CARDS.find((c) => c.id === id) || CARDS[0];
@@ -27,6 +27,10 @@ export default function CardDetail({ params }: { params: { id: string } }) {
   const ring = `conic-gradient(#7CB342 ${Math.min(360, (owned / base.required) * 360)}deg,#eef0e6 0)`;
 
   const buy = () => {
+    if (!hydrated || !state.accessToken) {
+      showToast('카드 구매는 로그인 후 이용할 수 있어요.', 'err');
+      return;
+    }
     if (total > balance) return showToast(`포인트가 ${fmt(total - balance)}P 부족해요.`, 'err');
     askConfirm({ icon: 'paid', title: '카드를 구매할까요?', ok: '구매하기',
       body: `${base.name} ${qty}장 · 총 ${fmt(total)}P를 사용해요. 무상 포인트가 먼저 사용돼요.`,

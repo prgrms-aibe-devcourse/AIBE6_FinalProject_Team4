@@ -45,7 +45,7 @@ export interface ProductDetail {
 }
 
 interface ProductListParams {
-  accessToken: string;
+  accessToken?: string | null;
   category?: ProductCategory;
   sort: ProductSort;
   page: number;
@@ -61,6 +61,8 @@ export function getProducts({
   size = 20,
   signal,
 }: ProductListParams): Promise<ProductPage> {
+  void accessToken;
+
   const query = new URLSearchParams({
     sort,
     page: String(page),
@@ -69,18 +71,18 @@ export function getProducts({
   if (category) query.set('category', category);
 
   return request<ProductPage>(`/api/v1/product?${query.toString()}`, {
-    accessToken,
     signal,
   });
 }
 
 export function getProduct(
   productId: number,
-  accessToken: string,
+  accessToken?: string | null,
   signal?: AbortSignal,
 ): Promise<ProductDetail> {
+  void accessToken;
+
   return request<ProductDetail>(`/api/v1/product/${productId}`, {
-    accessToken,
     signal,
   });
 }

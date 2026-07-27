@@ -10,7 +10,6 @@ import {
   ProductListItem,
   ProductSort,
 } from '@/lib/product-api';
-import { useStore } from '@/lib/store';
 
 const TABS = [
   { key: 'all', label: '전체' },
@@ -32,7 +31,6 @@ const SORT_QUERY: Record<string, ProductSort> = {
 };
 
 export default function Shop() {
-  const { state, hydrated } = useStore();
   const [cat, setCat] = useState('all');
   const [sort, setSort] = useState('new');
   const [page, setPage] = useState(0);
@@ -42,20 +40,11 @@ export default function Shop() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (!state.accessToken) {
-      setProducts([]);
-      setError('상품을 보려면 먼저 로그인해 주세요.');
-      setLoading(false);
-      return;
-    }
-
     const controller = new AbortController();
     setLoading(true);
     setError('');
 
     getProducts({
-      accessToken: state.accessToken,
       category: cat === 'all' ? undefined : (cat as ProductCategory),
       sort: SORT_QUERY[sort],
       page,
@@ -79,7 +68,7 @@ export default function Shop() {
       });
 
     return () => controller.abort();
-  }, [cat, hydrated, page, sort, state.accessToken]);
+  }, [cat, page, sort]);
 
   const changeCategory = (nextCategory: string) => {
     setCat(nextCategory);
@@ -111,14 +100,6 @@ export default function Shop() {
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">
           <p>{error}</p>
-          {!state.accessToken && (
-            <Link
-              href="/auth?view=login"
-              className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white"
-            >
-              로그인하기
-            </Link>
-          )}
         </div>
       ) : products.length === 0 ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
