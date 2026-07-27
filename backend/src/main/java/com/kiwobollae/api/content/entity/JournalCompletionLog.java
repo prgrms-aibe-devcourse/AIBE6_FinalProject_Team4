@@ -1,9 +1,12 @@
 package com.kiwobollae.api.content.entity;
 
 import com.kiwobollae.api.auth.entity.User;
+import com.kiwobollae.api.content.entity.enums.RewardStatus;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -19,8 +22,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "journal_completion_log", indexes = {
-		@Index(name = "idx_journal_completion_log_user_id_completion_date", columnList = "user_id, completion_date", unique = true),
-		@Index(name = "idx_journal_completion_log_plant_profile_id", columnList = "plant_profile_id")
+		@Index(name = "uq_journal_completion_log_plant_profile_id_completion_date",
+				columnList = "plant_profile_id, completion_date", unique = true)
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -41,6 +44,10 @@ public class JournalCompletionLog extends BaseEntity {
 
 	@Column(name = "completion_date", nullable = false)
 	private LocalDate completionDate;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "reward_status", nullable = false, length = 20)
+	private RewardStatus rewardStatus;
 
 	@Column(name = "plant_nickname_snapshot", length = 50)
 	private String plantNicknameSnapshot;
