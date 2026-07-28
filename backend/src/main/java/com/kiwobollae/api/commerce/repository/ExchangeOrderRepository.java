@@ -28,6 +28,10 @@ public interface ExchangeOrderRepository extends JpaRepository<ExchangeOrder, Lo
 			countQuery = "select count(eo) from ExchangeOrder eo where (:status is null or eo.status = :status)")
 	Page<ExchangeOrder> search(@Param("status") ExchangeStatus status, Pageable pageable);
 
+	@Query("select eo from ExchangeOrder eo join fetch eo.user join fetch eo.card "
+			+ "join fetch eo.exchangeProduct where eo.id = :id")
+	Optional<ExchangeOrder> findByIdWithDetails(@Param("id") Long id);
+
 	@Modifying
 	@Query("update ExchangeOrder eo set eo.status = :newStatus "
 			+ "where eo.id = :id and eo.status = :expectedStatus")
