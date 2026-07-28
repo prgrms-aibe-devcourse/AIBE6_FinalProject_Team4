@@ -1,4 +1,4 @@
-package com.kiwobollae.api.content.entity.enums;
+package com.kiwobollae.api.report.entity.enums;
 
 public enum ReportTargetType {
 	JOURNAL, USER

@@ -74,7 +74,7 @@ export default function Home() {
             <div className="text-lg font-extrabold text-[#6b5500]">교환 가능한 카드가 {state.readyCards}종 있어요!</div>
             <div className="text-[14.5px] text-gold-text">진짜 열매로 바꿔볼까요?</div>
           </div>
-          <Link href="/my/cards" className="rounded-xl bg-ink px-5 py-3 font-bold text-white transition-colors duration-150 hover:bg-[#2a332a] hover:text-white">교환하러 가기 🎉</Link>
+          <Link href="/cards?scope=mine" className="rounded-xl bg-ink px-5 py-3 font-bold text-white transition-colors duration-150 hover:bg-[#2a332a] hover:text-white">교환하러 가기 🎉</Link>
           {CONFETTI.map((c, i) => (
             <span
               key={i}

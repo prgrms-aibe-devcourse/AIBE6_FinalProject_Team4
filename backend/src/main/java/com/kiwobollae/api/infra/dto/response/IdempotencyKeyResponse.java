@@ -26,7 +26,7 @@ public record IdempotencyKeyResponse(
 				idempotencyKey.getStatus(),
 				idempotencyKey.getHttpStatus(),
 				idempotencyKey.getResponseSnapshot(),
-				idempotencyKey.getResponseExpiresAt(),
+				idempotencyKey.getExpiresAt(),
 				idempotencyKey.getCreatedAt()
 		);
 	}

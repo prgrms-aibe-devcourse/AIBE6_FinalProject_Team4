@@ -1,8 +1,8 @@
-package com.kiwobollae.api.content.entity;
+package com.kiwobollae.api.report.entity;
 
+import com.kiwobollae.api.report.entity.enums.ReportStatus;
+import com.kiwobollae.api.report.entity.enums.ReportTargetType;
 import com.kiwobollae.api.auth.entity.User;
-import com.kiwobollae.api.content.entity.enums.ReportStatus;
-import com.kiwobollae.api.content.entity.enums.ReportTargetType;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "report", indexes = {
-		@Index(name = "idx_report_reporter_target", columnList = "reporter_id, target_type, target_id", unique = true),
+		@Index(name = "idx_report_reporter_target_status", columnList = "reporter_id, target_type, target_id, status"),
 		@Index(name = "idx_report_status_created_at", columnList = "status, created_at")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -65,4 +65,16 @@ public class Report extends BaseEntity {
 
 	@Column(name = "processed_at")
 	private LocalDateTime processedAt;
+
+	public static Report create(User reporter, ReportTargetType targetType, Long targetId, String reason) {
+		return Report.builder()
+				.reporter(reporter)
+				.targetType(targetType)
+				.targetId(targetId)
+				.reason(reason)
+				.status(ReportStatus.PENDING)
+				.createdAt(LocalDateTime.now())
+				.build();
+	}
+
 }

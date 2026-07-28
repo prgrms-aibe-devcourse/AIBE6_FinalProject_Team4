@@ -18,14 +18,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
 @Entity
 @Table(name = "idempotency_keys", indexes = {
 		@Index(name = "idx_idempotency_key_user_api_client", columnList = "user_id, api_type, client_key", unique = true),
-		@Index(name = "idx_idempotency_key_response_expires_at", columnList = "response_expires_at")
+		@Index(name = "idx_idempotency_key_expires_at", columnList = "expires_at")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -36,10 +34,10 @@ public class IdempotencyKey extends BaseEntity {
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
-	@Column(name = "api_type", nullable = false, length = 40)
+	@Column(name = "api_type", nullable = false, length = 30)
 	private String apiType;
 
-	@Column(name = "client_key", nullable = false, length = 100)
+	@Column(name = "client_key", nullable = false, length = 64)
 	private String clientKey;
 
 	@Column(name = "request_hash", nullable = false, length = 64)
@@ -52,7 +50,7 @@ public class IdempotencyKey extends BaseEntity {
 	@Column(name = "http_status")
 	private Integer httpStatus;
 
-	@Column(name = "response_snapshot", columnDefinition = "text")
+	@Column(name = "response_snapshot", length = 4000)
 	private String responseSnapshot;
 
 	@Column(name = "resource_type", length = 30)
@@ -67,27 +65,25 @@ public class IdempotencyKey extends BaseEntity {
 	@Column(name = "response_expires_at")
 	private LocalDateTime responseExpiresAt;
 
-	@CreationTimestamp
+	@Column(name = "expires_at", nullable = false)
+	private LocalDateTime expiresAt;
+
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
 
-	@UpdateTimestamp
-	@Column(name = "updated_at", nullable = false)
-	private LocalDateTime updatedAt;
-
-	public void complete(int httpStatus, String responseSnapshot, String resourceType,
-			Long resourceId, LocalDateTime responseExpiresAt) {
+	public void succeed(
+			int statusCode,
+			String response,
+			String responseResourceType,
+			Long responseResourceId,
+			LocalDateTime now
+	) {
 		this.status = IdempotencyStatus.SUCCEEDED;
-		this.httpStatus = httpStatus;
-		this.responseSnapshot = responseSnapshot;
-		this.resourceType = resourceType;
-		this.resourceId = resourceId;
-		this.completedAt = LocalDateTime.now();
-		this.responseExpiresAt = responseExpiresAt;
-	}
-
-	public void fail() {
-		this.status = IdempotencyStatus.FAILED;
-		this.completedAt = LocalDateTime.now();
+		this.httpStatus = statusCode;
+		this.responseSnapshot = response;
+		this.resourceType = responseResourceType;
+		this.resourceId = responseResourceId;
+		this.completedAt = now;
+		this.responseExpiresAt = now.plusHours(24);
 	}
 }

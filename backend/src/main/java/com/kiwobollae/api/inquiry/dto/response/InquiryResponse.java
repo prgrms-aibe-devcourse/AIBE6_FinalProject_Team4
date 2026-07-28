@@ -1,8 +1,8 @@
-package com.kiwobollae.api.content.dto.response;
+package com.kiwobollae.api.inquiry.dto.response;
 
-import com.kiwobollae.api.content.entity.Inquiry;
-import com.kiwobollae.api.content.entity.enums.InquiryCategory;
-import com.kiwobollae.api.content.entity.enums.InquiryStatus;
+import com.kiwobollae.api.inquiry.entity.Inquiry;
+import com.kiwobollae.api.inquiry.entity.enums.InquiryCategory;
+import com.kiwobollae.api.inquiry.entity.enums.InquiryStatus;
 import java.time.LocalDateTime;
 
 public record InquiryResponse(

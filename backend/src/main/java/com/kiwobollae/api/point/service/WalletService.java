@@ -4,6 +4,7 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
+import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
@@ -39,6 +40,38 @@ public class WalletService {
 		Wallet wallet = walletRepository.findByUserId(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 		return WalletResponse.from(wallet);
+	}
+
+	/**
+	 * 구매 포인트를 무상 포인트부터 차감하고, 사용 통화별 원장을 같은 트랜잭션에 기록한다.
+	 */
+	@Transactional
+	public PointDeductionResult deductForPurchase(
+			Long userId,
+			long amount,
+			PointRefType refType,
+			Long refId
+	) {
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+
+		if (amount < 1 || wallet.totalBalance() < amount) {
+			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
+		}
+
+		long usedFreePoint = Math.min(Math.max(wallet.getFreePoint(), 0L), amount);
+		long usedPaidPoint = amount - usedFreePoint;
+
+		if (usedFreePoint > 0) {
+			long balanceAfter = wallet.increaseFreePoint(-usedFreePoint);
+			saveTransaction(wallet, CurrencyType.FREE, -usedFreePoint, balanceAfter, refType, refId);
+		}
+		if (usedPaidPoint > 0) {
+			long balanceAfter = wallet.increasePaidPoint(-usedPaidPoint);
+			saveTransaction(wallet, CurrencyType.PAID, -usedPaidPoint, balanceAfter, refType, refId);
+		}
+
+		return new PointDeductionResult(usedFreePoint, usedPaidPoint, wallet.totalBalance());
 	}
 
 	/**
@@ -81,5 +114,24 @@ public class WalletService {
 				.refId(refId)
 				.build();
 		return pointTransactionRepository.save(tx);
+	}
+
+	private void saveTransaction(
+			Wallet wallet,
+			CurrencyType currency,
+			long amount,
+			long balanceAfter,
+			PointRefType refType,
+			Long refId
+	) {
+		pointTransactionRepository.save(PointTransaction.builder()
+				.wallet(wallet)
+				.type(PointTxType.PURCHASE)
+				.currencyType(currency)
+				.amount(amount)
+				.balanceAfter(balanceAfter)
+				.refType(refType)
+				.refId(refId)
+				.build());
 	}
 }

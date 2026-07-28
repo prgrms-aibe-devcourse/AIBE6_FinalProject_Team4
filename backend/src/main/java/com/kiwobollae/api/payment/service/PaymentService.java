@@ -6,8 +6,8 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
-import com.kiwobollae.api.infra.service.IdempotencyService.StartResult;
 import com.kiwobollae.api.payment.dto.request.ChargeProductRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentConfirmRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRequest;
@@ -26,7 +26,11 @@ import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.PointCreditService;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -60,14 +64,15 @@ public class PaymentService {
 	@Transactional
 	public PaymentResponse requestCharge(Long userId, String idempotencyKey, PaymentRequest request) {
 		User user = userRepository.getReferenceById(userId);
-		StartResult idempotency = idempotencyService.start(
-				user,
+		validateIdempotencyKey(idempotencyKey);
+		IdempotencyExecution idempotency = idempotencyService.start(
+				userId,
 				CHARGE_API_TYPE,
 				idempotencyKey,
-				"chargeProductId=" + request.chargeProductId()
+				sha256("chargeProductId=" + request.chargeProductId())
 		);
 		if (idempotency.replay()) {
-			return readSnapshot(idempotency.responseSnapshot());
+			return readSnapshot(idempotency.key().getResponseSnapshot());
 		}
 
 		ChargeProduct chargeProduct = getAvailableChargeProduct(request.chargeProductId());
@@ -89,14 +94,15 @@ public class PaymentService {
 	@Transactional
 	public PaymentResponse confirmPayment(Long userId, String idempotencyKey, PaymentConfirmRequest request) {
 		User user = userRepository.getReferenceById(userId);
-		StartResult idempotency = idempotencyService.start(
-				user,
+		validateIdempotencyKey(idempotencyKey);
+		IdempotencyExecution idempotency = idempotencyService.start(
+				userId,
 				CONFIRM_API_TYPE,
 				idempotencyKey,
-				normalizedConfirmRequest(request)
+				sha256(normalizedConfirmRequest(request))
 		);
 		if (idempotency.replay()) {
-			return readSnapshot(idempotency.responseSnapshot());
+			return readSnapshot(idempotency.key().getResponseSnapshot());
 		}
 
 		Payment payment = paymentRepository
@@ -189,7 +195,7 @@ public class PaymentService {
 	}
 
 	private PaymentResponse finishWithoutCredit(Payment payment, PaymentStatus status, String paymentKey,
-			String message, StartResult idempotency) {
+			String message, IdempotencyExecution idempotency) {
 		changePendingStatus(payment.getId(), status, paymentKey, null);
 		PaymentResponse response = PaymentResponse.from(getPaymentDetails(payment.getId()), message);
 		completeIdempotency(idempotency, 200, response, payment.getId());
@@ -239,9 +245,26 @@ public class PaymentService {
 				+ "&scenario=" + request.scenario();
 	}
 
-	private void completeIdempotency(StartResult idempotency, int httpStatus,
+	private void validateIdempotencyKey(String idempotencyKey) {
+		if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 64) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+	}
+
+	private String sha256(String value) {
+		try {
+			return HexFormat.of().formatHex(
+					MessageDigest.getInstance("SHA-256")
+							.digest(value.getBytes(StandardCharsets.UTF_8))
+			);
+		} catch (NoSuchAlgorithmException exception) {
+			throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR);
+		}
+	}
+
+	private void completeIdempotency(IdempotencyExecution idempotency, int httpStatus,
 			PaymentResponse response, Long paymentId) {
-		idempotencyService.complete(
+		idempotencyService.succeed(
 				idempotency.key(),
 				httpStatus,
 				writeSnapshot(response),
