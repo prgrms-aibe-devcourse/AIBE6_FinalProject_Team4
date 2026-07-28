@@ -72,11 +72,4 @@ public class Inquiry extends BaseEntity {
 				.createdAt(LocalDateTime.now())
 				.build();
 	}
-
-	public void answer(User admin, String answerContent) {
-		this.answerAdmin = admin;
-		this.answerContent = answerContent;
-		this.answeredAt = LocalDateTime.now();
-		this.status = InquiryStatus.ANSWERED;
-	}
 }

@@ -12,6 +12,7 @@ import com.kiwobollae.api.report.entity.Report;
 import com.kiwobollae.api.report.entity.enums.ReportStatus;
 import com.kiwobollae.api.report.entity.enums.ReportTargetType;
 import com.kiwobollae.api.report.repository.ReportRepository;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +36,9 @@ public class ReportService {
 		if (!plantJournalService.existsActive(request.targetId())) {
 			throw new BusinessException(ErrorCode.JOURNAL_NOT_FOUND);
 		}
+		if (reportRepository.existsWithStatus(userId, request.targetType(), request.targetId(), ReportStatus.PENDING)) {
+			throw new BusinessException(ErrorCode.REPORT_DUPLICATE_PENDING);
+		}
 		User reporter = userRepository.getReferenceById(userId);
 		Report saved = reportRepository.save(
 				Report.create(reporter, request.targetType(), request.targetId(), request.reason()));
@@ -57,26 +61,30 @@ public class ReportService {
 
 	@Transactional
 	public ReportResponse completeReport(Long adminId, Long reportId, ReportActionRequest request) {
-		Report report = findPending(reportId);
-		User admin = userRepository.getReferenceById(adminId);
-		report.complete(admin, request.actionType(), request.actionDetail());
-		return ReportResponse.from(report);
+		return processReport(adminId, reportId, request, ReportStatus.COMPLETED);
 	}
 
 	@Transactional
 	public ReportResponse rejectReport(Long adminId, Long reportId, ReportActionRequest request) {
-		Report report = findPending(reportId);
-		User admin = userRepository.getReferenceById(adminId);
-		report.reject(admin, request.actionType(), request.actionDetail());
-		return ReportResponse.from(report);
+		return processReport(adminId, reportId, request, ReportStatus.REJECTED);
 	}
 
-	private Report findPending(Long reportId) {
-		Report report = reportRepository.findByIdWithReporter(reportId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
-		if (report.getStatus() != ReportStatus.PENDING) {
+	// PENDING인 경우에만 원자적으로 상태를 바꾸는 조건부 UPDATE. 두 관리자가 동시에 같은 건을
+	// 처리해도 WHERE절의 status 조건 때문에 둘 중 하나만 실제로 반영되고, 나머지는 0건 갱신으로
+	// 감지된다(check-then-act 경쟁 조건 없음).
+	private ReportResponse processReport(Long adminId, Long reportId, ReportActionRequest request,
+			ReportStatus newStatus) {
+		User admin = userRepository.getReferenceById(adminId);
+		int updated = reportRepository.updateStatusIfMatches(reportId, admin, request.actionType(),
+				request.actionDetail(), LocalDateTime.now(), newStatus, ReportStatus.PENDING);
+		if (updated == 0) {
+			if (!reportRepository.existsById(reportId)) {
+				throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
+			}
 			throw new BusinessException(ErrorCode.REPORT_INVALID_STATE);
 		}
-		return report;
+		Report report = reportRepository.findByIdWithReporter(reportId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.REPORT_NOT_FOUND));
+		return ReportResponse.from(report);
 	}
 }

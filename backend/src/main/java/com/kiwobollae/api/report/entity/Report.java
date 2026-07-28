@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "report", indexes = {
-		@Index(name = "idx_report_reporter_target", columnList = "reporter_id, target_type, target_id", unique = true),
+		@Index(name = "idx_report_reporter_target_status", columnList = "reporter_id, target_type, target_id, status"),
 		@Index(name = "idx_report_status_created_at", columnList = "status, created_at")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -77,19 +77,4 @@ public class Report extends BaseEntity {
 				.build();
 	}
 
-	public void complete(User admin, String actionType, String actionDetail) {
-		this.processedAdmin = admin;
-		this.actionType = actionType;
-		this.actionDetail = actionDetail;
-		this.processedAt = LocalDateTime.now();
-		this.status = ReportStatus.COMPLETED;
-	}
-
-	public void reject(User admin, String actionType, String actionDetail) {
-		this.processedAdmin = admin;
-		this.actionType = actionType;
-		this.actionDetail = actionDetail;
-		this.processedAt = LocalDateTime.now();
-		this.status = ReportStatus.REJECTED;
-	}
 }
