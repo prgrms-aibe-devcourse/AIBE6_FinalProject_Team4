@@ -17,19 +17,22 @@ interface RequireAuthProps {
 // Gates a route (and everything nested under it) behind login, and optionally a role.
 export default function RequireAuth({ children, role }: RequireAuthProps) {
   const router = useRouter();
-  const { state, hydrated } = useStore();
+  const { state, hydrated, authExpired } = useStore();
   const { showToast } = useUI();
   const forbidden = !!role && state.user?.role !== role;
 
   useEffect(() => {
     if (!hydrated) return;
     if (!state.authed) {
-      router.replace('/auth?view=login');
+      if (authExpired) {
+        showToast('로그인 시간이 만료되었어요. 다시 로그인해 주세요.', 'err');
+      }
+      router.replace(`/auth?view=login${authExpired ? '&reason=expired' : ''}`);
     } else if (forbidden) {
       showToast('접근 권한이 없어요.', 'err');
       router.replace('/');
     }
-  }, [hydrated, state.authed, forbidden, router, showToast]);
+  }, [authExpired, hydrated, state.authed, forbidden, router, showToast]);
 
   if (!hydrated || !state.authed || forbidden) return null;
   return <>{children}</>;

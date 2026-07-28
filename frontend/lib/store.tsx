@@ -2,7 +2,7 @@
 // 키워볼래 — shared cross-page store (React Context + localStorage persistence)
 // Mirrors the prototype store.js: single wallet, journal/plant/card counters.
 import { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
-import { ApiError } from '@/lib/api';
+import { ApiError, AUTH_EXPIRED_EVENT } from '@/lib/api';
 import { getWallet } from '@/features/point/api';
 
 const KEY = 'kwb_store_v1';
@@ -52,6 +52,7 @@ export type StorePatch = Partial<StoreState> | ((s: StoreState) => Partial<Store
 export interface StoreContextValue {
   state: StoreState;
   hydrated: boolean;
+  authExpired: boolean;
   walletLoading: boolean;
   walletLoaded: boolean;
   walletError: string | null;
@@ -97,10 +98,26 @@ const StoreCtx = createContext<StoreContextValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<StoreState>(DEFAULTS);
   const [hydrated, setHydrated] = useState(false);
+  const [authExpired, setAuthExpired] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
   const [walletLoaded, setWalletLoaded] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
   const walletRequestId = useRef(0);
+
+  const clearAuthentication = useCallback((expired: boolean) => {
+    walletRequestId.current += 1;
+    setWalletLoading(false);
+    setWalletLoaded(false);
+    setWalletError(null);
+    setAuthExpired(expired);
+    setState((s) => ({
+      ...s,
+      authed: false,
+      accessToken: null,
+      user: null,
+      wallet: EMPTY_WALLET,
+    }));
+  }, []);
 
   useEffect(() => {
     try {
@@ -114,6 +131,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try { localStorage.setItem(KEY, JSON.stringify({ ...state, wallet: EMPTY_WALLET })); } catch (e) {}
   }, [state, hydrated]);
+
+  useEffect(() => {
+    const handleAuthExpired = () => clearAuthentication(true);
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+  }, [clearAuthentication]);
 
   const refreshWallet = useCallback(async () => {
     const requestId = ++walletRequestId.current;
@@ -180,6 +203,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setWalletLoading(false);
     setWalletLoaded(false);
     setWalletError(null);
+    setAuthExpired(false);
     setState(DEFAULTS);
   }, []);
 
@@ -188,21 +212,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setWalletLoading(false);
     setWalletLoaded(false);
     setWalletError(null);
+    setAuthExpired(false);
     setState((s) => ({ ...s, authed: true, accessToken, user, wallet: EMPTY_WALLET }));
   }, []);
-  const logout = useCallback(() => {
-    walletRequestId.current += 1;
-    setWalletLoading(false);
-    setWalletLoaded(false);
-    setWalletError(null);
-    setState((s) => ({
-      ...s,
-      authed: false,
-      accessToken: null,
-      user: null,
-      wallet: EMPTY_WALLET,
-    }));
-  }, []);
+  const logout = useCallback(() => clearAuthentication(false), [clearAuthentication]);
 
   const markNotifRead = useCallback((id: number) => {
     setState((s) => ({ ...s, notifications: s.notifications.map((n) => (n.id === id ? { ...n, unread: false } : n)) }));
@@ -220,6 +233,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         hydrated,
+        authExpired,
         walletLoading,
         walletLoaded,
         walletError,
