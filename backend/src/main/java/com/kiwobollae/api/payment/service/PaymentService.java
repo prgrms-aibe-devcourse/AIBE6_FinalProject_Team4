@@ -1,7 +1,5 @@
 package com.kiwobollae.api.payment.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -36,6 +34,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -276,7 +276,7 @@ public class PaymentService {
 	private String writeSnapshot(PaymentResponse response) {
 		try {
 			return objectMapper.writeValueAsString(response);
-		} catch (JsonProcessingException exception) {
+		} catch (JacksonException exception) {
 			throw new IllegalStateException("멱등성 응답 저장에 실패했습니다.", exception);
 		}
 	}
@@ -284,7 +284,7 @@ public class PaymentService {
 	private PaymentResponse readSnapshot(String snapshot) {
 		try {
 			return objectMapper.readValue(snapshot, PaymentResponse.class);
-		} catch (JsonProcessingException exception) {
+		} catch (JacksonException exception) {
 			throw new IllegalStateException("멱등성 응답 복원에 실패했습니다.", exception);
 		}
 	}
