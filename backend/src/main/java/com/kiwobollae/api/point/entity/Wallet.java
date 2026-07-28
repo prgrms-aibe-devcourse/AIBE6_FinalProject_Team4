@@ -27,9 +27,9 @@ import lombok.NoArgsConstructor;
 		check = {
 				@CheckConstraint(name = "chk_wallets_paid_point", constraint = "paid_point >= 0")
 		})
-// JPA Auditing(@LastModifiedDate)에 더해 DB 레벨 ON UPDATE 안전망까지 둔다(공용 BaseTimeEntity는 건드리지 않고 override).
+// JPA Auditing(@LastModifiedDate)에 더해 Asia/Seoul DB 세션 기준 ON UPDATE 안전망까지 둔다(공용 BaseTimeEntity는 건드리지 않고 override).
 @AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
-		columnDefinition = "datetime default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP"))
+		columnDefinition = "datetime(6) default CURRENT_TIMESTAMP(6) on update CURRENT_TIMESTAMP(6)"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
