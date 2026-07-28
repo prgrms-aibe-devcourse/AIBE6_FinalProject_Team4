@@ -47,6 +47,15 @@ public class CardService {
 		return CardResponse.from(card, ownedCount);
 	}
 
+	public List<CardResponse> getMyCards(Long userId) {
+		if (userId == null) {
+			throw new BusinessException(ErrorCode.AUTH_AUTHENTICATION_REQUIRED);
+		}
+		return userCardRepository.findAllByUser_IdAndCountGreaterThanOrderByIdDesc(userId, 0).stream()
+				.map(userCard -> CardResponse.from(userCard.getCard(), userCard.getCount()))
+				.toList();
+	}
+
 	private Map<Long, Integer> getOwnedCounts(Long userId, List<Card> cards) {
 		if (userId == null || cards.isEmpty()) {
 			return Map.of();

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kiwobollae.api.commerce.dto.response.CardResponse;
 import com.kiwobollae.api.commerce.entity.enums.ActiveStatus;
 import com.kiwobollae.api.commerce.service.CardService;
+import com.kiwobollae.api.commerce.service.CardPurchaseService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
@@ -27,11 +28,14 @@ class CardControllerTest {
 	@Mock
 	private CardService cardService;
 
+	@Mock
+	private CardPurchaseService cardPurchaseService;
+
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		CardController cardController = new CardController(cardService);
+		CardController cardController = new CardController(cardService, cardPurchaseService);
 		mockMvc = MockMvcBuilders.standaloneSetup(cardController)
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.build();

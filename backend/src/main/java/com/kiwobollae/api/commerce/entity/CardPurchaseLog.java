@@ -2,6 +2,7 @@ package com.kiwobollae.api.commerce.entity;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.common.BaseEntity;
+import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -60,4 +61,9 @@ public class CardPurchaseLog extends BaseEntity {
 
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
+
+	public void applyPointUsage(PointDeductionResult result) {
+		this.usedFreePoint = result.usedFreePoint();
+		this.usedPaidPoint = result.usedPaidPoint();
+	}
 }

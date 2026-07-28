@@ -120,6 +120,31 @@ class CardServiceTest {
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CARD_NOT_FOUND));
 	}
 
+	@Test
+	void myCardsIncludesOwnedHiddenCards() {
+		Card hiddenCard = card(9L);
+		given(hiddenCard.getStatus()).willReturn(ActiveStatus.HIDDEN);
+		UserCard userCard = org.mockito.Mockito.mock(UserCard.class);
+		given(userCard.getCard()).willReturn(hiddenCard);
+		given(userCard.getCount()).willReturn(2);
+		given(userCardRepository.findAllByUser_IdAndCountGreaterThanOrderByIdDesc(7L, 0))
+				.willReturn(List.of(userCard));
+
+		List<CardResponse> response = cardService.getMyCards(7L);
+
+		assertThat(response).hasSize(1);
+		assertThat(response.getFirst().ownedCount()).isEqualTo(2);
+		assertThat(response.getFirst().status()).isEqualTo(ActiveStatus.HIDDEN);
+	}
+
+	@Test
+	void myCardsRequiresAuthentication() {
+		assertThatThrownBy(() -> cardService.getMyCards(null))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.AUTH_AUTHENTICATION_REQUIRED));
+	}
+
 	private Card card(Long id) {
 		ExchangeProduct exchangeProduct = org.mockito.Mockito.mock(ExchangeProduct.class);
 		given(exchangeProduct.getId()).willReturn(10L + id);
