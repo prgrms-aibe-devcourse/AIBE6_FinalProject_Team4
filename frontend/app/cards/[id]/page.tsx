@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api';
-import { CardData, getCard } from '@/lib/card-api';
+import { CardData, getCard, purchaseCard } from '@/lib/card-api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
@@ -16,7 +16,7 @@ const CONFETTI = [
 
 export default function CardDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { state, hydrated, balance, spend, set } = useStore();
+  const { state, hydrated, spend, set } = useStore();
   const { showToast, askConfirm } = useUI();
   const cardId = Number(params.id);
   const [card, setCard] = useState<CardData | null>(null);
@@ -25,6 +25,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
   const [celebrate, setCelebrate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
     if (!Number.isInteger(cardId) || cardId < 1) {
@@ -96,19 +97,40 @@ export default function CardDetail({ params }: { params: { id: string } }) {
       showToast('카드 구매는 로그인 후 이용할 수 있어요.', 'err');
       return;
     }
-    if (total > balance) return showToast(`포인트가 ${fmt(total - balance)}P 부족해요.`, 'err');
     askConfirm({ icon: 'paid', title: '카드를 구매할까요?', ok: '구매하기',
       body: `${card.name} ${qty}장 · 총 ${fmt(total)}P를 사용해요. 무상 포인트가 먼저 사용돼요.`,
-      onOk: () => {
-        spend(total);
+      onOk: async () => {
         const currentOwned = owned ?? 0;
-        const newOwned = currentOwned + qty;
-        const reached =
-          newOwned >= card.requiredCountForExchange &&
-          currentOwned < card.requiredCountForExchange;
-        setOwned(newOwned); setQty(1);
-        if (reached) { set((s) => ({ readyCards: s.readyCards + 1 })); setCelebrate(true); }
-        else showToast('카드를 구매했어요! 🃏');
+        setPurchasing(true);
+        try {
+          const response = await purchaseCard(
+            card.id,
+            qty,
+            state.accessToken!,
+            crypto.randomUUID(),
+          );
+          spend(response.usedPoint);
+          setOwned(response.ownedCount);
+          setQty(1);
+          const reached =
+            response.ownedCount >= card.requiredCountForExchange &&
+            currentOwned < card.requiredCountForExchange;
+          if (reached) {
+            set((s) => ({ readyCards: s.readyCards + 1 }));
+            setCelebrate(true);
+          } else {
+            showToast('카드를 구매했어요! 🃏');
+          }
+        } catch (purchaseError) {
+          showToast(
+            purchaseError instanceof ApiError
+              ? purchaseError.message
+              : '카드를 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
+            'err',
+          );
+        } finally {
+          setPurchasing(false);
+        }
       } });
   };
 
@@ -198,8 +220,13 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             </span>
           </div>
 
-          <button type="button" onClick={buy} className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white">
-            구매하기
+          <button
+            type="button"
+            onClick={buy}
+            disabled={purchasing}
+            className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            {purchasing ? '구매 처리 중...' : '구매하기'}
           </button>
         </div>
       </div>

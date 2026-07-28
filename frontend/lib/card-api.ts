@@ -20,6 +20,20 @@ export interface CardData {
   ownedCount: number | null;
 }
 
+export interface CardPurchaseData {
+  purchaseId: number;
+  cardId: number;
+  cardName: string;
+  unitPoint: number;
+  quantity: number;
+  usedPoint: number;
+  usedFreePoint: number;
+  usedPaidPoint: number;
+  ownedCount: number;
+  remainingBalance: number;
+  purchasedAt: string;
+}
+
 export function getCards(
   accessToken?: string | null,
   signal?: AbortSignal,
@@ -38,5 +52,31 @@ export function getCard(
   return request<CardData>(`/api/v1/card/${cardId}`, {
     accessToken,
     signal,
+  });
+}
+
+export function getMyCards(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<CardData[]> {
+  return request<CardData[]>('/api/v1/card/me', {
+    accessToken,
+    signal,
+  });
+}
+
+export function purchaseCard(
+  cardId: number,
+  quantity: number,
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<CardPurchaseData> {
+  return request<CardPurchaseData>('/api/v1/card/purchase', {
+    method: 'POST',
+    accessToken,
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({ cardId, quantity }),
   });
 }
