@@ -25,6 +25,7 @@ import java.time.ZoneOffset;
 import java.util.HexFormat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -42,7 +43,7 @@ public class CardPurchaseService {
 	private final IdempotencyService idempotencyService;
 	private final ObjectMapper objectMapper;
 
-	@Transactional
+	@Transactional(isolation = Isolation.REPEATABLE_READ)
 	public CardPurchaseResponse purchase(
 			Long userId,
 			String idempotencyKey,
