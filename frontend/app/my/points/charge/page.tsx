@@ -1,25 +1,54 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ApiError } from '@/lib/api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-
-interface ChargeProduct {
-  id: number;
-  point: number;
-  price: number;
-}
-
-const PRODUCTS: ChargeProduct[] = [{ id: 1, point: 1000, price: 1000 }, { id: 2, point: 5000, price: 5000 }, { id: 3, point: 10000, price: 10000 }];
+import { ChargeProduct, getChargeProducts } from '@/features/payment/api';
 
 export default function Charge() {
   const router = useRouter();
-  const { creditPaid } = useStore();
+  const { state, creditPaid } = useStore();
   const { showToast } = useUI();
   const [sheet, setSheet] = useState<ChargeProduct | null>(null);
+  const [products, setProducts] = useState<ChargeProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const success = () => { if (!sheet) return; creditPaid(sheet.point); setSheet(null); showToast('충전이 완료됐어요! ☀️'); router.push('/my/points'); };
+  useEffect(() => {
+    if (!state.accessToken) return;
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+
+    getChargeProducts(state.accessToken, controller.signal)
+      .then(setProducts)
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setProducts([]);
+        setError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : '충전 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [reloadKey, state.accessToken]);
+
+  const success = () => {
+    if (!sheet) return;
+    creditPaid(sheet.pointAmount);
+    setSheet(null);
+    showToast('충전이 완료됐어요! ☀️');
+    router.push('/my/points');
+  };
 
   return (
     <div className="container max-w-[900px]">
@@ -29,20 +58,48 @@ export default function Charge() {
         <span className="material-symbols-outlined text-base">light_mode</span> 테스트 모드예요. 실제 결제가 발생하지 않아요.
       </div>
 
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-        {PRODUCTS.map((c) => (
+      {loading ? (
+        <div className="rounded-[18px] bg-white py-14 text-center text-sm text-sub shadow-card">
+          충전 상품을 불러오고 있어요.
+        </div>
+      ) : error ? (
+        <div className="rounded-[18px] bg-white px-5 py-14 text-center text-sm text-sub shadow-card">
+          <p>{error}</p>
           <button
-            key={c.id}
             type="button"
-            onClick={() => setSheet(c)}
-            className="cursor-pointer rounded-[18px] border-2 border-transparent bg-white px-5 py-6 text-center shadow-card"
+            onClick={() => setReloadKey((current) => current + 1)}
+            className="mt-4 cursor-pointer rounded-xl bg-brand px-5 py-2.5 font-bold text-white"
           >
-            <div><span className="material-symbols-outlined text-[34px] text-gold-text">monetization_on</span></div>
-            <div className="mb-0.5 mt-2 text-[22px] font-extrabold">{fmt(c.point)}P</div>
-            <div className="font-bold text-sub">{fmt(c.price)}원</div>
+            다시 시도
           </button>
-        ))}
-      </div>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="rounded-[18px] bg-white py-14 text-center text-sm text-sub shadow-card">
+          지금은 구매할 수 있는 충전 상품이 없어요.
+        </div>
+      ) : (
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+          {products.map((product) => (
+            <button
+              key={product.id}
+              type="button"
+              onClick={() => setSheet(product)}
+              className="cursor-pointer rounded-[18px] border-2 border-transparent bg-white px-5 py-6 text-center shadow-card"
+            >
+              <div>
+                <span className="material-symbols-outlined text-[34px] text-gold-text">
+                  monetization_on
+                </span>
+              </div>
+              <div className="mb-0.5 mt-2 text-[22px] font-extrabold">
+                {fmt(product.pointAmount)}P
+              </div>
+              <div className="font-bold text-sub">{fmt(product.price)}원</div>
+              <div className="mt-1 text-xs text-faint">{product.name}</div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {sheet && (
         <div onClick={() => setSheet(null)} className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgba(46,54,42,.45)]">
@@ -50,7 +107,7 @@ export default function Charge() {
             <div className="mx-auto mb-[18px] h-[5px] w-11 rounded-full bg-line" />
             <div className="mb-2 text-center text-[13px] font-extrabold text-sub">MOCK 결제 (테스트)</div>
             <div className="mb-1 text-center text-[26px] font-extrabold">{fmt(sheet.price)}원</div>
-            <div className="mb-[22px] text-center text-sub">{fmt(sheet.point)}P 충전</div>
+            <div className="mb-[22px] text-center text-sub">{fmt(sheet.pointAmount)}P 충전</div>
             <div className="flex flex-col gap-2.5">
               <button type="button" onClick={success} className="cursor-pointer rounded-[13px] bg-brand p-3.5 font-extrabold text-white">
                 <span className="material-symbols-outlined text-lg">check_circle</span> 결제 성공 시뮬레이션
