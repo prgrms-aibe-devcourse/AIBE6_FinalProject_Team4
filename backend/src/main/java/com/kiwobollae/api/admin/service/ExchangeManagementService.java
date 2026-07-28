@@ -80,7 +80,7 @@ public class ExchangeManagementService {
 	}
 
 	private ExchangeOrder findExchangeForAdmin(Long id) {
-		return exchangeOrderRepository.findByIdWithDetails(id)
+		return exchangeOrderRepository.findById(id)
 				.orElseThrow(() -> new BusinessException(ErrorCode.EXCHANGE_NOT_FOUND));
 	}
 
@@ -91,8 +91,6 @@ public class ExchangeManagementService {
 		throw new BusinessException(ErrorCode.EXCHANGE_INVALID_STATE);
 	}
 
-	// Small (2-line) duplication of ExchangeService#refund — kept separate rather than shared
-	// since user-cancel and admin-cancel now live in different bounded contexts (commerce vs admin).
 	private void refund(ExchangeOrder exchangeOrder) {
 		userCardRepository.incrementCount(
 				exchangeOrder.getUser().getId(),

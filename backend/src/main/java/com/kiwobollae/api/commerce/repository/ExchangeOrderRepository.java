@@ -14,23 +14,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface ExchangeOrderRepository extends JpaRepository<ExchangeOrder, Long> {
 
-	@Query(value = "select eo from ExchangeOrder eo join fetch eo.card join fetch eo.exchangeProduct "
-			+ "where eo.user.id = :userId",
+	@Query(value = "select eo from ExchangeOrder eo where eo.user.id = :userId",
 			countQuery = "select count(eo) from ExchangeOrder eo where eo.user.id = :userId")
 	Page<ExchangeOrder> findAllByUserId(@Param("userId") Long userId, Pageable pageable);
 
-	@Query("select eo from ExchangeOrder eo join fetch eo.card join fetch eo.exchangeProduct "
-			+ "where eo.id = :id and eo.user.id = :userId")
+	@Query("select eo from ExchangeOrder eo where eo.id = :id and eo.user.id = :userId")
 	Optional<ExchangeOrder> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
-	@Query(value = "select eo from ExchangeOrder eo join fetch eo.user join fetch eo.card "
-			+ "join fetch eo.exchangeProduct where (:status is null or eo.status = :status)",
+	@Query(value = "select eo from ExchangeOrder eo where (:status is null or eo.status = :status)",
 			countQuery = "select count(eo) from ExchangeOrder eo where (:status is null or eo.status = :status)")
 	Page<ExchangeOrder> search(@Param("status") ExchangeStatus status, Pageable pageable);
-
-	@Query("select eo from ExchangeOrder eo join fetch eo.user join fetch eo.card "
-			+ "join fetch eo.exchangeProduct where eo.id = :id")
-	Optional<ExchangeOrder> findByIdWithDetails(@Param("id") Long id);
 
 	@Modifying
 	@Query("update ExchangeOrder eo set eo.status = :newStatus "

@@ -58,9 +58,6 @@ class ExchangeServiceTest {
 		User user = mock(User.class);
 		Card card = mock(Card.class);
 		ExchangeProduct product = mock(ExchangeProduct.class);
-		// This helper is shared by tests that only touch a subset of these getters (e.g. cancelExchange's
-		// refund path vs. ExchangeOrderResponse.from's full field set), so every stub is lenient to avoid
-		// UnnecessaryStubbingException on the fields a given test never reads.
 		lenient().when(user.getId()).thenReturn(userId);
 		lenient().when(card.getId()).thenReturn(cardId);
 		lenient().when(product.getId()).thenReturn(productId);

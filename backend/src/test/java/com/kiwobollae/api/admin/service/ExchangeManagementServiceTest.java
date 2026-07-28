@@ -50,8 +50,6 @@ class ExchangeManagementServiceTest {
 		User user = mock(User.class);
 		Card card = mock(Card.class);
 		ExchangeProduct product = mock(ExchangeProduct.class);
-		// Shared by tests that only touch a subset of these getters, so every stub is lenient to
-		// avoid UnnecessaryStubbingException on fields a given test never reads.
 		lenient().when(user.getId()).thenReturn(userId);
 		lenient().when(card.getId()).thenReturn(cardId);
 		lenient().when(product.getId()).thenReturn(productId);
@@ -90,7 +88,7 @@ class ExchangeManagementServiceTest {
 		given(exchangeOrderRepository.updateStatusIfMatches(50L, ExchangeStatus.PREPARING, ExchangeStatus.REQUESTED))
 				.willReturn(1);
 		ExchangeOrder refreshed = mockOrder(50L, ExchangeStatus.PREPARING, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findByIdWithDetails(50L)).willReturn(Optional.of(refreshed));
+		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(refreshed));
 
 		ExchangeOrderResponse response = exchangeManagementService.prepareExchange(50L);
 
@@ -124,7 +122,7 @@ class ExchangeManagementServiceTest {
 		given(exchangeOrderRepository.updateStatusIfMatches(50L, ExchangeStatus.SHIPPING, ExchangeStatus.PREPARING))
 				.willReturn(1);
 		ExchangeOrder refreshed = mockOrder(50L, ExchangeStatus.SHIPPING, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findByIdWithDetails(50L)).willReturn(Optional.of(refreshed));
+		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(refreshed));
 
 		ExchangeOrderResponse response = exchangeManagementService.shipExchange(50L);
 
@@ -136,7 +134,7 @@ class ExchangeManagementServiceTest {
 		given(exchangeOrderRepository.deliverIfMatches(eq(50L), any(LocalDateTime.class), eq(ExchangeStatus.SHIPPING)))
 				.willReturn(1);
 		ExchangeOrder refreshed = mockOrder(50L, ExchangeStatus.DELIVERED, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findByIdWithDetails(50L)).willReturn(Optional.of(refreshed));
+		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(refreshed));
 
 		ExchangeOrderResponse response = exchangeManagementService.deliverExchange(50L);
 
@@ -160,7 +158,7 @@ class ExchangeManagementServiceTest {
 				eq(50L), eq(CancelledBy.ADMIN), eq("품절"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
 		)).willReturn(1);
 		ExchangeOrder refreshed = mockOrder(50L, ExchangeStatus.CANCELLED, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findByIdWithDetails(50L)).willReturn(Optional.of(refreshed));
+		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(refreshed));
 
 		ExchangeOrderResponse response = exchangeManagementService.adminCancelExchange(50L, "품절");
 
