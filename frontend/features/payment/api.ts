@@ -33,6 +33,25 @@ export interface PaymentData {
   message: string | null;
 }
 
+export type PaymentRefundStatus = 'REQUESTED' | 'COMPLETED' | 'FAILED';
+
+export interface PaymentRefundData {
+  id: number;
+  paymentId: number;
+  cashAmount: number;
+  pointAmount: number;
+  status: PaymentRefundStatus;
+  reason: string | null;
+  refundKey: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface PaymentHistory {
+  payment: PaymentData;
+  refunds: PaymentRefundData[];
+}
+
 export function getChargeProducts(
   accessToken: string,
   signal?: AbortSignal,
@@ -73,5 +92,12 @@ export function confirmPayment(
     accessToken,
     headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(payload),
+  });
+}
+
+export function getPaymentHistory(accessToken: string, signal?: AbortSignal): Promise<PaymentHistory[]> {
+  return request<PaymentHistory[]>('/api/v1/payments', {
+    accessToken,
+    signal,
   });
 }
