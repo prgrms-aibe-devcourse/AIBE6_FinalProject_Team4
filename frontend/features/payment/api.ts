@@ -8,6 +8,31 @@ export interface ChargeProduct {
   isActive: boolean;
 }
 
+export type PaymentScenario = 'SUCCESS' | 'FAILURE' | 'CANCEL';
+export type PaymentStatus =
+  | 'PENDING'
+  | 'PAID'
+  | 'FAILED'
+  | 'CANCELED'
+  | 'REFUNDED'
+  | 'PARTIAL_REFUNDED';
+
+export interface PaymentData {
+  id: number;
+  userId: number;
+  chargeProductId: number;
+  chargeProductName: string;
+  cashAmount: number;
+  pointAmount: number;
+  status: PaymentStatus;
+  provider: 'MOCK' | 'TOSS';
+  providerOrderId: string;
+  providerPaymentKey: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  message: string | null;
+}
+
 export function getChargeProducts(
   accessToken: string,
   signal?: AbortSignal,
@@ -15,5 +40,38 @@ export function getChargeProducts(
   return request<ChargeProduct[]>('/api/v1/payments/products', {
     accessToken,
     signal,
+  });
+}
+
+export function requestCharge(
+  accessToken: string,
+  chargeProductId: number,
+  idempotencyKey: string,
+): Promise<PaymentData> {
+  return request<PaymentData>('/api/v1/payments/charge', {
+    method: 'POST',
+    accessToken,
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ chargeProductId }),
+  });
+}
+
+interface ConfirmPaymentInput {
+  providerOrderId: string;
+  paymentKey: string;
+  amount: number;
+  scenario: PaymentScenario;
+}
+
+export function confirmPayment(
+  accessToken: string,
+  payload: ConfirmPaymentInput,
+  idempotencyKey: string,
+): Promise<PaymentData> {
+  return request<PaymentData>('/api/v1/payments/confirm', {
+    method: 'POST',
+    accessToken,
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(payload),
   });
 }
