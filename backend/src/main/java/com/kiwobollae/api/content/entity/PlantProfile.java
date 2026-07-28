@@ -55,6 +55,10 @@ public class PlantProfile extends BaseEntity {
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
 
+	// null이면 미지급(재지급 가능), 값이 있으면 현재 지급 중인 일지 완료 보상이 있음을 뜻한다.
+	@Column(name = "journal_reward_granted_at")
+	private LocalDateTime journalRewardGrantedAt;
+
 	public static PlantProfile create(User user, PlantSpecies species,
 			String plantName, LocalDate startDate, String plantImage) {
 		return PlantProfile.builder()
