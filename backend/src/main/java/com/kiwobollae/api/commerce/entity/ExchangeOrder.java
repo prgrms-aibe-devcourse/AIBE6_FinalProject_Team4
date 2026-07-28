@@ -84,4 +84,22 @@ public class ExchangeOrder extends BaseEntity {
 
 	@Column(name = "requested_at", nullable = false)
 	private LocalDateTime requestedAt;
+
+	public static ExchangeOrder create(User user, Card card, ExchangeProduct exchangeProduct, Integer usedCardCount,
+			String receiverName, String receiverPhone, String address, String addressDetail, LocalDateTime now) {
+		return ExchangeOrder.builder()
+				.user(user)
+				.card(card)
+				.cardName(card.getName())
+				.exchangeProduct(exchangeProduct)
+				.exchangeProductName(exchangeProduct.getName())
+				.usedCardCount(usedCardCount)
+				.status(ExchangeStatus.REQUESTED)
+				.receiverName(receiverName)
+				.receiverPhone(receiverPhone)
+				.address(address)
+				.addressDetail(addressDetail)
+				.requestedAt(now)
+				.build();
+	}
 }
