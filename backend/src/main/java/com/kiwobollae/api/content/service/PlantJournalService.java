@@ -6,16 +6,18 @@ import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
-import com.kiwobollae.api.content.entity.JournalCompletionLog;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantJournal;
 import com.kiwobollae.api.content.entity.PlantProfile;
-import com.kiwobollae.api.content.repository.JournalCompletionLogRepository;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.point.entity.enums.CurrencyType;
+import com.kiwobollae.api.point.entity.enums.PointRefType;
+import com.kiwobollae.api.point.entity.enums.PointTxType;
+import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -37,11 +39,14 @@ public class PlantJournalService {
 	// 작성일·하루 경계는 KST 기준으로 판정한다 (중복검사·완료 판정의 "같은 날" 기준).
 	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+	// 일지 완료 보상 포인트. 임시값 — 추후 팀 협의 후 조정 예정.
+	private static final long JOURNAL_REWARD_AMOUNT = 100L;
+
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
-	private final JournalCompletionLogRepository journalCompletionLogRepository;
 	private final PlantProfileRepository plantProfileRepository;
 	private final UserRepository userRepository;
+	private final WalletService walletService;
 
 	@Transactional
 	public PlantJournalResponse createJournal(Long userId, PlantJournalRequest request) {
@@ -61,10 +66,13 @@ public class PlantJournalService {
 				.toList();
 		journalImageRepository.saveAll(images);
 
-		// 작성완료 체크(1식물 1회): 이 프로필에 완료 로그가 없을 때만 생성한다.
-		// 완료 로그는 point 도메인이 읽어 실제 포인트를 지급하는 트리거이며, 여기서는 기록만 남긴다.
-		if (!journalCompletionLogRepository.existsByProfileId(profile.getId())) {
-			journalCompletionLogRepository.save(JournalCompletionLog.create(user, profile, journal, today));
+		// 작성완료 체크(1식물 1일 1회, 매일 리셋): 오늘 아직 지급 안 됐을 때만 원자적으로 클레임하고,
+		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
+		LocalDateTime now = LocalDateTime.now(KST);
+		LocalDateTime startOfToday = today.atStartOfDay();
+		if (plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1) {
+			walletService.applyDelta(userId, PointTxType.JOURNAL_REWARD, CurrencyType.FREE,
+					JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_COMPLETION, profile.getId());
 		}
 		return PlantJournalResponse.from(journal, images);
 	}
@@ -118,11 +126,20 @@ public class PlantJournalService {
 		LocalDateTime now = LocalDateTime.now(KST);
 		journal.softDelete(now);
 
-		// 자정 기준 회수: 완료 일지를 같은 날(KST)에 삭제하면 보상 마커를 REVOKED로 전환한다.
-		// 완료 로그 자체는 남기며, 실제 포인트 회수와 재획득 가능 여부는 point 도메인이 판단한다.
-		if (journal.getWrittenDate().equals(now.toLocalDate())) {
-			journalCompletionLogRepository.findByJournalId(journalId)
-					.ifPresent(JournalCompletionLog::markRevoked);
+		// 자정 기준 회수: 오늘 지급된 보상이 있고, 오늘 작성된 활성 일지가 이 삭제로 0이 되면
+		// (다른 날 작성된 일지가 남아있어도 오늘자 보상 근거는 아니므로 회수 대상) 원자적으로
+		// 클레임을 해제한 뒤에만 point 도메인에 회수를 요청한다.
+		PlantProfile profile = journal.getPlantProfile();
+		LocalDateTime grantedAt = profile.getJournalRewardGrantedAt();
+		LocalDate today = now.toLocalDate();
+		boolean grantedToday = grantedAt != null && grantedAt.toLocalDate().equals(today);
+		boolean hasTodayActiveJournal =
+				plantJournalRepository.existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(profile.getId(), today);
+		if (grantedToday && !hasTodayActiveJournal) {
+			if (plantProfileRepository.clearJournalRewardIfMatches(profile.getId(), grantedAt) == 1) {
+				walletService.applyDelta(userId, PointTxType.CLAWBACK, CurrencyType.FREE,
+						-JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_REVOCATION, profile.getId());
+			}
 		}
 	}
 

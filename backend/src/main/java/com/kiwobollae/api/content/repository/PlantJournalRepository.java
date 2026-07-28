@@ -36,4 +36,6 @@ public interface PlantJournalRepository extends JpaRepository<PlantJournal, Long
 	Optional<PlantJournal> findOwnedActive(@Param("id") Long id, @Param("userId") Long userId);
 
 	boolean existsByIdAndDeletedAtIsNull(Long id);
+
+	boolean existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(Long plantProfileId, LocalDate writtenDate);
 }
