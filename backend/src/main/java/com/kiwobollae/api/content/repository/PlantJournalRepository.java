@@ -37,5 +37,5 @@ public interface PlantJournalRepository extends JpaRepository<PlantJournal, Long
 
 	boolean existsByIdAndDeletedAtIsNull(Long id);
 
-	boolean existsByPlantProfileIdAndDeletedAtIsNull(Long plantProfileId);
+	boolean existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(Long plantProfileId, LocalDate writtenDate);
 }

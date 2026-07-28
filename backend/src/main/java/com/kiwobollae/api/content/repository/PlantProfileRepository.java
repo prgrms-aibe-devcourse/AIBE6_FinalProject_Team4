@@ -19,11 +19,13 @@ public interface PlantProfileRepository extends JpaRepository<PlantProfile, Long
 			+ "where p.id = :id and p.user.id = :userId")
 	Optional<PlantProfile> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
-	// 미지급 상태(null)일 때만 원자적으로 클레임한다. 동시 요청 중 하나만 성공(1건 갱신)한다.
+	// 오늘 아직 지급 안 된 경우(null이거나 오늘 이전)에만 원자적으로 클레임한다(매일 리셋).
+	// 동시 요청 중 하나만 성공(1건 갱신)한다.
 	@Modifying
 	@Query("update PlantProfile p set p.journalRewardGrantedAt = :now "
-			+ "where p.id = :id and p.journalRewardGrantedAt is null")
-	int claimJournalReward(@Param("id") Long id, @Param("now") LocalDateTime now);
+			+ "where p.id = :id and (p.journalRewardGrantedAt is null or p.journalRewardGrantedAt < :startOfToday)")
+	int claimJournalReward(@Param("id") Long id, @Param("now") LocalDateTime now,
+			@Param("startOfToday") LocalDateTime startOfToday);
 
 	// 읽었던 지급 시각과 현재 값이 같을 때만 원자적으로 해제한다(다른 요청이 먼저 처리했으면 0건).
 	@Modifying

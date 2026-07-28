@@ -66,9 +66,11 @@ public class PlantJournalService {
 				.toList();
 		journalImageRepository.saveAll(images);
 
-		// 작성완료 체크(1식물 1회): journalRewardGrantedAt이 null일 때만 원자적으로 클레임하고,
+		// 작성완료 체크(1식물 1일 1회, 매일 리셋): 오늘 아직 지급 안 됐을 때만 원자적으로 클레임하고,
 		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
-		if (plantProfileRepository.claimJournalReward(profile.getId(), LocalDateTime.now(KST)) == 1) {
+		LocalDateTime now = LocalDateTime.now(KST);
+		LocalDateTime startOfToday = today.atStartOfDay();
+		if (plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1) {
 			walletService.applyDelta(userId, PointTxType.JOURNAL_REWARD, CurrencyType.FREE,
 					JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_COMPLETION, profile.getId());
 		}
@@ -124,12 +126,16 @@ public class PlantJournalService {
 		LocalDateTime now = LocalDateTime.now(KST);
 		journal.softDelete(now);
 
-		// 자정 기준 회수: 오늘 지급된 보상이 있고, 이 삭제로 프로필의 활성 일지가 0이 되면
-		// 원자적으로 클레임을 해제한 뒤에만 point 도메인에 회수를 요청한다.
+		// 자정 기준 회수: 오늘 지급된 보상이 있고, 오늘 작성된 활성 일지가 이 삭제로 0이 되면
+		// (다른 날 작성된 일지가 남아있어도 오늘자 보상 근거는 아니므로 회수 대상) 원자적으로
+		// 클레임을 해제한 뒤에만 point 도메인에 회수를 요청한다.
 		PlantProfile profile = journal.getPlantProfile();
 		LocalDateTime grantedAt = profile.getJournalRewardGrantedAt();
-		boolean grantedToday = grantedAt != null && grantedAt.toLocalDate().equals(now.toLocalDate());
-		if (grantedToday && !plantJournalRepository.existsByPlantProfileIdAndDeletedAtIsNull(profile.getId())) {
+		LocalDate today = now.toLocalDate();
+		boolean grantedToday = grantedAt != null && grantedAt.toLocalDate().equals(today);
+		boolean hasTodayActiveJournal =
+				plantJournalRepository.existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(profile.getId(), today);
+		if (grantedToday && !hasTodayActiveJournal) {
 			if (plantProfileRepository.clearJournalRewardIfMatches(profile.getId(), grantedAt) == 1) {
 				walletService.applyDelta(userId, PointTxType.CLAWBACK, CurrencyType.FREE,
 						-JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_REVOCATION, profile.getId());
