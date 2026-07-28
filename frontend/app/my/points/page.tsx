@@ -20,9 +20,43 @@ const TXS = [
 const FILTERS = [['all', '전체'], ['CHARGE', '충전'], ['JOURNAL_REWARD', '일지 보상'], ['PURCHASE', '구매'], ['REFUND', '환급']];
 
 export default function PointsHome() {
-  const { state, balance } = useStore();
+  const {
+    state,
+    balance,
+    walletLoading,
+    walletLoaded,
+    walletError,
+    refreshWallet,
+  } = useStore();
   const [filter, setFilter] = useState('all');
   const txs = TXS.filter((t) => filter === 'all' || t.type === filter);
+
+  if (!walletLoaded && (walletLoading || !walletError)) {
+    return (
+      <div className="container max-w-[900px]">
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">
+          포인트 잔액을 불러오고 있어요.
+        </div>
+      </div>
+    );
+  }
+
+  if (walletError && !walletLoaded) {
+    return (
+      <div className="container max-w-[900px]">
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
+          <p>{walletError}</p>
+          <button
+            type="button"
+            onClick={() => void refreshWallet()}
+            className="mt-4 cursor-pointer rounded-xl bg-brand px-5 py-2.5 font-bold text-white"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-[900px]">
@@ -32,7 +66,9 @@ export default function PointsHome() {
           <span className="grid h-8 w-8 place-items-center rounded-full bg-gold text-base text-gold-text">P</span>
           {fmt(balance)}<span className="text-xl">P</span>
         </div>
-        <div className="text-[13.5px] text-gold-text opacity-85">충전 {fmt(state.wallet.paid)}P · 보상 {fmt(state.wallet.free)}P</div>
+        <div className="text-[13.5px] text-gold-text opacity-85">
+          유상 포인트 {fmt(state.wallet.paid)}P · 무상 포인트 {fmt(state.wallet.free)}P
+        </div>
         <Link href="/my/points/charge" className="mt-4 inline-block rounded-xl bg-ink px-[22px] py-[11px] font-bold text-white hover:text-white">충전하기</Link>
       </div>
 

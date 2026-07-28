@@ -16,7 +16,7 @@ const CONFETTI = [
 
 export default function CardDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { state, hydrated, spend, set } = useStore();
+  const { state, hydrated, refreshWallet, set } = useStore();
   const { showToast, askConfirm } = useUI();
   const cardId = Number(params.id);
   const [card, setCard] = useState<CardData | null>(null);
@@ -109,7 +109,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             state.accessToken!,
             crypto.randomUUID(),
           );
-          spend(response.usedPoint);
+          await refreshWallet();
           setOwned(response.ownedCount);
           setQty(1);
           const reached =

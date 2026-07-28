@@ -35,7 +35,7 @@ public class WalletService {
 		walletRepository.save(wallet);
 	}
 
-	/** POINT-01: 잔액 조회. 화면엔 paid+free 합산만 노출(정책 #2). */
+	/** POINT-01: 합산 잔액과 유상/무상 잔액을 조회한다. */
 	public WalletResponse getWallet(Long userId) {
 		Wallet wallet = walletRepository.findByUserId(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));

@@ -57,7 +57,7 @@ public class Wallet extends BaseTimeEntity {
 		return this.freePoint;
 	}
 
-	/** 화면 표시용 합산 잔액(정책 #2: paid+free 합산만 노출). */
+	/** 화면 표시용 유상/무상 합산 잔액. */
 	public long totalBalance() {
 		return this.paidPoint + this.freePoint;
 	}
