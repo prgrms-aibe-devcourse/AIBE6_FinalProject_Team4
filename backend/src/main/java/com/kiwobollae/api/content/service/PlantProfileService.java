@@ -7,7 +7,6 @@ import com.kiwobollae.api.content.dto.request.PlantProfileUpdateRequest;
 import com.kiwobollae.api.content.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
-import com.kiwobollae.api.content.repository.JournalCompletionLogRepository;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
@@ -28,7 +27,6 @@ public class PlantProfileService {
 	private final PlantSpeciesRepository plantSpeciesRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
-	private final JournalCompletionLogRepository journalCompletionLogRepository;
 	private final UserRepository userRepository;
 
 	@Transactional
@@ -61,9 +59,7 @@ public class PlantProfileService {
 	@Transactional
 	public void deleteProfile(Long userId, Long profileId) {
 		PlantProfile profile = findOwned(userId, profileId);
-		String nickname = profile.getPlantName();
 		journalImageRepository.deleteAllByProfileId(profileId);
-		journalCompletionLogRepository.detachByProfileId(profileId, nickname);
 		plantJournalRepository.deleteAllByProfileId(profileId);
 		plantProfileRepository.delete(profile);
 	}
