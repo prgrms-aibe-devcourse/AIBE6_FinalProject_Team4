@@ -12,3 +12,6 @@ app:
     product:
       # Set to false when local development should use manually managed or production-like data.
       enabled: true
+    card:
+      # Seeds ten cards and their exchange products only when both tables are empty.
+      enabled: true

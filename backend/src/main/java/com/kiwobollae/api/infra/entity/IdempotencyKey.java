@@ -70,4 +70,20 @@ public class IdempotencyKey extends BaseEntity {
 
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
+
+	public void succeed(
+			int statusCode,
+			String response,
+			String responseResourceType,
+			Long responseResourceId,
+			LocalDateTime now
+	) {
+		this.status = IdempotencyStatus.SUCCEEDED;
+		this.httpStatus = statusCode;
+		this.responseSnapshot = response;
+		this.resourceType = responseResourceType;
+		this.resourceId = responseResourceId;
+		this.completedAt = now;
+		this.responseExpiresAt = now.plusHours(24);
+	}
 }

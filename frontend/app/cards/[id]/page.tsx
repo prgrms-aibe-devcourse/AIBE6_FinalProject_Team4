@@ -1,11 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ApiError } from '@/lib/api';
+import { CardData, getCard, purchaseCard } from '@/lib/card-api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
-import { CARDS } from '@/lib/data';
 
 const CONFETTI = [
   { left: '10%', dur: '1.5s', delay: '0s', emoji: '🎉' }, { left: '28%', dur: '1.8s', delay: '.2s', emoji: '✨' },
@@ -15,32 +16,121 @@ const CONFETTI = [
 
 export default function CardDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { state, hydrated, balance, spend, set } = useStore();
+  const { state, hydrated, spend, set } = useStore();
   const { showToast, askConfirm } = useUI();
-  const id = Number(params.id);
-  const base = CARDS.find((c) => c.id === id) || CARDS[0];
-  const [owned, setOwned] = useState(base.owned);
+  const cardId = Number(params.id);
+  const [card, setCard] = useState<CardData | null>(null);
+  const [owned, setOwned] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
   const [celebrate, setCelebrate] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
 
-  const total = base.price * qty;
-  const ring = `conic-gradient(#7CB342 ${Math.min(360, (owned / base.required) * 360)}deg,#eef0e6 0)`;
+  useEffect(() => {
+    if (!Number.isInteger(cardId) || cardId < 1) {
+      setError('잘못된 카드 주소예요.');
+      setLoading(false);
+      return;
+    }
+    if (!hydrated) return;
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+
+    getCard(cardId, state.accessToken, controller.signal)
+      .then((response) => {
+        setCard(response);
+        setOwned(response.ownedCount);
+      })
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setCard(null);
+        setError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : '카드를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [cardId, hydrated, state.accessToken]);
+
+  if (loading) {
+    return (
+      <div className="container">
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">
+          카드를 불러오고 있어요 🃏
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !card) {
+    return (
+      <div className="container">
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
+          <p>{error || '카드를 찾을 수 없어요.'}</p>
+          <Link
+            href="/cards"
+            className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white"
+          >
+            카드 목록으로 돌아가기
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const total = card.pointPrice * qty;
+  const ring = `conic-gradient(#7CB342 ${Math.min(
+    360,
+    ((owned ?? 0) / card.requiredCountForExchange) * 360,
+  )}deg,#eef0e6 0)`;
 
   const buy = () => {
-    if (!hydrated || !state.accessToken) {
+    if (!hydrated || !state.accessToken || owned === null) {
       showToast('카드 구매는 로그인 후 이용할 수 있어요.', 'err');
       return;
     }
-    if (total > balance) return showToast(`포인트가 ${fmt(total - balance)}P 부족해요.`, 'err');
     askConfirm({ icon: 'paid', title: '카드를 구매할까요?', ok: '구매하기',
-      body: `${base.name} ${qty}장 · 총 ${fmt(total)}P를 사용해요. 무상 포인트가 먼저 사용돼요.`,
-      onOk: () => {
-        spend(total);
-        const newOwned = owned + qty;
-        const reached = newOwned >= base.required && owned < base.required;
-        setOwned(newOwned); setQty(1);
-        if (reached) { set((s) => ({ readyCards: s.readyCards + 1 })); setCelebrate(true); }
-        else showToast('카드를 구매했어요! 🃏');
+      body: `${card.name} ${qty}장 · 총 ${fmt(total)}P를 사용해요. 무상 포인트가 먼저 사용돼요.`,
+      onOk: async () => {
+        const currentOwned = owned ?? 0;
+        setPurchasing(true);
+        try {
+          const response = await purchaseCard(
+            card.id,
+            qty,
+            state.accessToken!,
+            crypto.randomUUID(),
+          );
+          spend(response.usedPoint);
+          setOwned(response.ownedCount);
+          setQty(1);
+          const reached =
+            response.ownedCount >= card.requiredCountForExchange &&
+            currentOwned < card.requiredCountForExchange;
+          if (reached) {
+            set((s) => ({ readyCards: s.readyCards + 1 }));
+            setCelebrate(true);
+          } else {
+            showToast('카드를 구매했어요! 🃏');
+          }
+        } catch (purchaseError) {
+          showToast(
+            purchaseError instanceof ApiError
+              ? purchaseError.message
+              : '카드를 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
+            'err',
+          );
+        } finally {
+          setPurchasing(false);
+        }
       } });
   };
 
@@ -49,38 +139,72 @@ export default function CardDetail({ params }: { params: { id: string } }) {
       <Link href="/cards" className="text-sm font-semibold text-sub">← 카드</Link>
       <div className="mt-4 grid items-start gap-7 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <div
-          className="flex aspect-[3/4] max-h-[420px] items-center justify-center overflow-hidden rounded-[22px] text-[150px] shadow-[0_12px_36px_rgba(0,0,0,.1)]"
-          style={{ background: base.grad }}
+          className="flex aspect-[3/4] max-h-[420px] items-center justify-center overflow-hidden rounded-[22px] bg-brand-soft bg-cover bg-center text-[150px] shadow-[0_12px_36px_rgba(0,0,0,.1)]"
+          style={
+            card.imageUrl
+              ? { backgroundImage: `url("${card.imageUrl}")` }
+              : undefined
+          }
         >
-          {base.emoji}
+          {!card.imageUrl && '🃏'}
         </div>
         <div>
-          <h1 className="mb-1.5 text-[28px] font-extrabold">{base.name}</h1>
-          <PointPrice value={base.price} size="lg" className="mb-5" />
-
-          <div className="mb-5 flex items-center gap-5 rounded-[18px] bg-white px-5 py-[18px] shadow-card">
-            <div className="flex h-[92px] w-[92px] flex-none items-center justify-center rounded-full" style={{ background: ring }}>
-              <div className="flex h-[70px] w-[70px] flex-col items-center justify-center rounded-full bg-white font-extrabold">
-                <span className="text-xl text-brand">{owned}</span>
-                <span className="text-xs text-faint">/ {base.required}</span>
-              </div>
-            </div>
-            <div>
-              <div className="text-base font-extrabold">내 진행도</div>
-              <div className="mt-[3px] text-[13.5px] text-sub">
-                {owned >= base.required ? '모두 모았어요! 교환할 수 있어요 🎉' : `${base.required - owned}장만 더 모으면 교환할 수 있어요`}
-              </div>
-            </div>
+          <h1 className="mb-1.5 text-[28px] font-extrabold">{card.name}</h1>
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-sm font-bold text-sub">1장당</span>
+            <PointPrice value={card.pointPrice} size="lg" />
           </div>
+          <p className="mb-5 text-[14.5px] leading-[1.7] text-[#6d7a68]">
+            {card.description || '카드 설명을 준비하고 있어요.'}
+          </p>
+
+          {owned === null ? (
+            <div className="mb-5 rounded-[18px] bg-white px-5 py-[18px] text-[13.5px] text-sub shadow-card">
+              로그인하면 내 보유 수량과 교환 진행도를 확인할 수 있어요.
+            </div>
+          ) : (
+            <div className="mb-5 flex items-center gap-5 rounded-[18px] bg-white px-5 py-[18px] shadow-card">
+              <div
+                className="flex h-[92px] w-[92px] flex-none items-center justify-center rounded-full"
+                style={{ background: ring }}
+              >
+                <div className="flex h-[70px] w-[70px] flex-col items-center justify-center rounded-full bg-white font-extrabold">
+                  <span className="text-xl text-brand">{owned}</span>
+                  <span className="text-xs text-faint">
+                    / {card.requiredCountForExchange}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <div className="text-base font-extrabold">내 진행도</div>
+                <div className="mt-[3px] text-[13.5px] text-sub">
+                  {owned >= card.requiredCountForExchange
+                    ? '모두 모았어요! 교환할 수 있어요 🎉'
+                    : `${card.requiredCountForExchange - owned}장만 더 모으면 교환할 수 있어요`}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mb-[22px] flex items-center gap-3.5 rounded-[18px] bg-white px-5 py-[18px] shadow-card">
-            <div className="flex h-16 w-16 flex-none items-center justify-center rounded-[14px] text-[34px]" style={{ background: base.realGrad }}>
-              {base.realEmoji}
+            <div
+              className="flex h-16 w-16 flex-none items-center justify-center rounded-[14px] bg-brand-soft bg-cover bg-center text-[34px]"
+              style={
+                card.exchangeProductImageUrl
+                  ? { backgroundImage: `url("${card.exchangeProductImageUrl}")` }
+                  : undefined
+              }
+            >
+              {!card.exchangeProductImageUrl && '🎁'}
             </div>
             <div>
               <div className="text-xs font-bold text-faint">교환 상품</div>
-              <div className="font-extrabold">{base.realName}</div>
-              <div className="mt-0.5 text-[13px] text-sub">{base.realDesc} · {base.required}장 필요</div>
+              <div className="font-extrabold">{card.exchangeProductName}</div>
+              <div className="mt-0.5 text-[13px] text-sub">
+                {card.exchangeProductDescription || '교환 상품 설명을 준비하고 있어요.'}
+                {' · '}
+                {card.requiredCountForExchange}장 필요
+              </div>
             </div>
           </div>
 
@@ -96,8 +220,13 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             </span>
           </div>
 
-          <button type="button" onClick={buy} className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white">
-            구매하기
+          <button
+            type="button"
+            onClick={buy}
+            disabled={purchasing}
+            className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            {purchasing ? '구매 처리 중...' : '구매하기'}
           </button>
         </div>
       </div>
@@ -116,9 +245,9 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             ))}
             <div className="text-[66px]">🎉</div>
             <h3 className="mb-2 mt-3.5 text-xl font-extrabold">축하해요!</h3>
-            <p className="mb-6 leading-[1.6] text-[#6d7a68]">{base.name}가 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
+            <p className="mb-6 leading-[1.6] text-[#6d7a68]">{card.name}가 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
             <div className="flex gap-2.5">
-              <button type="button" onClick={() => router.push(`/exchange/new?cardId=${base.id}`)} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
+              <button type="button" onClick={() => router.push(`/exchange/new?cardId=${card.id}`)} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
                 교환 신청하기
               </button>
               <button type="button" onClick={() => setCelebrate(false)} className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-[18px] py-[13px] font-bold text-sub">
