@@ -1,7 +1,7 @@
 package com.kiwobollae.api.payment.dto.response;
 
 import com.kiwobollae.api.payment.entity.Payment;
-import com.kiwobollae.api.payment.entity.enums.PaymentProvider;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import java.time.LocalDateTime;
 
@@ -10,16 +10,21 @@ public record PaymentResponse(
 		Long userId,
 		Long chargeProductId,
 		String chargeProductName,
-		Long amount,
+		Long cashAmount,
 		Long pointAmount,
 		PaymentStatus status,
-		PaymentProvider provider,
+		PaymentProviderType provider,
 		String providerOrderId,
 		String providerPaymentKey,
 		LocalDateTime approvedAt,
-		LocalDateTime createdAt
+		LocalDateTime createdAt,
+		String message
 ) {
 	public static PaymentResponse from(Payment payment) {
+		return from(payment, null);
+	}
+
+	public static PaymentResponse from(Payment payment, String message) {
 		return new PaymentResponse(
 				payment.getId(),
 				payment.getUser().getId(),
@@ -32,7 +37,8 @@ public record PaymentResponse(
 				payment.getProviderOrderId(),
 				payment.getProviderPaymentKey(),
 				payment.getApprovedAt(),
-				payment.getCreatedAt()
+				payment.getCreatedAt(),
+				message
 		);
 	}
 }

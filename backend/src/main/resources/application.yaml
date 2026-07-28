@@ -15,6 +15,10 @@ spring:
     url: jdbc:mysql://localhost:3306/kiwobollae?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:password}
+    hikari:
+      # DB 함수(CURRENT_TIMESTAMP)가 애플리케이션 감사 시각과 같은 Asia/Seoul 기준을 사용하도록
+      # 모든 풀 연결이 생성될 때 세션 시간대를 고정한다.
+      connection-init-sql: SET time_zone = '+09:00'
   jpa:
     hibernate:
       # Default to "update" for convenience while there's no migration tool yet (see
@@ -31,3 +35,6 @@ jwt:
   secret: ${JWT_SECRET:CHANGE_ME_dev_only_placeholder_secret}
   access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+payment:
+  provider: ${PAYMENT_PROVIDER:MOCK}

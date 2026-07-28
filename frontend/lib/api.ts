@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+export const AUTH_EXPIRED_EVENT = 'kwb:auth-expired';
 
 // Backend error codes/messages: see docs/error-codes.md. The server already returns
 // user-facing Korean messages, so no client-side translation table is needed here.
@@ -31,6 +32,9 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}):
   const body = await res.json().catch(() => null);
 
   if (!res.ok) {
+    if (res.status === 401 && accessToken && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
     const code = body?.code || 'UNKNOWN_ERROR';
     const message = body?.message || '요청 처리 중 문제가 발생했어요.';
     throw new ApiError(code, message, res.status);

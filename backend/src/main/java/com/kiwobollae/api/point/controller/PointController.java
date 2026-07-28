@@ -34,7 +34,8 @@ public class PointController {
 	private final WalletService walletService;
 	private final PointTransactionService pointTransactionService;
 
-	@Operation(summary = "포인트 잔액 조회", description = "내 지갑의 합산 잔액(유상+무상)을 조회합니다. [POINT-01]")
+	@Operation(summary = "포인트 잔액 조회",
+			description = "내 지갑의 합산 잔액과 유상/무상 잔액을 조회합니다. [POINT-01]")
 	@GetMapping("/wallet")
 	public ResponseEntity<ApiResponse<WalletResponse>> getWallet(@AuthenticationPrincipal Long userId) {
 		return ResponseEntity.ok(ApiResponse.success(walletService.getWallet(userId)));

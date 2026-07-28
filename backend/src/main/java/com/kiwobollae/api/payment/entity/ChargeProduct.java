@@ -30,4 +30,15 @@ public class ChargeProduct extends BaseEntity {
 
 	@Column(name = "is_active", nullable = false)
 	private Boolean isActive;
+
+	public void update(String name, Long price, Long pointAmount, Boolean isActive) {
+		this.name = name;
+		this.price = price;
+		this.pointAmount = pointAmount;
+		this.isActive = isActive;
+	}
+
+	public void deactivate() {
+		this.isActive = false;
+	}
 }

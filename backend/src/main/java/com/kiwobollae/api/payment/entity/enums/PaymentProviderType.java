@@ -1,5 +1,5 @@
 package com.kiwobollae.api.payment.entity.enums;
 
-public enum PaymentProvider {
+public enum PaymentProviderType {
 	MOCK, TOSS
 }

@@ -120,7 +120,7 @@ export default function AuthPanel({ initialView = 'login' }: AuthPanelProps) {
               </div>
             )}
 
-            <button type="button" disabled={submitting} onClick={handleLogin} className="w-full cursor-pointer rounded-xl bg-brand p-3.5 text-base font-bold text-white transition-colors duration-150 hover:bg-brand-dark disabled:opacity-60">
+            <button type="button" disabled={submitting} onClick={() => void handleLogin()} className="w-full cursor-pointer rounded-xl bg-brand p-3.5 text-base font-bold text-white transition-colors duration-150 hover:bg-brand-dark disabled:opacity-60">
               로그인
             </button>
 

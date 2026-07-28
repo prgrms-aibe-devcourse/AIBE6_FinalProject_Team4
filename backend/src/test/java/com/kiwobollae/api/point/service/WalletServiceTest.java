@@ -3,12 +3,15 @@ package com.kiwobollae.api.point.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.dto.response.PointDeductionResult;
+import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
@@ -33,6 +36,25 @@ class WalletServiceTest {
 
 	@InjectMocks
 	private WalletService walletService;
+
+	@Test
+	void walletResponseContainsTotalPaidAndFreePoints() {
+		User user = mock(User.class);
+		given(user.getId()).willReturn(7L);
+		Wallet wallet = Wallet.builder()
+				.user(user)
+				.paidPoint(500L)
+				.freePoint(300L)
+				.build();
+		given(walletRepository.findByUserId(7L)).willReturn(Optional.of(wallet));
+
+		WalletResponse response = walletService.getWallet(7L);
+
+		assertThat(response.userId()).isEqualTo(7L);
+		assertThat(response.balance()).isEqualTo(800L);
+		assertThat(response.paidPoint()).isEqualTo(500L);
+		assertThat(response.freePoint()).isEqualTo(300L);
+	}
 
 	@Test
 	void purchaseUsesFreePointBeforePaidPointAndWritesLedgers() {

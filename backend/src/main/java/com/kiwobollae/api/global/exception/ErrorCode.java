@@ -54,7 +54,13 @@ public enum ErrorCode {
 
 	POINT_INSUFFICIENT_BALANCE(HttpStatus.UNPROCESSABLE_CONTENT, "사용 가능한 포인트가 부족합니다."),
 	POINT_WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "포인트 지갑을 찾을 수 없습니다."),
+	POINT_DUPLICATE_TRANSACTION(HttpStatus.CONFLICT, "이미 처리된 포인트 거래입니다."),
 
+	PAYMENT_CHARGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "충전 상품을 찾을 수 없습니다."),
+	PAYMENT_CHARGE_PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 충전 상품입니다."),
+	PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 건을 찾을 수 없습니다."),
+	PAYMENT_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 결제를 처리할 수 없습니다."),
+	PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "승인 금액이 결제 요청 금액과 일치하지 않습니다."),
 	PAYMENT_DECLINED(HttpStatus.UNPROCESSABLE_CONTENT, "결제가 거절되었습니다."),
 	PAYMENT_PROVIDER_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "결제 대행사로부터 올바르지 않은 응답을 받았습니다."),
 	PAYMENT_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "결제 대행사를 일시적으로 사용할 수 없습니다."),

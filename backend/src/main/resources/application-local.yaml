@@ -9,6 +9,8 @@ logging:
 
 app:
   seed:
+    charge-product:
+      enabled: true
     product:
       # Set to false when local development should use manually managed or production-like data.
       enabled: true

@@ -2,7 +2,7 @@ package com.kiwobollae.api.payment.entity;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
-import com.kiwobollae.api.payment.entity.enums.PaymentProvider;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
@@ -33,9 +33,9 @@ import lombok.NoArgsConstructor;
 				@Index(name = "idx_payment_user_id_created_at", columnList = "user_id, created_at"),
 				@Index(name = "idx_payment_status", columnList = "status")
 		})
-// JPA Auditing에 더해 DB 레벨 ON UPDATE 안전망(공용 BaseTimeEntity는 건드리지 않고 override).
+// JPA Auditing에 더해 Asia/Seoul DB 세션 기준 ON UPDATE 안전망(공용 BaseTimeEntity는 건드리지 않고 override).
 @AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
-		columnDefinition = "datetime default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP"))
+		columnDefinition = "datetime(6) default CURRENT_TIMESTAMP(6) on update CURRENT_TIMESTAMP(6)"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
@@ -61,7 +61,7 @@ public class Payment extends BaseTimeEntity {
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private PaymentProvider provider;
+	private PaymentProviderType provider;
 
 	@Column(name = "provider_order_id", nullable = false, length = 100)
 	private String providerOrderId;

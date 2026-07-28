@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
+		if (e.getErrorCode() == ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS) {
+			return ResponseEntity.status(e.getErrorCode().getHttpStatus())
+					.header("Retry-After", "2")
+					.body(errorResponse(e.getErrorCode(), e.getMessage(), e.getDetails(), null, request));
+		}
 		return respond(e.getErrorCode(), e.getMessage(), e.getDetails(), null, request);
 	}
 
@@ -84,9 +89,14 @@ public class GlobalExceptionHandler {
 
 	private ResponseEntity<ErrorResponse> respond(ErrorCode errorCode, String message, Map<String, Object> details,
 			List<ErrorResponse.FieldError> fieldErrors, HttpServletRequest request) {
-		ErrorResponse response = ErrorResponse.of(
+		return ResponseEntity.status(errorCode.getHttpStatus())
+				.body(errorResponse(errorCode, message, details, fieldErrors, request));
+	}
+
+	private ErrorResponse errorResponse(ErrorCode errorCode, String message, Map<String, Object> details,
+			List<ErrorResponse.FieldError> fieldErrors, HttpServletRequest request) {
+		return ErrorResponse.of(
 				errorCode, message != null ? message : errorCode.getDefaultMessage(),
 				details, fieldErrors, ErrorResponse.newTraceId(), request.getRequestURI());
-		return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
 	}
 }
