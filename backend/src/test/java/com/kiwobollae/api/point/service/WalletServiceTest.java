@@ -14,7 +14,9 @@ import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
+import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
+import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
 import java.util.Optional;
@@ -95,5 +97,93 @@ class WalletServiceTest {
 				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
 		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void purchaseDoesNotUseNegativeFreePointAsAvailableBalance() {
+		Wallet wallet = Wallet.builder().freePoint(-100L).paidPoint(200L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForPurchase(
+				7L,
+				150L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		);
+
+		assertThat(result.usedFreePoint()).isZero();
+		assertThat(result.usedPaidPoint()).isEqualTo(150L);
+		assertThat(wallet.getFreePoint()).isEqualTo(-100L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(50L);
+	}
+
+	@Test
+	void restorePurchasePointsRestoresEachCurrencyAndWritesLedgers() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(200L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		walletService.restorePurchasePoints(7L, 300L, 300L, PointRefType.CARD_PURCHASE, 11L);
+
+		assertThat(wallet.getFreePoint()).isEqualTo(300L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(500L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getType)
+				.containsExactly(PointTxType.RESTORE, PointTxType.RESTORE);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getCurrencyType)
+				.containsExactly(CurrencyType.FREE, CurrencyType.PAID);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getAmount)
+				.containsExactly(300L, 300L);
+	}
+
+	@Test
+	void restorePurchasePointsRejectsDuplicateRestore() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(200L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.RESTORE,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).willReturn(true);
+
+		assertThatThrownBy(() -> walletService.restorePurchasePoints(
+				7L,
+				300L,
+				300L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_DUPLICATE_TRANSACTION));
+
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void restorePurchasePointsRejectsZeroOrNegativeUsage() {
+		assertThatThrownBy(() -> walletService.restorePurchasePoints(
+				7L,
+				0L,
+				0L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		assertThatThrownBy(() -> walletService.restorePurchasePoints(
+				7L,
+				-1L,
+				1L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
 	}
 }

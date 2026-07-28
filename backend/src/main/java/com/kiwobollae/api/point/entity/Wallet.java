@@ -61,4 +61,9 @@ public class Wallet extends BaseTimeEntity {
 	public long totalBalance() {
 		return this.paidPoint + this.freePoint;
 	}
+
+	/** 구매에 사용할 수 있는 잔액. 무상 포인트가 부채인 경우 유상 포인트만 사용한다. */
+	public long availableBalance() {
+		return this.paidPoint + Math.max(this.freePoint, 0L);
+	}
 }

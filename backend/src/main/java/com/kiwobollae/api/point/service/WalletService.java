@@ -55,7 +55,7 @@ public class WalletService {
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 
-		if (amount < 1 || wallet.totalBalance() < amount) {
+		if (amount < 1 || wallet.availableBalance() < amount) {
 			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
 		}
 
@@ -64,14 +64,43 @@ public class WalletService {
 
 		if (usedFreePoint > 0) {
 			long balanceAfter = wallet.increaseFreePoint(-usedFreePoint);
-			saveTransaction(wallet, CurrencyType.FREE, -usedFreePoint, balanceAfter, refType, refId);
+			saveTransaction(wallet, PointTxType.PURCHASE, CurrencyType.FREE, -usedFreePoint, balanceAfter, refType, refId);
 		}
 		if (usedPaidPoint > 0) {
 			long balanceAfter = wallet.increasePaidPoint(-usedPaidPoint);
-			saveTransaction(wallet, CurrencyType.PAID, -usedPaidPoint, balanceAfter, refType, refId);
+			saveTransaction(wallet, PointTxType.PURCHASE, CurrencyType.PAID, -usedPaidPoint, balanceAfter, refType, refId);
 		}
 
 		return new PointDeductionResult(usedFreePoint, usedPaidPoint, wallet.totalBalance());
+	}
+
+	/**
+	 * 구매 시 실제로 차감한 통화별 포인트를 그대로 원복한다. 동일 구매 건은 한 번만 원복할 수 있다.
+	 */
+	@Transactional
+	public void restorePurchasePoints(
+			Long userId,
+			long usedFreePoint,
+			long usedPaidPoint,
+			PointRefType refType,
+			Long refId
+	) {
+		validateRestoreRequest(usedFreePoint, usedPaidPoint, refType, refId);
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+
+		if (pointTransactionRepository.existsByTypeAndRefTypeAndRefId(PointTxType.RESTORE, refType, refId)) {
+			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
+		}
+
+		if (usedFreePoint > 0) {
+			long balanceAfter = wallet.increaseFreePoint(usedFreePoint);
+			saveTransaction(wallet, PointTxType.RESTORE, CurrencyType.FREE, usedFreePoint, balanceAfter, refType, refId);
+		}
+		if (usedPaidPoint > 0) {
+			long balanceAfter = wallet.increasePaidPoint(usedPaidPoint);
+			saveTransaction(wallet, PointTxType.RESTORE, CurrencyType.PAID, usedPaidPoint, balanceAfter, refType, refId);
+		}
 	}
 
 	/**
@@ -118,6 +147,7 @@ public class WalletService {
 
 	private void saveTransaction(
 			Wallet wallet,
+			PointTxType type,
 			CurrencyType currency,
 			long amount,
 			long balanceAfter,
@@ -126,12 +156,24 @@ public class WalletService {
 	) {
 		pointTransactionRepository.save(PointTransaction.builder()
 				.wallet(wallet)
-				.type(PointTxType.PURCHASE)
+				.type(type)
 				.currencyType(currency)
 				.amount(amount)
 				.balanceAfter(balanceAfter)
 				.refType(refType)
 				.refId(refId)
 				.build());
+	}
+
+	private void validateRestoreRequest(
+			long usedFreePoint,
+			long usedPaidPoint,
+			PointRefType refType,
+			Long refId
+	) {
+		if (usedFreePoint < 0 || usedPaidPoint < 0 || (usedFreePoint == 0 && usedPaidPoint == 0)
+				|| refType == null || refId == null || refId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
 	}
 }
