@@ -84,7 +84,7 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
     throw new ApiError(code, message, res.status);
   }
 
-  return body.data as T;
+  return body?.data as T;
 }
 
 // Shape of Spring Data's Page<T> as Jackson serializes it by default (content/number/
