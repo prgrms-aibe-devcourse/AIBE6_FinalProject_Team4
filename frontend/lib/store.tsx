@@ -67,6 +67,7 @@ export interface StoreContextValue {
   walletError: string | null;
   set: (patch: StorePatch) => void;
   spend: (amount: number) => void;
+  spendForOrder: (amount: number, requestedFreePoint: number) => void;
   creditFree: (amount: number) => void;
   creditPaid: (amount: number) => void;
   reset: () => void;
@@ -230,6 +231,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // 상품 주문 목 흐름 전용. 실제 주문 API가 연결되면 서버 응답 후 refreshWallet()로 대체한다.
+  const spendForOrder = useCallback((amount: number, requestedFreePoint: number) => {
+    setState((s) => ({
+      ...s,
+      wallet: {
+        free: s.wallet.free - requestedFreePoint,
+        paid: s.wallet.paid - (amount - requestedFreePoint),
+      },
+    }));
+  }, []);
+
   const creditFree = useCallback((amount: number) => {
     setState((s) => ({ ...s, wallet: { free: s.wallet.free + amount, paid: s.wallet.paid } }));
   }, []);
@@ -292,6 +304,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         walletError,
         set,
         spend,
+        spendForOrder,
         creditFree,
         creditPaid,
         reset,

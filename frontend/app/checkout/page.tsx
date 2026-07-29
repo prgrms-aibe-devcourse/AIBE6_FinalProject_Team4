@@ -4,22 +4,41 @@ import Link from 'next/link';
 import { useStore, fmt } from '@/lib/store';
 import PointPrice from '@/components/PointPrice';
 import { PRODUCTS, ADDRESSES } from '@/lib/data';
+import {
+  calculateOrderPointUsage,
+  getMaximumOrderFreePoint,
+  ORDER_FREE_POINT_UNIT,
+} from '@/features/order/point-policy';
 
 const ITEMS = [{ id: 1, qty: 1 }, { id: 3, qty: 2 }];
 
 export default function Checkout() {
-  const { balance, spend, set } = useStore();
+  const { state, spendForOrder, set } = useStore();
   const [selAddr, setSelAddr] = useState(0);
+  const [useFreePoint, setUseFreePoint] = useState(false);
+  const [freePointInput, setFreePointInput] = useState(0);
   const [ordering, setOrdering] = useState(false);
   const [done, setDone] = useState(false);
   const prod = (id: number) => PRODUCTS.find((p) => p.id === id);
   const total = ITEMS.reduce((s, i) => s + (prod(i.id)?.price ?? 0) * i.qty, 0);
+  const requestedFreePoint = useFreePoint ? freePointInput : 0;
+  const maximumFreePoint = getMaximumOrderFreePoint(total, state.wallet.free);
+  const pointUsage = calculateOrderPointUsage({
+    totalPoint: total,
+    paidPoint: state.wallet.paid,
+    freePoint: state.wallet.free,
+    requestedFreePoint,
+  });
 
   const place = () => {
     if (ordering) return;
-    if (total > balance) return;
+    if (!pointUsage.valid) return;
     setOrdering(true);
-    setTimeout(() => { spend(total); set((s) => ({ cartCount: Math.max(0, s.cartCount - ITEMS.length) })); setDone(true); }, 600);
+    setTimeout(() => {
+      spendForOrder(total, requestedFreePoint);
+      set((s) => ({ cartCount: Math.max(0, s.cartCount - ITEMS.length) }));
+      setDone(true);
+    }, 600);
   };
 
   if (done) {
@@ -32,6 +51,8 @@ export default function Checkout() {
           <div className="mb-[22px] rounded-[14px] bg-[#F6F9EF] p-4 text-left text-sm">
             <div className="flex justify-between py-1"><span className="text-sub">주문번호</span><span className="font-extrabold">ORD-20260721-0043</span></div>
             <div className="flex justify-between py-1"><span className="text-sub">배송지</span><span className="font-bold">{ADDRESSES[selAddr].addr.split(',')[0]}</span></div>
+            <div className="mt-2 flex justify-between border-t border-[#e4ead8] pt-2"><span className="text-sub">유상 포인트 사용</span><span className="font-bold">{fmt(pointUsage.usedPaidPoint)}P</span></div>
+            <div className="flex justify-between py-1"><span className="text-sub">무상 포인트 사용</span><span className="font-bold">{fmt(pointUsage.usedFreePoint)}P</span></div>
           </div>
           <div className="flex flex-wrap justify-center gap-2.5">
             <Link href="/my/orders" className="rounded-xl bg-brand px-6 py-[13px] font-bold text-white hover:text-white">주문 내역 보기</Link>
@@ -88,15 +109,82 @@ export default function Checkout() {
 
         <div className="rounded-[18px] bg-white p-[22px] shadow-card">
           <div className="mb-4 font-extrabold">결제</div>
-          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">보유 포인트</span><span className="font-bold">{fmt(balance)}P</span></div>
+          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">유상 포인트</span><span className="font-bold">{fmt(state.wallet.paid)}P</span></div>
+          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">무상 포인트</span><span className="font-bold">{fmt(state.wallet.free)}P</span></div>
           <div className="flex items-center justify-between py-2 text-[14.5px]"><span className="text-sub">주문 금액</span><PointPrice value={total} size="sm" /></div>
-          <div className="mt-1.5 flex justify-between border-t border-[#f2f3ec] py-2 text-[14.5px]"><span className="text-sub">결제 후 잔액</span><span className="font-extrabold">{fmt(balance - total)}P</span></div>
-          <p className="mb-4 mt-3 text-xs text-[#a9b3a0]">무상 포인트가 먼저 사용돼요.</p>
+
+          <div className="my-4 rounded-[14px] border border-[#e4ead8] bg-[#FAFCF6] p-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={useFreePoint}
+                disabled={maximumFreePoint < ORDER_FREE_POINT_UNIT}
+                onChange={(event) => {
+                  setUseFreePoint(event.target.checked);
+                  if (!event.target.checked) setFreePointInput(0);
+                }}
+                className="mt-0.5 h-[18px] w-[18px] accent-[#7CB342]"
+              />
+              <span>
+                <span className="block text-sm font-extrabold">무상 포인트 함께 사용</span>
+                <span className="mt-0.5 block text-xs leading-[1.5] text-sub">
+                  선택하지 않으면 유상 포인트로만 결제돼요.
+                </span>
+              </span>
+            </label>
+
+            {useFreePoint && (
+              <div className="mt-3 border-t border-[#e4ead8] pt-3">
+                <div className="mb-2 flex items-center justify-between text-xs text-sub">
+                  <span>{ORDER_FREE_POINT_UNIT}P 단위로 입력</span>
+                  <span>최대 {fmt(maximumFreePoint)}P</span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={maximumFreePoint}
+                    step={ORDER_FREE_POINT_UNIT}
+                    value={freePointInput}
+                    onChange={(event) => setFreePointInput(Number(event.target.value))}
+                    className="min-w-0 flex-1 rounded-xl border-[1.5px] border-line bg-white px-3 py-2.5 text-right font-bold outline-none focus:border-brand"
+                    aria-label="사용할 무상 포인트"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFreePointInput(maximumFreePoint)}
+                    className="cursor-pointer whitespace-nowrap rounded-xl bg-brand-soft px-3.5 text-sm font-bold text-brand-dark"
+                  >
+                    최대 사용
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-[#f2f3ec] pt-2 text-[14.5px]">
+            <div className="flex justify-between py-1.5"><span className="text-sub">유상 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedPaidPoint)}P</span></div>
+            <div className="flex justify-between py-1.5"><span className="text-sub">무상 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedFreePoint)}P</span></div>
+            <div className="mt-1.5 flex justify-between border-t border-[#f2f3ec] py-2"><span className="text-sub">결제 후 유상 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingPaidPoint))}P</span></div>
+            <div className="flex justify-between pb-2"><span className="text-sub">결제 후 무상 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingFreePoint))}P</span></div>
+          </div>
+
+          {pointUsage.error && (
+            <div className="mb-4 mt-2 rounded-[11px] bg-danger-soft px-[13px] py-[11px] text-[13px] font-semibold text-danger">
+              {pointUsage.error}
+              {!useFreePoint && maximumFreePoint > 0 && (
+                <span className="mt-1 block">무상 포인트를 함께 사용하려면 위 항목을 선택해 주세요.</span>
+              )}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={place}
-            disabled={ordering}
-            className={`w-full rounded-[13px] p-[15px] font-extrabold text-white ${ordering ? 'cursor-default bg-[#b0c894]' : 'cursor-pointer bg-brand'}`}
+            disabled={ordering || !pointUsage.valid}
+            className={`w-full rounded-[13px] p-[15px] font-extrabold text-white ${
+              ordering || !pointUsage.valid ? 'cursor-not-allowed bg-[#b0c894]' : 'cursor-pointer bg-brand'
+            }`}
           >
             {ordering ? '주문 처리 중…' : '결제하고 주문 완료'}
           </button>

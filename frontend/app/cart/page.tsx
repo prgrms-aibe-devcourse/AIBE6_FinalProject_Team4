@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useStore, fmt } from '@/lib/store';
 import PointPrice from '@/components/PointPrice';
 import { PRODUCTS } from '@/lib/data';
+import {
+  getMaximumOrderFreePoint,
+  getMinimumOrderFreePoint,
+} from '@/features/order/point-policy';
 
 interface CartItem {
   id: number;
@@ -19,13 +23,16 @@ const INITIAL: CartItem[] = [
 
 export default function Cart() {
   const router = useRouter();
-  const { balance } = useStore();
+  const { state } = useStore();
   const [cart, setCart] = useState<CartItem[]>(INITIAL);
   const [checked, setChecked] = useState<Record<number, boolean>>({ 1: true, 3: true, 5: false, 6: true });
   const prod = (id: number) => PRODUCTS.find((p) => p.id === id);
 
   const total = cart.filter((i) => checked[i.id] && (prod(i.id)?.stock ?? 0) > 0).reduce((s, i) => s + (prod(i.id)?.price ?? 0) * i.qty, 0);
-  const short = Math.max(0, total - balance);
+  const maximumFreePoint = getMaximumOrderFreePoint(total, state.wallet.free);
+  const minimumFreePoint = getMinimumOrderFreePoint(total, state.wallet.paid);
+  const canPurchase = total > 0 && minimumFreePoint <= maximumFreePoint;
+  const shortage = Math.max(0, total - state.wallet.paid - maximumFreePoint);
 
   return (
     <div className="container">
@@ -79,16 +86,31 @@ export default function Cart() {
             <span className="text-sub">선택 상품 합계</span>
             <PointPrice value={total} size="sm" />
           </div>
-          <div className="flex justify-between border-b border-[#f2f3ec] py-2 text-[14.5px]">
-            <span className="text-sub">내 잔액</span><span className="font-bold">{fmt(balance)}P</span>
+          <div className="flex justify-between py-2 text-[14.5px]">
+            <span className="text-sub">유상 포인트</span><span className="font-bold">{fmt(state.wallet.paid)}P</span>
           </div>
-          {short > 0 && (
+          <div className="flex justify-between border-b border-[#f2f3ec] py-2 text-[14.5px]">
+            <span className="text-sub">무상 포인트</span><span className="font-bold">{fmt(state.wallet.free)}P</span>
+          </div>
+          {minimumFreePoint > 0 && canPurchase && (
+            <div className="my-3.5 rounded-[11px] bg-brand-soft px-[13px] py-[11px] text-[13px] font-semibold text-brand-dark">
+              기본 결제에 필요한 유상 포인트가 부족해요. 결제 단계에서 무상 포인트를 최소 {fmt(minimumFreePoint)}P 사용해 주세요.
+            </div>
+          )}
+          {!canPurchase && total > 0 && (
             <div className="my-3.5 rounded-[11px] bg-danger-soft px-[13px] py-[11px] text-[13px] font-semibold text-danger">
-              포인트가 {fmt(short)}P 부족해요.{' '}
+              사용 가능한 포인트가 {fmt(shortage)}P 부족해요.{' '}
               <Link href="/my/points/charge" className="font-extrabold text-danger underline hover:text-danger">충전하러 가기</Link>
             </div>
           )}
-          <button type="button" onClick={() => total > 0 && router.push('/checkout')} className="mt-4 w-full cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white">
+          <button
+            type="button"
+            onClick={() => canPurchase && router.push('/checkout')}
+            disabled={!canPurchase}
+            className={`mt-4 w-full rounded-[13px] p-[15px] font-extrabold text-white ${
+              canPurchase ? 'cursor-pointer bg-brand' : 'cursor-not-allowed bg-[#b0c894]'
+            }`}
+          >
             주문하기
           </button>
         </div>
