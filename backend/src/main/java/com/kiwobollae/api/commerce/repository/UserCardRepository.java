@@ -30,4 +30,13 @@ public interface UserCardRepository extends JpaRepository<UserCard, Long> {
 			@Param("cardId") Long cardId,
 			@Param("quantity") Integer quantity
 	);
+
+	@Modifying
+	@Query("update UserCard uc set uc.count = uc.count - :requiredCount "
+			+ "where uc.user.id = :userId and uc.card.id = :cardId and uc.count >= :requiredCount")
+	int decrementCountIfEnough(
+			@Param("userId") Long userId,
+			@Param("cardId") Long cardId,
+			@Param("requiredCount") Integer requiredCount
+	);
 }

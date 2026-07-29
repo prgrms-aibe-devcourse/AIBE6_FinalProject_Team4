@@ -60,6 +60,8 @@ public enum ErrorCode {
 	CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."),
 	CARD_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "교환에 필요한 카드를 보유하고 있지 않습니다."),
 
+	EXCHANGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 상품을 찾을 수 없습니다."),
+	EXCHANGE_PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "교환 상품의 재고가 부족합니다."),
 	EXCHANGE_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 신청을 찾을 수 없습니다."),
 	EXCHANGE_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 처리할 수 없는 교환 신청입니다."),
 
