@@ -87,6 +87,20 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
   return body.data as T;
 }
 
+// Shape of Spring Data's Page<T> as Jackson serializes it by default (content/number/
+// totalElements/... alongside a nested pageable/sort object we don't need on the client).
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  empty: boolean;
+}
+
 export interface UserResponse {
   id: number;
   email: string;

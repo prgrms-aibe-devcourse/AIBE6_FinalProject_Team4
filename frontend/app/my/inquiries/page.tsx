@@ -1,30 +1,36 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ApiError } from '@/lib/api';
+import {
+  createInquiry,
+  getMyInquiries,
+  InquiryCategory,
+  InquiryData,
+} from '@/lib/inquiry-api';
+import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 
-const CAT: Record<string, string> = { PAYMENT: '결제', DELIVERY: '배송', ACCOUNT: '계정', ETC: '기타' };
-const STAT: Record<string, [string, string]> = {
-  PENDING: ['대기', 'bg-[#f0f1ea] text-[#8a8a8a]'],
+const CAT: Record<InquiryCategory, string> = { PAYMENT: '결제', DELIVERY: '배송', ACCOUNT: '계정', ETC: '기타' };
+const STAT: Record<InquiryData['status'], [string, string]> = {
+  OPEN: ['대기', 'bg-[#f0f1ea] text-[#8a8a8a]'],
   ANSWERED: ['답변완료', 'bg-[#E8F3D8] text-brand-text'],
 };
 
-interface Inquiry {
-  id: number;
-  cat: string;
-  title: string;
-  date: string;
-  status: string;
-  content: string;
-  answer?: string;
-  answeredAt?: string;
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
-const INITIAL: Inquiry[] = [
-  { id: 1, cat: 'DELIVERY', title: '배송이 언제 시작되나요?', date: '2026.07.20', status: 'ANSWERED', content: '어제 주문한 상추 모종이 아직 준비중으로 표시돼요. 언제쯤 받아볼 수 있을까요?', answer: '안녕하세요, 초록님! 주문하신 상추 모종은 오늘 오후 발송 예정이에요. 발송이 시작되면 알림으로 알려드릴게요. 기다려 주셔서 고마워요 🌿', answeredAt: '2026.07.20 18:20' },
-  { id: 2, cat: 'PAYMENT', title: '포인트 환불은 어떻게 하나요?', date: '2026.07.19', status: 'PENDING', content: '충전한 포인트를 환불받고 싶은데 방법을 알고 싶어요.' },
-  { id: 3, cat: 'ACCOUNT', title: '닉네임을 바꾸고 싶어요', date: '2026.07.15', status: 'ANSWERED', content: '가입할 때 정한 닉네임을 변경할 수 있을까요?', answer: '물론이에요! 마이페이지 > 프로필 수정에서 언제든 닉네임을 바꾸실 수 있어요. 다만 이미 사용 중인 닉네임은 선택할 수 없답니다 🌱', answeredAt: '2026.07.15 11:05' },
-];
-const CATS = [['PAYMENT', '결제'], ['DELIVERY', '배송'], ['ACCOUNT', '계정'], ['ETC', '기타']];
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date);
+}
+
+const CATS: [InquiryCategory, string][] = [['PAYMENT', '결제'], ['DELIVERY', '배송'], ['ACCOUNT', '계정'], ['ETC', '기타']];
 const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘텐츠'], ['stolen', '사진 도용'], ['etc', '기타']];
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
@@ -33,22 +39,69 @@ const CHIP_CAT = 'rounded-full bg-brand-soft px-[11px] py-1 text-xs font-extrabo
 const CHIP_STAT = 'rounded-full px-3 py-[5px] text-[12.5px] font-extrabold';
 
 export default function Inquiries() {
+  const { state, hydrated } = useStore();
   const { showToast } = useUI();
-  const [inquiries, setInquiries] = useState<Inquiry[]>(INITIAL);
+  const [inquiries, setInquiries] = useState<InquiryData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [view, setView] = useState('list');
-  const [cur, setCur] = useState<Inquiry | null>(null);
-  const [form, setForm] = useState<{ cat: string | null; title: string; content: string }>({ cat: null, title: '', content: '' });
+  const [cur, setCur] = useState<InquiryData | null>(null);
+  const [form, setForm] = useState<{ cat: InquiryCategory | null; title: string; content: string }>({ cat: null, title: '', content: '' });
+  const [submitting, setSubmitting] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
   const [reported, setReported] = useState(false);
 
-  const submit = () => {
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+
+    getMyInquiries(accessToken, 0, 50, controller.signal)
+      .then((page) => setInquiries(page.content))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setInquiries([]);
+        setError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : '문의 내역을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
+
+  const submit = async () => {
     if (!form.cat) return showToast('문의 유형을 골라주세요.', 'err');
     if (!form.title.trim()) return showToast('제목을 입력해 주세요.', 'err');
     if (!form.content.trim()) return showToast('문의 내용을 입력해 주세요.', 'err');
-    setInquiries([{ id: Date.now(), cat: form.cat, title: form.title, date: '2026.07.21', status: 'PENDING', content: form.content }, ...inquiries]);
-    setForm({ cat: null, title: '', content: '' }); setView('list');
-    showToast('문의가 접수됐어요. 정성껏 답변드릴게요 💌');
+    if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
+
+    setSubmitting(true);
+    try {
+      const created = await createInquiry(
+        { category: form.cat, title: form.title, content: form.content },
+        state.accessToken,
+      );
+      setInquiries([created, ...inquiries]);
+      setForm({ cat: null, title: '', content: '' });
+      setView('list');
+      showToast('문의가 접수됐어요. 정성껏 답변드릴게요 💌');
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '문의 등록에 실패했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
   const submitReport = () => {
     if (!reason) return showToast('신고 사유를 골라주세요.', 'err');
@@ -96,7 +149,9 @@ export default function Inquiries() {
             placeholder="자세히 알려주시면 더 정확하게 도와드릴 수 있어요."
             className="mt-1.5 min-h-[150px] w-full resize-y rounded-xl border-[1.5px] border-line p-3.5 text-[15px] leading-[1.6] outline-none"
           />
-          <button type="button" onClick={submit} className="mt-[18px] w-full cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white">문의 접수</button>
+          <button type="button" onClick={submit} disabled={submitting} className="mt-[18px] w-full cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60">
+            {submitting ? '접수 중...' : '문의 접수'}
+          </button>
         </div>
       </div>
     );
@@ -108,11 +163,11 @@ export default function Inquiries() {
       <div className="container max-w-[820px]">
         <button type="button" onClick={() => setView('list')} className="cursor-pointer text-sm font-semibold text-sub">← 1:1 문의</button>
         <div className="my-4 flex items-center gap-2.5">
-          <span className={CHIP_CAT}>{CAT[cur.cat]}</span>
+          <span className={CHIP_CAT}>{CAT[cur.category]}</span>
           <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
         </div>
         <h1 className="mb-1.5 text-[22px] font-extrabold">{cur.title}</h1>
-        <div className="mb-[18px] text-[13px] text-faint">{cur.date}</div>
+        <div className="mb-[18px] text-[13px] text-faint">{formatDate(cur.createdAt)}</div>
         <div className="whitespace-pre-wrap rounded-2xl bg-white p-5 leading-[1.7] text-[#4a5647] shadow-card">{cur.content}</div>
 
         {cur.status === 'ANSWERED' ? (
@@ -120,11 +175,11 @@ export default function Inquiries() {
             <div className="mb-2.5 flex items-center gap-2.5">
               <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] text-base">🌱</div>
               <div>
-                <div className="text-sm font-extrabold">키워볼래 지기</div>
-                <div className="text-xs text-sub">{cur.answeredAt}</div>
+                <div className="text-sm font-extrabold">{cur.answerAdminName ?? '키워볼래 지기'}</div>
+                <div className="text-xs text-sub">{cur.answeredAt ? formatDateTime(cur.answeredAt) : ''}</div>
               </div>
             </div>
-            <p className="whitespace-pre-wrap leading-[1.7] text-[#4a5647]">{cur.answer}</p>
+            <p className="whitespace-pre-wrap leading-[1.7] text-[#4a5647]">{cur.answerContent}</p>
           </div>
         ) : (
           <div className="mt-4 rounded-2xl bg-[#f5f2ee] px-5 py-[18px] text-sm font-semibold text-[#8a7d6f]">
@@ -143,26 +198,34 @@ export default function Inquiries() {
       </div>
       <p className="mb-[22px] text-sub">궁금하거나 불편한 점이 있으면 편하게 남겨주세요. 정성껏 답해드릴게요 💌</p>
 
-      <div className="flex flex-col gap-3">
-        {inquiries.map((q) => {
-          const st = STAT[q.status];
-          return (
-            <button
-              key={q.id}
-              type="button"
-              onClick={() => { setCur(q); setView('detail'); }}
-              className="flex flex-wrap items-center gap-3.5 rounded-2xl bg-white px-5 py-[18px] text-left shadow-card"
-            >
-              <span className={CHIP_CAT}>{CAT[q.cat]}</span>
-              <div className="min-w-[150px] flex-1">
-                <div className="font-bold">{q.title}</div>
-                <div className="mt-[3px] text-[12.5px] text-faint">{q.date}</div>
-              </div>
-              <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
-            </button>
-          );
-        })}
-      </div>
+      {loading ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">문의 내역을 불러오고 있어요 💌</div>
+      ) : error ? (
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
+      ) : inquiries.length === 0 ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">아직 등록한 문의가 없어요.</div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {inquiries.map((q) => {
+            const st = STAT[q.status];
+            return (
+              <button
+                key={q.id}
+                type="button"
+                onClick={() => { setCur(q); setView('detail'); }}
+                className="flex flex-wrap items-center gap-3.5 rounded-2xl bg-white px-5 py-[18px] text-left shadow-card"
+              >
+                <span className={CHIP_CAT}>{CAT[q.category]}</span>
+                <div className="min-w-[150px] flex-1">
+                  <div className="font-bold">{q.title}</div>
+                  <div className="mt-[3px] text-[12.5px] text-faint">{formatDate(q.createdAt)}</div>
+                </div>
+                <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-[30px] text-center">
         <button type="button" onClick={() => setReportOpen(true)} className="cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white px-[18px] py-[11px] font-bold text-sub">
