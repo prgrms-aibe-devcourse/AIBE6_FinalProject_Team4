@@ -26,7 +26,7 @@ public class WalletService {
 	private final WalletRepository walletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
 
-	/** POINT-10: 회원가입 트랜잭션에서 지갑 자동 생성(paid=0, free=0). auth 도메인이 호출. */
+	/** POINT-10: 일반·소셜 회원가입 트랜잭션에서 지갑 자동 생성(paid=0, free=0). auth 도메인이 호출. */
 	@Transactional
 	public void createWallet(User user) {
 		Wallet wallet = Wallet.builder()

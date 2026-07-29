@@ -131,7 +131,9 @@ public class AuthService {
 				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build();
-		return userRepository.save(user);
+		User savedUser = userRepository.save(user);
+		walletService.createWallet(savedUser); // POINT-10: 소셜 자동가입 트랜잭션에서 지갑 생성
+		return savedUser;
 	}
 
 	private String generateUniqueNickname(String base) {
