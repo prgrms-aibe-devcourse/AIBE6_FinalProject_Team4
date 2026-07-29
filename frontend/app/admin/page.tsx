@@ -1,10 +1,18 @@
 "use client";
-import { fmt } from "@/lib/store";
+import { ApiError } from "@/lib/api";
+import {
+  adminCancelExchange,
+  deliverExchange,
+  ExchangeOrderData,
+  getExchangesForAdmin,
+  prepareExchange,
+  shipExchange,
+} from "@/lib/exchange-api";
+import { fmt, useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const DELSEQ = ["PREPARING", "SHIPPING", "DELIVERED"];
-const EXSEQ = ["REQUESTED", "PREPARING", "SHIPPING", "DELIVERED"];
 const delMeta: Record<string, [string, string, string]> = {
   PREPARING: ["준비중", "bg-[#FFF3CC] text-gold-text", "배송 시작"],
   SHIPPING: ["배송중", "bg-[#E3F0FA] text-[#3a76a8]", "배송 완료"],
@@ -81,29 +89,36 @@ export default function Admin() {
       delivery: "PREPARING",
     },
   ]);
-  const [exchanges, setExchanges] = useState([
-    {
-      id: 1,
-      product: "진짜 수박",
-      card: "수박 카드",
-      count: 5,
-      status: "REQUESTED",
-    },
-    {
-      id: 2,
-      product: "방울토마토 1kg",
-      card: "토마토 카드",
-      count: 4,
-      status: "PREPARING",
-    },
-    {
-      id: 3,
-      product: "당근 1kg",
-      card: "당근 카드",
-      count: 3,
-      status: "SHIPPING",
-    },
-  ]);
+  const { state, hydrated } = useStore();
+  const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
+  const [exchangesLoading, setExchangesLoading] = useState(true);
+  const [exchangesError, setExchangesError] = useState("");
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+
+    const controller = new AbortController();
+    setExchangesLoading(true);
+    setExchangesError("");
+
+    getExchangesForAdmin(accessToken, undefined, 0, 50, controller.signal)
+      .then((page) => setExchanges(page.content))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setExchanges([]);
+        setExchangesError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : "교환 신청을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setExchangesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
   const [products, setProducts] = useState([
     {
       id: 1,
@@ -187,25 +202,35 @@ export default function Admin() {
     );
     showToast("배송 상태를 업데이트했어요. 고객에게 알림이 발송돼요 📦");
   };
-  const advEx = (id: number) => {
-    setExchanges(
-      exchanges.map((x) =>
-        x.id === id && x.status !== "CANCELLED"
-          ? {
-              ...x,
-              status:
-                EXSEQ[Math.min(EXSEQ.length - 1, EXSEQ.indexOf(x.status) + 1)],
-            }
-          : x,
-      ),
-    );
-    showToast("교환 상태를 업데이트했어요 🍉");
+  const advEx = async (x: ExchangeOrderData) => {
+    if (!state.accessToken) return;
+    try {
+      let updated: ExchangeOrderData;
+      if (x.status === "REQUESTED") updated = await prepareExchange(x.id, state.accessToken);
+      else if (x.status === "PREPARING") updated = await shipExchange(x.id, state.accessToken);
+      else if (x.status === "SHIPPING") updated = await deliverExchange(x.id, state.accessToken);
+      else return;
+      setExchanges((prev) => prev.map((e) => (e.id === x.id ? updated : e)));
+      showToast("교환 상태를 업데이트했어요 🍉");
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : "상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    }
   };
-  const cancelEx = (id: number) => {
-    setExchanges(
-      exchanges.map((x) => (x.id === id ? { ...x, status: "CANCELLED" } : x)),
-    );
-    showToast("교환을 취소하고 카드를 복원했어요.");
+  const cancelEx = async (id: number) => {
+    if (!state.accessToken) return;
+    try {
+      const updated = await adminCancelExchange(id, "관리자 취소", state.accessToken);
+      setExchanges((prev) => prev.map((e) => (e.id === id ? updated : e)));
+      showToast("교환을 취소하고 카드를 복원했어요.");
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : "취소에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    }
   };
   const toggleProd = (id: number) => {
     setProducts(
@@ -311,39 +336,52 @@ export default function Admin() {
             <div>상태</div>
             <div className="text-right">처리</div>
           </div>
-          {exchanges.map((x) => {
-            const m = exMeta[x.status];
-            return (
-              <div
-                key={x.id}
-                className={`grid grid-cols-[1.3fr_1fr_1fr_1.4fr] ${ROW}`}
-              >
-                <div className="font-bold">{x.product}</div>
-                <div className="text-[#6d7a68]">
-                  {x.card} {x.count}장
+          {exchangesLoading ? (
+            <div className="px-[18px] py-10 text-center text-sm text-sub">교환 신청을 불러오고 있어요 🍉</div>
+          ) : exchangesError ? (
+            <div className="px-[18px] py-10 text-center text-sm text-sub">{exchangesError}</div>
+          ) : exchanges.length === 0 ? (
+            <div className="px-[18px] py-10 text-center text-sm text-sub">교환 신청이 없어요.</div>
+          ) : (
+            exchanges.map((x) => {
+              const m = exMeta[x.status];
+              const advanceable = x.status === "REQUESTED" || x.status === "PREPARING" || x.status === "SHIPPING";
+              return (
+                <div
+                  key={x.id}
+                  className={`grid grid-cols-[1.3fr_1fr_1fr_1.4fr] ${ROW}`}
+                >
+                  <div className="font-bold">{x.exchangeProductName}</div>
+                  <div className="text-[#6d7a68]">
+                    {x.cardName} {x.usedCardCount}장
+                  </div>
+                  <div>
+                    <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
+                  </div>
+                  <div className="flex justify-end gap-1.5">
+                    {advanceable && (
+                      <button
+                        type="button"
+                        onClick={() => advEx(x)}
+                        className="cursor-pointer rounded-[9px] bg-brand-soft px-3 py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white"
+                      >
+                        {m[2]}
+                      </button>
+                    )}
+                    {x.status === "REQUESTED" && (
+                      <button
+                        type="button"
+                        onClick={() => cancelEx(x.id)}
+                        className="cursor-pointer rounded-[9px] border-[1.5px] border-[#e8bdad] bg-white px-3 py-[7px] text-[13px] font-bold text-[#b5502f] transition-colors duration-150 hover:bg-danger-soft hover:border-[#e0a488]"
+                      >
+                        취소
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
-                </div>
-                <div className="flex justify-end gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => advEx(x.id)}
-                    className="cursor-pointer rounded-[9px] bg-brand-soft px-3 py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white"
-                  >
-                    {m[2]}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => cancelEx(x.id)}
-                    className="cursor-pointer rounded-[9px] border-[1.5px] border-[#e8bdad] bg-white px-3 py-[7px] text-[13px] font-bold text-[#b5502f] transition-colors duration-150 hover:bg-danger-soft hover:border-[#e0a488]"
-                  >
-                    취소
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
 
