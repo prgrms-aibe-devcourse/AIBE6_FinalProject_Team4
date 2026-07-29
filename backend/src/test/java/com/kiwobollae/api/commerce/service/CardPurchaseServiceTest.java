@@ -22,7 +22,6 @@ import com.kiwobollae.api.infra.entity.IdempotencyKey;
 import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
 import com.kiwobollae.api.point.dto.response.PointDeductionResult;
-import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -74,7 +73,7 @@ class CardPurchaseServiceTest {
 		given(log.getQuantity()).willReturn(2);
 		given(log.getUsedPoint()).willReturn(600L);
 		given(log.getCreatedAt()).willReturn(LocalDateTime.of(2026, 7, 27, 0, 0));
-		given(walletService.deductForPurchase(7L, 600L, PointRefType.CARD_PURCHASE, 11L))
+		given(walletService.deductForCardPurchase(7L, 600L, 11L))
 				.willReturn(pointUsage);
 		given(userCardRepository.findByUser_IdAndCard_Id(7L, 1L))
 				.willReturn(Optional.of(userCard));
@@ -85,6 +84,8 @@ class CardPurchaseServiceTest {
 		CardPurchaseResponse response = cardPurchaseService.purchase(7L, "purchase-key", request);
 
 		assertThat(response.usedPoint()).isEqualTo(600L);
+		assertThat(response.usedFreePoint()).isEqualTo(500L);
+		assertThat(response.usedPaidPoint()).isEqualTo(100L);
 		assertThat(response.ownedCount()).isEqualTo(4);
 		assertThat(response.remainingBalance()).isEqualTo(700L);
 		verify(userCardRepository).incrementCount(7L, 1L, 2);
@@ -109,10 +110,9 @@ class CardPurchaseServiceTest {
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CARD_NOT_FOUND));
 
-		verify(walletService, never()).deductForPurchase(
+		verify(walletService, never()).deductForCardPurchase(
 				org.mockito.ArgumentMatchers.anyLong(),
 				org.mockito.ArgumentMatchers.anyLong(),
-				org.mockito.ArgumentMatchers.any(),
 				org.mockito.ArgumentMatchers.anyLong()
 		);
 	}

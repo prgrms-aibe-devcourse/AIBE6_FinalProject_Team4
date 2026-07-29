@@ -94,7 +94,11 @@ export default function CardDetail({ params }: { params: { id: string } }) {
   }
 
   const total = card.pointPrice * qty;
-  const freePointShortage = Math.max(0, total - state.wallet.free);
+  const availableFreePoint = Math.max(state.wallet.free, 0);
+  const availablePaidPoint = Math.max(state.wallet.paid, 0);
+  const usedFreePoint = Math.min(availableFreePoint, total);
+  const usedPaidPoint = total - usedFreePoint;
+  const pointShortage = Math.max(0, usedPaidPoint - availablePaidPoint);
   const ring = `conic-gradient(#7CB342 ${Math.min(
     360,
     ((owned ?? 0) / card.requiredCountForExchange) * 360,
@@ -108,21 +112,21 @@ export default function CardDetail({ params }: { params: { id: string } }) {
     if (!walletLoaded) {
       showToast(
         walletLoading
-          ? '무상 포인트 잔액을 확인하고 있어요.'
-          : '무상 포인트 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+          ? '포인트 잔액을 확인하고 있어요.'
+          : '포인트 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
         'err',
       );
       return;
     }
-    if (freePointShortage > 0) {
+    if (pointShortage > 0) {
       showToast(
-        `무상 포인트가 ${fmt(freePointShortage)}P 부족해요. 성장 일지로 포인트를 모아보세요.`,
+        `사용 가능한 포인트가 ${fmt(pointShortage)}P 부족해요.`,
         'err',
       );
       return;
     }
     askConfirm({ icon: 'eco', title: '카드를 구매할까요?', ok: '구매하기',
-      body: `${card.name} ${qty}장 · 무상 포인트 ${fmt(total)}P를 사용해요. 유상 포인트는 사용할 수 없어요.`,
+      body: `${card.name} ${qty}장 · 무상 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 유상 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
       onOk: async () => {
         const currentOwned = owned ?? 0;
         setPurchasing(true);
@@ -178,7 +182,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             <span className="text-sm font-bold text-sub">1장당</span>
             <PointPrice value={card.pointPrice} size="lg" />
             <span className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-extrabold text-brand-dark">
-              무상 포인트 전용
+              무상 포인트 우선
             </span>
           </div>
           <p className="mb-5 text-[14.5px] leading-[1.7] text-[#6d7a68]">
@@ -255,10 +259,18 @@ export default function CardDetail({ params }: { params: { id: string } }) {
                   {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.free)}P`}
                 </span>
               </div>
-              <p className={`mt-1.5 text-xs ${freePointShortage > 0 && walletLoaded ? 'font-semibold text-danger' : 'text-sub'}`}>
-                {freePointShortage > 0 && walletLoaded
-                  ? `${fmt(freePointShortage)}P가 부족해요. 성장 일지를 작성해 포인트를 모아보세요.`
-                  : '카드는 성장 일지 보상으로 받은 무상 포인트로만 구매할 수 있어요.'}
+              <div className="mt-1.5 flex items-center justify-between text-sm">
+                <span className="font-bold text-sub">보유 유상 포인트</span>
+                <span className="font-extrabold text-brand-dark">
+                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.paid)}P`}
+                </span>
+              </div>
+              <p className={`mt-2 text-xs ${pointShortage > 0 && walletLoaded ? 'font-semibold text-danger' : 'text-sub'}`}>
+                {pointShortage > 0 && walletLoaded
+                  ? `사용 가능한 포인트가 ${fmt(pointShortage)}P 부족해요.`
+                  : usedPaidPoint > 0
+                    ? `무상 ${fmt(usedFreePoint)}P를 먼저 사용하고 유상 ${fmt(usedPaidPoint)}P를 사용해요.`
+                    : `무상 포인트 ${fmt(usedFreePoint)}P를 먼저 사용해요.`}
               </p>
             </div>
           )}
@@ -266,14 +278,14 @@ export default function CardDetail({ params }: { params: { id: string } }) {
           <button
             type="button"
             onClick={buy}
-            disabled={purchasing || (walletLoaded && freePointShortage > 0)}
+            disabled={purchasing || (walletLoaded && pointShortage > 0)}
             className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {purchasing
               ? '구매 처리 중...'
-              : walletLoaded && freePointShortage > 0
-                ? '무상 포인트 부족'
-                : '무상 포인트로 구매하기'}
+              : walletLoaded && pointShortage > 0
+                ? '포인트 부족'
+                : '포인트로 구매하기'}
           </button>
         </div>
       </div>

@@ -59,7 +59,7 @@ class WalletServiceTest {
 	}
 
 	@Test
-	void cardPurchaseUsesOnlyFreePointAndWritesFreeLedger() {
+	void cardPurchaseUsesFreePointFirstWhenFreeBalanceCoversTotal() {
 		Wallet wallet = Wallet.builder().freePoint(700L).paidPoint(500L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
 
@@ -84,8 +84,60 @@ class WalletServiceTest {
 	}
 
 	@Test
-	void cardPurchaseRejectsInsufficientFreePointEvenWhenPaidPointIsEnough() {
+	void cardPurchaseUsesPaidPointForFreePointShortage() {
 		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(1_000L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForPurchase(
+				7L,
+				200L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		);
+
+		assertThat(result.usedFreePoint()).isEqualTo(100L);
+		assertThat(result.usedPaidPoint()).isEqualTo(100L);
+		assertThat(result.remainingBalance()).isEqualTo(900L);
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isEqualTo(900L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getCurrencyType)
+				.containsExactly(CurrencyType.FREE, CurrencyType.PAID);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getAmount)
+				.containsExactly(-100L, -100L);
+	}
+
+	@Test
+	void cardPurchaseUsesOnlyPaidPointWhenFreePointIsNegative() {
+		Wallet wallet = Wallet.builder().freePoint(-100L).paidPoint(200L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForPurchase(
+				7L,
+				150L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		);
+
+		assertThat(result.usedFreePoint()).isZero();
+		assertThat(result.usedPaidPoint()).isEqualTo(150L);
+		assertThat(wallet.getFreePoint()).isEqualTo(-100L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(50L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository).save(captor.capture());
+		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.PAID);
+		assertThat(captor.getValue().getAmount()).isEqualTo(-150L);
+		assertThat(captor.getValue().getBalanceAfter()).isEqualTo(50L);
+	}
+
+	@Test
+	void cardPurchaseRejectsInsufficientCombinedPointWithoutPartialDeduction() {
+		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(99L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
 
 		assertThatThrownBy(() -> walletService.deductForPurchase(
@@ -97,25 +149,7 @@ class WalletServiceTest {
 				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
 		assertThat(wallet.getFreePoint()).isEqualTo(100L);
-		assertThat(wallet.getPaidPoint()).isEqualTo(1_000L);
-		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
-	}
-
-	@Test
-	void cardPurchaseDoesNotUsePaidPointWhenFreePointIsNegative() {
-		Wallet wallet = Wallet.builder().freePoint(-100L).paidPoint(200L).build();
-		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
-
-		assertThatThrownBy(() -> walletService.deductForPurchase(
-				7L,
-				150L,
-				PointRefType.CARD_PURCHASE,
-				11L
-		)).isInstanceOfSatisfying(BusinessException.class, exception ->
-				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
-
-		assertThat(wallet.getFreePoint()).isEqualTo(-100L);
-		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(99L);
 		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
 	}
 

@@ -47,8 +47,9 @@ public class WalletService {
 	/**
 	 * 기존 구매 도메인 연동을 위한 호환 메서드다.
 	 *
-	 * <p>카드 구매는 무상 포인트만 사용하고, 상품 주문은 무상 포인트를 요청하지 않은 기본값(유상
-	 * 포인트만 사용)으로 처리한다. 새 상품 주문 흐름은 무상 포인트 사용액을 명시할 수 있는
+	 * <p>카드 구매는 무상 포인트를 먼저 사용하고 부족분을 유상 포인트로 차감한다. 상품 주문은
+	 * 무상 포인트를 요청하지 않은 기본값(유상 포인트만 사용)으로 처리한다. 새 상품 주문 흐름은
+	 * 무상 포인트 사용액을 명시할 수 있는
 	 * {@link #deductForOrderPurchase(Long, long, long, Long)}를 사용한다.
 	 */
 	@Transactional
@@ -67,7 +68,7 @@ public class WalletService {
 		throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 	}
 
-	/** 카드 구매 금액 전부를 무상 포인트에서만 차감한다. */
+	/** 카드 구매 금액을 무상 포인트에서 먼저 차감하고 부족분을 유상 포인트에서 차감한다. */
 	@Transactional
 	public PointDeductionResult deductForCardPurchase(
 			Long userId,
@@ -79,14 +80,16 @@ public class WalletService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 
 		long availableFreePoint = Math.max(wallet.getFreePoint(), 0L);
-		if (availableFreePoint < amount) {
+		long usedFreePoint = Math.min(availableFreePoint, amount);
+		long usedPaidPoint = amount - usedFreePoint;
+		if (wallet.getPaidPoint() < usedPaidPoint) {
 			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
 		}
 
 		return deductPoints(
 				wallet,
-				amount,
-				0L,
+				usedFreePoint,
+				usedPaidPoint,
 				PointRefType.CARD_PURCHASE,
 				cardPurchaseId
 		);

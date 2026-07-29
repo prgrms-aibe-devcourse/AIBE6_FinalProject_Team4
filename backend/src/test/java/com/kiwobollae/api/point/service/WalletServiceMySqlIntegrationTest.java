@@ -97,6 +97,40 @@ class WalletServiceMySqlIntegrationTest {
 	}
 
 	@Test
+	void concurrentCardDeductionsDoNotOverspendCombinedPoint() throws Exception {
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch start = new CountDownLatch(1);
+
+		List<AttemptResult> results = runConcurrently(
+				cardDeductionAttempt(ready, start, 111L),
+				cardDeductionAttempt(ready, start, 112L),
+				ready,
+				start
+		);
+
+		assertThat(results).containsExactlyInAnyOrder(
+				AttemptResult.SUCCESS,
+				AttemptResult.INSUFFICIENT_BALANCE
+		);
+
+		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isEqualTo(700L);
+
+		List<PointTransaction> transactions = pointTransactionRepository.findAll();
+		assertThat(transactions).hasSize(2);
+		assertThat(transactions)
+				.extracting(PointTransaction::getType)
+				.containsOnly(PointTxType.PURCHASE);
+		assertThat(transactions)
+				.extracting(PointTransaction::getRefType)
+				.containsOnly(PointRefType.CARD_PURCHASE);
+		assertThat(transactions)
+				.extracting(PointTransaction::getAmount)
+				.containsExactlyInAnyOrder(-500L, -300L);
+	}
+
+	@Test
 	void outerOrderTransactionRollbackRestoresWalletAndRemovesLedger() {
 		assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
 			walletService.deductForOrderPurchase(userId, 600L, 200L, 201L);
@@ -149,6 +183,25 @@ class WalletServiceMySqlIntegrationTest {
 			awaitStart(ready, start);
 			try {
 				walletService.deductForOrderPurchase(userId, 800L, 0L, orderId);
+				return AttemptResult.SUCCESS;
+			} catch (BusinessException exception) {
+				if (exception.getErrorCode() == ErrorCode.POINT_INSUFFICIENT_BALANCE) {
+					return AttemptResult.INSUFFICIENT_BALANCE;
+				}
+				throw exception;
+			}
+		};
+	}
+
+	private Callable<AttemptResult> cardDeductionAttempt(
+			CountDownLatch ready,
+			CountDownLatch start,
+			long cardPurchaseId
+	) {
+		return () -> {
+			awaitStart(ready, start);
+			try {
+				walletService.deductForCardPurchase(userId, 800L, cardPurchaseId);
 				return AttemptResult.SUCCESS;
 			} catch (BusinessException exception) {
 				if (exception.getErrorCode() == ErrorCode.POINT_INSUFFICIENT_BALANCE) {
