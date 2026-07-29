@@ -1,12 +1,14 @@
 package com.kiwobollae.api.global.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -36,11 +38,20 @@ public class JwtTokenProvider {
 		return generateToken(userId, null, refreshExpirationMs);
 	}
 
+	public long getAccessExpirationMs() {
+		return accessExpirationMs;
+	}
+
+	public long getRefreshExpirationMs() {
+		return refreshExpirationMs;
+	}
+
 	private String generateToken(Long userId, String role, long expirationMs) {
 		Date now = new Date();
 		Date expiry = new Date(now.getTime() + expirationMs);
 
 		JwtBuilder builder = Jwts.builder()
+				.id(UUID.randomUUID().toString())
 				.subject(String.valueOf(userId))
 				.issuedAt(now)
 				.expiration(expiry);
@@ -51,12 +62,27 @@ public class JwtTokenProvider {
 	}
 
 	public boolean validateToken(String token) {
+		return checkToken(token) == TokenStatus.VALID;
+	}
+
+	/**
+	 * Same parsing as {@link #validateToken}, but distinguishes "expired" from
+	 * "malformed/tampered/wrong signature" so callers (JwtAuthenticationFilter) can
+	 * surface AUTH_TOKEN_EXPIRED vs AUTH_TOKEN_INVALID instead of one generic 401.
+	 */
+	public TokenStatus checkToken(String token) {
 		try {
 			parseClaims(token);
-			return true;
+			return TokenStatus.VALID;
+		} catch (ExpiredJwtException e) {
+			return TokenStatus.EXPIRED;
 		} catch (JwtException | IllegalArgumentException e) {
-			return false;
+			return TokenStatus.INVALID;
 		}
+	}
+
+	public enum TokenStatus {
+		VALID, EXPIRED, INVALID
 	}
 
 	public Long getUserId(String token) {

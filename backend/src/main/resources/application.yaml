@@ -36,5 +36,37 @@ jwt:
   access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
 
+app:
+  cookie:
+    # Secure 속성은 HTTPS에서만 쿠키를 전송하게 강제함. 로컬 http 개발 환경에서는 false로 둠.
+    secure: ${COOKIE_SECURE:false}
+  mail:
+    # false(기본값)면 실제 발송 대신 콘솔 로그로만 인증코드를 남김(LoggingEmailSender).
+    # 실제 SMTP로 발송하려면 true로 두고 아래 값을 application-secret.yaml에 채울 것.
+    # (spring.mail.* 자동설정 대신 MailConfig에서 JavaMailSenderImpl을 직접 구성한다.)
+    enabled: ${MAIL_ENABLED:false}
+    from: ${MAIL_FROM:no-reply@kiwobollae.com}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    smtp-auth: ${MAIL_SMTP_AUTH:true}
+    starttls: ${MAIL_STARTTLS:true}
+  oauth:
+    # 각 provider 콘솔에서 발급받은 값. 비어 있으면 해당 provider로 로그인 시도 시 provider가
+    # 요청을 거부해 AUTH_OAUTH_AUTHENTICATION_FAILED로 이어진다(기동 자체는 막지 않음).
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:3000/oauth/callback/google}
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:3000/oauth/callback/kakao}
+    naver:
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:3000/oauth/callback/naver}
+
 payment:
   provider: ${PAYMENT_PROVIDER:MOCK}

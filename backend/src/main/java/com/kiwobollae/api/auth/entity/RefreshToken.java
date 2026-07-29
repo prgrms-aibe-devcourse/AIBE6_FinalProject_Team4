@@ -41,4 +41,8 @@ public class RefreshToken extends BaseEntity {
 
 	@Column(name = "revoked_at")
 	private LocalDateTime revokedAt;
+
+	public void revoke(LocalDateTime revokedAt) {
+		this.revokedAt = revokedAt;
+	}
 }

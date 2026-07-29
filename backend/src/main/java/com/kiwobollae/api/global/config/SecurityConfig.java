@@ -36,6 +36,11 @@ public class SecurityConfig {
 				.cors(cors -> cors.configurationSource(corsConfigurationSource))
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
+						// More specific than the /auth/** permitAll below: viewing/editing "my"
+						// profile (and sub-resources like changing my password) requires a valid
+						// access token, unlike signup/login/reissue/logout.
+						.requestMatchers(ApiVersion.V1 + "/auth/me/**").authenticated()
+						.requestMatchers(ApiVersion.V1 + "/auth/me").authenticated()
 						.requestMatchers(ApiVersion.V1 + "/admin/**").hasRole("ADMIN")
 						.requestMatchers(ApiVersion.V1 + "/auth/**").permitAll()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/product").permitAll()

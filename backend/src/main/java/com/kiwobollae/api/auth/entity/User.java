@@ -64,6 +64,10 @@ public class User extends BaseTimeEntity {
 	@Column(nullable = false)
 	private Integer level;
 
+	@Builder.Default
+	@Column(nullable = false)
+	private Long experience = 0L;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 50)
 	private UserStatus status;
@@ -73,4 +77,30 @@ public class User extends BaseTimeEntity {
 
 	@Column(name = "withdrawn_at")
 	private LocalDateTime withdrawnAt;
+
+	public void updateProfile(String nickname, String name, String phoneNumber) {
+		if (nickname != null) {
+			this.nickname = nickname;
+		}
+		if (name != null) {
+			this.name = name;
+		}
+		if (phoneNumber != null) {
+			this.phoneNumber = phoneNumber;
+		}
+	}
+
+	public void changePassword(String encodedPassword) {
+		this.password = encodedPassword;
+	}
+
+	/**
+	 * Soft delete — flips status to WITHDRAWN and stamps withdrawnAt. No row is
+	 * ever physically removed; every FK (orders, journals, point history, ...)
+	 * stays intact for history/audit purposes.
+	 */
+	public void withdraw() {
+		this.status = UserStatus.WITHDRAWN;
+		this.withdrawnAt = LocalDateTime.now();
+	}
 }
