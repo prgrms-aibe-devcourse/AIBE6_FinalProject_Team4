@@ -19,6 +19,7 @@ import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -260,6 +261,21 @@ class WalletServiceTest {
 	void restorePurchasePointsRestoresEachCurrencyAndWritesLedgers() {
 		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(200L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.findAllByWalletAndTypeAndRefTypeAndRefId(
+				wallet,
+				PointTxType.PURCHASE,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).willReturn(List.of(
+				PointTransaction.builder()
+						.currencyType(CurrencyType.FREE)
+						.amount(-300L)
+						.build(),
+				PointTransaction.builder()
+						.currencyType(CurrencyType.PAID)
+						.amount(-300L)
+						.build()
+		));
 
 		walletService.restorePurchasePoints(7L, 300L, 300L, PointRefType.CARD_PURCHASE, 11L);
 
@@ -277,6 +293,70 @@ class WalletServiceTest {
 		assertThat(captor.getAllValues())
 				.extracting(PointTransaction::getAmount)
 				.containsExactly(300L, 300L);
+	}
+
+	@Test
+	void restorePurchasePointsRejectsUsageThatDoesNotMatchPurchaseLedger() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(200L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.findAllByWalletAndTypeAndRefTypeAndRefId(
+				wallet,
+				PointTxType.PURCHASE,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).willReturn(List.of(
+				PointTransaction.builder()
+						.currencyType(CurrencyType.FREE)
+						.amount(-300L)
+						.build(),
+				PointTransaction.builder()
+						.currencyType(CurrencyType.PAID)
+						.amount(-300L)
+						.build()
+		));
+
+		assertThatThrownBy(() -> walletService.restorePurchasePoints(
+				7L,
+				300L,
+				299L,
+				PointRefType.CARD_PURCHASE,
+				11L
+		)).isInstanceOfSatisfying(BusinessException.class, exception -> {
+			assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_DATA_CONFLICT);
+			assertThat(exception.getDetails()).containsEntry("recordedFreePoint", 300L);
+			assertThat(exception.getDetails()).containsEntry("recordedPaidPoint", 300L);
+			assertThat(exception.getDetails()).containsEntry("requestedFreePoint", 300L);
+			assertThat(exception.getDetails()).containsEntry("requestedPaidPoint", 299L);
+		});
+
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void restorePurchasePointsRejectsMissingPurchaseLedger() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(200L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.findAllByWalletAndTypeAndRefTypeAndRefId(
+				wallet,
+				PointTxType.PURCHASE,
+				PointRefType.ORDER,
+				21L
+		)).willReturn(List.of());
+
+		assertThatThrownBy(() -> walletService.restorePurchasePoints(
+				7L,
+				100L,
+				200L,
+				PointRefType.ORDER,
+				21L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_DATA_CONFLICT));
+
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test

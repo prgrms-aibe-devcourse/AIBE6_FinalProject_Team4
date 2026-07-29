@@ -12,6 +12,8 @@ import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,7 +134,8 @@ public class WalletService {
 	}
 
 	/**
-	 * 구매 시 실제로 차감한 통화별 포인트를 그대로 원복한다. 동일 구매 건은 한 번만 원복할 수 있다.
+	 * 구매 원장과 호출자가 전달한 통화별 사용액이 일치할 때만 그대로 원복한다.
+	 * 동일 구매 건은 한 번만 원복할 수 있다.
 	 */
 	@Transactional
 	public void restorePurchasePoints(
@@ -148,6 +151,12 @@ public class WalletService {
 
 		if (pointTransactionRepository.existsByTypeAndRefTypeAndRefId(PointTxType.RESTORE, refType, refId)) {
 			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
+		}
+
+		PurchasePointUsage recordedUsage = getRecordedPurchaseUsage(wallet, refType, refId);
+		if (recordedUsage.freePoint() != usedFreePoint
+				|| recordedUsage.paidPoint() != usedPaidPoint) {
+			throw purchaseUsageMismatch(recordedUsage, usedFreePoint, usedPaidPoint);
 		}
 
 		if (usedFreePoint > 0) {
@@ -274,8 +283,63 @@ public class WalletService {
 			Long refId
 	) {
 		if (usedFreePoint < 0 || usedPaidPoint < 0 || (usedFreePoint == 0 && usedPaidPoint == 0)
-				|| refType == null || refId == null || refId < 1) {
+				|| (refType != PointRefType.ORDER && refType != PointRefType.CARD_PURCHASE)
+				|| refId == null || refId < 1) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+	}
+
+	private PurchasePointUsage getRecordedPurchaseUsage(
+			Wallet wallet,
+			PointRefType refType,
+			Long refId
+	) {
+		List<PointTransaction> purchaseTransactions =
+				pointTransactionRepository.findAllByWalletAndTypeAndRefTypeAndRefId(
+						wallet,
+						PointTxType.PURCHASE,
+						refType,
+						refId
+				);
+
+		long recordedFreePoint = 0L;
+		long recordedPaidPoint = 0L;
+		for (PointTransaction transaction : purchaseTransactions) {
+			if (transaction.getAmount() >= 0) {
+				throw new BusinessException(
+						ErrorCode.COMMON_DATA_CONFLICT,
+						"최초 구매 차감 원장이 올바르지 않습니다."
+				);
+			}
+
+			long usedPoint = Math.negateExact(transaction.getAmount());
+			if (transaction.getCurrencyType() == CurrencyType.FREE) {
+				recordedFreePoint = Math.addExact(recordedFreePoint, usedPoint);
+			} else {
+				recordedPaidPoint = Math.addExact(recordedPaidPoint, usedPoint);
+			}
+		}
+
+		return new PurchasePointUsage(recordedFreePoint, recordedPaidPoint);
+	}
+
+	private BusinessException purchaseUsageMismatch(
+			PurchasePointUsage recordedUsage,
+			long requestedFreePoint,
+			long requestedPaidPoint
+	) {
+		return new BusinessException(
+				ErrorCode.COMMON_DATA_CONFLICT,
+				"원복 요청 포인트가 최초 구매 차감 내역과 일치하지 않습니다.",
+				Map.of(
+						"recordedFreePoint", recordedUsage.freePoint(),
+						"recordedPaidPoint", recordedUsage.paidPoint(),
+						"requestedFreePoint", requestedFreePoint,
+						"requestedPaidPoint", requestedPaidPoint
+				)
+		);
+	}
+
+	private record PurchasePointUsage(long freePoint, long paidPoint) {
 	}
 }

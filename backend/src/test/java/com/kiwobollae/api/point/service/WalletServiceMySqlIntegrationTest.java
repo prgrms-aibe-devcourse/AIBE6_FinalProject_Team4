@@ -145,6 +145,8 @@ class WalletServiceMySqlIntegrationTest {
 
 	@Test
 	void concurrentDuplicateRestoreIsAppliedOnlyOnce() throws Exception {
+		walletService.deductForOrderPurchase(userId, 500L, 300L, 301L);
+
 		CountDownLatch ready = new CountDownLatch(2);
 		CountDownLatch start = new CountDownLatch(1);
 
@@ -161,15 +163,17 @@ class WalletServiceMySqlIntegrationTest {
 		);
 
 		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
-		assertThat(wallet.getFreePoint()).isEqualTo(800L);
-		assertThat(wallet.getPaidPoint()).isEqualTo(1_200L);
+		assertThat(wallet.getFreePoint()).isEqualTo(500L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(1_000L);
 
 		List<PointTransaction> transactions = pointTransactionRepository.findAll();
-		assertThat(transactions).hasSize(2);
+		assertThat(transactions).hasSize(4);
 		assertThat(transactions)
+				.filteredOn(transaction -> transaction.getType() == PointTxType.RESTORE)
 				.extracting(PointTransaction::getType)
 				.containsOnly(PointTxType.RESTORE);
 		assertThat(transactions)
+				.filteredOn(transaction -> transaction.getType() == PointTxType.RESTORE)
 				.extracting(PointTransaction::getAmount)
 				.containsExactlyInAnyOrder(300L, 200L);
 	}
