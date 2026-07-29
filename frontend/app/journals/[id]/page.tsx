@@ -1,15 +1,17 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { ApiError } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { JOURNALS } from '@/lib/data';
+import { createReport } from '@/lib/report-api';
 
 const N = 30;
 const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘텐츠'], ['stolen', '사진 도용'], ['etc', '기타']];
 
 export default function JournalDetail({ params }: { params: { id: string } }) {
-  const { set, spend } = useStore();
+  const { state, set, spend } = useStore();
   const { showToast, askConfirm } = useUI();
   const id = Number(params.id);
   const [journal, setJournal] = useState(JOURNALS.find((j) => j.id === id) || JOURNALS[0]);
@@ -17,6 +19,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   const [content, setContent] = useState(journal.content);
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
+  const [submittingReport, setSubmittingReport] = useState(false);
   const [deleted, setDeleted] = useState(false);
 
   const confirmDelete = () => {
@@ -31,10 +34,24 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
     }
   };
 
-  const submitReport = () => {
+  const submitReport = async () => {
     if (!reason) return showToast('신고 사유를 골라주세요.', 'err');
-    setReportOpen(false); setReason(null);
-    showToast('신고가 접수됐어요. 검토 후 조치할게요. 알려주셔서 고마워요.');
+    if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
+
+    const label = REASONS.find(([k]) => k === reason)?.[1] ?? reason;
+    setSubmittingReport(true);
+    try {
+      await createReport({ targetType: 'JOURNAL', targetId: journal.id, reason: label }, state.accessToken);
+      setReportOpen(false); setReason(null);
+      showToast('신고가 접수됐어요. 검토 후 조치할게요. 알려주셔서 고마워요.');
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '신고 접수에 실패했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   if (deleted) {
@@ -149,7 +166,14 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
               ))}
             </div>
             <div className="flex gap-2.5">
-              <button type="button" onClick={submitReport} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">신고 접수</button>
+              <button
+                type="button"
+                onClick={submitReport}
+                disabled={submittingReport}
+                className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submittingReport ? '접수 중...' : '신고 접수'}
+              </button>
               <button type="button" onClick={() => setReportOpen(false)} className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-5 py-[13px] font-bold text-sub">닫기</button>
             </div>
           </div>
