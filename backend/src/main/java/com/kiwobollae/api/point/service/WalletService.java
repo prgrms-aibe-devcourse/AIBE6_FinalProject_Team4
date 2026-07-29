@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WalletService {
 
+	private static final long ORDER_FREE_POINT_UNIT = 100L;
+
 	private final WalletRepository walletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
 
@@ -43,7 +45,11 @@ public class WalletService {
 	}
 
 	/**
-	 * 구매 포인트를 무상 포인트부터 차감하고, 사용 통화별 원장을 같은 트랜잭션에 기록한다.
+	 * 기존 구매 도메인 연동을 위한 호환 메서드다.
+	 *
+	 * <p>카드 구매는 무상 포인트만 사용하고, 상품 주문은 무상 포인트를 요청하지 않은 기본값(유상
+	 * 포인트만 사용)으로 처리한다. 새 상품 주문 흐름은 무상 포인트 사용액을 명시할 수 있는
+	 * {@link #deductForOrderPurchase(Long, long, long, Long)}를 사용한다.
 	 */
 	@Transactional
 	public PointDeductionResult deductForPurchase(
@@ -52,26 +58,74 @@ public class WalletService {
 			PointRefType refType,
 			Long refId
 	) {
+		if (refType == PointRefType.CARD_PURCHASE) {
+			return deductForCardPurchase(userId, amount, refId);
+		}
+		if (refType == PointRefType.ORDER) {
+			return deductForOrderPurchase(userId, amount, 0L, refId);
+		}
+		throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+	}
+
+	/** 카드 구매 금액 전부를 무상 포인트에서만 차감한다. */
+	@Transactional
+	public PointDeductionResult deductForCardPurchase(
+			Long userId,
+			long amount,
+			Long cardPurchaseId
+	) {
+		validatePurchaseRequest(amount, PointRefType.CARD_PURCHASE, cardPurchaseId);
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 
-		if (amount < 1 || wallet.availableBalance() < amount) {
+		long availableFreePoint = Math.max(wallet.getFreePoint(), 0L);
+		if (availableFreePoint < amount) {
 			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
 		}
 
-		long usedFreePoint = Math.min(Math.max(wallet.getFreePoint(), 0L), amount);
-		long usedPaidPoint = amount - usedFreePoint;
+		return deductPoints(
+				wallet,
+				amount,
+				0L,
+				PointRefType.CARD_PURCHASE,
+				cardPurchaseId
+		);
+	}
 
-		if (usedFreePoint > 0) {
-			long balanceAfter = wallet.increaseFreePoint(-usedFreePoint);
-			saveTransaction(wallet, PointTxType.PURCHASE, CurrencyType.FREE, -usedFreePoint, balanceAfter, refType, refId);
-		}
-		if (usedPaidPoint > 0) {
-			long balanceAfter = wallet.increasePaidPoint(-usedPaidPoint);
-			saveTransaction(wallet, PointTxType.PURCHASE, CurrencyType.PAID, -usedPaidPoint, balanceAfter, refType, refId);
+	/**
+	 * 상품 주문에 요청한 무상 포인트를 100P 단위로 차감하고, 나머지 금액을 유상 포인트로
+	 * 차감한다. requestedFreePoint가 0이면 유상 포인트만 사용한다.
+	 */
+	@Transactional
+	public PointDeductionResult deductForOrderPurchase(
+			Long userId,
+			long amount,
+			long requestedFreePoint,
+			Long orderId
+	) {
+		validatePurchaseRequest(amount, PointRefType.ORDER, orderId);
+		if (requestedFreePoint < 0
+				|| requestedFreePoint > amount
+				|| requestedFreePoint % ORDER_FREE_POINT_UNIT != 0) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 
-		return new PointDeductionResult(usedFreePoint, usedPaidPoint, wallet.totalBalance());
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		long usedPaidPoint = amount - requestedFreePoint;
+
+		if (Math.max(wallet.getFreePoint(), 0L) < requestedFreePoint
+				|| wallet.getPaidPoint() < usedPaidPoint) {
+			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
+		}
+
+		return deductPoints(
+				wallet,
+				requestedFreePoint,
+				usedPaidPoint,
+				PointRefType.ORDER,
+				orderId
+		);
 	}
 
 	/**
@@ -163,6 +217,51 @@ public class WalletService {
 				.refType(refType)
 				.refId(refId)
 				.build());
+	}
+
+	private PointDeductionResult deductPoints(
+			Wallet wallet,
+			long usedFreePoint,
+			long usedPaidPoint,
+			PointRefType refType,
+			Long refId
+	) {
+		if (usedFreePoint > 0) {
+			long balanceAfter = wallet.increaseFreePoint(-usedFreePoint);
+			saveTransaction(
+					wallet,
+					PointTxType.PURCHASE,
+					CurrencyType.FREE,
+					-usedFreePoint,
+					balanceAfter,
+					refType,
+					refId
+			);
+		}
+		if (usedPaidPoint > 0) {
+			long balanceAfter = wallet.increasePaidPoint(-usedPaidPoint);
+			saveTransaction(
+					wallet,
+					PointTxType.PURCHASE,
+					CurrencyType.PAID,
+					-usedPaidPoint,
+					balanceAfter,
+					refType,
+					refId
+			);
+		}
+
+		return new PointDeductionResult(usedFreePoint, usedPaidPoint, wallet.totalBalance());
+	}
+
+	private void validatePurchaseRequest(
+			long amount,
+			PointRefType refType,
+			Long refId
+	) {
+		if (amount < 1 || refType == null || refId == null || refId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
 	}
 
 	private void validateRestoreRequest(

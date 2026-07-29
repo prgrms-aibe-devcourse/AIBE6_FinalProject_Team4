@@ -59,8 +59,8 @@ class WalletServiceTest {
 	}
 
 	@Test
-	void purchaseUsesFreePointBeforePaidPointAndWritesLedgers() {
-		Wallet wallet = Wallet.builder().freePoint(300L).paidPoint(500L).build();
+	void cardPurchaseUsesOnlyFreePointAndWritesFreeLedger() {
+		Wallet wallet = Wallet.builder().freePoint(700L).paidPoint(500L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
 
 		PointDeductionResult result = walletService.deductForPurchase(
@@ -70,51 +70,156 @@ class WalletServiceTest {
 				11L
 		);
 
-		assertThat(result.usedFreePoint()).isEqualTo(300L);
-		assertThat(result.usedPaidPoint()).isEqualTo(300L);
-		assertThat(result.remainingBalance()).isEqualTo(200L);
-		assertThat(wallet.getFreePoint()).isZero();
-		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+		assertThat(result.usedFreePoint()).isEqualTo(600L);
+		assertThat(result.usedPaidPoint()).isZero();
+		assertThat(result.remainingBalance()).isEqualTo(600L);
+		assertThat(wallet.getFreePoint()).isEqualTo(100L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(500L);
 
 		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
-		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
-		assertThat(captor.getAllValues())
-				.extracting(PointTransaction::getAmount)
-				.containsExactly(-300L, -300L);
+		verify(pointTransactionRepository).save(captor.capture());
+		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.FREE);
+		assertThat(captor.getValue().getAmount()).isEqualTo(-600L);
+		assertThat(captor.getValue().getBalanceAfter()).isEqualTo(100L);
 	}
 
 	@Test
-	void purchaseRejectsInsufficientTotalBalance() {
-		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(200L).build();
+	void cardPurchaseRejectsInsufficientFreePointEvenWhenPaidPointIsEnough() {
+		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(1_000L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
 
 		assertThatThrownBy(() -> walletService.deductForPurchase(
 				7L,
-				301L,
+				200L,
 				PointRefType.CARD_PURCHASE,
 				11L
 		)).isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
+		assertThat(wallet.getFreePoint()).isEqualTo(100L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(1_000L);
 		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test
-	void purchaseDoesNotUseNegativeFreePointAsAvailableBalance() {
+	void cardPurchaseDoesNotUsePaidPointWhenFreePointIsNegative() {
 		Wallet wallet = Wallet.builder().freePoint(-100L).paidPoint(200L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
 
-		PointDeductionResult result = walletService.deductForPurchase(
+		assertThatThrownBy(() -> walletService.deductForPurchase(
 				7L,
 				150L,
 				PointRefType.CARD_PURCHASE,
 				11L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
+
+		assertThat(wallet.getFreePoint()).isEqualTo(-100L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void orderPurchaseUsesOnlyPaidPointByDefault() {
+		Wallet wallet = Wallet.builder().freePoint(500L).paidPoint(700L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForOrderPurchase(
+				7L,
+				600L,
+				0L,
+				21L
 		);
 
 		assertThat(result.usedFreePoint()).isZero();
-		assertThat(result.usedPaidPoint()).isEqualTo(150L);
-		assertThat(wallet.getFreePoint()).isEqualTo(-100L);
-		assertThat(wallet.getPaidPoint()).isEqualTo(50L);
+		assertThat(result.usedPaidPoint()).isEqualTo(600L);
+		assertThat(result.remainingBalance()).isEqualTo(600L);
+		assertThat(wallet.getFreePoint()).isEqualTo(500L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(100L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository).save(captor.capture());
+		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.PAID);
+		assertThat(captor.getValue().getAmount()).isEqualTo(-600L);
+		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.ORDER);
+	}
+
+	@Test
+	void orderPurchaseUsesRequestedFreePointAndPaidPointTogether() {
+		Wallet wallet = Wallet.builder().freePoint(500L).paidPoint(700L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForOrderPurchase(
+				7L,
+				650L,
+				200L,
+				21L
+		);
+
+		assertThat(result.usedFreePoint()).isEqualTo(200L);
+		assertThat(result.usedPaidPoint()).isEqualTo(450L);
+		assertThat(result.remainingBalance()).isEqualTo(550L);
+		assertThat(wallet.getFreePoint()).isEqualTo(300L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(250L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getCurrencyType)
+				.containsExactly(CurrencyType.FREE, CurrencyType.PAID);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getAmount)
+				.containsExactly(-200L, -450L);
+	}
+
+	@Test
+	void orderPurchaseRejectsFreePointThatIsNotInHundredPointUnits() {
+		assertThatThrownBy(() -> walletService.deductForOrderPurchase(
+				7L,
+				650L,
+				250L,
+				21L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void orderPurchaseRejectsRequestedFreePointAboveAvailableFreePoint() {
+		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(1_000L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		assertThatThrownBy(() -> walletService.deductForOrderPurchase(
+				7L,
+				500L,
+				200L,
+				21L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
+
+		assertThat(wallet.getFreePoint()).isEqualTo(100L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(1_000L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void orderPurchaseRejectsInsufficientPaidPointForRemainder() {
+		Wallet wallet = Wallet.builder().freePoint(1_000L).paidPoint(299L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		assertThatThrownBy(() -> walletService.deductForOrderPurchase(
+				7L,
+				500L,
+				200L,
+				21L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
+
+		assertThat(wallet.getFreePoint()).isEqualTo(1_000L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(299L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test
