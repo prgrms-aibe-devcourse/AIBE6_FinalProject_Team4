@@ -12,11 +12,11 @@ public interface ExchangeProductRepository extends JpaRepository<ExchangeProduct
 
 	Optional<ExchangeProduct> findByIdAndStatus(Long id, ActiveStatus status);
 
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Modifying
 	@Query("update ExchangeProduct p set p.stock = p.stock - 1 where p.id = :id and p.stock >= 1")
 	int decrementStockIfAvailable(@Param("id") Long id);
 
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Modifying
 	@Query("update ExchangeProduct p set p.stock = p.stock + 1 where p.id = :id")
 	int incrementStock(@Param("id") Long id);
 }

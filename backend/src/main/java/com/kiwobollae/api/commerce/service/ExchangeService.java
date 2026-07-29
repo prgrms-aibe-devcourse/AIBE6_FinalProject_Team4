@@ -16,7 +16,7 @@ import com.kiwobollae.api.commerce.repository.UserCardRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ExchangeService {
+
+	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
 	private final ExchangeProductRepository exchangeProductRepository;
 	private final ExchangeOrderRepository exchangeOrderRepository;
@@ -68,7 +70,7 @@ public class ExchangeService {
 						request.receiverPhone(),
 						request.address(),
 						request.addressDetail(),
-						LocalDateTime.now(ZoneOffset.UTC)
+						LocalDateTime.now(KST)
 				)
 		);
 
@@ -96,7 +98,7 @@ public class ExchangeService {
 				id,
 				CancelledBy.USER,
 				reason,
-				LocalDateTime.now(ZoneOffset.UTC),
+				LocalDateTime.now(KST),
 				ExchangeStatus.REQUESTED
 		);
 		if (cancelled == 0) {
@@ -107,11 +109,12 @@ public class ExchangeService {
 	}
 
 	private void refund(ExchangeOrder exchangeOrder) {
-		userCardRepository.incrementCount(
-				exchangeOrder.getUser().getId(),
-				exchangeOrder.getCard().getId(),
-				exchangeOrder.getUsedCardCount()
-		);
-		exchangeProductRepository.incrementStock(exchangeOrder.getExchangeProduct().getId());
+		Long userId = exchangeOrder.getUser().getId();
+		Long cardId = exchangeOrder.getCard().getId();
+		Long exchangeProductId = exchangeOrder.getExchangeProduct().getId();
+		Integer usedCardCount = exchangeOrder.getUsedCardCount();
+
+		userCardRepository.incrementCount(userId, cardId, usedCardCount);
+		exchangeProductRepository.incrementStock(exchangeProductId);
 	}
 }
