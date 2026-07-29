@@ -25,7 +25,10 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 	@Override
 	public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
 			throws java.io.IOException {
-		ErrorCode errorCode = ErrorCode.AUTH_AUTHENTICATION_REQUIRED;
+		// JwtAuthenticationFilter stashes *why* a present-but-rejected token failed
+		// (expired vs invalid/tampered); no attribute at all means no token was sent.
+		Object attribute = request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_CODE_ATTRIBUTE);
+		ErrorCode errorCode = attribute instanceof ErrorCode code ? code : ErrorCode.AUTH_AUTHENTICATION_REQUIRED;
 		ErrorResponse body = ErrorResponse.of(
 				errorCode, errorCode.getDefaultMessage(), null, null,
 				ErrorResponse.newTraceId(), request.getRequestURI());

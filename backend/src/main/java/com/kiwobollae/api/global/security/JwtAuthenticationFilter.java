@@ -1,5 +1,6 @@
 package com.kiwobollae.api.global.security;
 
+import com.kiwobollae.api.global.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,6 +27,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	private static final String HEADER = "Authorization";
 	private static final String PREFIX = "Bearer ";
 
+	/** Read by JwtAuthenticationEntryPoint to report *why* auth failed, not just that it did. */
+	public static final String AUTH_ERROR_CODE_ATTRIBUTE = "authErrorCode";
+
 	private final JwtTokenProvider jwtTokenProvider;
 
 	@Override
@@ -33,15 +37,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			throws ServletException, IOException {
 		String token = resolveToken(request);
 
-		if (token != null && jwtTokenProvider.validateToken(token)) {
-			Long userId = jwtTokenProvider.getUserId(token);
-			String role = jwtTokenProvider.getRole(token);
-			List<GrantedAuthority> authorities = role != null
-					? List.of(new SimpleGrantedAuthority("ROLE_" + role))
-					: List.of();
+		if (token != null) {
+			JwtTokenProvider.TokenStatus status = jwtTokenProvider.checkToken(token);
+			if (status == JwtTokenProvider.TokenStatus.VALID) {
+				Long userId = jwtTokenProvider.getUserId(token);
+				String role = jwtTokenProvider.getRole(token);
+				List<GrantedAuthority> authorities = role != null
+						? List.of(new SimpleGrantedAuthority("ROLE_" + role))
+						: List.of();
 
-			var authentication = new UsernamePasswordAuthenticationToken(userId, null, authorities);
-			SecurityContextHolder.getContext().setAuthentication(authentication);
+				var authentication = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+				SecurityContextHolder.getContext().setAuthentication(authentication);
+			} else {
+				ErrorCode errorCode = status == JwtTokenProvider.TokenStatus.EXPIRED
+						? ErrorCode.AUTH_TOKEN_EXPIRED
+						: ErrorCode.AUTH_TOKEN_INVALID;
+				request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, errorCode);
+			}
 		}
 
 		filterChain.doFilter(request, response);

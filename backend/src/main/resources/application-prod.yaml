@@ -12,5 +12,31 @@ jwt:
   access-expiration: ${JWT_ACCESS_EXPIRATION}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION}
 
+app:
+  cookie:
+    secure: ${COOKIE_SECURE:true}
+  mail:
+    # 운영은 기본값 없이 명시적으로 true를 요구 — 설정을 빠뜨리면 기동 자체가 실패해서
+    # "이메일이 콘솔에만 찍히고 실제로는 안 나가는" 상태로 조용히 배포되는 걸 막는다.
+    enabled: ${MAIL_ENABLED}
+    from: ${MAIL_FROM}
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+  oauth:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID}
+      client-secret: ${GOOGLE_CLIENT_SECRET}
+      redirect-uri: ${GOOGLE_REDIRECT_URI}
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID}
+      client-secret: ${KAKAO_CLIENT_SECRET}
+      redirect-uri: ${KAKAO_REDIRECT_URI}
+    naver:
+      client-id: ${NAVER_CLIENT_ID}
+      client-secret: ${NAVER_CLIENT_SECRET}
+      redirect-uri: ${NAVER_REDIRECT_URI}
+
 payment:
   provider: TOSS
