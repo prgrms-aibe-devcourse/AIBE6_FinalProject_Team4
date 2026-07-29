@@ -7,23 +7,10 @@ import { SPECIES, BADGE } from '@/lib/data';
 import { grads } from '@/lib/theme';
 import { ApiError } from '@/lib/api';
 import { createPlant, getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const REG_PHOTOS = [['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry]];
-
-// Backend doesn't return emoji/gradient for a species — map by name for card visuals,
-// with a fallback for any species not in this table (e.g. newly added ones).
-const SPECIES_VISUAL: Record<string, { emoji: string; grad: string }> = {
-  방울토마토: { emoji: '🍅', grad: grads.tomato },
-  바질: { emoji: '🌿', grad: grads.basil },
-  상추: { emoji: '🥬', grad: grads.lettuce },
-  딸기: { emoji: '🍓', grad: grads.strawberry },
-  고추: { emoji: '🌶️', grad: grads.pepper },
-  수박: { emoji: '🍉', grad: grads.mint },
-  당근: { emoji: '🥕', grad: grads.carrot },
-  청경채: { emoji: '🥬', grad: grads.sprout },
-};
-const DEFAULT_VISUAL = { emoji: '🌱', grad: grads.sprout };
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
@@ -33,19 +20,6 @@ function nickValid(v: string) {
   if (v.length > 50) return { ok: false, msg: '50자 이내로 지어주세요.' };
   if (/[^가-힣a-zA-Z0-9 ]/.test(v)) return { ok: false, msg: '특수문자 없이 예쁜 이름으로 지어주세요 🌱' };
   return { ok: true, msg: '좋은 이름이에요! 🌿' };
-}
-
-function dPlus(startDate: string): number {
-  const start = new Date(startDate);
-  if (Number.isNaN(start.getTime())) return 0;
-  const diff = Date.now() - start.getTime();
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\s/g, '').replace(/\.$/, '');
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -155,7 +129,7 @@ export default function PlantsPage() {
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
           {list.map((p) => {
             const b = (BADGE as Record<string, { label: string; bg: string; color: string }>)[p.status];
-            const visual = SPECIES_VISUAL[p.speciesName] || DEFAULT_VISUAL;
+            const visual = plantVisual(p.speciesName);
             return (
               <Link key={p.id} href={`/plants/${p.id}`} className="relative block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
                 <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: visual.grad }}>{visual.emoji}</div>
