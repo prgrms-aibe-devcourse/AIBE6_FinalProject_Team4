@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WalletService {
 
+	private static final long JOURNAL_REWARD_AMOUNT = 100L;
 	private static final long ORDER_FREE_POINT_UNIT = 100L;
 
 	private final WalletRepository walletRepository;
@@ -44,6 +45,92 @@ public class WalletService {
 		Wallet wallet = walletRepository.findByUserId(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 		return WalletResponse.from(wallet);
+	}
+
+	/** 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다. */
+	@Transactional
+	public void rewardJournal(Long userId, Long journalId) {
+		validateJournalRewardRequest(userId, journalId);
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+
+		if (hasJournalTransaction(
+				PointTxType.JOURNAL_REWARD,
+				PointRefType.JOURNAL_COMPLETION,
+				journalId
+		)) {
+			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
+		}
+
+		long balanceAfter = wallet.increaseFreePoint(JOURNAL_REWARD_AMOUNT);
+		saveTransaction(
+				wallet,
+				PointTxType.JOURNAL_REWARD,
+				CurrencyType.FREE,
+				JOURNAL_REWARD_AMOUNT,
+				balanceAfter,
+				PointRefType.JOURNAL_COMPLETION,
+				journalId
+		);
+	}
+
+	/**
+	 * 당일 삭제된 보상 일지의 무상 포인트 100P를 한 번만 회수한다.
+	 * 지급 원장이 없는 일지는 회수할 수 없다.
+	 */
+	@Transactional
+	public void revokeJournalReward(Long userId, Long journalId) {
+		validateJournalRewardRequest(userId, journalId);
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+
+		if (hasJournalTransaction(
+				PointTxType.CLAWBACK,
+				PointRefType.JOURNAL_REVOCATION,
+				journalId
+		)) {
+			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
+		}
+		if (!hasJournalTransaction(
+				wallet,
+				PointTxType.JOURNAL_REWARD,
+				PointRefType.JOURNAL_COMPLETION,
+				journalId
+		)) {
+			throw new BusinessException(
+					ErrorCode.COMMON_DATA_CONFLICT,
+					"지급된 일지 보상 원장을 찾을 수 없습니다."
+			);
+		}
+
+		long balanceAfter = wallet.increaseFreePoint(-JOURNAL_REWARD_AMOUNT);
+		saveTransaction(
+				wallet,
+				PointTxType.CLAWBACK,
+				CurrencyType.FREE,
+				-JOURNAL_REWARD_AMOUNT,
+				balanceAfter,
+				PointRefType.JOURNAL_REVOCATION,
+				journalId
+		);
+	}
+
+	/** 해당 사용자의 일지 보상이 지급됐고 아직 회수되지 않았는지 확인한다. */
+	public boolean hasActiveJournalReward(Long userId, Long journalId) {
+		validateJournalRewardRequest(userId, journalId);
+		Wallet wallet = walletRepository.findByUserId(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		return hasJournalTransaction(
+				wallet,
+				PointTxType.JOURNAL_REWARD,
+				PointRefType.JOURNAL_COMPLETION,
+				journalId
+		) && !hasJournalTransaction(
+				wallet,
+				PointTxType.CLAWBACK,
+				PointRefType.JOURNAL_REVOCATION,
+				journalId
+		);
 	}
 
 	/**
@@ -287,6 +374,38 @@ public class WalletService {
 				|| refId == null || refId < 1) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+	}
+
+	private void validateJournalRewardRequest(Long userId, Long journalId) {
+		if (userId == null || userId < 1 || journalId == null || journalId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+	}
+
+	private boolean hasJournalTransaction(
+			PointTxType type,
+			PointRefType refType,
+			Long journalId
+	) {
+		return pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				type,
+				refType,
+				journalId
+		);
+	}
+
+	private boolean hasJournalTransaction(
+			Wallet wallet,
+			PointTxType type,
+			PointRefType refType,
+			Long journalId
+	) {
+		return pointTransactionRepository.existsByWalletAndTypeAndRefTypeAndRefId(
+				wallet,
+				type,
+				refType,
+				journalId
+		);
 	}
 
 	private PurchasePointUsage getRecordedPurchaseUsage(
