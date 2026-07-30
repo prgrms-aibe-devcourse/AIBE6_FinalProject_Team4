@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "idPolicy": "Card IDs 1-43 are ordered by rarity (COMMON, RARE, SUPER_RARE, HYPER_RARE, GOLDEN_RARE), then by code. Shared gacha assets use IDs from 900001.",
+  "uuidPolicy": "UUIDv5 using the DNS namespace and the stable asset code.",
+  "assets": [
+    {
+      "id": 1,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_cabbage",
+      "rarity": "COMMON",
+      "path": "/cards/1/8d09cd4e-6956-539c-a858-2f146d206fb3.png"
+    },
+    {
+      "id": 2,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_carrot",
+      "rarity": "COMMON",
+      "path": "/cards/2/73a2d109-2d8f-58fd-8172-0a93f2e0cf1b.png"
+    },
+    {
+      "id": 3,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_cherry_tomato",
+      "rarity": "COMMON",
+      "path": "/cards/3/f909b85a-5be6-537d-af72-8dfd3d019ad5.png"
+    },
+    {
+      "id": 4,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_chili_pepper",
+      "rarity": "COMMON",
+      "path": "/cards/4/63108783-1e70-56eb-b7ed-519b2b29afbb.png"
+    },
+    {
+      "id": 5,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_corn",
+      "rarity": "COMMON",
+      "path": "/cards/5/6a79ae47-df92-5105-926b-3323c0804d2f.png"
+    },
+    {
+      "id": 6,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_cucumber",
+      "rarity": "COMMON",
+      "path": "/cards/6/f686745a-8d4c-5464-8f5d-234d49bbdf3b.png"
+    },
+    {
+      "id": 7,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_green_onion",
+      "rarity": "COMMON",
+      "path": "/cards/7/2f372b19-276f-5966-a655-6b1191792506.png"
+    },
+    {
+      "id": 8,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_lettuce",
+      "rarity": "COMMON",
+      "path": "/cards/8/399f7998-3e24-5d1d-b69c-68da63b839ef.png"
+    },
+    {
+      "id": 9,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_pea",
+      "rarity": "COMMON",
+      "path": "/cards/9/725d9440-6a96-5329-be45-e5d62be2c3c1.png"
+    },
+    {
+      "id": 10,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_perilla",
+      "rarity": "COMMON",
+      "path": "/cards/10/75f95dea-065e-5e74-ad88-a0c94d3f9854.png"
+    },
+    {
+      "id": 11,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_potato",
+      "rarity": "COMMON",
+      "path": "/cards/11/2680e6db-335d-5e37-a128-d984497537b3.png"
+    },
+    {
+      "id": 12,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_radish",
+      "rarity": "COMMON",
+      "path": "/cards/12/62466e97-406c-513a-9861-1ce1c715cd04.png"
+    },
+    {
+      "id": 13,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_spinach",
+      "rarity": "COMMON",
+      "path": "/cards/13/b7232c3d-5791-5b6e-8d59-99711d8f474e.png"
+    },
+    {
+      "id": 14,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_sweet_potato",
+      "rarity": "COMMON",
+      "path": "/cards/14/f09e0d5f-9ff2-539b-8f1f-60ee096dc2bc.png"
+    },
+    {
+      "id": 15,
+      "type": "CARD_ILLUSTRATION",
+      "code": "common_zucchini",
+      "rarity": "COMMON",
+      "path": "/cards/15/3cfafc95-bf72-5ff0-b0bd-6b155d8ac977.png"
+    },
+    {
+      "id": 16,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_asparagus",
+      "rarity": "RARE",
+      "path": "/cards/16/d39de513-9715-57af-b5de-d6d4c93a745a.png"
+    },
+    {
+      "id": 17,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_basil",
+      "rarity": "RARE",
+      "path": "/cards/17/acdf6f51-4216-5a52-b949-25a989279fde.png"
+    },
+    {
+      "id": 18,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_blueberry",
+      "rarity": "RARE",
+      "path": "/cards/18/7686007b-53b5-5155-b828-b040f2e68cd0.png"
+    },
+    {
+      "id": 19,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_broccoli",
+      "rarity": "RARE",
+      "path": "/cards/19/78f6e3d1-9c4c-50be-9912-0f1404ea155c.png"
+    },
+    {
+      "id": 20,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_cauliflower",
+      "rarity": "RARE",
+      "path": "/cards/20/d5293f7e-c7c7-55bd-a1c6-f24db75c8602.png"
+    },
+    {
+      "id": 21,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_eggplant",
+      "rarity": "RARE",
+      "path": "/cards/21/e9669b23-fba3-5431-8644-74f3f015d7c2.png"
+    },
+    {
+      "id": 22,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_fig",
+      "rarity": "RARE",
+      "path": "/cards/22/83e7f166-97e8-5ecb-9eda-00383bc54a12.png"
+    },
+    {
+      "id": 23,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_ginger",
+      "rarity": "RARE",
+      "path": "/cards/23/bc0cb20f-beed-549d-8ad8-a055ba3564f9.png"
+    },
+    {
+      "id": 24,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_paprika",
+      "rarity": "RARE",
+      "path": "/cards/24/c6cf9e95-a165-52c8-bf83-046ba0f8f742.png"
+    },
+    {
+      "id": 25,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_peanut",
+      "rarity": "RARE",
+      "path": "/cards/25/f53a18d7-c1f6-55d4-8c43-956f82ed74fa.png"
+    },
+    {
+      "id": 26,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_pumpkin",
+      "rarity": "RARE",
+      "path": "/cards/26/26be55ab-c750-5286-9f5f-e81a3152b3a5.png"
+    },
+    {
+      "id": 27,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_rosemary",
+      "rarity": "RARE",
+      "path": "/cards/27/60b2d60d-8a59-53f9-ab01-238cec084867.png"
+    },
+    {
+      "id": 28,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_strawberry",
+      "rarity": "RARE",
+      "path": "/cards/28/67887ea5-a7ca-5b0e-a843-234556e9c162.png"
+    },
+    {
+      "id": 29,
+      "type": "CARD_ILLUSTRATION",
+      "code": "rare_watermelon",
+      "rarity": "RARE",
+      "path": "/cards/29/03e0a40e-1cc1-56d5-ab5f-d29af7bea2db.png"
+    },
+    {
+      "id": 30,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_artichoke",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/30/fcf5dfde-2da6-5b42-b67e-66af139a5da3.png"
+    },
+    {
+      "id": 31,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_cacao",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/31/8c26cc7a-16d6-5388-b557-45a225393a00.png"
+    },
+    {
+      "id": 32,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_coffee_cherry",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/32/65761d37-e88c-54e7-ba8a-f1741be9a6ea.png"
+    },
+    {
+      "id": 33,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_dragon_fruit",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/33/12f05e35-b2d0-5493-89ec-bca670e3f569.png"
+    },
+    {
+      "id": 34,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_passion_fruit",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/34/5ea74c98-fe6e-5569-8cab-35c689b7da37.png"
+    },
+    {
+      "id": 35,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_saffron_crocus",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/35/dcfb9ba0-b951-548b-8dce-ab00131b07b2.png"
+    },
+    {
+      "id": 36,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_vanilla_orchid",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/36/f2a736d1-e444-58c1-bf40-b26a4332761c.png"
+    },
+    {
+      "id": 37,
+      "type": "CARD_ILLUSTRATION",
+      "code": "super_rare_wasabi",
+      "rarity": "SUPER_RARE",
+      "path": "/cards/37/c7b0d87c-541b-5cf3-ade6-84eb8cb1819f.png"
+    },
+    {
+      "id": 38,
+      "type": "CARD_ILLUSTRATION",
+      "code": "hyper_rare_apple_mango",
+      "rarity": "HYPER_RARE",
+      "path": "/cards/38/cf045f5f-da60-5b20-b6b1-498f7655f336.png"
+    },
+    {
+      "id": 39,
+      "type": "CARD_ILLUSTRATION",
+      "code": "hyper_rare_shine_muscat",
+      "rarity": "HYPER_RARE",
+      "path": "/cards/39/4a9576a7-9e0a-54f4-b004-13fa13f45387.png"
+    },
+    {
+      "id": 40,
+      "type": "CARD_ILLUSTRATION",
+      "code": "hyper_rare_white_strawberry",
+      "rarity": "HYPER_RARE",
+      "path": "/cards/40/e2e0430e-1731-55cc-9194-c5dcce51c1e3.png"
+    },
+    {
+      "id": 41,
+      "type": "CARD_ILLUSTRATION",
+      "code": "golden_rare_golden_sun_corn",
+      "rarity": "GOLDEN_RARE",
+      "path": "/cards/41/f6442e98-d414-576d-bd12-6ced74a9c475.png"
+    },
+    {
+      "id": 42,
+      "type": "CARD_ILLUSTRATION",
+      "code": "golden_rare_moonlight_tomato",
+      "rarity": "GOLDEN_RARE",
+      "path": "/cards/42/4eb1d007-ec5e-5c14-8f81-2f251b923e82.png"
+    },
+    {
+      "id": 43,
+      "type": "CARD_ILLUSTRATION",
+      "code": "golden_rare_stardust_strawberry",
+      "rarity": "GOLDEN_RARE",
+      "path": "/cards/43/be7b328b-f538-5d38-8a62-5952d2bc5745.png"
+    },
+    {
+      "id": 900001,
+      "type": "GACHA_FRAME",
+      "code": "common_frame_png",
+      "path": "/cards/900001/7ba3322c-f0ed-5ec8-b324-32e69c0ce2f1.png"
+    },
+    {
+      "id": 900002,
+      "type": "GACHA_FRAME",
+      "code": "common_frame_svg",
+      "path": "/cards/900002/00e26b51-bded-5925-bb6c-eed61a8df37a.svg"
+    }
+  ]
+}
