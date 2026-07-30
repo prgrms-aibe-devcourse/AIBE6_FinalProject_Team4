@@ -6,7 +6,6 @@ import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,13 +26,12 @@ public class JournalImageUploadController {
 
 	private final JournalImageUploadService journalImageUploadService;
 
-	@Operation(summary = "성장 일지 이미지 업로드", description = "일지 작성/수정에 사용할 이미지를 S3에 업로드하고, 서버가 대신 서빙하는 URL과 해시를 반환합니다.")
+	@Operation(summary = "성장 일지 이미지 업로드", description = "일지 작성/수정에 사용할 이미지를 S3에 업로드하고, 서버가 대신 서빙하는 경로와 해시를 반환합니다.")
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<ApiResponse<JournalImageUploadResponse>> uploadImage(
 			@AuthenticationPrincipal Long userId,
-			@RequestParam("file") MultipartFile file,
-			HttpServletRequest request) {
-		JournalImageUploadResponse response = journalImageUploadService.upload(file, userId, baseUrl(request));
+			@RequestParam("file") MultipartFile file) {
+		JournalImageUploadResponse response = journalImageUploadService.upload(file, userId);
 		return ResponseEntity.ok(ApiResponse.success(response));
 	}
 
@@ -44,9 +42,5 @@ public class JournalImageUploadController {
 	@GetMapping("/{userId}/{filename}")
 	public ResponseEntity<byte[]> serveImage(@PathVariable Long userId, @PathVariable String filename) {
 		return journalImageUploadService.download(userId, filename);
-	}
-
-	private String baseUrl(HttpServletRequest request) {
-		return request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
 	}
 }

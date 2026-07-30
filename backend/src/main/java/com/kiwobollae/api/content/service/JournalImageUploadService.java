@@ -33,6 +33,13 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
  * com.kiwobollae.api.content.controller.JournalImageUploadController#serveImage},
  * which fetches the bytes from S3 (using our S3Client credentials) and streams
  * them to the client. So the browser never talks to S3 directly.
+ *
+ * <p>The URL returned/stored is host-relative (e.g. "/api/v1/journals/images/...").
+ * Baking the request's scheme/host/port in at upload time would get persisted into
+ * JournalImage rows forever — fine on one environment, but breaks (and requires a
+ * data migration) the moment the app moves to a different host, e.g. from local dev
+ * to a real deployment. Callers (frontend) prefix it with whatever base URL is
+ * correct for their current environment when rendering.
  */
 @Slf4j
 @Service
@@ -50,7 +57,7 @@ public class JournalImageUploadService {
 	@Value("${aws.s3.bucket}")
 	private String bucket;
 
-	public JournalImageUploadResponse upload(MultipartFile file, Long userId, String baseUrl) {
+	public JournalImageUploadResponse upload(MultipartFile file, Long userId) {
 		if (file.isEmpty() || !ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
 			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_INVALID_TYPE);
 		}
@@ -77,7 +84,7 @@ public class JournalImageUploadService {
 			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
 		}
 
-		String url = baseUrl + SERVE_PATH_MARKER + userId + "/" + filename;
+		String url = SERVE_PATH_MARKER + userId + "/" + filename;
 		return new JournalImageUploadResponse(url, hash);
 	}
 
@@ -86,10 +93,22 @@ public class JournalImageUploadService {
 	 * journal (replaced on update, or the journal itself was deleted). Never
 	 * throws — a failed cleanup shouldn't fail the journal write/delete that
 	 * triggered it; it just leaves an orphaned object to be dealt with later.
+	 *
+	 * <p>{@code ownerUserId} must be the userId of whoever's journal operation
+	 * triggered this — the userId embedded in the key (parsed back out of the
+	 * stored URL) has to match it, or the delete is refused. This method is only
+	 * ever called by already-ownership-checked call sites today (see
+	 * PlantJournalService), but the check is enforced here too rather than trusted
+	 * to every future caller — nothing about this URL/key pair is itself proof of
+	 * ownership.
 	 */
-	public void delete(String imageUrl) {
+	public void delete(String imageUrl, Long ownerUserId) {
 		String key = keyFromUrl(imageUrl);
 		if (key == null) {
+			return;
+		}
+		if (!isOwnedBy(key, ownerUserId)) {
+			log.warn("Refused to delete journal image not owned by user {}: {}", ownerUserId, key);
 			return;
 		}
 		try {
@@ -105,6 +124,12 @@ public class JournalImageUploadService {
 			return null;
 		}
 		return "journals/" + imageUrl.substring(idx + SERVE_PATH_MARKER.length());
+	}
+
+	// key 형태는 항상 "journals/{userId}/{filename}" — 두 번째 세그먼트가 소유자다.
+	private boolean isOwnedBy(String key, Long ownerUserId) {
+		String[] parts = key.split("/");
+		return parts.length == 3 && parts[1].equals(String.valueOf(ownerUserId));
 	}
 
 	public ResponseEntity<byte[]> download(Long userId, String filename) {

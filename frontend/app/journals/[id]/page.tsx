@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ApiError } from '@/lib/api';
+import { ApiError, resolveImageUrl } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { deleteJournal, getJournal, PlantJournalData, updateJournal, uploadJournalImage } from '@/lib/journal-api';
@@ -13,12 +13,16 @@ const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘�
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+// Raw (server-relative) image — pass this back to updateJournal as-is, never resolveImageUrl()
+// it first, or we'd bake an absolute host into the stored row again.
 function representativeJournalImage(journal: PlantJournalData) {
   return journal.images.find((img) => img.representative) || journal.images[0] || null;
 }
 
+// Display-ready version for <img src> — same data, resolved to an absolute URL.
 function representativeImage(journal: PlantJournalData): string | null {
-  return representativeJournalImage(journal)?.imageUrl || null;
+  const url = representativeJournalImage(journal)?.imageUrl || null;
+  return url ? resolveImageUrl(url) : null;
 }
 
 export default function JournalDetail({ params }: { params: { id: string } }) {

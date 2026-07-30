@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { ApiError } from '@/lib/api';
+import { ApiError, resolveImageUrl } from '@/lib/api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { formatDate } from '@/lib/format';
 
 function representativeImage(journal: PlantJournalData): string | null {
-  return journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
+  const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
+  return url ? resolveImageUrl(url) : null;
 }
 
 const currentMonth = () => new Date().toISOString().slice(0, 7);

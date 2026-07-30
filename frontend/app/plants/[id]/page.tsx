@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
-import { ApiError } from '@/lib/api';
+import { ApiError, resolveImageUrl } from '@/lib/api';
 import { deletePlant, getPlant, PlantProfileData, PlantStatus, updatePlant } from '@/lib/plant-api';
 import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 
 function representativeImage(journal: PlantJournalData): string | null {
-  return journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
+  const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
+  return url ? resolveImageUrl(url) : null;
 }
 
 export default function PlantDetail({ params }: { params: { id: string } }) {

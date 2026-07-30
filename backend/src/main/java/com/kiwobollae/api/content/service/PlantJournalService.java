@@ -119,7 +119,7 @@ public class PlantJournalService {
 		oldImages.stream()
 				.map(JournalImage::getImageUrl)
 				.filter(url -> !keptUrls.contains(url))
-				.forEach(journalImageUploadService::delete);
+				.forEach(url -> journalImageUploadService.delete(url, userId));
 
 		return PlantJournalResponse.from(journal, images);
 	}
@@ -128,9 +128,14 @@ public class PlantJournalService {
 	public void deleteJournal(Long userId, Long journalId) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		List<JournalImage> images = journalImageRepository.findByJournalId(journalId);
 		journal.softDelete(LocalDateTime.now(KST));
 		// 작성 보상은 삭제 여부와 무관하게 확정 지급한다. 당일 클레임도 유지하므로
 		// 삭제 후 같은 식물 프로필로 다시 작성해도 당일 추가 보상은 지급되지 않는다.
+
+		// soft delete는 사용자에게만 "삭제됨"으로 보일 뿐 복구 API가 없어 사실상 영구 삭제와
+		// 같으므로, 더 이상 어떤 일지도 참조하지 않는 S3 객체를 이 시점에 정리한다.
+		images.forEach(image -> journalImageUploadService.delete(image.getImageUrl(), userId));
 	}
 
 	// 페이지에 담긴 일지들의 이미지를 한 번에 로딩해 journalId로 묶는다 (개별 조회로 인한 N+1 방지).
