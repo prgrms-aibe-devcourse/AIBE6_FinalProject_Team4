@@ -1,5 +1,7 @@
 import { grads } from '@/lib/theme';
 
+export { formatDate } from '@/lib/format';
+
 // Backend doesn't return emoji/gradient for a species — map by name for card visuals,
 // with a fallback for any species not in this table (e.g. newly added ones).
 export const SPECIES_VISUAL: Record<string, { emoji: string; grad: string }> = {
@@ -23,10 +25,4 @@ export function dPlus(startDate: string): number {
   if (Number.isNaN(start.getTime())) return 0;
   const diff = Date.now() - start.getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-}
-
-export function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date).replace(/\s/g, '').replace(/\.$/, '');
 }
