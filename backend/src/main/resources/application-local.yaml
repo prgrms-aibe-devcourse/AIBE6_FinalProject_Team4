@@ -17,3 +17,8 @@ app:
     card:
       # Seeds ten cards and their exchange products only when both tables are empty.
       enabled: true
+    plant-profile:
+      # Seeds sample plant profiles for the InitData test users, so /plants isn't
+      # empty on a fresh local DB. Depends on InitData (users) and ProductInitData
+      # (plant species) having already run — see @Order on PlantProfileInitData.
+      enabled: true

@@ -1,7 +1,9 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore, fmt } from '@/lib/store';
-import { PLANTS } from '@/lib/data';
+import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { dPlus, plantVisual } from '@/lib/plant-visual';
 
 const CONFETTI = [
   { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
@@ -17,8 +19,23 @@ const FEATURES = [
 ];
 
 export default function Home() {
-  const { state, balance } = useStore();
-  const plants = PLANTS.filter((p) => !p.archived).slice(0, 4);
+  const { state, hydrated, balance } = useStore();
+  const [plants, setPlants] = useState<PlantProfileData[]>([]);
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+
+    getMyPlants(accessToken, controller.signal)
+      .then((data) => setPlants(data.slice(0, 4)))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setPlants([]);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
 
   if (!state.authed) {
     return (
@@ -121,15 +138,18 @@ export default function Home() {
         <Link href="/plants" className="text-sm font-bold text-brand-dark">전체보기 →</Link>
       </div>
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-        {plants.map((p) => (
-          <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-            <div className="flex h-[120px] items-center justify-center text-[60px]" style={{ background: p.grad }}>{p.emoji}</div>
-            <div className="p-3.5">
-              <div className="font-extrabold">{p.nickname}</div>
-              <div className="mt-0.5 text-[13px] text-sub">{p.species} · D+{p.dplus}</div>
-            </div>
-          </Link>
-        ))}
+        {plants.map((p) => {
+          const visual = plantVisual(p.speciesName);
+          return (
+            <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
+              <div className="flex h-[120px] items-center justify-center text-[60px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+              <div className="p-3.5">
+                <div className="font-extrabold">{p.nickname}</div>
+                <div className="mt-0.5 text-[13px] text-sub">{p.speciesName} · D+{dPlus(p.startDate)}</div>
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

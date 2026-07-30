@@ -128,7 +128,6 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           <h1 className="mb-1.5 text-[28px] font-extrabold">{plant.nickname}</h1>
           <div className="flex items-center gap-1.5 text-[15px] text-sub">
             {plant.speciesName}
-            <span className="text-xs text-[#c2c9b8]"><span className="material-symbols-outlined text-sm">lock</span> 종은 변경할 수 없어요</span>
           </div>
           <div className="mt-2 text-sm text-faint">
             <span className="material-symbols-outlined text-[15px]">calendar_month</span> {formatDate(plant.startDate)} 시작 · D+{dPlus(plant.startDate)}
@@ -170,14 +169,6 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
         ))}
       </div>
 
-      <div className="mt-[34px] rounded-2xl border-[1.5px] border-dashed border-[#f0c9b8] bg-[#fdf6f3] px-5 py-[18px]">
-        <div className="mb-1 font-extrabold text-[#b5502f]">위험 구역</div>
-        <div className="mb-3 text-[13.5px] text-[#a56b58]">삭제하면 이 식물과 일지가 함께 사라지고 되돌릴 수 없어요.</div>
-        <button type="button" onClick={remove} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-[18px] py-2.5 font-bold text-[#b5502f]">
-          삭제하기
-        </button>
-      </div>
-
       {statusOpen && (
         <div onClick={() => !saving && setStatusOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[400px] animate-pop rounded-[20px] bg-white p-6">
@@ -203,9 +194,20 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={saveStatus} disabled={saving} className="w-full cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:opacity-60">
-              {saving ? '저장 중...' : '저장하기'}
-            </button>
+            {editStatus === 'FAILED' ? (
+              <div className="flex gap-2.5">
+                <button type="button" onClick={saveStatus} disabled={saving} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:opacity-60">
+                  {saving ? '저장 중...' : '저장하기'}
+                </button>
+                <button type="button" onClick={remove} disabled={saving} className="cursor-pointer rounded-xl border-[1.5px] border-[#e8bdad] bg-white px-5 py-[13px] font-bold text-[#b5502f] disabled:opacity-60">
+                  삭제
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={saveStatus} disabled={saving} className="w-full cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:opacity-60">
+                {saving ? '저장 중...' : '저장하기'}
+              </button>
+            )}
           </div>
         </div>
       )}
