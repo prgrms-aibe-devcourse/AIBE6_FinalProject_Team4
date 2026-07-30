@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import GachaBatchResultGrid from "@/components/gacha/GachaBatchResultGrid";
 import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
+import { playRarityRevealSound } from "@/features/gacha/audio";
 import {
   loadGachaBatch,
   removeGachaBatch,
@@ -15,12 +16,20 @@ import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navi
 import { ApiError } from "@/lib/api";
 import {
   GachaDrawDetail,
+  GachaRarity,
   getGachaDraw,
   markGachaDrawViewed,
 } from "@/lib/gacha-api";
 import { useStore } from "@/lib/store";
 
 const REQUEST_CHUNK_SIZE = 10;
+const RARITY_ORDER: Record<GachaRarity, number> = {
+  COMMON: 1,
+  RARE: 2,
+  SUPER_RARE: 3,
+  HYPER_RARE: 4,
+  GOLDEN_RARE: 5,
+};
 
 type Stage = "loading" | "pack" | "shuffle" | "summary";
 
@@ -47,6 +56,7 @@ export default function GachaBatchOpenPage({
   const [details, setDetails] = useState<GachaDrawDetail[]>([]);
   const [stage, setStage] = useState<Stage>("loading");
   const [error, setError] = useState("");
+  const [muted, setMuted] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -169,6 +179,20 @@ export default function GachaBatchOpenPage({
     router.replace("/gacha");
   };
 
+  const showSummary = () => {
+    const highestRarity = details
+      .flatMap((detail) => detail.items)
+      .reduce<GachaRarity>(
+        (highest, item) =>
+          RARITY_ORDER[item.finalRarity] > RARITY_ORDER[highest]
+            ? item.finalRarity
+            : highest,
+        "COMMON",
+      );
+    playRarityRevealSound(highestRarity, muted);
+    setStage("summary");
+  };
+
   if (!hydrated) {
     return (
       <div className="container py-20 text-center text-sub">불러오는 중...</div>
@@ -227,7 +251,14 @@ export default function GachaBatchOpenPage({
     <main className="relative min-h-screen overflow-x-hidden overflow-y-auto bg-[#0d140f] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(116,145,76,.32),transparent_38%),linear-gradient(180deg,rgba(255,255,255,.025),transparent_35%)]" />
       <div className="relative mx-auto flex min-h-screen max-w-[1180px] flex-col px-4 py-5">
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setMuted((value) => !value)}
+            className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
+          >
+            {muted ? "🔇 음소거" : "🔊 사운드"}
+          </button>
           {stage !== "summary" && (
             <button
               type="button"
@@ -242,6 +273,7 @@ export default function GachaBatchOpenPage({
         <div className="flex flex-1 flex-col items-center justify-center py-10">
           {stage === "pack" && (
             <GachaPackStage
+              muted={muted}
               packCount={drawIds.length}
               onOpen={() => setStage("shuffle")}
             />
@@ -249,8 +281,9 @@ export default function GachaBatchOpenPage({
 
           {stage === "shuffle" && (
             <GachaShuffleStage
+              muted={muted}
               packCount={drawIds.length}
-              onComplete={() => setStage("summary")}
+              onComplete={showSummary}
               completeLabel="전체 결과 확인하기"
             />
           )}

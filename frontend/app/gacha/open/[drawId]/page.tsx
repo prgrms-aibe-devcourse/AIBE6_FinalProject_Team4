@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
+import { playRarityRevealSound } from "@/features/gacha/audio";
 import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
 import { ApiError } from "@/lib/api";
 import {
@@ -27,7 +28,49 @@ const RARITY_LABEL: Record<GachaRarity, string> = {
   GOLDEN_RARE: "골든 레어",
 };
 
-type Stage = "loading" | "pack" | "shuffle" | "backs" | "reveal" | "summary";
+const RARITY_REVEAL_STYLE: Record<
+  GachaRarity,
+  {
+    aura: string;
+    frame: string;
+    particleColor: string;
+    particleCount: number;
+  }
+> = {
+  COMMON: {
+    aura: "bg-[#80bd78]/20",
+    frame: "ring-1 ring-[#a9d39e]/35",
+    particleColor: "#a9d39e",
+    particleCount: 0,
+  },
+  RARE: {
+    aura: "bg-[#6ca9dc]/25",
+    frame: "ring-2 ring-[#8fc9f4]/55 shadow-[0_25px_75px_rgba(84,155,213,.22)]",
+    particleColor: "#9bd4ff",
+    particleCount: 6,
+  },
+  SUPER_RARE: {
+    aura: "bg-[#a779e0]/30",
+    frame: "ring-2 ring-[#c9a2f2]/70 shadow-[0_25px_80px_rgba(151,95,211,.3)]",
+    particleColor: "#d8b8ff",
+    particleCount: 10,
+  },
+  HYPER_RARE: {
+    aura: "bg-[#ef6e8e]/30",
+    frame: "ring-2 ring-[#ff9fb7]/80 shadow-[0_25px_90px_rgba(234,78,122,.38)]",
+    particleColor: "#ffb0c4",
+    particleCount: 16,
+  },
+  GOLDEN_RARE: {
+    aura: "bg-[#d8ad42]/20",
+    frame:
+      "ring-1 ring-[#f4d97b]/80 shadow-[0_30px_110px_rgba(191,145,33,.34)]",
+    particleColor: "#ffe783",
+    particleCount: 22,
+  },
+};
+
+type Stage = "loading" | "pack" | "shuffle" | "reveal" | "summary";
 
 export default function GachaOpenPage({
   params,
@@ -41,7 +84,7 @@ export default function GachaOpenPage({
   const [stage, setStage] = useState<Stage>("loading");
   const [revealedIndex, setRevealedIndex] = useState(0);
   const [error, setError] = useState("");
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -117,10 +160,6 @@ export default function GachaOpenPage({
       return;
     }
     if (stage === "shuffle") {
-      setStage("backs");
-      return;
-    }
-    if (stage === "backs") {
       setRevealedIndex(0);
       setStage("reveal");
       return;
@@ -215,39 +254,12 @@ export default function GachaOpenPage({
         )}
 
         <div className="flex flex-1 flex-col items-center justify-center py-12">
-          {stage === "pack" && <GachaPackStage onOpen={revealNext} />}
+          {stage === "pack" && (
+            <GachaPackStage muted={muted} onOpen={revealNext} />
+          )}
 
-          {stage === "shuffle" && <GachaShuffleStage onComplete={revealNext} />}
-
-          {stage === "backs" && (
-            <button
-              type="button"
-              onClick={revealNext}
-              className="flex flex-col items-center"
-            >
-              <p className="mb-8 text-sm font-bold tracking-[0.22em] text-white/55">
-                5 CARDS
-              </p>
-              <div className="flex -space-x-24 sm:-space-x-14">
-                {detail.items.map((item, index) => (
-                  <div
-                    key={item.sequence}
-                    className="relative aspect-[1122/1402] w-[min(38vw,220px)] origin-bottom drop-shadow-2xl transition-transform duration-300 hover:-translate-y-2"
-                    style={{ transform: `rotate(${(index - 2) * 6}deg)` }}
-                  >
-                    <Image
-                      src={CARD_BACK}
-                      alt="카드 뒷면"
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                ))}
-              </div>
-              <span className="mt-10 rounded-full bg-white px-6 py-3 font-black text-[#253822]">
-                첫 카드 확인하기
-              </span>
-            </button>
+          {stage === "shuffle" && (
+            <GachaShuffleStage muted={muted} onComplete={revealNext} />
           )}
 
           {stage === "reveal" && (
@@ -256,6 +268,7 @@ export default function GachaOpenPage({
               item={detail.items[revealedIndex]}
               index={revealedIndex}
               total={detail.items.length}
+              muted={muted}
               onNext={revealNext}
             />
           )}
@@ -329,18 +342,44 @@ function RevealCard({
   item,
   index,
   total,
+  muted,
   onNext,
 }: {
   item: GachaDrawItem;
   index: number;
   total: number;
+  muted: boolean;
   onNext: () => void;
 }) {
   const golden = item.finalRarity === "GOLDEN_RARE";
+  const revealStyle = RARITY_REVEAL_STYLE[item.finalRarity];
+  const [revealComplete, setRevealComplete] = useState(!golden);
+
+  useEffect(() => {
+    playRarityRevealSound(item.finalRarity, muted);
+  }, [item.finalRarity, muted]);
+
+  useEffect(() => {
+    if (!golden) {
+      setRevealComplete(true);
+      return;
+    }
+
+    const reducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const timer = window.setTimeout(
+      () => setRevealComplete(true),
+      reducedMotion ? 0 : 2_150,
+    );
+    return () => window.clearTimeout(timer);
+  }, [golden, item.sequence]);
+
   return (
     <section
       aria-live="polite"
-      className="flex w-full flex-col items-center text-center"
+      className={`flex w-full flex-col items-center text-center ${
+        golden ? "" : "motion-safe:animate-stageEnter"
+      }`}
     >
       <div
         className="mb-5 flex items-center gap-2"
@@ -359,49 +398,120 @@ function RevealCard({
           />
         ))}
       </div>
+
+      <div className="relative isolate flex items-center justify-center">
+        <div
+          className={`pointer-events-none absolute h-[82%] w-[115%] rounded-full blur-3xl motion-safe:animate-revealAura ${revealStyle.aura}`}
+        />
+        {golden && (
+          <>
+            <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(ellipse_at_50%_44%,rgba(196,148,39,.16),rgba(5,9,6,.97)_66%)] motion-safe:animate-goldenBackdrop" />
+            <div className="pointer-events-none fixed inset-0 z-[3] bg-black motion-safe:animate-goldenVeil" />
+            <div className="pointer-events-none fixed inset-x-0 top-1/2 z-[4] h-px bg-gradient-to-r from-transparent via-[#f5d97e] to-transparent shadow-[0_0_18px_rgba(245,217,126,.7)] motion-safe:animate-goldenOmenLine" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[125%] w-[18%] -translate-x-1/2 -translate-y-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-[#f4d87a]/30 to-transparent blur-xl motion-safe:animate-goldenBeamLeft" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[125%] w-[18%] -translate-x-1/2 -translate-y-1/2 skew-x-12 bg-gradient-to-r from-transparent via-[#fff1b0]/24 to-transparent blur-xl motion-safe:animate-goldenBeamRight" />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[104%] w-[112%] -translate-x-1/2 -translate-y-1/2 rounded-[32px] border border-[#f0d170]/45 shadow-[0_0_65px_rgba(226,185,69,.24)] motion-safe:animate-goldenHalo" />
+            <div className="pointer-events-none fixed inset-0 z-[2] bg-[#fff8d0]/45 motion-safe:animate-goldenFlash" />
+          </>
+        )}
+
+        {Array.from(
+          { length: golden ? 0 : revealStyle.particleCount },
+          (_, particleIndex) => {
+            const angle =
+              (particleIndex / revealStyle.particleCount) * Math.PI * 2;
+            const distance = 150 + (particleIndex % 4) * 24;
+            return (
+              <span
+                key={particleIndex}
+                className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 rounded-full motion-safe:animate-rarityParticle"
+                style={
+                  {
+                    "--particle-x": `${Math.cos(angle) * distance}px`,
+                    "--particle-y": `${Math.sin(angle) * distance * 0.78}px`,
+                    backgroundColor: revealStyle.particleColor,
+                    boxShadow: `0 0 14px ${revealStyle.particleColor}`,
+                    animationDelay: `${particleIndex * 35}ms`,
+                  } as CSSProperties
+                }
+              />
+            );
+          },
+        )}
+
+        <div className="relative aspect-[1122/1402] w-[min(84vw,51vh,400px)] [perspective:1500px]">
+          <div
+            className={`absolute inset-0 [transform-style:preserve-3d] ${
+              golden
+                ? "motion-safe:animate-goldenCardReveal"
+                : "motion-safe:animate-cardReveal3d"
+            }`}
+          >
+            <div
+              className={`absolute inset-0 aspect-[1122/1402] overflow-hidden rounded-[24px] bg-black/20 shadow-[0_30px_70px_rgba(0,0,0,.5)] [backface-visibility:hidden] ${revealStyle.frame}`}
+            >
+              {item.imageUrl && (
+                <Image
+                  src={item.imageUrl}
+                  alt={item.name}
+                  fill
+                  priority
+                  sizes="(max-width: 640px) 84vw, 400px"
+                  className="object-contain"
+                />
+              )}
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,transparent_28%,rgba(255,255,255,.28)_45%,transparent_62%)] bg-[length:240%_100%] opacity-70 mix-blend-screen motion-safe:animate-goldenSweep" />
+              {golden && (
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(108deg,transparent_30%,rgba(255,246,188,.2)_45%,transparent_58%)] bg-[length:280%_100%] mix-blend-screen motion-safe:animate-goldenFoil" />
+              )}
+              {item.new && (
+                <span className="absolute left-4 top-4 rounded-full bg-[#ffda52] px-3 py-1.5 text-xs font-black text-[#4e3a00] shadow-[0_5px_20px_rgba(255,218,82,.35)]">
+                  NEW
+                </span>
+              )}
+            </div>
+            <div
+              className="absolute inset-0 overflow-hidden rounded-[24px] bg-[#102519] shadow-[0_30px_70px_rgba(0,0,0,.55)] [backface-visibility:hidden]"
+              style={{ transform: "rotateY(180deg)" }}
+            >
+              <Image
+                src={CARD_BACK}
+                alt=""
+                fill
+                priority
+                className="object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div
-        className={`relative aspect-[1122/1402] w-[min(84vw,51vh,400px)] overflow-hidden rounded-[24px] bg-black/20 shadow-[0_30px_70px_rgba(0,0,0,.5)] motion-safe:animate-pop ${
-          golden
-            ? "ring-2 ring-[#f6da63] shadow-[0_25px_80px_rgba(218,181,65,.25)]"
-            : "ring-1 ring-white/10"
+        className={`flex flex-col items-center transition duration-500 ${
+          revealComplete
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-3 opacity-0"
         }`}
       >
-        {item.imageUrl && (
-          <Image
-            src={item.imageUrl}
-            alt={item.name}
-            fill
-            priority
-            sizes="(max-width: 640px) 84vw, 400px"
-            className="object-contain"
-          />
-        )}
-        {golden && (
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-white/25 to-transparent mix-blend-screen" />
-        )}
-        {item.new && (
-          <span className="absolute left-4 top-4 rounded-full bg-[#ffda52] px-3 py-1.5 text-xs font-black text-[#4e3a00]">
-            NEW
-          </span>
-        )}
-      </div>
-      <h1 className="mt-5 text-2xl font-black">{item.name}</h1>
-      <p className="mt-1 text-sm font-bold text-[#dfca72]">
-        {RARITY_LABEL[item.finalRarity]}
-        {item.downgraded ? " · 골든 구간 대체" : ""}
-      </p>
-      {item.goldenOriginRank && (
-        <p className="mt-2 text-sm text-white/70">
-          이 카드의 제 {item.goldenOriginRank}번째 최초 획득자
+        <h1 className="mt-5 text-2xl font-black">{item.name}</h1>
+        <p className="mt-1 text-sm font-bold text-[#dfca72]">
+          {RARITY_LABEL[item.finalRarity]}
+          {item.downgraded ? " · 골든 구간 대체" : ""}
         </p>
-      )}
-      <button
-        type="button"
-        onClick={onNext}
-        className="mt-5 min-w-48 rounded-full bg-white px-6 py-3 text-sm font-black text-[#253822] shadow-lg transition hover:-translate-y-0.5 hover:bg-[#f4f8ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8d77d]"
-      >
-        {index < total - 1 ? "다음 카드 보기" : "전체 결과 보기"}
-      </button>
+        {item.goldenOriginRank && (
+          <p className="mt-2 text-sm text-white/70">
+            이 카드의 제 {item.goldenOriginRank}번째 최초 획득자
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={!revealComplete}
+          onClick={onNext}
+          className="mt-5 min-w-48 rounded-full bg-white px-6 py-3 text-sm font-black text-[#253822] shadow-lg transition hover:-translate-y-0.5 hover:bg-[#f4f8ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8d77d] disabled:cursor-wait"
+        >
+          {index < total - 1 ? "다음 카드 보기" : "전체 결과 보기"}
+        </button>
+      </div>
     </section>
   );
 }

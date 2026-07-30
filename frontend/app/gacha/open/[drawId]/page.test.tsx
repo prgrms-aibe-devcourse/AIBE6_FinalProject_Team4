@@ -80,9 +80,14 @@ describe("GachaOpenPage", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /팩을 눌러 개봉하기/ }),
     );
-    expect(screen.getByText("카드의 순서를 섞고 있어요")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "섞인 카드 펼치기" }));
-    fireEvent.click(screen.getByRole("button", { name: /첫 카드 확인하기/ }));
+    expect(
+      await screen.findByText(
+        "카드의 순서를 섞고 있어요",
+        {},
+        { timeout: 1800 },
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "첫 카드 확인하기" }));
 
     const revealedCard = await screen.findByRole("img", { name: "카드 1" });
     expect(revealedCard).toHaveAttribute("data-class", "object-contain");

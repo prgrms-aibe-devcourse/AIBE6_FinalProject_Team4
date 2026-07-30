@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GachaPackStage from "./GachaPackStage";
 
@@ -11,7 +17,7 @@ vi.mock("next/image", () => ({
 describe("GachaPackStage", () => {
   afterEach(cleanup);
 
-  it("카드팩 앞면과 뒷면을 같은 규격으로 렌더링한다", () => {
+  it("카드팩 앞면과 뒷면을 같은 규격으로 렌더링한다", async () => {
     const onOpen = vi.fn();
     render(<GachaPackStage onOpen={onOpen} />);
 
@@ -29,6 +35,9 @@ describe("GachaPackStage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /팩을 눌러 개봉하기/ }));
-    expect(onOpen).toHaveBeenCalledOnce();
+    expect(screen.getByText("팩을 뜯는 중...")).toBeInTheDocument();
+    await waitFor(() => expect(onOpen).toHaveBeenCalledOnce(), {
+      timeout: 1800,
+    });
   });
 });

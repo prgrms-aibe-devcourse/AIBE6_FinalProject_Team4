@@ -105,7 +105,13 @@ describe("GachaBatchOpenPage", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /2팩 한번에 개봉하기/ }),
     );
-    expect(screen.getByText("카드의 순서를 섞고 있어요")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "카드의 순서를 섞고 있어요",
+        {},
+        { timeout: 1800 },
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "전체 결과 확인하기" }));
 
     expect(await screen.findByText("2팩 개봉 완료")).toBeInTheDocument();

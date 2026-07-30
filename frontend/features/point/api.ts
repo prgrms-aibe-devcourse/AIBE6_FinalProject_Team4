@@ -14,7 +14,6 @@ export type PointTransactionType =
   | 'PURCHASE'
   | 'RESTORE'
   | 'REFUND'
-  | 'CLAWBACK'
   | 'ADMIN_ADJUST';
 
 export type PointCurrencyType = 'FREE' | 'PAID';
@@ -25,7 +24,6 @@ export type PointReferenceType =
   | 'PAYMENT'
   | 'PAYMENT_REFUND'
   | 'JOURNAL_COMPLETION'
-  | 'JOURNAL_REVOCATION'
   | 'ADMIN';
 
 export interface PointTransaction {
