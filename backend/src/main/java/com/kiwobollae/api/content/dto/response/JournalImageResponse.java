@@ -4,9 +4,10 @@ import com.kiwobollae.api.content.entity.JournalImage;
 
 public record JournalImageResponse(
 		String imageUrl,
+		String imageHash,
 		boolean representative
 ) {
 	public static JournalImageResponse from(JournalImage image) {
-		return new JournalImageResponse(image.getImageUrl(), image.isRepresentative());
+		return new JournalImageResponse(image.getImageUrl(), image.getImageHash(), image.isRepresentative());
 	}
 }

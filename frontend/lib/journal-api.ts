@@ -2,6 +2,7 @@ import { request, SpringPage } from '@/lib/api';
 
 export interface JournalImageData {
   imageUrl: string;
+  imageHash: string;
   representative: boolean;
 }
 
@@ -60,5 +61,57 @@ export function deleteJournal(journalId: number, accessToken: string): Promise<v
   return request<void>(`/api/v1/journals/${journalId}`, {
     method: 'DELETE',
     accessToken,
+  });
+}
+
+export interface JournalImageUploadData {
+  imageUrl: string;
+  imageHash: string;
+}
+
+export function uploadJournalImage(file: File, accessToken: string): Promise<JournalImageUploadData> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request<JournalImageUploadData>('/api/v1/journals/images', {
+    method: 'POST',
+    accessToken,
+    body: formData,
+  });
+}
+
+export interface JournalImagePayload {
+  imageUrl: string;
+  imageHash: string;
+  representative: boolean;
+}
+
+export interface CreateJournalPayload {
+  plantProfileId: number;
+  content: string;
+  images: JournalImagePayload[];
+}
+
+export function createJournal(payload: CreateJournalPayload, accessToken: string): Promise<PlantJournalData> {
+  return request<PlantJournalData>('/api/v1/journals', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface UpdateJournalPayload {
+  content: string;
+  images: JournalImagePayload[];
+}
+
+export function updateJournal(
+  journalId: number,
+  payload: UpdateJournalPayload,
+  accessToken: string,
+): Promise<PlantJournalData> {
+  return request<PlantJournalData>(`/api/v1/journals/${journalId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: JSON.stringify(payload),
   });
 }

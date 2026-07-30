@@ -44,8 +44,11 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
   // store-synced in-memory token so older calls in this file keep working unchanged.
   const tokenForThisCall = accessToken !== undefined ? accessToken : currentAccessToken;
 
+  // FormData bodies (file uploads) must NOT get an explicit Content-Type — the
+  // browser sets it itself with the multipart boundary fetch needs.
+  const isFormData = requestOptions.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(requestOptions.headers as Record<string, string> | undefined),
   };
   if (tokenForThisCall && !headers.Authorization) {

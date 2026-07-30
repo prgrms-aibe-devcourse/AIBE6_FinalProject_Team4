@@ -1,18 +1,24 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { deleteJournal, getJournal, PlantJournalData } from '@/lib/journal-api';
+import { deleteJournal, getJournal, PlantJournalData, updateJournal, uploadJournalImage } from '@/lib/journal-api';
 import { formatDate } from '@/lib/format';
 import { createReport } from '@/lib/report-api';
 
 const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘텐츠'], ['stolen', '사진 도용'], ['etc', '기타']];
+const MAX_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function representativeJournalImage(journal: PlantJournalData) {
+  return journal.images.find((img) => img.representative) || journal.images[0] || null;
+}
 
 function representativeImage(journal: PlantJournalData): string | null {
-  return journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
+  return representativeJournalImage(journal)?.imageUrl || null;
 }
 
 export default function JournalDetail({ params }: { params: { id: string } }) {
@@ -27,6 +33,12 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState<string | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editPhoto, setEditPhoto] = useState<File | null>(null);
+  const [editPreview, setEditPreview] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -74,6 +86,54 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
     });
   };
 
+  const openEdit = () => {
+    if (!journal) return;
+    setEditContent(journal.content);
+    setEditPhoto(null);
+    setEditPreview(representativeImage(journal));
+    setEditing(true);
+  };
+
+  const pickEditPhoto = (file: File | null) => {
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+    if (file.size > MAX_SIZE) return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+    setEditPhoto(file);
+    setEditPreview(URL.createObjectURL(file));
+  };
+
+  const saveEdit = async () => {
+    if (!journal || !state.accessToken) return;
+    const accessToken = state.accessToken;
+
+    setSaving(true);
+    try {
+      const image = editPhoto
+        ? await uploadJournalImage(editPhoto, accessToken)
+        : representativeJournalImage(journal);
+      if (!image) return showToast('사진을 선택해 주세요.', 'err');
+
+      const updated = await updateJournal(
+        journal.id,
+        {
+          content: editContent,
+          images: [{ imageUrl: image.imageUrl, imageHash: image.imageHash, representative: true }],
+        },
+        accessToken,
+      );
+      setJournal(updated);
+      setEditing(false);
+      showToast('일지를 수정했어요 🌿');
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '수정에 실패했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitReport = async () => {
     if (!journal) return;
     if (!reason) return showToast('신고 사유를 골라주세요.', 'err');
@@ -112,6 +172,68 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
     );
   }
 
+  if (editing) {
+    return (
+      <div className="container">
+        <button type="button" onClick={() => setEditing(false)} className="cursor-pointer text-sm font-semibold text-sub">← 일지 상세</button>
+        <h1 className="mb-[18px] mt-3.5 text-2xl font-extrabold">일지 수정</h1>
+        <div className="max-w-[640px] rounded-[20px] bg-white p-6 shadow-card">
+          <div className="mb-5 flex items-center gap-4">
+            <input
+              ref={editFileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => pickEditPhoto(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => editFileInputRef.current?.click()}
+              className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
+                editPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
+              }`}
+            >
+              {editPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={editPreview} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                  <span className="text-[11px] font-bold">사진 선택</span>
+                </>
+              )}
+            </button>
+            <div className="flex min-w-[180px] flex-1 flex-col justify-center gap-2">
+              <div className="flex gap-3.5 text-[13px] text-faint">
+                <span>작성일 {formatDate(journal.writtenDate)}</span>
+                <span>{journal.plantProfileNickname}</span>
+              </div>
+            </div>
+          </div>
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            maxLength={2000}
+            className="min-h-[130px] w-full resize-y rounded-[14px] border-[1.5px] border-line p-3.5 text-[15px] leading-[1.6] outline-none"
+          />
+          <div className="mt-4 flex gap-2.5">
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={saving}
+              className="flex-1 cursor-pointer rounded-[13px] bg-brand p-3.5 font-extrabold text-white disabled:opacity-60"
+            >
+              {saving ? '저장 중...' : '저장하기'}
+            </button>
+            <button type="button" onClick={() => setEditing(false)} className="cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white px-[22px] py-3.5 font-bold text-sub">
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const image = representativeImage(journal);
 
   return (
@@ -137,6 +259,9 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
           </div>
           <p className="mb-6 whitespace-pre-wrap text-base leading-[1.75] text-ink">{journal.content}</p>
           <div className="flex flex-wrap gap-2.5">
+            <button type="button" onClick={openEdit} className="cursor-pointer rounded-[11px] bg-brand-soft px-[18px] py-[11px] font-bold text-brand-dark">
+              <span className="material-symbols-outlined text-[17px]">edit</span> 수정
+            </button>
             <button type="button" onClick={confirmDelete} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-[18px] py-[11px] font-bold text-[#b5502f]">
               <span className="material-symbols-outlined text-[17px]">delete</span> 삭제
             </button>
