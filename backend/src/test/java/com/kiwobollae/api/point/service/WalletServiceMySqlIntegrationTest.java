@@ -160,38 +160,6 @@ class WalletServiceMySqlIntegrationTest {
 	}
 
 	@Test
-	void concurrentJournalRewardRevocationsAreAppliedOnlyOnce() throws Exception {
-		walletService.rewardJournal(userId, 122L);
-		CountDownLatch ready = new CountDownLatch(2);
-		CountDownLatch start = new CountDownLatch(1);
-
-		List<AttemptResult> results = runConcurrently(
-				journalRewardRevocationAttempt(ready, start, 122L),
-				journalRewardRevocationAttempt(ready, start, 122L),
-				ready,
-				start
-		);
-
-		assertThat(results).containsExactlyInAnyOrder(
-				AttemptResult.SUCCESS,
-				AttemptResult.DUPLICATE_TRANSACTION
-		);
-
-		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
-		assertThat(wallet.getFreePoint()).isEqualTo(500L);
-		assertThat(wallet.getPaidPoint()).isEqualTo(1_000L);
-
-		List<PointTransaction> transactions = pointTransactionRepository.findAll();
-		assertThat(transactions).hasSize(2);
-		assertThat(transactions)
-				.extracting(PointTransaction::getType)
-				.containsExactlyInAnyOrder(PointTxType.JOURNAL_REWARD, PointTxType.CLAWBACK);
-		assertThat(transactions)
-				.extracting(PointTransaction::getRefId)
-				.containsOnly(122L);
-	}
-
-	@Test
 	void outerOrderTransactionRollbackRestoresWalletAndRemovesLedger() {
 		assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
 			walletService.deductForOrderPurchase(userId, 600L, 200L, 201L);
@@ -311,25 +279,6 @@ class WalletServiceMySqlIntegrationTest {
 			awaitStart(ready, start);
 			try {
 				walletService.rewardJournal(userId, journalId);
-				return AttemptResult.SUCCESS;
-			} catch (BusinessException exception) {
-				if (exception.getErrorCode() == ErrorCode.POINT_DUPLICATE_TRANSACTION) {
-					return AttemptResult.DUPLICATE_TRANSACTION;
-				}
-				throw exception;
-			}
-		};
-	}
-
-	private Callable<AttemptResult> journalRewardRevocationAttempt(
-			CountDownLatch ready,
-			CountDownLatch start,
-			long journalId
-	) {
-		return () -> {
-			awaitStart(ready, start);
-			try {
-				walletService.revokeJournalReward(userId, journalId);
 				return AttemptResult.SUCCESS;
 			} catch (BusinessException exception) {
 				if (exception.getErrorCode() == ErrorCode.POINT_DUPLICATE_TRANSACTION) {

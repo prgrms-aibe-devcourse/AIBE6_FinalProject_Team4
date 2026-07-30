@@ -75,65 +75,6 @@ public class WalletService {
 	}
 
 	/**
-	 * 당일 삭제된 보상 일지의 무상 포인트 100P를 한 번만 회수한다.
-	 * 지급 원장이 없는 일지는 회수할 수 없다.
-	 */
-	@Transactional
-	public void revokeJournalReward(Long userId, Long journalId) {
-		validateJournalRewardRequest(userId, journalId);
-		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
-
-		if (hasJournalTransaction(
-				PointTxType.CLAWBACK,
-				PointRefType.JOURNAL_REVOCATION,
-				journalId
-		)) {
-			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
-		}
-		if (!hasJournalTransaction(
-				wallet,
-				PointTxType.JOURNAL_REWARD,
-				PointRefType.JOURNAL_COMPLETION,
-				journalId
-		)) {
-			throw new BusinessException(
-					ErrorCode.COMMON_DATA_CONFLICT,
-					"지급된 일지 보상 원장을 찾을 수 없습니다."
-			);
-		}
-
-		long balanceAfter = wallet.increaseFreePoint(-JOURNAL_REWARD_AMOUNT);
-		saveTransaction(
-				wallet,
-				PointTxType.CLAWBACK,
-				CurrencyType.FREE,
-				-JOURNAL_REWARD_AMOUNT,
-				balanceAfter,
-				PointRefType.JOURNAL_REVOCATION,
-				journalId
-		);
-	}
-
-	/** 해당 사용자의 일지 보상이 지급됐고 아직 회수되지 않았는지 확인한다. */
-	public boolean hasActiveJournalReward(Long userId, Long journalId) {
-		validateJournalRewardRequest(userId, journalId);
-		Wallet wallet = walletRepository.findByUserId(userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
-		return hasJournalTransaction(
-				wallet,
-				PointTxType.JOURNAL_REWARD,
-				PointRefType.JOURNAL_COMPLETION,
-				journalId
-		) && !hasJournalTransaction(
-				wallet,
-				PointTxType.CLAWBACK,
-				PointRefType.JOURNAL_REVOCATION,
-				journalId
-		);
-	}
-
-	/**
 	 * 기존 구매 도메인 연동을 위한 호환 메서드다.
 	 *
 	 * <p>카드 구매는 무상 포인트를 먼저 사용하고 부족분을 유상 포인트로 차감한다. 상품 주문은
@@ -388,20 +329,6 @@ public class WalletService {
 			Long journalId
 	) {
 		return pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
-				type,
-				refType,
-				journalId
-		);
-	}
-
-	private boolean hasJournalTransaction(
-			Wallet wallet,
-			PointTxType type,
-			PointRefType refType,
-			Long journalId
-	) {
-		return pointTransactionRepository.existsByWalletAndTypeAndRefTypeAndRefId(
-				wallet,
 				type,
 				refType,
 				journalId

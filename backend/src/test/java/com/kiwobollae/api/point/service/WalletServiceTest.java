@@ -98,63 +98,6 @@ class WalletServiceTest {
 	}
 
 	@Test
-	void journalRewardRevocationDecreasesFreePointAndWritesClawbackLedger() {
-		Wallet wallet = Wallet.builder().freePoint(50L).paidPoint(500L).build();
-		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
-		given(pointTransactionRepository.existsByWalletAndTypeAndRefTypeAndRefId(
-				wallet,
-				PointTxType.JOURNAL_REWARD,
-				PointRefType.JOURNAL_COMPLETION,
-				31L
-		)).willReturn(true);
-
-		walletService.revokeJournalReward(7L, 31L);
-
-		assertThat(wallet.getFreePoint()).isEqualTo(-50L);
-		assertThat(wallet.getPaidPoint()).isEqualTo(500L);
-		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
-		verify(pointTransactionRepository).save(captor.capture());
-		assertThat(captor.getValue().getType()).isEqualTo(PointTxType.CLAWBACK);
-		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.FREE);
-		assertThat(captor.getValue().getAmount()).isEqualTo(-100L);
-		assertThat(captor.getValue().getBalanceAfter()).isEqualTo(-50L);
-		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.JOURNAL_REVOCATION);
-		assertThat(captor.getValue().getRefId()).isEqualTo(31L);
-	}
-
-	@Test
-	void journalRewardRevocationRejectsDuplicateJournalId() {
-		Wallet wallet = Wallet.builder().freePoint(200L).paidPoint(500L).build();
-		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
-		given(pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
-				PointTxType.CLAWBACK,
-				PointRefType.JOURNAL_REVOCATION,
-				31L
-		)).willReturn(true);
-
-		assertThatThrownBy(() -> walletService.revokeJournalReward(7L, 31L))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode())
-								.isEqualTo(ErrorCode.POINT_DUPLICATE_TRANSACTION));
-
-		assertThat(wallet.getFreePoint()).isEqualTo(200L);
-		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
-	}
-
-	@Test
-	void journalRewardRevocationRejectsJournalWithoutRewardLedger() {
-		Wallet wallet = Wallet.builder().freePoint(200L).paidPoint(500L).build();
-		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
-
-		assertThatThrownBy(() -> walletService.revokeJournalReward(7L, 31L))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_DATA_CONFLICT));
-
-		assertThat(wallet.getFreePoint()).isEqualTo(200L);
-		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
-	}
-
-	@Test
 	void cardPurchaseUsesFreePointFirstWhenFreeBalanceCoversTotal() {
 		Wallet wallet = Wallet.builder().freePoint(700L).paidPoint(500L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));

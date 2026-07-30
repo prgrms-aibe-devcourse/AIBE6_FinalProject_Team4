@@ -1,10 +1,11 @@
 package com.kiwobollae.api.content.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
@@ -76,37 +77,52 @@ class PlantJournalServiceTest {
 	}
 
 	@Test
-	void deleteRewardedJournalRevokesWithJournalId() {
+	void createJournalDoesNotRewardWhenDailyProfileClaimWasAlreadyUsed() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, LocalDateTime.now(KST));
+		PlantJournalRequest request = new PlantJournalRequest(
+				21L,
+				"같은 날 두 번째 성장 기록",
+				List.of(new JournalImageRequest("https://example.test/journal-2.jpg", "hash-2", true))
+		);
+		given(plantProfileRepository.findByIdAndUserId(21L, 7L))
+				.willReturn(Optional.of(profile));
+		given(journalImageRepository.findExistingHashes(
+				eq(7L),
+				eq(List.of("hash-2")),
+				any(LocalDate.class)
+		)).willReturn(List.of());
+		given(userRepository.getReferenceById(7L)).willReturn(user);
+		given(plantJournalRepository.save(any(PlantJournal.class))).willAnswer(invocation -> {
+			PlantJournal journal = invocation.getArgument(0);
+			ReflectionTestUtils.setField(journal, "id", 32L);
+			return journal;
+		});
+		given(plantProfileRepository.claimJournalReward(
+				eq(21L),
+				any(LocalDateTime.class),
+				any(LocalDateTime.class)
+		)).willReturn(0);
+
+		plantJournalService.createJournal(7L, request);
+
+		verifyNoInteractions(walletService);
+	}
+
+	@Test
+	void deleteRewardedJournalKeepsRewardClaimAndDoesNotChangePoints() {
 		User user = user(7L);
 		LocalDateTime grantedAt = LocalDateTime.now(KST);
 		PlantProfile profile = profile(21L, user, grantedAt);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L))
 				.willReturn(Optional.of(journal));
-		given(walletService.hasActiveJournalReward(7L, 31L)).willReturn(true);
-		given(plantProfileRepository.clearJournalRewardIfMatches(21L, grantedAt))
-				.willReturn(1);
 
 		plantJournalService.deleteJournal(7L, 31L);
 
-		verify(walletService).revokeJournalReward(7L, 31L);
-	}
-
-	@Test
-	void deleteJournalWithoutRewardLedgerDoesNotRequestRevocation() {
-		User user = user(7L);
-		LocalDateTime grantedAt = LocalDateTime.now(KST);
-		PlantProfile profile = profile(21L, user, grantedAt);
-		PlantJournal journal = journal(32L, user, profile);
-		given(plantJournalRepository.findOwnedActive(32L, 7L))
-				.willReturn(Optional.of(journal));
-		given(walletService.hasActiveJournalReward(7L, 32L)).willReturn(false);
-
-		plantJournalService.deleteJournal(7L, 32L);
-
-		verify(plantProfileRepository, never())
-				.clearJournalRewardIfMatches(any(Long.class), any(LocalDateTime.class));
-		verify(walletService, never()).revokeJournalReward(any(Long.class), any(Long.class));
+		assertThat(journal.getDeletedAt()).isNotNull();
+		assertThat(profile.getJournalRewardGrantedAt()).isEqualTo(grantedAt);
+		verifyNoInteractions(walletService);
 	}
 
 	private User user(Long id) {

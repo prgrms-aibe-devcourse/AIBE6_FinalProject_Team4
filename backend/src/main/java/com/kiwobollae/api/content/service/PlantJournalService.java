@@ -116,22 +116,9 @@ public class PlantJournalService {
 	public void deleteJournal(Long userId, Long journalId) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
-		LocalDateTime now = LocalDateTime.now(KST);
-		journal.softDelete(now);
-
-		// 오늘 보상받은 일지를 삭제하는 경우에만 프로필의 보상 클레임을 원자적으로 해제한 뒤
-		// point 도메인에 journalId 기준 회수를 요청한다.
-		PlantProfile profile = journal.getPlantProfile();
-		LocalDateTime grantedAt = profile.getJournalRewardGrantedAt();
-		LocalDate today = now.toLocalDate();
-		boolean grantedToday = grantedAt != null && grantedAt.toLocalDate().equals(today);
-		boolean rewardedJournal =
-				grantedToday && walletService.hasActiveJournalReward(userId, journalId);
-		if (rewardedJournal) {
-			if (plantProfileRepository.clearJournalRewardIfMatches(profile.getId(), grantedAt) == 1) {
-				walletService.revokeJournalReward(userId, journalId);
-			}
-		}
+		journal.softDelete(LocalDateTime.now(KST));
+		// 작성 보상은 삭제 여부와 무관하게 확정 지급한다. 당일 클레임도 유지하므로
+		// 삭제 후 같은 식물 프로필로 다시 작성해도 당일 추가 보상은 지급되지 않는다.
 	}
 
 	// 페이지에 담긴 일지들의 이미지를 한 번에 로딩해 journalId로 묶는다 (개별 조회로 인한 N+1 방지).

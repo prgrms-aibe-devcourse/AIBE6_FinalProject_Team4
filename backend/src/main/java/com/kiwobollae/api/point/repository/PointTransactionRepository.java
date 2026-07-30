@@ -16,13 +16,6 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 
 	boolean existsByTypeAndRefTypeAndRefId(PointTxType type, PointRefType refType, Long refId);
 
-	boolean existsByWalletAndTypeAndRefTypeAndRefId(
-			Wallet wallet,
-			PointTxType type,
-			PointRefType refType,
-			Long refId
-	);
-
 	List<PointTransaction> findAllByWalletAndTypeAndRefTypeAndRefId(
 			Wallet wallet,
 			PointTxType type,
