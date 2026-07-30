@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { ApiError } from '@/lib/api';
@@ -22,6 +22,7 @@ export default function JournalsPage() {
   const [monthFilter, setMonthFilter] = useState(currentMonth); // "" = 전체, else "YYYY-MM"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const monthInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -95,18 +96,17 @@ export default function JournalsPage() {
           필터{selectedProfileIds.length > 0 ? ` (${selectedProfileIds.length})` : ''}
         </button>
         <div className="flex-1" />
-        <div className="flex items-center gap-2 rounded-[11px] border-[1.5px] border-line bg-white px-[13px] py-2 text-sm font-bold text-[#6d7a68]">
+        <div
+          onClick={() => monthInputRef.current?.showPicker?.()}
+          className="flex cursor-pointer select-none items-center gap-2 rounded-[11px] border-[1.5px] border-line bg-white px-[13px] py-2 text-sm font-bold text-[#6d7a68]"
+        >
           <input
+            ref={monthInputRef}
             type="month"
             value={monthFilter}
             onChange={(e) => setMonthFilter(e.target.value)}
-            className="cursor-pointer bg-transparent outline-none"
+            className="w-full cursor-pointer select-none bg-transparent outline-none pointer-events-none"
           />
-          {monthFilter && (
-            <button type="button" onClick={() => setMonthFilter('')} className="cursor-pointer text-faint">
-              <span className="material-symbols-outlined text-base">close</span>
-            </button>
-          )}
         </div>
       </div>
 

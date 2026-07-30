@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { ApiError } from '@/lib/api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { plantVisual } from '@/lib/plant-visual';
 import { createJournal, uploadJournalImage } from '@/lib/journal-api';
 
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -18,6 +19,7 @@ interface Draft {
 
 function NewJournalInner() {
   const params = useSearchParams();
+  const router = useRouter();
   const preselect = params.get('plant');
   const { state, hydrated } = useStore();
   const { showToast } = useUI();
@@ -30,6 +32,7 @@ function NewJournalInner() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [plantModalOpen, setPlantModalOpen] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -97,9 +100,17 @@ function NewJournalInner() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const selectedPlant = plants.find((p) => p.id === draft.plantId) ?? null;
+
+  const selectPlant = (plant: PlantProfileData) => {
+    if (plant.status === 'FAILED') return;
+    setDraft({ ...draft, plantId: plant.id });
+    setPlantModalOpen(false);
+  };
+
   return (
     <div className="container">
-      <Link href="/journals" className="text-sm font-semibold text-sub">← 일지</Link>
+      <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
       <h1 className="mb-1 mt-3.5 text-[26px] font-extrabold">오늘의 일지 쓰기</h1>
       <p className="mb-[22px] text-[14.5px] text-sub">오늘 이 아이의 모습을 남겨주세요.</p>
 
@@ -122,20 +133,31 @@ function NewJournalInner() {
           {plantsLoading ? (
             <div className="mb-[26px] text-sm text-sub">식물 목록을 불러오고 있어요...</div>
           ) : (
-            <div className="mb-[26px] flex flex-wrap gap-2.5">
-              {plants.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setDraft({ ...draft, plantId: p.id })}
-                  className={`flex cursor-pointer items-center gap-[9px] rounded-[13px] border-2 px-3.5 py-[9px] ${
-                    draft.plantId === p.id ? 'border-brand bg-[#F3F8EA]' : 'border-[#eceee5] bg-white'
-                  }`}
-                >
-                  <span className="font-bold">{p.nickname}</span>
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setPlantModalOpen(true)}
+              className="mb-[26px] flex w-full cursor-pointer items-center gap-3 rounded-[14px] border-2 border-[#eceee5] bg-white p-3 text-left hover:border-brand"
+            >
+              {selectedPlant ? (
+                <>
+                  <span
+                    className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[11px] text-[26px]"
+                    style={{ background: plantVisual(selectedPlant.speciesName).grad }}
+                  >
+                    {plantVisual(selectedPlant.speciesName).emoji}
+                  </span>
+                  <span className="font-bold">{selectedPlant.nickname}</span>
+                </>
+              ) : (
+                <>
+                  <span className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[11px] bg-[#f9faf6] text-[#a9b3a0]">
+                    <span className="material-symbols-outlined">potted_plant</span>
+                  </span>
+                  <span className="font-bold text-[#a9b3a0]">식물을 선택해 주세요</span>
+                </>
+              )}
+              <span className="material-symbols-outlined ml-auto text-faint">chevron_right</span>
+            </button>
           )}
 
           <div className="mb-[5px] font-extrabold">2. 오늘의 사진 <span className="text-[#e5533b]">*</span></div>
@@ -193,6 +215,45 @@ function NewJournalInner() {
           >
             {submitting ? '저장 중...' : '기록하기'}
           </button>
+        </div>
+      )}
+
+      {plantModalOpen && (
+        <div onClick={() => setPlantModalOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[420px] animate-pop rounded-[20px] bg-white p-6">
+            <h3 className="mb-1 text-[19px] font-extrabold">어떤 식물인가요?</h3>
+            <p className="mb-4 text-[13.5px] text-sub">오늘 기록을 남길 식물을 골라주세요.</p>
+            <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto">
+              {plants.map((p) => {
+                const visual = plantVisual(p.speciesName);
+                const disabled = p.status === 'FAILED';
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => selectPlant(p)}
+                    className={`flex cursor-pointer items-center gap-3 rounded-[13px] border-2 p-2.5 text-left ${
+                      disabled
+                        ? 'cursor-not-allowed border-transparent opacity-45'
+                        : draft.plantId === p.id
+                          ? 'border-brand bg-[#F3F8EA]'
+                          : 'border-[#eceee5] bg-white hover:border-brand'
+                    }`}
+                  >
+                    <span
+                      className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-[10px] text-[22px]"
+                      style={{ background: visual.grad }}
+                    >
+                      {visual.emoji}
+                    </span>
+                    <span className="flex-1 font-bold">{p.nickname}</span>
+                    {disabled && <span className="text-xs font-bold text-faint">실패</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
