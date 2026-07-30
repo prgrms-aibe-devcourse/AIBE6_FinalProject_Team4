@@ -1,5 +1,13 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 export const AUTH_EXPIRED_EVENT = 'kwb:auth-expired';
+
+// Server stores/returns image paths host-relative (e.g. "/api/v1/journals/images/...")
+// so a DB row never bakes in a specific environment's host — see JournalImageUploadService.
+// Local blob:/data: URLs (unsaved file picker previews) are already display-ready, pass through.
+export function resolveImageUrl(path: string): string {
+  if (!path || /^(https?:|blob:|data:)/.test(path)) return path;
+  return API_BASE_URL + path;
+}
 
 // Backend error codes/messages: see docs/error-codes.md. The server already returns
 // user-facing Korean messages, so no client-side translation table is needed here.
@@ -44,8 +52,11 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
   // store-synced in-memory token so older calls in this file keep working unchanged.
   const tokenForThisCall = accessToken !== undefined ? accessToken : currentAccessToken;
 
+  // FormData bodies (file uploads) must NOT get an explicit Content-Type — the
+  // browser sets it itself with the multipart boundary fetch needs.
+  const isFormData = requestOptions.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(requestOptions.headers as Record<string, string> | undefined),
   };
   if (tokenForThisCall && !headers.Authorization) {
@@ -84,7 +95,21 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
     throw new ApiError(code, message, res.status);
   }
 
-  return body.data as T;
+  return body?.data as T;
+}
+
+// Shape of Spring Data's Page<T> as Jackson serializes it by default (content/number/
+// totalElements/... alongside a nested pageable/sort object we don't need on the client).
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  empty: boolean;
 }
 
 export interface UserResponse {

@@ -1,91 +1,86 @@
 'use client';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { grads } from '@/lib/theme';
 import { ApiError } from '@/lib/api';
-import {
-  createPlantJournal,
-  getMyPlantProfiles,
-  PlantProfileData,
-} from '@/features/journal/api';
+import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { plantVisual } from '@/lib/plant-visual';
+import { createJournal, uploadJournalImage } from '@/lib/journal-api';
 
-const PHOTOS = [
-  { emoji: '🌱', grad: grads.sprout, imageUrl: '/journal-demo/photo-1.svg' },
-  { emoji: '🍅', grad: grads.tomato, imageUrl: '/journal-demo/photo-2.svg' },
-  { emoji: '🌿', grad: 'linear-gradient(135deg,#A5D6A7,#66BB6A)', imageUrl: '/journal-demo/photo-3.svg' },
-  { emoji: '☀️', grad: grads.sun, imageUrl: '/journal-demo/photo-4.svg' },
-];
-const CONFETTI = [
-  { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
-  { left: '46%', dur: '1.3s', delay: '.1s', emoji: '🍅' }, { left: '64%', dur: '1.8s', delay: '.35s', emoji: '🌱' },
-  { left: '82%', dur: '1.5s', delay: '.15s', emoji: '✨' }, { left: '92%', dur: '1.6s', delay: '.28s', emoji: '💚' },
-];
+const MAX_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 interface Draft {
   plantId: number | null;
-  photoIdx: number | null;
   content: string;
-}
-
-interface JournalResult {
-  kind: 'neutral' | 'reward';
-  emoji: string;
-  title: string;
-  body: string;
 }
 
 function NewJournalInner() {
   const router = useRouter();
   const params = useSearchParams();
   const preselect = params.get('plant');
-  const { state, set, refreshWallet } = useStore();
+  const { state, set, refreshWallet, hydrated } = useStore();
   const { showToast } = useUI();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
-  const [loadingPlants, setLoadingPlants] = useState(true);
+  const [plantsLoading, setPlantsLoading] = useState(true);
+  const [draft, setDraft] = useState<Draft>({ plantId: preselect ? Number(preselect) : null, content: '' });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [draft, setDraft] = useState<Draft>({ plantId: preselect ? Number(preselect) : null, photoIdx: null, content: '' });
-  const [result, setResult] = useState<JournalResult | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [plantModalOpen, setPlantModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!state.accessToken) {
-      setLoadingPlants(false);
-      return;
-    }
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
     const controller = new AbortController();
-    getMyPlantProfiles(state.accessToken, controller.signal)
-      .then((profiles) => setPlants(profiles.filter((profile) => profile.status === 'GROWING')))
-      .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return;
-        showToast(
-          cause instanceof ApiError ? cause.message : '내 식물 목록을 불러오지 못했어요.',
-          'err',
-        );
+    setPlantsLoading(true);
+
+    getMyPlants(accessToken, controller.signal)
+      .then((data) => setPlants(data))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setPlants([]);
       })
-      .finally(() => setLoadingPlants(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setPlantsLoading(false);
+      });
+
     return () => controller.abort();
-  }, [showToast, state.accessToken]);
+  }, [hydrated, state.accessToken]);
+
+  const pickPhoto = (file: File | null) => {
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+    }
+    if (file.size > MAX_SIZE) {
+      return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
 
   const submit = async () => {
-    if (submitting) return;
-    if (draft.photoIdx === null) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요 📷', 'err');
+    if (!photoFile) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요 📷', 'err');
     if (draft.plantId === null) return showToast('먼저 어떤 식물인지 골라주세요 🌿', 'err');
-    if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
-    const photo = PHOTOS[draft.photoIdx];
+    if (!state.accessToken) return;
+
     setSubmitting(true);
     try {
-      const hashSource = new TextEncoder().encode(`journal-demo-photo:${draft.photoIdx}`);
-      const digest = await crypto.subtle.digest('SHA-256', hashSource);
-      const imageHash = Array.from(new Uint8Array(digest))
-        .map((value) => value.toString(16).padStart(2, '0'))
-        .join('');
-      const journal = await createPlantJournal(state.accessToken, {
-        plantProfileId: draft.plantId,
-        content: draft.content.trim(),
-        images: [{ imageUrl: photo.imageUrl, imageHash, representative: true }],
-      });
+      const uploaded = await uploadJournalImage(photoFile, state.accessToken);
+      const journal = await createJournal(
+        {
+          plantProfileId: draft.plantId,
+          content: draft.content,
+          images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
+        },
+        state.accessToken,
+      );
       set((current) => ({
         wroteToday: true,
         rewardedToday: current.rewardedToday || journal.gachaReward.granted,
@@ -96,15 +91,10 @@ function NewJournalInner() {
         router.push(`/gacha/open/${journal.gachaReward.drawId}`);
         return;
       }
-      setResult({
-        kind: 'neutral',
-        emoji: '🌙',
-        title: '일지가 저장됐어요!',
-        body: '오늘의 카드팩은 이미 받으셨어요. 내일 다시 만나요 🌙',
-      });
-    } catch (cause: unknown) {
+      setSaved(true);
+    } catch (requestError) {
       showToast(
-        cause instanceof ApiError ? cause.message : '일지를 저장하지 못했어요.',
+        requestError instanceof ApiError ? requestError.message : '일지 저장에 실패했어요. 잠시 후 다시 시도해 주세요.',
         'err',
       );
     } finally {
@@ -112,52 +102,37 @@ function NewJournalInner() {
     }
   };
 
-  const reward = result && result.kind === 'reward';
+  const reset = () => {
+    setSaved(false);
+    setDraft({ plantId: null, content: '' });
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const selectedPlant = plants.find((p) => p.id === draft.plantId) ?? null;
+
+  const selectPlant = (plant: PlantProfileData) => {
+    if (plant.status === 'FAILED') return;
+    setDraft({ ...draft, plantId: plant.id });
+    setPlantModalOpen(false);
+  };
 
   return (
     <div className="container">
-      <Link href="/journals" className="text-sm font-semibold text-sub">← 일지</Link>
+      <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
       <h1 className="mb-1 mt-3.5 text-[26px] font-extrabold">오늘의 일지 쓰기</h1>
-      <p className="mb-2 text-[14.5px] text-sub">오늘 이 아이의 모습을 남겨주세요.</p>
-      <div className="mb-[22px] inline-flex items-center gap-1.5 rounded-full bg-gold-soft px-[13px] py-[7px] text-[12.5px] font-bold text-gold-text">
-        ⓘ 포인트는 하루에 한 번, 새로운 사진으로 기록할 때 지급돼요.
-      </div>
+      <p className="mb-[22px] text-[14.5px] text-sub">오늘 이 아이의 모습을 남겨주세요.</p>
 
-      {result ? (
-        <div
-          className={`relative max-w-[640px] animate-pop overflow-hidden rounded-[18px] p-6 ${
-            reward ? 'bg-gradient-to-br from-[#FFE9A6] to-[#FFD54F]' : 'bg-brand-soft'
-          }`}
-        >
-          {reward && CONFETTI.map((c, i) => (
-            <span
-              key={i}
-              className="absolute -top-2 animate-confettiFall text-[15px]"
-              style={{ left: c.left, animationDuration: c.dur, animationDelay: c.delay, animationIterationCount: 'infinite' }}
-            >
-              {c.emoji}
-            </span>
-          ))}
-          <div className="text-[34px]">{result.emoji}</div>
-          <div className={`mt-2 text-lg font-extrabold ${reward ? 'text-[#6b5500]' : 'text-ink'}`}>{result.title}</div>
-          <div className={`mt-[5px] text-[14.5px] leading-[1.55] opacity-90 ${reward ? 'text-[#6b5500]' : 'text-ink'}`}>{result.body}</div>
+      {saved ? (
+        <div className="max-w-[640px] rounded-[18px] bg-brand-soft p-6">
+          <div className="text-[34px]">🌿</div>
+          <div className="mt-2 text-lg font-extrabold text-ink">일지가 저장됐어요!</div>
           <div className="mt-[18px] flex flex-wrap gap-2.5">
-            <Link href="/journals" className={`rounded-[11px] px-5 py-[11px] font-bold text-white hover:text-white ${reward ? 'bg-[#6b5500]' : 'bg-ink'}`}>
+            <Link href="/journals" className="rounded-[11px] bg-ink px-5 py-[11px] font-bold text-white hover:text-white">
               일지 목록으로
             </Link>
-            {reward && (
-              <Link
-                href="/gacha"
-                className="rounded-[11px] border border-[#d8bd52] bg-white px-5 py-[11px] font-bold text-[#6b5500]"
-              >
-                오늘의 카드팩 확인
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={() => { setResult(null); setDraft({ plantId: null, photoIdx: null, content: '' }); }}
-              className={`cursor-pointer rounded-[11px] bg-white/70 px-5 py-[11px] font-bold ${reward ? 'text-[#6b5500]' : 'text-ink'}`}
-            >
+            <button type="button" onClick={reset} className="cursor-pointer rounded-[11px] bg-white/70 px-5 py-[11px] font-bold text-ink">
               다른 식물도 기록
             </button>
           </div>
@@ -165,47 +140,72 @@ function NewJournalInner() {
       ) : (
         <div className="max-w-[640px] rounded-[20px] bg-white p-6 shadow-card">
           <div className="mb-3 font-extrabold">1. 어떤 식물인가요?</div>
-          <div className="mb-[26px] flex flex-wrap gap-2.5">
-            {loadingPlants && <span className="text-sm text-sub">내 식물을 불러오는 중...</span>}
-            {!loadingPlants && plants.length === 0 && (
-              <Link href="/plants" className="text-sm font-bold text-brand">
-                먼저 재배 중인 식물을 등록해 주세요.
-              </Link>
-            )}
-            {plants.map((p, index) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setDraft({ ...draft, plantId: p.id })}
-                className={`flex cursor-pointer items-center gap-[9px] rounded-[13px] border-2 px-3.5 py-[9px] ${
-                  draft.plantId === p.id ? 'border-brand bg-[#F3F8EA]' : 'border-[#eceee5] bg-white'
-                }`}
-              >
-                <span className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] text-lg" style={{ background: [grads.sprout, grads.tomato, grads.mint][index % 3] }}>🌿</span>
-                <span className="font-bold">{p.nickname}</span>
-              </button>
-            ))}
-          </div>
+          {plantsLoading ? (
+            <div className="mb-[26px] text-sm text-sub">식물 목록을 불러오고 있어요...</div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPlantModalOpen(true)}
+              className="mb-[26px] flex w-full cursor-pointer items-center gap-3 rounded-[14px] border-2 border-[#eceee5] bg-white p-3 text-left hover:border-brand"
+            >
+              {selectedPlant ? (
+                <>
+                  <span
+                    className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[11px] text-[26px]"
+                    style={{ background: plantVisual(selectedPlant.speciesName).grad }}
+                  >
+                    {plantVisual(selectedPlant.speciesName).emoji}
+                  </span>
+                  <span className="font-bold">{selectedPlant.nickname}</span>
+                </>
+              ) : (
+                <>
+                  <span className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[11px] bg-[#f9faf6] text-[#a9b3a0]">
+                    <span className="material-symbols-outlined">potted_plant</span>
+                  </span>
+                  <span className="font-bold text-[#a9b3a0]">식물을 선택해 주세요</span>
+                </>
+              )}
+              <span className="material-symbols-outlined ml-auto text-faint">chevron_right</span>
+            </button>
+          )}
 
           <div className="mb-[5px] font-extrabold">2. 오늘의 사진 <span className="text-[#e5533b]">*</span></div>
-          <div className="mb-3 text-[12.5px] text-[#a9b3a0]">S3 연결 전까지 제공되는 QA용 샘플 사진이에요.</div>
-          <div className="mb-[26px] flex flex-wrap gap-3">
-            {PHOTOS.map((ph, i) => (
+          <div className="mb-3 text-[12.5px] text-[#a9b3a0]">jpg · png · webp / 5MB 이하</div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+            className="hidden"
+          />
+          <div className="mb-[26px] flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
+                photoPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
+              }`}
+            >
+              {photoPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                  <span className="text-[11px] font-bold">사진 선택</span>
+                </>
+              )}
+            </button>
+            {photoPreview && (
               <button
-                key={i}
                 type="button"
-                onClick={() => setDraft({ ...draft, photoIdx: i })}
-                className={`relative flex h-[90px] w-[90px] cursor-pointer items-center justify-center rounded-[14px] border-[3px] text-[40px] ${
-                  draft.photoIdx === i ? 'border-brand' : 'border-transparent'
-                }`}
-                style={{ background: ph.grad }}
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
               >
-                {ph.emoji}
-                {draft.photoIdx === i && (
-                  <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs text-white">✓</span>
-                )}
+                <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
               </button>
-            ))}
+            )}
           </div>
 
           <div className="mb-2.5 font-extrabold">3. 오늘의 기록</div>
@@ -217,9 +217,53 @@ function NewJournalInner() {
             className="min-h-[130px] w-full resize-y rounded-[14px] border-[1.5px] border-line p-3.5 text-[15px] leading-[1.6] outline-none"
           />
           <div className="mt-[5px] text-right text-xs text-faint">{draft.content.length} / 2000</div>
-          <button type="button" onClick={submit} disabled={submitting || loadingPlants || plants.length === 0} className="mt-3 w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {submitting ? '기록을 저장하는 중...' : '기록하고 카드팩 받기 ✨'}
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="mt-3 w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:opacity-60"
+          >
+            {submitting ? '저장 중...' : '기록하기'}
           </button>
+        </div>
+      )}
+
+      {plantModalOpen && (
+        <div onClick={() => setPlantModalOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[420px] animate-pop rounded-[20px] bg-white p-6">
+            <h3 className="mb-1 text-[19px] font-extrabold">어떤 식물인가요?</h3>
+            <p className="mb-4 text-[13.5px] text-sub">오늘 기록을 남길 식물을 골라주세요.</p>
+            <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto">
+              {plants.map((p) => {
+                const visual = plantVisual(p.speciesName);
+                const disabled = p.status === 'FAILED';
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => selectPlant(p)}
+                    className={`flex cursor-pointer items-center gap-3 rounded-[13px] border-2 p-2.5 text-left ${
+                      disabled
+                        ? 'cursor-not-allowed border-transparent opacity-45'
+                        : draft.plantId === p.id
+                          ? 'border-brand bg-[#F3F8EA]'
+                          : 'border-[#eceee5] bg-white hover:border-brand'
+                    }`}
+                  >
+                    <span
+                      className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-[10px] text-[22px]"
+                      style={{ background: visual.grad }}
+                    >
+                      {visual.emoji}
+                    </span>
+                    <span className="flex-1 font-bold">{p.nickname}</span>
+                    {disabled && <span className="text-xs font-bold text-faint">실패</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

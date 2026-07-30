@@ -1,10 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { PLANTS, SPECIES, BADGE } from '@/lib/data';
+import { SPECIES, BADGE } from '@/lib/data';
 import { grads } from '@/lib/theme';
+import { ApiError } from '@/lib/api';
+import { createPlant, getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const REG_PHOTOS = [['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry]];
@@ -19,30 +22,77 @@ function nickValid(v: string) {
   return { ok: true, msg: '좋은 이름이에요! 🌿' };
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+
 export default function PlantsPage() {
-  const { set } = useStore();
+  const { state, hydrated, set } = useStore();
   const { showToast } = useUI();
-  const [plants, setPlants] = useState(PLANTS);
+  const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState(false);
-  const [reg, setReg] = useState<{ nick: string; speciesId: number | null; photoIdx: number }>({ nick: '', speciesId: null, photoIdx: 0 });
+  const [submitting, setSubmitting] = useState(false);
+  const [reg, setReg] = useState<{ nick: string; speciesId: number | null; photoIdx: number; startDate: string }>({
+    nick: '', speciesId: null, photoIdx: 0, startDate: today(),
+  });
   const [query, setQuery] = useState('');
 
-  const active = plants.filter((p) => !p.archived);
-  const list = active.filter((p) => filter === 'all' || p.status === filter);
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+
+    getMyPlants(accessToken, controller.signal)
+      .then((data) => setPlants(data))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setPlants([]);
+        setError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : '식물 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
+
+  const list = plants.filter((p) => filter === 'all' || p.status === filter);
   const regV = nickValid(reg.nick);
   const spResults = SPECIES.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
 
-  const submit = () => {
+  const submit = async () => {
+    if (!state.accessToken) return;
     if (!regV.ok) return showToast(regV.msg, 'err');
     if (!reg.speciesId) return showToast('식물 종을 골라주세요 🌱', 'err');
-    const sp = SPECIES.find((s) => s.id === reg.speciesId);
-    if (!sp) return showToast('식물 종을 골라주세요 🌱', 'err');
-    const np = { id: Date.now(), nickname: reg.nick, species: sp.name, emoji: sp.emoji, grad: REG_PHOTOS[reg.photoIdx][1], startDate: '2026.07.21', dplus: 0, status: 'GROWING', archived: false, careGuide: '새로 등록된 식물이에요. 매일의 모습을 일지로 남겨보세요 🌱' };
-    setPlants([np, ...plants]);
-    set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
-    setOpen(false); setReg({ nick: '', speciesId: null, photoIdx: 0 }); setQuery('');
-    showToast(`'${reg.nick}'와의 여정이 시작됐어요! 🌿`);
+    if (!reg.startDate) return showToast('재배 시작일을 선택해 주세요.', 'err');
+
+    setSubmitting(true);
+    try {
+      const created = await createPlant(
+        { speciesId: reg.speciesId, nickname: reg.nick, startDate: reg.startDate },
+        state.accessToken,
+      );
+      setPlants([created, ...plants]);
+      set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
+      setOpen(false);
+      setReg({ nick: '', speciesId: null, photoIdx: 0, startDate: today() });
+      setQuery('');
+      showToast(`'${created.nickname}'와의 여정이 시작됐어요! 🌿`);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '등록에 실패했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -65,7 +115,11 @@ export default function PlantsPage() {
         ))}
       </div>
 
-      {list.length === 0 ? (
+      {loading ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
+      ) : error ? (
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
+      ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌱</div>
           <p className="mb-5 mt-4 text-[17px] font-bold text-[#6d7a68]">아직 함께하는 식물이 없네요.<br />첫 반려식물을 등록해 볼까요?</p>
@@ -75,15 +129,16 @@ export default function PlantsPage() {
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
           {list.map((p) => {
             const b = (BADGE as Record<string, { label: string; bg: string; color: string }>)[p.status];
+            const visual = plantVisual(p.speciesName);
             return (
               <Link key={p.id} href={`/plants/${p.id}`} className="relative block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-                <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: p.grad }}>{p.emoji}</div>
+                <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: visual.grad }}>{visual.emoji}</div>
                 <div className="absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
                 <div className="p-[15px]">
                   <div className="text-base font-extrabold">{p.nickname}</div>
-                  <div className="mt-0.5 text-[13px] text-sub">{p.species}</div>
+                  <div className="mt-0.5 text-[13px] text-sub">{p.speciesName}</div>
                   <div className="mt-1.5 text-[13px] text-faint">
-                    <span className="material-symbols-outlined text-[15px]">calendar_month</span> {p.startDate} · D+{p.dplus}
+                    <span className="material-symbols-outlined text-[15px]">calendar_month</span> {formatDate(p.startDate)} · D+{dPlus(p.startDate)}
                   </div>
                 </div>
               </Link>
@@ -101,7 +156,7 @@ export default function PlantsPage() {
       </button>
 
       {open && (
-        <div onClick={() => setOpen(false)} className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10">
+        <div onClick={() => !submitting && setOpen(false)} className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]">
             <h3 className="mb-1 text-xl font-extrabold">새 식물 등록 🌿</h3>
             <p className="mb-5 text-[13.5px] text-sub">새 친구의 정보를 알려주세요.</p>
@@ -143,7 +198,12 @@ export default function PlantsPage() {
             </div>
 
             <label className={LABEL}>재배 시작일</label>
-            <input type="date" defaultValue="2026-07-21" className={`${FIELD} mb-[18px] mt-1.5`} />
+            <input
+              type="date"
+              value={reg.startDate}
+              onChange={(e) => setReg({ ...reg, startDate: e.target.value })}
+              className={`${FIELD} mb-[18px] mt-1.5`}
+            />
 
             <label className={LABEL}>대표 사진</label>
             <div className="mb-1.5 mt-2 flex flex-wrap gap-2.5">
@@ -163,7 +223,9 @@ export default function PlantsPage() {
             </div>
             <div className="text-xs text-[#a9b3a0]">jpg · png · webp / 5MB 이하</div>
 
-            <button type="button" onClick={submit} className="mt-[22px] w-full cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white">등록하기</button>
+            <button type="button" onClick={submit} disabled={submitting} className="mt-[22px] w-full cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white disabled:opacity-60">
+              {submitting ? '등록 중...' : '등록하기'}
+            </button>
           </div>
         </div>
       )}

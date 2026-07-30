@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Seeds a handful of test users on startup so there's something to log in with
  * without hitting /auth/signup by hand. Local dev only — never runs in prod.
+ *
+ * <p>Ordered first (see @Order) so InitData runners that seed data owned by these
+ * users (e.g. PlantProfileInitData) can rely on them already existing.
  */
 @Component
 @Profile("local")
+@Order(1)
 @RequiredArgsConstructor
 public class InitData implements ApplicationRunner {
 

@@ -16,6 +16,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
  * Local-only sample products for shop development.
  *
  * <p>Disable without changing code by setting {@code app.seed.product.enabled=false}.
+ *
+ * <p>Ordered before PlantProfileInitData (see @Order) so the plant species it
+ * seeds here already exist when profiles are created against them.
  */
 @Component
 @Profile("local")
 @ConditionalOnProperty(prefix = "app.seed.product", name = "enabled", havingValue = "true")
+@Order(2)
 @RequiredArgsConstructor
 public class ProductInitData implements ApplicationRunner {
 
