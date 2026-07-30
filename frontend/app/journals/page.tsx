@@ -7,17 +7,18 @@ import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { formatDate } from '@/lib/format';
 
-const TILE_H = ['190px', '150px', '210px', '160px', '200px', '170px'];
-
 function representativeImage(journal: PlantJournalData): string | null {
   return journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
 }
+
+const currentMonth = () => new Date().toISOString().slice(0, 7);
 
 export default function JournalsPage() {
   const { state, hydrated } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
   const [filter, setFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState(currentMonth); // "" = 전체, else "YYYY-MM"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -28,10 +29,12 @@ export default function JournalsPage() {
     setLoading(true);
     setError('');
 
+    const [year, month] = monthFilter ? monthFilter.split('-').map(Number) : [undefined, undefined];
+
     Promise.all([
       getMyPlants(accessToken, controller.signal),
       getJournals(
-        { profileId: filter === 'all' ? undefined : Number(filter), size: 100 },
+        { profileId: filter === 'all' ? undefined : Number(filter), year, month, size: 100 },
         accessToken,
         controller.signal,
       ),
@@ -54,7 +57,7 @@ export default function JournalsPage() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken, filter]);
+  }, [hydrated, state.accessToken, filter, monthFilter]);
 
   const filters = [['all', '전체'], ...plants.map((p) => [String(p.id), p.nickname])];
 
@@ -79,6 +82,20 @@ export default function JournalsPage() {
             {label}
           </button>
         ))}
+        <div className="flex-1" />
+        <div className="flex items-center gap-2 rounded-[11px] border-[1.5px] border-line bg-white px-[13px] py-2 text-sm font-bold text-[#6d7a68]">
+          <input
+            type="month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="cursor-pointer bg-transparent outline-none"
+          />
+          {monthFilter && (
+            <button type="button" onClick={() => setMonthFilter('')} className="cursor-pointer text-faint">
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -88,19 +105,16 @@ export default function JournalsPage() {
       ) : journals.length === 0 ? (
         <div className="px-5 py-[60px] text-center text-sub">이 조건의 일지가 아직 없어요. 오늘의 기록을 남겨볼까요? 🌱</div>
       ) : (
-        <div className="gap-[18px] [column-gap:18px] [columns:auto_250px]">
-          {journals.map((j, i) => {
+        <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
+          {journals.map((j) => {
             const image = representativeImage(j);
             return (
               <Link
                 key={j.id}
                 href={`/journals/${j.id}`}
-                className="mb-[18px] block overflow-hidden rounded-[18px] bg-white text-ink shadow-card [break-inside:avoid] hover:text-ink"
+                className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink"
               >
-                <div
-                  className="relative flex items-center justify-center overflow-hidden bg-brand-soft text-[62px]"
-                  style={{ height: TILE_H[i % TILE_H.length] }}
-                >
+                <div className="relative flex h-[190px] items-center justify-center overflow-hidden bg-brand-soft text-[62px]">
                   {image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={image} alt="" className="h-full w-full object-cover" />
