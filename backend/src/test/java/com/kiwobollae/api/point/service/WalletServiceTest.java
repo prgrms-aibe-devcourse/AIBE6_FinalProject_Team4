@@ -60,6 +60,44 @@ class WalletServiceTest {
 	}
 
 	@Test
+	void journalRewardIncreasesFreePointAndWritesJournalLedger() {
+		Wallet wallet = Wallet.builder().freePoint(200L).paidPoint(500L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		walletService.rewardJournal(7L, 31L);
+
+		assertThat(wallet.getFreePoint()).isEqualTo(300L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(500L);
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository).save(captor.capture());
+		assertThat(captor.getValue().getType()).isEqualTo(PointTxType.JOURNAL_REWARD);
+		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.FREE);
+		assertThat(captor.getValue().getAmount()).isEqualTo(100L);
+		assertThat(captor.getValue().getBalanceAfter()).isEqualTo(300L);
+		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.JOURNAL_COMPLETION);
+		assertThat(captor.getValue().getRefId()).isEqualTo(31L);
+	}
+
+	@Test
+	void journalRewardRejectsDuplicateJournalId() {
+		Wallet wallet = Wallet.builder().freePoint(200L).paidPoint(500L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.JOURNAL_REWARD,
+				PointRefType.JOURNAL_COMPLETION,
+				31L
+		)).willReturn(true);
+
+		assertThatThrownBy(() -> walletService.rewardJournal(7L, 31L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.POINT_DUPLICATE_TRANSACTION));
+
+		assertThat(wallet.getFreePoint()).isEqualTo(200L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
 	void cardPurchaseUsesFreePointFirstWhenFreeBalanceCoversTotal() {
 		Wallet wallet = Wallet.builder().freePoint(700L).paidPoint(500L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));

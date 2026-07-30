@@ -16,7 +16,6 @@ const ICON: Record<PointTransactionType, [string, string]> = {
   PURCHASE: ['shopping_cart', 'bg-brand-soft'],
   RESTORE: ['undo', 'bg-brand-soft'],
   REFUND: ['currency_exchange', 'bg-[#fff1eb]'],
-  CLAWBACK: ['history', 'bg-[#f4f0eb]'],
   ADMIN_ADJUST: ['tune', 'bg-[#f4f0eb]'],
 };
 
@@ -26,7 +25,6 @@ const TX_LABEL: Record<PointTransactionType, string> = {
   PURCHASE: '포인트 사용',
   RESTORE: '구매 취소 원복',
   REFUND: '충전 취소 회수',
-  CLAWBACK: '보상 회수',
   ADMIN_ADJUST: '관리자 조정',
 };
 
@@ -42,7 +40,6 @@ const FILTERS: { key: 'all' | PointTransactionType; label: string }[] = [
   { key: 'PURCHASE', label: '사용' },
   { key: 'RESTORE', label: '구매 취소' },
   { key: 'REFUND', label: '충전 취소' },
-  { key: 'CLAWBACK', label: '보상 회수' },
   { key: 'ADMIN_ADJUST', label: '관리자 조정' },
 ];
 

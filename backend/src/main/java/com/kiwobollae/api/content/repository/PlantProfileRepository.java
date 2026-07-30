@@ -26,10 +26,4 @@ public interface PlantProfileRepository extends JpaRepository<PlantProfile, Long
 			+ "where p.id = :id and (p.journalRewardGrantedAt is null or p.journalRewardGrantedAt < :startOfToday)")
 	int claimJournalReward(@Param("id") Long id, @Param("now") LocalDateTime now,
 			@Param("startOfToday") LocalDateTime startOfToday);
-
-	// 읽었던 지급 시각과 현재 값이 같을 때만 원자적으로 해제한다(다른 요청이 먼저 처리했으면 0건).
-	@Modifying
-	@Query("update PlantProfile p set p.journalRewardGrantedAt = null "
-			+ "where p.id = :id and p.journalRewardGrantedAt = :expectedGrantedAt")
-	int clearJournalRewardIfMatches(@Param("id") Long id, @Param("expectedGrantedAt") LocalDateTime expectedGrantedAt);
 }
