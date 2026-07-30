@@ -22,6 +22,7 @@ public enum ErrorCode {
 	COMMON_UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type입니다."),
 	COMMON_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
 	COMMON_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
+	COMMON_FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "파일 용량이 너무 큽니다. 5MB 이하로 업로드해 주세요."),
 
 	// --- Auth / session (docs/error-codes.md §4) ---
 	AUTH_AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다. 로그인 후 다시 시도해 주세요."),
@@ -83,6 +84,8 @@ public enum ErrorCode {
 	PLANT_SPECIES_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 종을 찾을 수 없습니다."),
 	JOURNAL_NOT_FOUND(HttpStatus.NOT_FOUND, "성장 일지를 찾을 수 없습니다."),
 	JOURNAL_DUPLICATE_IMAGE(HttpStatus.UNPROCESSABLE_CONTENT, "같은 날 이미 사용한 사진입니다."),
+	JOURNAL_IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 형식의 이미지만 업로드할 수 있습니다."),
+	JOURNAL_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요."),
 
 	// --- 마이페이지 / 배송지 도메인 ---
 	ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "배송지를 찾을 수 없습니다."),
