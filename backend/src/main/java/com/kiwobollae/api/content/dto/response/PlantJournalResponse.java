@@ -16,9 +16,15 @@ public record PlantJournalResponse(
 		LocalDateTime createdAt,
 		LocalDateTime updatedAt,
 		LocalDateTime deletedAt,
-		List<JournalImageResponse> images
+		List<JournalImageResponse> images,
+		GachaRewardResponse gachaReward
 ) {
 	public static PlantJournalResponse from(PlantJournal plantJournal, List<JournalImage> images) {
+		return from(plantJournal, images, null);
+	}
+
+	public static PlantJournalResponse from(
+			PlantJournal plantJournal, List<JournalImage> images, GachaRewardResponse gachaReward) {
 		return new PlantJournalResponse(
 				plantJournal.getId(),
 				plantJournal.getPlantProfile().getId(),
@@ -29,7 +35,8 @@ public record PlantJournalResponse(
 				plantJournal.getCreatedAt(),
 				plantJournal.getUpdatedAt(),
 				plantJournal.getDeletedAt(),
-				images.stream().map(JournalImageResponse::from).toList()
+				images.stream().map(JournalImageResponse::from).toList(),
+				gachaReward
 		);
 	}
 }

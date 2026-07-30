@@ -8,12 +8,17 @@ logging:
     com.kiwobollae.api: DEBUG
 
 app:
+  gacha:
+    qa:
+      enabled: true
   seed:
+    gacha:
+      enabled: true
+    gacha-qa:
+      enabled: true
     charge-product:
       enabled: true
     product:
-      # Set to false when local development should use manually managed or production-like data.
       enabled: true
     card:
-      # Seeds ten cards and their exchange products only when both tables are empty.
       enabled: true

@@ -214,7 +214,7 @@ CREATE TABLE gacha_draws (
     source_type VARCHAR(20) NOT NULL
         COMMENT 'LOG_REWARD / PURCHASE / EVENT / ADMIN',
     source_id BIGINT NOT NULL
-        COMMENT 'LOG_REWARD=plant_journals.id, PURCHASE=order_items.id, ADMIN=idempotency_keys.id',
+        COMMENT 'LOG_REWARD=idempotency_keys.id, PURCHASE=order_items.id, ADMIN=idempotency_keys.id',
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
         COMMENT 'PENDING / PROCESSING / COMPLETED / RETRYABLE_FAILED / MANUAL_REVIEW',
     draw_count INT NOT NULL DEFAULT 5,

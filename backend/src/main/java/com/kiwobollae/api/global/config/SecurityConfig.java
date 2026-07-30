@@ -46,6 +46,8 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/product").permitAll()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/product/**").permitAll()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/card").permitAll()
+						.requestMatchers(ApiVersion.V1 + "/card/gacha/me/**").authenticated()
+						.requestMatchers(ApiVersion.V1 + "/card/gacha/draws/**").authenticated()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/card/**").permitAll()
 						.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
 						.anyRequest().authenticated()

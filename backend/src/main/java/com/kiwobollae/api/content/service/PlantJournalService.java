@@ -2,9 +2,12 @@ package com.kiwobollae.api.content.service;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
+import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservation;
+import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservationService;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
+import com.kiwobollae.api.content.dto.response.GachaRewardResponse;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantJournal;
@@ -47,6 +50,7 @@ public class PlantJournalService {
 	private final PlantProfileRepository plantProfileRepository;
 	private final UserRepository userRepository;
 	private final WalletService walletService;
+	private final GachaRewardReservationService gachaRewardReservationService;
 
 	@Transactional
 	public PlantJournalResponse createJournal(Long userId, PlantJournalRequest request) {
@@ -70,11 +74,13 @@ public class PlantJournalService {
 		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
 		LocalDateTime now = LocalDateTime.now(KST);
 		LocalDateTime startOfToday = today.atStartOfDay();
+		GachaRewardReservation gachaReservation = GachaRewardReservation.none();
 		if (plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1) {
 			walletService.applyDelta(userId, PointTxType.JOURNAL_REWARD, CurrencyType.FREE,
 					JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_COMPLETION, profile.getId());
+			gachaReservation = gachaRewardReservationService.reserveDailyJournalReward(userId, today);
 		}
-		return PlantJournalResponse.from(journal, images);
+		return PlantJournalResponse.from(journal, images, GachaRewardResponse.from(gachaReservation));
 	}
 
 	public Page<PlantJournalResponse> getJournals(Long userId, Long profileId, Integer year, Integer month,
