@@ -14,9 +14,6 @@ import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
-import com.kiwobollae.api.point.entity.enums.CurrencyType;
-import com.kiwobollae.api.point.entity.enums.PointRefType;
-import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,9 +35,6 @@ public class PlantJournalService {
 
 	// 작성일·하루 경계는 KST 기준으로 판정한다 (중복검사·완료 판정의 "같은 날" 기준).
 	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
-	// 일지 완료 보상 포인트. 임시값 — 추후 팀 협의 후 조정 예정.
-	private static final long JOURNAL_REWARD_AMOUNT = 100L;
 
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
@@ -71,8 +65,7 @@ public class PlantJournalService {
 		LocalDateTime now = LocalDateTime.now(KST);
 		LocalDateTime startOfToday = today.atStartOfDay();
 		if (plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1) {
-			walletService.applyDelta(userId, PointTxType.JOURNAL_REWARD, CurrencyType.FREE,
-					JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_COMPLETION, profile.getId());
+			walletService.rewardJournal(userId, journal.getId());
 		}
 		return PlantJournalResponse.from(journal, images);
 	}
@@ -126,19 +119,17 @@ public class PlantJournalService {
 		LocalDateTime now = LocalDateTime.now(KST);
 		journal.softDelete(now);
 
-		// 자정 기준 회수: 오늘 지급된 보상이 있고, 오늘 작성된 활성 일지가 이 삭제로 0이 되면
-		// (다른 날 작성된 일지가 남아있어도 오늘자 보상 근거는 아니므로 회수 대상) 원자적으로
-		// 클레임을 해제한 뒤에만 point 도메인에 회수를 요청한다.
+		// 오늘 보상받은 일지를 삭제하는 경우에만 프로필의 보상 클레임을 원자적으로 해제한 뒤
+		// point 도메인에 journalId 기준 회수를 요청한다.
 		PlantProfile profile = journal.getPlantProfile();
 		LocalDateTime grantedAt = profile.getJournalRewardGrantedAt();
 		LocalDate today = now.toLocalDate();
 		boolean grantedToday = grantedAt != null && grantedAt.toLocalDate().equals(today);
-		boolean hasTodayActiveJournal =
-				plantJournalRepository.existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(profile.getId(), today);
-		if (grantedToday && !hasTodayActiveJournal) {
+		boolean rewardedJournal =
+				grantedToday && walletService.hasActiveJournalReward(userId, journalId);
+		if (rewardedJournal) {
 			if (plantProfileRepository.clearJournalRewardIfMatches(profile.getId(), grantedAt) == 1) {
-				walletService.applyDelta(userId, PointTxType.CLAWBACK, CurrencyType.FREE,
-						-JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_REVOCATION, profile.getId());
+				walletService.revokeJournalReward(userId, journalId);
 			}
 		}
 	}
