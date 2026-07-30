@@ -24,6 +24,7 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -47,6 +48,7 @@ public class PlantJournalService {
 	private final PlantProfileRepository plantProfileRepository;
 	private final UserRepository userRepository;
 	private final WalletService walletService;
+	private final JournalImageUploadService journalImageUploadService;
 
 	@Transactional
 	public PlantJournalResponse createJournal(Long userId, PlantJournalRequest request) {
@@ -106,6 +108,7 @@ public class PlantJournalService {
 
 		// 이미지 전체 교체: 기존 이미지를 먼저 지우고(같은 사진 유지 시 자기 자신과의 중복 오탐 방지),
 		// 원래 작성일 기준으로 중복검사한 뒤 새 이미지를 저장한다. 사진은 수정 불가가 아니라 전체 교체한다.
+		List<JournalImage> oldImages = journalImageRepository.findByJournalId(journalId);
 		journalImageRepository.deleteByJournalId(journalId);
 		LocalDate writtenDate = journal.getWrittenDate();
 		checkDuplicateImages(userId, request.images(), writtenDate);
@@ -116,6 +119,15 @@ public class PlantJournalService {
 						img.representative(), writtenDate))
 				.toList();
 		journalImageRepository.saveAll(images);
+
+		// 새 목록에 그대로 남아있는 사진(교체 안 한 경우)의 S3 객체까지 지우면 안 되므로,
+		// 실제로 빠진 것만 골라서 정리한다.
+		Set<String> keptUrls = request.images().stream().map(JournalImageRequest::imageUrl).collect(Collectors.toSet());
+		oldImages.stream()
+				.map(JournalImage::getImageUrl)
+				.filter(url -> !keptUrls.contains(url))
+				.forEach(journalImageUploadService::delete);
+
 		return PlantJournalResponse.from(journal, images);
 	}
 
@@ -123,6 +135,7 @@ public class PlantJournalService {
 	public void deleteJournal(Long userId, Long journalId) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		List<JournalImage> images = journalImageRepository.findByJournalId(journalId);
 		LocalDateTime now = LocalDateTime.now(KST);
 		journal.softDelete(now);
 
@@ -141,6 +154,10 @@ public class PlantJournalService {
 						-JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_REVOCATION, profile.getId());
 			}
 		}
+
+		// soft delete는 사용자에게만 "삭제됨"으로 보일 뿐 복구 API가 없어 사실상 영구 삭제와
+		// 같으므로, 더 이상 어떤 일지도 참조하지 않는 S3 객체를 이 시점에 정리한다.
+		images.forEach(image -> journalImageUploadService.delete(image.getImageUrl()));
 	}
 
 	// 페이지에 담긴 일지들의 이미지를 한 번에 로딩해 journalId로 묶는다 (개별 조회로 인한 N+1 방지).

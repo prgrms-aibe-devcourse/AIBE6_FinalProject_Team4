@@ -175,7 +175,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   if (editing) {
     return (
       <div className="container">
-        <button type="button" onClick={() => setEditing(false)} className="cursor-pointer text-sm font-semibold text-sub">← 일지 상세</button>
+        <button type="button" onClick={() => setEditing(false)} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 일지 상세</button>
         <h1 className="mb-[18px] mt-3.5 text-2xl font-extrabold">일지 수정</h1>
         <div className="max-w-[640px] rounded-[20px] bg-white p-6 shadow-card">
           <div className="mb-5 flex items-center gap-4">
