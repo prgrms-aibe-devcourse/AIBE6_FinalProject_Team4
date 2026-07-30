@@ -1,10 +1,21 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GachaBatchOpenPage from "./page";
 import { saveGachaBatch } from "@/features/gacha/batch-session";
-import { GachaDrawDetail, GachaRarity, getGachaDraw } from "@/lib/gacha-api";
+import {
+  GachaDrawDetail,
+  GachaRarity,
+  getGachaDraw,
+  markGachaDrawViewed,
+} from "@/lib/gacha-api";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation,
@@ -33,6 +44,7 @@ vi.mock("@/lib/gacha-api", async (importOriginal) => {
 });
 
 const mockedGetDraw = vi.mocked(getGachaDraw);
+const mockedMarkViewed = vi.mocked(markGachaDrawViewed);
 
 function completedDraw(
   drawId: number,
@@ -80,6 +92,15 @@ describe("GachaBatchOpenPage", () => {
     const batchKey = saveGachaBatch([11, 22]);
 
     render(<GachaBatchOpenPage params={{ batchKey }} />);
+
+    await waitFor(() => {
+      expect(mockedMarkViewed).toHaveBeenCalledTimes(2);
+      expect(mockedMarkViewed).toHaveBeenCalledWith(11, "access-token");
+      expect(mockedMarkViewed).toHaveBeenCalledWith(22, "access-token");
+    });
+    expect(
+      screen.queryByRole("link", { name: "← 나가기" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(
       await screen.findByRole("button", { name: /2팩 한번에 개봉하기/ }),

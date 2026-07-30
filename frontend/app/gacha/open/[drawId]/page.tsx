@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
+import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
 import { ApiError } from "@/lib/api";
 import {
   GachaDrawDetail,
@@ -53,13 +54,22 @@ export default function GachaOpenPage({
           );
           return;
         }
-        setDetail(data);
+        const shouldStartOpening =
+          data.status === "COMPLETED" && !data.resultViewedAt;
+        if (shouldStartOpening) {
+          await markGachaDrawViewed(data.drawId, state.accessToken);
+        }
+        const viewedData = shouldStartOpening
+          ? { ...data, resultViewedAt: new Date().toISOString() }
+          : data;
+
+        setDetail(viewedData);
         setError("");
         setStage(
           data.status === "COMPLETED"
-            ? data.resultViewedAt
-              ? "summary"
-              : "pack"
+            ? shouldStartOpening
+              ? "pack"
+              : "summary"
             : "loading",
         );
       } catch (cause) {
@@ -92,6 +102,14 @@ export default function GachaOpenPage({
     };
   }, [detail, load, state.accessToken]);
 
+  usePreventBackNavigation(
+    hydrated &&
+      Boolean(state.accessToken) &&
+      Number.isInteger(drawId) &&
+      drawId > 0 &&
+      !error,
+  );
+
   const revealNext = () => {
     if (!detail) return;
     if (stage === "pack") {
@@ -116,12 +134,8 @@ export default function GachaOpenPage({
     }
   };
 
-  const confirm = async () => {
-    if (!detail || !state.accessToken) return;
-    if (!detail.resultViewedAt) {
-      await markGachaDrawViewed(detail.drawId, state.accessToken);
-    }
-    router.push("/gacha");
+  const confirm = () => {
+    router.replace("/gacha");
   };
 
   const replay = () => {
@@ -180,10 +194,7 @@ export default function GachaOpenPage({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0d140f] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(91,130,71,.32),transparent_38%),linear-gradient(180deg,rgba(255,255,255,.025),transparent_35%)]" />
       <div className="relative mx-auto flex min-h-full max-w-[1100px] flex-col px-4 py-5">
-        <div className="flex items-center justify-between">
-          <Link href="/gacha" className="text-sm font-bold text-white/70">
-            ← 나가기
-          </Link>
+        <div className="flex items-center justify-end">
           <button
             type="button"
             onClick={() => setMuted((value) => !value)}
@@ -300,7 +311,7 @@ export default function GachaOpenPage({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void confirm()}
+                  onClick={confirm}
                   className="rounded-xl bg-white px-7 py-3 text-sm font-black text-[#253822]"
                 >
                   확인하고 내 카드 보기

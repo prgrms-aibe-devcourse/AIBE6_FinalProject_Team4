@@ -1,9 +1,15 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import GachaOpenPage from "./page";
-import { getGachaDraw } from "@/lib/gacha-api";
+import { getGachaDraw, markGachaDrawViewed } from "@/lib/gacha-api";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation,
@@ -32,6 +38,7 @@ vi.mock("@/lib/gacha-api", async (importOriginal) => {
 });
 
 const mockedGetDraw = vi.mocked(getGachaDraw);
+const mockedMarkViewed = vi.mocked(markGachaDrawViewed);
 
 describe("GachaOpenPage", () => {
   afterEach(cleanup);
@@ -62,6 +69,13 @@ describe("GachaOpenPage", () => {
     });
 
     render(<GachaOpenPage params={{ drawId: "21" }} />);
+
+    await waitFor(() =>
+      expect(mockedMarkViewed).toHaveBeenCalledWith(21, "access-token"),
+    );
+    expect(
+      screen.queryByRole("link", { name: "← 나가기" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(
       await screen.findByRole("button", { name: /팩을 눌러 개봉하기/ }),

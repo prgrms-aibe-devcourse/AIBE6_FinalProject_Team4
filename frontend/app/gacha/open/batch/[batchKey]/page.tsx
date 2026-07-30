@@ -11,6 +11,7 @@ import {
   removeGachaBatch,
 } from "@/features/gacha/batch-session";
 import { groupGachaDrawResults } from "@/features/gacha/result";
+import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
 import { ApiError } from "@/lib/api";
 import {
   GachaDrawDetail,
@@ -46,7 +47,6 @@ export default function GachaBatchOpenPage({
   const [details, setDetails] = useState<GachaDrawDetail[]>([]);
   const [stage, setStage] = useState<Stage>("loading");
   const [error, setError] = useState("");
-  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -64,7 +64,7 @@ export default function GachaBatchOpenPage({
     async (signal?: AbortSignal) => {
       if (!state.accessToken || !drawIds) return;
       try {
-        const loaded = await mapInChunks(drawIds, (drawId) =>
+        let loaded = await mapInChunks(drawIds, (drawId) =>
           getGachaDraw(drawId, state.accessToken!, signal),
         );
         const invalid = loaded.some(
@@ -82,9 +82,30 @@ export default function GachaBatchOpenPage({
           return;
         }
 
+        const allCompleted = loaded.every(
+          (detail) => detail.status === "COMPLETED",
+        );
+        if (allCompleted) {
+          const unviewed = loaded.filter((detail) => !detail.resultViewedAt);
+          if (unviewed.length > 0) {
+            await mapInChunks(unviewed, (detail) =>
+              markGachaDrawViewed(detail.drawId, state.accessToken!),
+            );
+            const viewedDrawIds = new Set(
+              unviewed.map((detail) => detail.drawId),
+            );
+            const viewedAt = new Date().toISOString();
+            loaded = loaded.map((detail) =>
+              viewedDrawIds.has(detail.drawId)
+                ? { ...detail, resultViewedAt: viewedAt }
+                : detail,
+            );
+          }
+        }
+
         setDetails(loaded);
         setError("");
-        if (loaded.every((detail) => detail.status === "COMPLETED")) {
+        if (allCompleted) {
           setStage((current) => (current === "loading" ? "pack" : current));
         }
       } catch (cause) {
@@ -124,6 +145,13 @@ export default function GachaBatchOpenPage({
     };
   }, [details, drawIds, error, load]);
 
+  usePreventBackNavigation(
+    hydrated &&
+      Boolean(state.accessToken) &&
+      Boolean(drawIds?.length) &&
+      !error,
+  );
+
   const groupedResults = useMemo(
     () => groupGachaDrawResults(details),
     [details],
@@ -136,24 +164,9 @@ export default function GachaBatchOpenPage({
     0,
   );
 
-  const confirm = async () => {
-    if (!state.accessToken || confirming) return;
-    setConfirming(true);
-    try {
-      const unviewed = details.filter((detail) => !detail.resultViewedAt);
-      await mapInChunks(unviewed, (detail) =>
-        markGachaDrawViewed(detail.drawId, state.accessToken!),
-      );
-      removeGachaBatch(params.batchKey);
-      router.push("/gacha");
-    } catch (cause) {
-      setError(
-        cause instanceof ApiError
-          ? cause.message
-          : "결과 확인 처리에 실패했습니다.",
-      );
-      setConfirming(false);
-    }
+  const confirm = () => {
+    removeGachaBatch(params.batchKey);
+    router.replace("/gacha");
   };
 
   if (!hydrated) {
@@ -214,10 +227,7 @@ export default function GachaBatchOpenPage({
     <main className="relative min-h-screen overflow-x-hidden overflow-y-auto bg-[#0d140f] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(116,145,76,.32),transparent_38%),linear-gradient(180deg,rgba(255,255,255,.025),transparent_35%)]" />
       <div className="relative mx-auto flex min-h-screen max-w-[1180px] flex-col px-4 py-5">
-        <div className="flex items-center justify-between">
-          <Link href="/gacha" className="text-sm font-bold text-white/70">
-            ← 나가기
-          </Link>
+        <div className="flex items-center justify-end">
           {stage !== "summary" && (
             <button
               type="button"
@@ -271,11 +281,10 @@ export default function GachaBatchOpenPage({
               <div className="mt-10 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => void confirm()}
-                  disabled={confirming}
-                  className="rounded-full bg-white px-8 py-3.5 font-black text-[#253822] shadow-lg transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+                  onClick={confirm}
+                  className="rounded-full bg-white px-8 py-3.5 font-black text-[#253822] shadow-lg transition hover:-translate-y-0.5"
                 >
-                  {confirming ? "결과 저장 중..." : "확인 완료"}
+                  확인 완료
                 </button>
               </div>
             </section>
