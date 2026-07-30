@@ -1,18 +1,22 @@
 'use client';
-import { useState, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { PLANTS } from '@/lib/data';
 import { grads } from '@/lib/theme';
+import { ApiError } from '@/lib/api';
+import {
+  createPlantJournal,
+  getMyPlantProfiles,
+  PlantProfileData,
+} from '@/features/journal/api';
 
-const N = 30;
 const PHOTOS = [
-  { emoji: '🌱', grad: grads.sprout, reused: false },
-  { emoji: '🍅', grad: grads.tomato, reused: false },
-  { emoji: '🌿', grad: 'linear-gradient(135deg,#A5D6A7,#66BB6A)', reused: false },
-  { emoji: '☀️', grad: grads.sun, reused: true },
+  { emoji: '🌱', grad: grads.sprout, imageUrl: '/journal-demo/photo-1.svg' },
+  { emoji: '🍅', grad: grads.tomato, imageUrl: '/journal-demo/photo-2.svg' },
+  { emoji: '🌿', grad: 'linear-gradient(135deg,#A5D6A7,#66BB6A)', imageUrl: '/journal-demo/photo-3.svg' },
+  { emoji: '☀️', grad: grads.sun, imageUrl: '/journal-demo/photo-4.svg' },
 ];
 const CONFETTI = [
   { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
@@ -34,29 +38,77 @@ interface JournalResult {
 }
 
 function NewJournalInner() {
+  const router = useRouter();
   const params = useSearchParams();
   const preselect = params.get('plant');
-  const { state, set, creditFree } = useStore();
+  const { state, set, refreshWallet } = useStore();
   const { showToast } = useUI();
-  const plants = PLANTS.filter((p) => !p.archived);
+  const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  const [loadingPlants, setLoadingPlants] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [draft, setDraft] = useState<Draft>({ plantId: preselect ? Number(preselect) : null, photoIdx: null, content: '' });
   const [result, setResult] = useState<JournalResult | null>(null);
 
-  const submit = () => {
+  useEffect(() => {
+    if (!state.accessToken) {
+      setLoadingPlants(false);
+      return;
+    }
+    const controller = new AbortController();
+    getMyPlantProfiles(state.accessToken, controller.signal)
+      .then((profiles) => setPlants(profiles.filter((profile) => profile.status === 'GROWING')))
+      .catch((cause: unknown) => {
+        if (cause instanceof DOMException && cause.name === 'AbortError') return;
+        showToast(
+          cause instanceof ApiError ? cause.message : '내 식물 목록을 불러오지 못했어요.',
+          'err',
+        );
+      })
+      .finally(() => setLoadingPlants(false));
+    return () => controller.abort();
+  }, [showToast, state.accessToken]);
+
+  const submit = async () => {
+    if (submitting) return;
     if (draft.photoIdx === null) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요 📷', 'err');
     if (draft.plantId === null) return showToast('먼저 어떤 식물인지 골라주세요 🌿', 'err');
+    if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
     const photo = PHOTOS[draft.photoIdx];
-    // 보상 판정: 이미 오늘 받음 / 중복 사진(최근 30일) / 신규 → 지급
-    if (state.rewardedToday) {
-      setResult({ kind: 'neutral', emoji: '🌙', title: '일지가 저장됐어요!', body: '오늘의 포인트는 이미 받으셨네요. 내일 또 만나요 🌙' });
-      set({ wroteToday: true });
-    } else if (photo.reused) {
-      setResult({ kind: 'neutral', emoji: '🔁', title: '일지가 저장됐어요!', body: '새로운 사진으로 기록하면 포인트를 받을 수 있어요.' });
-      set({ wroteToday: true });
-    } else {
-      setResult({ kind: 'reward', emoji: '✨', title: '오늘도 정성껏 기록해 주셨네요!', body: `${N} 포인트가 지급되었어요 ✨` });
-      creditFree(N);
-      set({ rewardedToday: true, wroteToday: true, lastReward: N });
+    setSubmitting(true);
+    try {
+      const hashSource = new TextEncoder().encode(`journal-demo-photo:${draft.photoIdx}`);
+      const digest = await crypto.subtle.digest('SHA-256', hashSource);
+      const imageHash = Array.from(new Uint8Array(digest))
+        .map((value) => value.toString(16).padStart(2, '0'))
+        .join('');
+      const journal = await createPlantJournal(state.accessToken, {
+        plantProfileId: draft.plantId,
+        content: draft.content.trim(),
+        images: [{ imageUrl: photo.imageUrl, imageHash, representative: true }],
+      });
+      set((current) => ({
+        wroteToday: true,
+        rewardedToday: current.rewardedToday || journal.gachaReward.granted,
+      }));
+      await refreshWallet();
+
+      if (journal.gachaReward.granted && journal.gachaReward.drawId) {
+        router.push(`/gacha/open/${journal.gachaReward.drawId}`);
+        return;
+      }
+      setResult({
+        kind: 'neutral',
+        emoji: '🌙',
+        title: '일지가 저장됐어요!',
+        body: '오늘의 카드팩은 이미 받으셨어요. 내일 다시 만나요 🌙',
+      });
+    } catch (cause: unknown) {
+      showToast(
+        cause instanceof ApiError ? cause.message : '일지를 저장하지 못했어요.',
+        'err',
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -93,6 +145,14 @@ function NewJournalInner() {
             <Link href="/journals" className={`rounded-[11px] px-5 py-[11px] font-bold text-white hover:text-white ${reward ? 'bg-[#6b5500]' : 'bg-ink'}`}>
               일지 목록으로
             </Link>
+            {reward && (
+              <Link
+                href="/gacha"
+                className="rounded-[11px] border border-[#d8bd52] bg-white px-5 py-[11px] font-bold text-[#6b5500]"
+              >
+                오늘의 카드팩 확인
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => { setResult(null); setDraft({ plantId: null, photoIdx: null, content: '' }); }}
@@ -106,7 +166,13 @@ function NewJournalInner() {
         <div className="max-w-[640px] rounded-[20px] bg-white p-6 shadow-card">
           <div className="mb-3 font-extrabold">1. 어떤 식물인가요?</div>
           <div className="mb-[26px] flex flex-wrap gap-2.5">
-            {plants.map((p) => (
+            {loadingPlants && <span className="text-sm text-sub">내 식물을 불러오는 중...</span>}
+            {!loadingPlants && plants.length === 0 && (
+              <Link href="/plants" className="text-sm font-bold text-brand">
+                먼저 재배 중인 식물을 등록해 주세요.
+              </Link>
+            )}
+            {plants.map((p, index) => (
               <button
                 key={p.id}
                 type="button"
@@ -115,14 +181,14 @@ function NewJournalInner() {
                   draft.plantId === p.id ? 'border-brand bg-[#F3F8EA]' : 'border-[#eceee5] bg-white'
                 }`}
               >
-                <span className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] text-lg" style={{ background: p.grad }}>{p.emoji}</span>
+                <span className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] text-lg" style={{ background: [grads.sprout, grads.tomato, grads.mint][index % 3] }}>🌿</span>
                 <span className="font-bold">{p.nickname}</span>
               </button>
             ))}
           </div>
 
           <div className="mb-[5px] font-extrabold">2. 오늘의 사진 <span className="text-[#e5533b]">*</span></div>
-          <div className="mb-3 text-[12.5px] text-[#a9b3a0]">jpg · png · webp / 5MB 이하 · (🔁 표시는 최근 30일 내 쓴 사진이에요)</div>
+          <div className="mb-3 text-[12.5px] text-[#a9b3a0]">S3 연결 전까지 제공되는 QA용 샘플 사진이에요.</div>
           <div className="mb-[26px] flex flex-wrap gap-3">
             {PHOTOS.map((ph, i) => (
               <button
@@ -135,7 +201,6 @@ function NewJournalInner() {
                 style={{ background: ph.grad }}
               >
                 {ph.emoji}
-                {ph.reused && <span className="absolute bottom-1 left-1 rounded-full bg-black/35 px-1.5 py-0.5 text-[11px] text-white">🔁</span>}
                 {draft.photoIdx === i && (
                   <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs text-white">✓</span>
                 )}
@@ -152,8 +217,8 @@ function NewJournalInner() {
             className="min-h-[130px] w-full resize-y rounded-[14px] border-[1.5px] border-line p-3.5 text-[15px] leading-[1.6] outline-none"
           />
           <div className="mt-[5px] text-right text-xs text-faint">{draft.content.length} / 2000</div>
-          <button type="button" onClick={submit} className="mt-3 w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white">
-            기록하고 포인트 받기 ✨
+          <button type="button" onClick={submit} disabled={submitting || loadingPlants || plants.length === 0} className="mt-3 w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">
+            {submitting ? '기록을 저장하는 중...' : '기록하고 카드팩 받기 ✨'}
           </button>
         </div>
       )}

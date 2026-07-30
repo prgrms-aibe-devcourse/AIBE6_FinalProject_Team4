@@ -1,0 +1,316 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import GachaBatchResultGrid from "@/components/gacha/GachaBatchResultGrid";
+import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
+import {
+  loadGachaBatch,
+  removeGachaBatch,
+} from "@/features/gacha/batch-session";
+import { groupGachaDrawResults } from "@/features/gacha/result";
+import { ApiError } from "@/lib/api";
+import {
+  GachaDrawDetail,
+  getGachaDraw,
+  markGachaDrawViewed,
+} from "@/lib/gacha-api";
+import { useStore } from "@/lib/store";
+
+const PACK_IMAGE = "/cards/900001/7ba3322c-f0ed-5ec8-b324-32e69c0ce2f1.png";
+const REQUEST_CHUNK_SIZE = 10;
+
+type Stage = "loading" | "pack" | "shuffle" | "summary";
+
+async function mapInChunks<T, R>(
+  values: T[],
+  mapper: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let index = 0; index < values.length; index += REQUEST_CHUNK_SIZE) {
+    const chunk = values.slice(index, index + REQUEST_CHUNK_SIZE);
+    results.push(...(await Promise.all(chunk.map(mapper))));
+  }
+  return results;
+}
+
+export default function GachaBatchOpenPage({
+  params,
+}: {
+  params: { batchKey: string };
+}) {
+  const router = useRouter();
+  const { state, hydrated } = useStore();
+  const [drawIds, setDrawIds] = useState<number[] | null>(null);
+  const [details, setDetails] = useState<GachaDrawDetail[]>([]);
+  const [stage, setStage] = useState<Stage>("loading");
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const storedDrawIds = loadGachaBatch(params.batchKey);
+    if (!storedDrawIds) {
+      setError(
+        "다중 팩 개봉 정보를 찾을 수 없습니다. 생성한 브라우저 탭에서 다시 시도해 주세요.",
+      );
+      return;
+    }
+    setDrawIds(storedDrawIds);
+  }, [hydrated, params.batchKey]);
+
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!state.accessToken || !drawIds) return;
+      try {
+        const loaded = await mapInChunks(drawIds, (drawId) =>
+          getGachaDraw(drawId, state.accessToken!, signal),
+        );
+        const invalid = loaded.some(
+          (detail) =>
+            detail.status === "COMPLETED" && detail.items.length !== 5,
+        );
+        if (invalid) {
+          setError("일부 팩의 확정 결과가 올바르지 않습니다.");
+          return;
+        }
+        if (loaded.some((detail) => detail.status === "MANUAL_REVIEW")) {
+          setError(
+            "일부 팩을 자동 처리하지 못했습니다. 관리자 확인 후 다시 열어 주세요.",
+          );
+          return;
+        }
+
+        setDetails(loaded);
+        setError("");
+        if (loaded.every((detail) => detail.status === "COMPLETED")) {
+          setStage((current) => (current === "loading" ? "pack" : current));
+        }
+      } catch (cause) {
+        if (cause instanceof DOMException && cause.name === "AbortError")
+          return;
+        setError(
+          cause instanceof ApiError
+            ? cause.message
+            : "다중 팩 결과를 불러오지 못했습니다.",
+        );
+      }
+    },
+    [drawIds, state.accessToken],
+  );
+
+  useEffect(() => {
+    if (!drawIds || !state.accessToken) return;
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [drawIds, load, state.accessToken]);
+
+  useEffect(() => {
+    if (
+      !drawIds ||
+      details.length === 0 ||
+      details.every((detail) => detail.status === "COMPLETED") ||
+      error
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void load(controller.signal), 1500);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [details, drawIds, error, load]);
+
+  const groupedResults = useMemo(
+    () => groupGachaDrawResults(details),
+    [details],
+  );
+  const completedCount = details.filter(
+    (detail) => detail.status === "COMPLETED",
+  ).length;
+  const totalCardCount = details.reduce(
+    (sum, detail) => sum + detail.items.length,
+    0,
+  );
+
+  const confirm = async () => {
+    if (!state.accessToken || confirming) return;
+    setConfirming(true);
+    try {
+      const unviewed = details.filter((detail) => !detail.resultViewedAt);
+      await mapInChunks(unviewed, (detail) =>
+        markGachaDrawViewed(detail.drawId, state.accessToken!),
+      );
+      removeGachaBatch(params.batchKey);
+      router.push("/gacha");
+    } catch (cause) {
+      setError(
+        cause instanceof ApiError
+          ? cause.message
+          : "결과 확인 처리에 실패했습니다.",
+      );
+      setConfirming(false);
+    }
+  };
+
+  if (!hydrated) {
+    return (
+      <div className="container py-20 text-center text-sub">불러오는 중...</div>
+    );
+  }
+
+  if (!state.accessToken) {
+    return (
+      <div className="container py-20 text-center">
+        <h1 className="text-2xl font-extrabold">로그인이 필요합니다</h1>
+        <Link
+          href="/auth?next=/gacha"
+          className="mt-5 inline-block rounded-xl bg-brand px-5 py-3 font-bold text-white"
+        >
+          로그인하기
+        </Link>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container py-20 text-center">
+        <p className="font-bold text-danger">{error}</p>
+        {drawIds && (
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              void load();
+            }}
+            className="mt-5 rounded-xl bg-brand px-5 py-3 font-bold text-white"
+          >
+            다시 시도
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (!drawIds || stage === "loading") {
+    return (
+      <div className="container flex min-h-[65vh] flex-col items-center justify-center text-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#dfe6d8] border-t-brand" />
+        <h1 className="mt-5 text-xl font-extrabold">
+          {drawIds?.length ?? 0}팩의 결과를 확정하고 있어요
+        </h1>
+        <p className="mt-2 text-sm text-sub">
+          {completedCount}/{drawIds?.length ?? 0}팩 완료 · 화면을 닫아도 결과는
+          저장됩니다.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <main className="relative min-h-screen overflow-x-hidden overflow-y-auto bg-[#0d140f] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(116,145,76,.32),transparent_38%),linear-gradient(180deg,rgba(255,255,255,.025),transparent_35%)]" />
+      <div className="relative mx-auto flex min-h-screen max-w-[1180px] flex-col px-4 py-5">
+        <div className="flex items-center justify-between">
+          <Link href="/gacha" className="text-sm font-bold text-white/70">
+            ← 나가기
+          </Link>
+          {stage !== "summary" && (
+            <button
+              type="button"
+              onClick={() => setStage("summary")}
+              className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-xs font-bold text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white"
+            >
+              연출 건너뛰기
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col items-center justify-center py-10">
+          {stage === "pack" && (
+            <button
+              type="button"
+              onClick={() => setStage("shuffle")}
+              className="group flex flex-col items-center rounded-[32px] px-6 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8d77d]"
+            >
+              <p className="mb-3 text-xs font-black tracking-[0.3em] text-[#e4ce72]">
+                {drawIds.length} PACKS
+              </p>
+              <div className="relative aspect-[1122/1402] w-[min(72vw,320px)] motion-safe:animate-floaty">
+                {[-20, 0, 20].map((offset, index) => (
+                  <div
+                    key={offset}
+                    className="absolute inset-0"
+                    style={{
+                      transform: `translateX(${offset}px) rotate(${(index - 1) * 4}deg)`,
+                    }}
+                  >
+                    <Image
+                      src={PACK_IMAGE}
+                      alt={index === 1 ? `${drawIds.length}개 카드팩` : ""}
+                      fill
+                      priority={index === 1}
+                      className="object-contain drop-shadow-[0_28px_30px_rgba(0,0,0,.55)]"
+                    />
+                  </div>
+                ))}
+              </div>
+              <span className="mt-6 rounded-full bg-white px-7 py-3.5 font-black text-[#253822] shadow-lg transition group-hover:-translate-y-0.5 group-hover:bg-[#f4f8ed]">
+                {drawIds.length}팩 한번에 개봉하기
+              </span>
+            </button>
+          )}
+
+          {stage === "shuffle" && (
+            <GachaShuffleStage
+              packCount={drawIds.length}
+              onComplete={() => setStage("summary")}
+              completeLabel="전체 결과 확인하기"
+            />
+          )}
+
+          {stage === "summary" && (
+            <section
+              className="w-full py-4"
+              aria-labelledby="batch-result-title"
+            >
+              <div className="text-center">
+                <p className="text-sm font-bold tracking-[0.2em] text-[#d7c266]">
+                  MULTI PACK RESULT
+                </p>
+                <h1
+                  id="batch-result-title"
+                  className="mt-2 text-3xl font-black sm:text-4xl"
+                >
+                  {drawIds.length}팩 개봉 완료
+                </h1>
+                <p className="mt-2 text-sm text-white/60">
+                  총 {totalCardCount}장 · {groupedResults.length}종 · 높은
+                  등급순
+                </p>
+              </div>
+
+              <GachaBatchResultGrid results={groupedResults} />
+
+              <div className="mt-10 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void confirm()}
+                  disabled={confirming}
+                  className="rounded-full bg-white px-8 py-3.5 font-black text-[#253822] shadow-lg transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {confirming ? "결과 저장 중..." : "확인 완료"}
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}

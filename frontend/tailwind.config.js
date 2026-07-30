@@ -61,6 +61,20 @@ module.exports = {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        cardShuffle: {
+          '0%, 100%': {
+            transform: 'translate3d(0, 0, 0) rotate(0deg) scale(1)',
+          },
+          '22%': {
+            transform: 'translate3d(-72px, -12px, 0) rotate(-9deg) scale(.97)',
+          },
+          '48%': {
+            transform: 'translate3d(68px, -28px, 0) rotate(10deg) scale(1.03)',
+          },
+          '72%': {
+            transform: 'translate3d(-28px, 12px, 0) rotate(-4deg) scale(.99)',
+          },
+        },
       },
       animation: {
         upIn: 'upIn .3s ease',
@@ -69,6 +83,7 @@ module.exports = {
         glowPulse: 'glowPulse 2s infinite',
         confettiFall: 'confettiFall 1.4s ease-in forwards',
         shimmer: 'shimmer 1.6s ease-in-out infinite',
+        cardShuffle: 'cardShuffle 1.45s cubic-bezier(.45,.05,.2,1) infinite',
       },
     },
   },
