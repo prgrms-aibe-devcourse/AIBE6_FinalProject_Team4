@@ -56,6 +56,7 @@ public class GachaQueryService {
             ? tradingCardRepository.findAllByStatusOrderByDisplayOrderAsc(TradingCardStatus.ACTIVE)
             : tradingCardRepository.findAllByStatusAndRarityOrderByDisplayOrderAsc(
                 TradingCardStatus.ACTIVE, rarity);
+    // 공개 카탈로그는 뽑기 전 원본 일러스트를 노출하지 않는다(획득한 카드만 해금).
     return cards.stream().map(card -> GachaCardResponse.from(card, null)).toList();
   }
 
