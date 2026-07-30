@@ -24,10 +24,12 @@ const NAV = [
   { key: 'exchange', label: '교환', href: '/my/exchanges' },
 ];
 
+// 모바일 하단 탭은 5칸 제한이라 식물/일지를 "식물" 하나로 합쳐(일지는 식물 상세에서
+// 접근) 카드가 들어갈 자리를 확보했다. 데스크톱 상단 NAV는 그대로 둘 다 유지.
 const BOTTOM = [
   { key: 'home', label: '홈', icon: 'home', href: '/' },
   { key: 'plants', label: '식물', icon: 'potted_plant', href: '/plants' },
-  { key: 'journal', label: '일지', icon: 'menu_book', href: '/journals' },
+  { key: 'cards', label: '카드', icon: 'style', href: '/cards' },
   { key: 'shop', label: '상점', icon: 'storefront', href: '/shop' },
   { key: 'account', label: 'MY', icon: 'person', href: '/my' },
 ];
@@ -234,12 +236,14 @@ export default function Navbar() {
         <div className="flex h-[66px] w-full">
           {BOTTOM.map((b) => {
             const href = b.key === 'account' && !state.authed ? '/auth' : b.href;
+            // 일지 페이지는 BOTTOM에 자체 탭이 없으므로 "식물" 탭을 대신 활성 표시한다.
+            const mobileActive = active === 'journal' ? 'plants' : active;
             return (
               <Link
                 key={b.key}
                 href={href}
                 className={`flex flex-1 flex-col items-center justify-center gap-[3px] ${
-                  active === b.key ? 'text-brand hover:text-brand' : 'text-[#9aa691] hover:text-[#9aa691]'
+                  mobileActive === b.key ? 'text-brand hover:text-brand' : 'text-[#9aa691] hover:text-[#9aa691]'
                 }`}
               >
                 <span className="material-symbols-outlined text-2xl">{b.icon}</span>

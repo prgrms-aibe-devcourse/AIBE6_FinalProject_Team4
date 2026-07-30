@@ -166,7 +166,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   if (error || !journal) {
     return (
       <div className="container">
-        <Link href="/journals" className="text-sm font-semibold text-sub">← 일지</Link>
+        <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
         <div className="mt-4 px-5 py-[60px] text-center text-sub">{error || '일지를 찾을 수 없어요.'}</div>
       </div>
     );
@@ -238,7 +238,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
 
   return (
     <div className="container">
-      <Link href="/journals" className="text-sm font-semibold text-sub">← 일지</Link>
+      <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
       <div className="mt-4 grid items-start gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[20px] bg-brand-soft text-[150px]">
           {image ? (

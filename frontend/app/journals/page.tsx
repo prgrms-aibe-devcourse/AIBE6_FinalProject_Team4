@@ -17,7 +17,8 @@ export default function JournalsPage() {
   const { state, hydrated } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
-  const [filter, setFilter] = useState('all');
+  const [selectedProfileIds, setSelectedProfileIds] = useState<number[]>([]); // [] = 전체
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [monthFilter, setMonthFilter] = useState(currentMonth); // "" = 전체, else "YYYY-MM"
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,11 +34,7 @@ export default function JournalsPage() {
 
     Promise.all([
       getMyPlants(accessToken, controller.signal),
-      getJournals(
-        { profileId: filter === 'all' ? undefined : Number(filter), year, month, size: 100 },
-        accessToken,
-        controller.signal,
-      ),
+      getJournals({ year, month, size: 100 }, accessToken, controller.signal),
     ])
       .then(([plantList, journalPage]) => {
         setPlants(plantList);
@@ -57,9 +54,17 @@ export default function JournalsPage() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken, filter, monthFilter]);
+  }, [hydrated, state.accessToken, monthFilter]);
 
-  const filters = [['all', '전체'], ...plants.map((p) => [String(p.id), p.nickname])];
+  const toggleProfile = (profileId: number) => {
+    setSelectedProfileIds((prev) =>
+      prev.includes(profileId) ? prev.filter((id) => id !== profileId) : [...prev, profileId],
+    );
+  };
+
+  const visibleJournals = selectedProfileIds.length === 0
+    ? journals
+    : journals.filter((j) => selectedProfileIds.includes(j.plantProfileId));
 
   return (
     <div className="container">
@@ -70,18 +75,25 @@ export default function JournalsPage() {
       <p className="mb-5 text-sub">한 장 한 장이 모여 이 아이의 이야기가 돼요.</p>
 
       <div className="mb-6 flex flex-wrap items-center gap-2.5">
-        {filters.map(([k, label]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setFilter(k)}
-            className={`cursor-pointer rounded-full border-[1.5px] px-[15px] py-2 text-sm font-bold ${
-              filter === k ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => setSelectedProfileIds([])}
+          className={`cursor-pointer rounded-full border-[1.5px] px-[15px] py-2 text-sm font-bold ${
+            selectedProfileIds.length === 0 ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
+          }`}
+        >
+          전체
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterModalOpen(true)}
+          className={`flex cursor-pointer items-center gap-1.5 rounded-full border-[1.5px] px-[15px] py-2 text-sm font-bold ${
+            selectedProfileIds.length > 0 ? 'border-brand bg-[#F3F8EA] text-brand-dark' : 'border-line bg-white text-[#6d7a68]'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base">tune</span>
+          필터{selectedProfileIds.length > 0 ? ` (${selectedProfileIds.length})` : ''}
+        </button>
         <div className="flex-1" />
         <div className="flex items-center gap-2 rounded-[11px] border-[1.5px] border-line bg-white px-[13px] py-2 text-sm font-bold text-[#6d7a68]">
           <input
@@ -102,11 +114,11 @@ export default function JournalsPage() {
         <div className="px-5 py-[60px] text-center text-sub">일지를 불러오고 있어요 🌿</div>
       ) : error ? (
         <div className="px-5 py-[60px] text-center text-sub">{error}</div>
-      ) : journals.length === 0 ? (
+      ) : visibleJournals.length === 0 ? (
         <div className="px-5 py-[60px] text-center text-sub">이 조건의 일지가 아직 없어요. 오늘의 기록을 남겨볼까요? 🌱</div>
       ) : (
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
-          {journals.map((j) => {
+          {visibleJournals.map((j) => {
             const image = representativeImage(j);
             return (
               <Link
@@ -132,6 +144,45 @@ export default function JournalsPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {filterModalOpen && (
+        <div onClick={() => setFilterModalOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[420px] animate-pop rounded-[20px] bg-white p-6">
+            <h3 className="mb-1 text-[19px] font-extrabold">식물 필터</h3>
+            <p className="mb-4 text-[13.5px] text-sub">(중복 가능) 보고 싶은 식물을 선택하세요.</p>
+            <div className="mb-5 flex flex-wrap gap-2">
+              {plants.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => toggleProfile(p.id)}
+                  className={`cursor-pointer rounded-full border-[1.5px] px-[15px] py-2 text-sm font-bold ${
+                    selectedProfileIds.includes(p.id) ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
+                  }`}
+                >
+                  {p.nickname}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setFilterModalOpen(false)}
+                className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white"
+              >
+                적용
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedProfileIds([])}
+                className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-5 py-[13px] font-bold text-sub"
+              >
+                초기화
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
