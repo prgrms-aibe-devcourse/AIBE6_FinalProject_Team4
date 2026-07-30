@@ -3,7 +3,9 @@ import path from "node:path";
 
 const EXPECTED_WIDTH = 1122;
 const EXPECTED_HEIGHT = 1402;
-const EXPECTED_CARD_COUNT = 43;
+// 43개 카드 일러스트는 S3로 옮겨졌고 더 이상 리포에 들어있지 않다(백엔드 TradingCard.imageKey 참고).
+// 남은 manifest 항목은 공유 가챠 UI 자산(팩/카드 뒷면)뿐이라 로컬 CARD_ILLUSTRATION은 0개가 정상이다.
+const EXPECTED_CARD_COUNT = 0;
 const CARD_PATH_PATTERN =
   /^\/cards\/([1-9]\d*)\/([0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(png|svg)$/;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
