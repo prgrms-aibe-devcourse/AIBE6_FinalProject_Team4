@@ -42,7 +42,7 @@ describe("GachaTestMenuItem", () => {
     fireEvent.click(screen.getByRole("button", { name: "가챠 100팩 테스트" }));
 
     expect(
-      await screen.findByText("100팩 개봉 처리 중..."),
+      await screen.findByText("100팩 개봉 준비 중..."),
     ).toBeInTheDocument();
     expect(mockedCreateHundredDraws).toHaveBeenCalledWith(
       "access-token",

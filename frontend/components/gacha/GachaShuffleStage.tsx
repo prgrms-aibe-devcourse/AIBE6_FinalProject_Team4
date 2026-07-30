@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-const CARD_BACK = "/cards/900002/00e26b51-bded-5925-bb6c-eed61a8df37a.svg";
+const CARD_BACK = "/cards/900002/61de4f73-7b73-541c-9dfe-5bfc5ae6dc0c.svg";
 const CARD_OFFSETS = [-34, -17, 0, 17, 34];
 const CARD_ROTATIONS = [-10, -5, 0, 5, 10];
 
@@ -26,9 +26,7 @@ export default function GachaShuffleStage({
       <h1 id="shuffle-title" className="mt-2 text-2xl font-black">
         카드의 순서를 섞고 있어요
       </h1>
-      <p className="mt-2 text-sm text-white/55">
-        결과는 이미 서버에 안전하게 확정되어 있습니다.
-      </p>
+      <p className="mt-2 text-sm text-white/55">어떤 카드가 나타날까요?</p>
 
       <div
         className="relative mt-9 h-[340px] w-[min(82vw,420px)]"
@@ -45,7 +43,7 @@ export default function GachaShuffleStage({
             }}
           >
             <div
-              className="relative h-full w-full motion-safe:animate-cardShuffle"
+              className="relative h-full w-full overflow-hidden rounded-[20px] border-2 border-[#f5e5a4]/80 bg-[#102519] shadow-[0_18px_34px_rgba(0,0,0,.42)] motion-safe:animate-cardShuffle"
               style={{ animationDelay: `${index * 90}ms` }}
             >
               <Image

@@ -236,7 +236,7 @@ export default function Admin() {
         <h1 className="text-[26px] font-extrabold">관리자 콘솔</h1>
       </div>
       <p className="mb-[22px] text-sub">
-        서비스 운영 현황을 한눈에. (데모 — 실제 권한 검증은 서버에서 이뤄져요)
+        서비스 운영 현황을 한눈에. (데모 화면)
       </p>
 
       <div className="mb-7 grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">

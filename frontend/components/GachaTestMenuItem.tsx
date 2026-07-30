@@ -100,7 +100,7 @@ export default function GachaTestMenuItem({
         </span>
         <span aria-live="polite">
           {creating === "hundred"
-            ? "100팩 개봉 처리 중..."
+            ? "100팩 개봉 준비 중..."
             : failed === "hundred"
               ? "100팩 테스트 다시 시도"
               : "가챠 100팩 테스트"}

@@ -75,6 +75,17 @@ module.exports = {
             transform: 'translate3d(-28px, 12px, 0) rotate(-4deg) scale(.99)',
           },
         },
+        packTurn: {
+          '0%, 38%': {
+            transform: 'rotateY(0deg) translateY(0)',
+          },
+          '48%, 78%': {
+            transform: 'rotateY(180deg) translateY(-7px)',
+          },
+          '88%, 100%': {
+            transform: 'rotateY(360deg) translateY(0)',
+          },
+        },
       },
       animation: {
         upIn: 'upIn .3s ease',
@@ -84,6 +95,7 @@ module.exports = {
         confettiFall: 'confettiFall 1.4s ease-in forwards',
         shimmer: 'shimmer 1.6s ease-in-out infinite',
         cardShuffle: 'cardShuffle 1.45s cubic-bezier(.45,.05,.2,1) infinite',
+        packTurn: 'packTurn 5.2s cubic-bezier(.45,.05,.2,1) infinite',
       },
     },
   },

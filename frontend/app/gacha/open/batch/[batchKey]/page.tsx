@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GachaBatchResultGrid from "@/components/gacha/GachaBatchResultGrid";
+import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
 import {
   loadGachaBatch,
@@ -19,7 +19,6 @@ import {
 } from "@/lib/gacha-api";
 import { useStore } from "@/lib/store";
 
-const PACK_IMAGE = "/cards/900001/7ba3322c-f0ed-5ec8-b324-32e69c0ce2f1.png";
 const REQUEST_CHUNK_SIZE = 10;
 
 type Stage = "loading" | "pack" | "shuffle" | "summary";
@@ -202,11 +201,10 @@ export default function GachaBatchOpenPage({
       <div className="container flex min-h-[65vh] flex-col items-center justify-center text-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#dfe6d8] border-t-brand" />
         <h1 className="mt-5 text-xl font-extrabold">
-          {drawIds?.length ?? 0}팩의 결과를 확정하고 있어요
+          {drawIds?.length ?? 0}팩을 열고 있어요
         </h1>
         <p className="mt-2 text-sm text-sub">
-          {completedCount}/{drawIds?.length ?? 0}팩 완료 · 화면을 닫아도 결과는
-          저장됩니다.
+          {completedCount}/{drawIds?.length ?? 0}팩 준비 완료
         </p>
       </div>
     );
@@ -233,37 +231,10 @@ export default function GachaBatchOpenPage({
 
         <div className="flex flex-1 flex-col items-center justify-center py-10">
           {stage === "pack" && (
-            <button
-              type="button"
-              onClick={() => setStage("shuffle")}
-              className="group flex flex-col items-center rounded-[32px] px-6 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8d77d]"
-            >
-              <p className="mb-3 text-xs font-black tracking-[0.3em] text-[#e4ce72]">
-                {drawIds.length} PACKS
-              </p>
-              <div className="relative aspect-[1122/1402] w-[min(72vw,320px)] motion-safe:animate-floaty">
-                {[-20, 0, 20].map((offset, index) => (
-                  <div
-                    key={offset}
-                    className="absolute inset-0"
-                    style={{
-                      transform: `translateX(${offset}px) rotate(${(index - 1) * 4}deg)`,
-                    }}
-                  >
-                    <Image
-                      src={PACK_IMAGE}
-                      alt={index === 1 ? `${drawIds.length}개 카드팩` : ""}
-                      fill
-                      priority={index === 1}
-                      className="object-contain drop-shadow-[0_28px_30px_rgba(0,0,0,.55)]"
-                    />
-                  </div>
-                ))}
-              </div>
-              <span className="mt-6 rounded-full bg-white px-7 py-3.5 font-black text-[#253822] shadow-lg transition group-hover:-translate-y-0.5 group-hover:bg-[#f4f8ed]">
-                {drawIds.length}팩 한번에 개봉하기
-              </span>
-            </button>
+            <GachaPackStage
+              packCount={drawIds.length}
+              onOpen={() => setStage("shuffle")}
+            />
           )}
 
           {stage === "shuffle" && (

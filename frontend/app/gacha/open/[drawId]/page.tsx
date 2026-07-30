@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
 import { ApiError } from "@/lib/api";
 import {
@@ -15,8 +16,7 @@ import {
 } from "@/lib/gacha-api";
 import { useStore } from "@/lib/store";
 
-const PACK_IMAGE = "/cards/900001/7ba3322c-f0ed-5ec8-b324-32e69c0ce2f1.png";
-const CARD_BACK = "/cards/900002/00e26b51-bded-5925-bb6c-eed61a8df37a.svg";
+const CARD_BACK = "/cards/900002/61de4f73-7b73-541c-9dfe-5bfc5ae6dc0c.svg";
 
 const RARITY_LABEL: Record<GachaRarity, string> = {
   COMMON: "커먼",
@@ -49,7 +49,7 @@ export default function GachaOpenPage({
         const data = await getGachaDraw(drawId, state.accessToken, signal);
         if (data.status === "COMPLETED" && data.items.length !== 5) {
           setError(
-            "확정된 카드 결과가 올바르지 않습니다. 잠시 후 다시 시도해 주세요.",
+            "카드 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
           );
           return;
         }
@@ -169,11 +169,9 @@ export default function GachaOpenPage({
       <div className="container flex min-h-[65vh] flex-col items-center justify-center text-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#dfe6d8] border-t-brand" />
         <h1 className="mt-5 text-xl font-extrabold">
-          카드 5장을 확정하고 있어요
+          카드 5장을 준비하고 있어요
         </h1>
-        <p className="mt-2 text-sm text-sub">
-          화면을 닫아도 결과는 안전하게 저장됩니다.
-        </p>
+        <p className="mt-2 text-sm text-sub">잠시만 기다려 주세요.</p>
       </div>
     );
   }
@@ -206,27 +204,7 @@ export default function GachaOpenPage({
         )}
 
         <div className="flex flex-1 flex-col items-center justify-center py-12">
-          {stage === "pack" && (
-            <button
-              type="button"
-              onClick={revealNext}
-              className="group flex flex-col items-center rounded-[32px] px-6 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e8d77d]"
-            >
-              <div className="relative aspect-[1122/1402] w-[min(72vw,320px)] motion-safe:animate-floaty">
-                <div className="absolute inset-[12%] rounded-full bg-[#b4d29a]/15 blur-3xl transition group-hover:bg-[#d7e9bd]/25" />
-                <Image
-                  src={PACK_IMAGE}
-                  alt="시즌 1 카드팩"
-                  fill
-                  priority
-                  className="object-contain drop-shadow-[0_28px_30px_rgba(0,0,0,.55)]"
-                />
-              </div>
-              <span className="mt-5 rounded-full bg-white px-6 py-3 font-black text-[#253822] shadow-lg transition group-hover:-translate-y-0.5 group-hover:bg-[#f4f8ed]">
-                팩을 눌러 개봉하기
-              </span>
-            </button>
-          )}
+          {stage === "pack" && <GachaPackStage onOpen={revealNext} />}
 
           {stage === "shuffle" && <GachaShuffleStage onComplete={revealNext} />}
 
