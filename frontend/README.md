@@ -78,7 +78,7 @@ nextjs/
 
 ## 도메인 간 실제 연동 (핵심)
 `lib/store.js`의 단일 지갑(무상 `free` + 충전 `paid`)과 카운터를 모든 페이지가 공유합니다.
-- 일지 보상(+30) → 잔액·"오늘 기록" 갱신, 당일 삭제 시 회수
+- 일지 보상(+100) → 식물 프로필별 하루 1회 지급, 삭제 시 회수하지 않음
 - 상점/카드 구매 → 무상 포인트 먼저 차감
 - 충전/환불 → 잔액 반영
 - 식물 등록/보관 → 재배중 수 갱신 / 카드 완성·교환 → 교환가능 수 갱신
@@ -92,7 +92,7 @@ nextjs/
 
 ## 백엔드 연동 시 참고 (엔티티)
 프로토타입 기준 도메인 모델: PlantSpecies, Plant, Journal, JournalCompletionLog,
-PointTransaction(CHARGE/JOURNAL_REWARD/PURCHASE/REFUND/CLAWBACK/ADMIN_ADJUST),
+PointTransaction(CHARGE/JOURNAL_REWARD/PURCHASE/RESTORE/REFUND/ADMIN_ADJUST),
 Payment(PAID/FAILED/CANCELED/REFUNDED), Product, Cart, Order, Card, UserCard,
 CardPurchaseLog, ExchangeProduct, ExchangeOrder(REQUESTED→PREPARING→SHIPPING→DELIVERED/CANCELLED),
 UserAddress, Notification, Inquiry, Report.
