@@ -20,7 +20,7 @@ app:
     plant-profile:
       # Seeds sample plant profiles for the InitData test users, so /plants isn't
       # empty on a fresh local DB. Depends on InitData (users) and ProductInitData
-      # (plant species) having already run — see @Order on PlantProfileInitData.
+      # (plant speciegit s) having already run — see @Order on PlantProfileInitData.
       enabled: true
     journal:
       # Seeds sample journal entries (with placeholder images) for whichever plant
