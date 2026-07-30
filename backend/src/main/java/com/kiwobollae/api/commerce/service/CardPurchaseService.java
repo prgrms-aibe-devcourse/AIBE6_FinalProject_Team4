@@ -15,7 +15,6 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
 import com.kiwobollae.api.point.dto.response.PointDeductionResult;
-import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.service.WalletService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -84,10 +83,9 @@ public class CardPurchaseService {
 						.build()
 		);
 
-		PointDeductionResult pointUsage = walletService.deductForPurchase(
+		PointDeductionResult pointUsage = walletService.deductForCardPurchase(
 				userId,
 				totalPoint,
-				PointRefType.CARD_PURCHASE,
 				purchaseLog.getId()
 		);
 		purchaseLog.applyPointUsage(pointUsage);

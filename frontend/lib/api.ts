@@ -260,3 +260,55 @@ export function withdraw(password?: string): Promise<void> {
     body: JSON.stringify({ password: password || null }),
   });
 }
+
+export interface UserAddress {
+  id: number;
+  userId: number;
+  receiverName: string;
+  receiverPhone: string;
+  zipCode: string;
+  address: string;
+  addressDetail: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserAddressPayload {
+  receiverName: string;
+  receiverPhone: string;
+  zipCode: string;
+  address: string;
+  addressDetail?: string;
+  isDefault: boolean;
+}
+
+export function getAddresses(): Promise<UserAddress[]> {
+  return request<UserAddress[]>('/api/v1/mypage/addresses');
+}
+
+export function createAddress(payload: UserAddressPayload): Promise<UserAddress> {
+  return request<UserAddress>('/api/v1/mypage/addresses', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAddress(addressId: number, payload: UserAddressPayload): Promise<UserAddress> {
+  return request<UserAddress>(`/api/v1/mypage/addresses/${addressId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteAddress(addressId: number): Promise<void> {
+  return request<void>(`/api/v1/mypage/addresses/${addressId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function setDefaultAddress(addressId: number): Promise<UserAddress> {
+  return request<UserAddress>(`/api/v1/mypage/addresses/${addressId}/default`, {
+    method: 'PATCH',
+  });
+}

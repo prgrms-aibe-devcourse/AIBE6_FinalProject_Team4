@@ -52,4 +52,34 @@ public class UserAddress extends BaseTimeEntity {
 
 	@Column(name = "is_default", nullable = false)
 	private Boolean isDefault;
+
+	public static UserAddress create(User user, String receiverName, String receiverPhone, String zipCode,
+			String address, String addressDetail, boolean isDefault) {
+		return UserAddress.builder()
+				.user(user)
+				.receiverName(receiverName)
+				.receiverPhone(receiverPhone)
+				.zipCode(zipCode)
+				.address(address)
+				.addressDetail(addressDetail)
+				.isDefault(isDefault)
+				.build();
+	}
+
+	public void update(String receiverName, String receiverPhone, String zipCode, String address,
+			String addressDetail) {
+		this.receiverName = receiverName;
+		this.receiverPhone = receiverPhone;
+		this.zipCode = zipCode;
+		this.address = address;
+		this.addressDetail = addressDetail;
+	}
+
+	public void markDefault() {
+		this.isDefault = true;
+	}
+
+	public void unmarkDefault() {
+		this.isDefault = false;
+	}
 }

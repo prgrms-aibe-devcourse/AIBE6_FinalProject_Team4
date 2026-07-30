@@ -16,7 +16,14 @@ const CONFETTI = [
 
 export default function CardDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { state, hydrated, refreshWallet, set } = useStore();
+  const {
+    state,
+    hydrated,
+    walletLoading,
+    walletLoaded,
+    refreshWallet,
+    set,
+  } = useStore();
   const { showToast, askConfirm } = useUI();
   const cardId = Number(params.id);
   const [card, setCard] = useState<CardData | null>(null);
@@ -87,6 +94,11 @@ export default function CardDetail({ params }: { params: { id: string } }) {
   }
 
   const total = card.pointPrice * qty;
+  const availableFreePoint = Math.max(state.wallet.free, 0);
+  const availablePaidPoint = Math.max(state.wallet.paid, 0);
+  const usedFreePoint = Math.min(availableFreePoint, total);
+  const usedPaidPoint = total - usedFreePoint;
+  const pointShortage = Math.max(0, usedPaidPoint - availablePaidPoint);
   const ring = `conic-gradient(#7CB342 ${Math.min(
     360,
     ((owned ?? 0) / card.requiredCountForExchange) * 360,
@@ -97,8 +109,24 @@ export default function CardDetail({ params }: { params: { id: string } }) {
       showToast('카드 구매는 로그인 후 이용할 수 있어요.', 'err');
       return;
     }
-    askConfirm({ icon: 'paid', title: '카드를 구매할까요?', ok: '구매하기',
-      body: `${card.name} ${qty}장 · 총 ${fmt(total)}P를 사용해요. 무상 포인트가 먼저 사용돼요.`,
+    if (!walletLoaded) {
+      showToast(
+        walletLoading
+          ? '포인트 잔액을 확인하고 있어요.'
+          : '포인트 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+      return;
+    }
+    if (pointShortage > 0) {
+      showToast(
+        `사용 가능한 포인트가 ${fmt(pointShortage)}P 부족해요.`,
+        'err',
+      );
+      return;
+    }
+    askConfirm({ icon: 'eco', title: '카드를 구매할까요?', ok: '구매하기',
+      body: `${card.name} ${qty}장 · 무상 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 유상 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
       onOk: async () => {
         const currentOwned = owned ?? 0;
         setPurchasing(true);
@@ -153,6 +181,9 @@ export default function CardDetail({ params }: { params: { id: string } }) {
           <div className="mb-3 flex items-center gap-2">
             <span className="text-sm font-bold text-sub">1장당</span>
             <PointPrice value={card.pointPrice} size="lg" />
+            <span className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-extrabold text-brand-dark">
+              무상 포인트 우선
+            </span>
           </div>
           <p className="mb-5 text-[14.5px] leading-[1.7] text-[#6d7a68]">
             {card.description || '카드 설명을 준비하고 있어요.'}
@@ -220,13 +251,41 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             </span>
           </div>
 
+          {owned !== null && (
+            <div className="mb-4 rounded-[14px] border border-[#e4ead8] bg-[#FAFCF6] px-4 py-3.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-bold text-sub">보유 무상 포인트</span>
+                <span className="font-extrabold text-brand-dark">
+                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.free)}P`}
+                </span>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between text-sm">
+                <span className="font-bold text-sub">보유 유상 포인트</span>
+                <span className="font-extrabold text-brand-dark">
+                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.paid)}P`}
+                </span>
+              </div>
+              <p className={`mt-2 text-xs ${pointShortage > 0 && walletLoaded ? 'font-semibold text-danger' : 'text-sub'}`}>
+                {pointShortage > 0 && walletLoaded
+                  ? `사용 가능한 포인트가 ${fmt(pointShortage)}P 부족해요.`
+                  : usedPaidPoint > 0
+                    ? `무상 ${fmt(usedFreePoint)}P를 먼저 사용하고 유상 ${fmt(usedPaidPoint)}P를 사용해요.`
+                    : `무상 포인트 ${fmt(usedFreePoint)}P를 먼저 사용해요.`}
+              </p>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={buy}
-            disabled={purchasing}
-            className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-wait disabled:opacity-60"
+            disabled={purchasing || (walletLoaded && pointShortage > 0)}
+            className="w-full cursor-pointer rounded-[14px] bg-brand p-[15px] text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {purchasing ? '구매 처리 중...' : '구매하기'}
+            {purchasing
+              ? '구매 처리 중...'
+              : walletLoaded && pointShortage > 0
+                ? '포인트 부족'
+                : '포인트로 구매하기'}
           </button>
         </div>
       </div>

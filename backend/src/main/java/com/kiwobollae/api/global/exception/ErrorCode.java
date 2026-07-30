@@ -84,6 +84,10 @@ public enum ErrorCode {
 	JOURNAL_NOT_FOUND(HttpStatus.NOT_FOUND, "성장 일지를 찾을 수 없습니다."),
 	JOURNAL_DUPLICATE_IMAGE(HttpStatus.UNPROCESSABLE_CONTENT, "같은 날 이미 사용한 사진입니다."),
 
+	// --- 마이페이지 / 배송지 도메인 ---
+	ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "배송지를 찾을 수 없습니다."),
+	ADDRESS_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "배송지는 최대 5개까지 등록할 수 있습니다."),
+
 	// --- 문의 / 신고 도메인 ---
 	INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "문의를 찾을 수 없습니다."),
 	INQUIRY_INVALID_STATE(HttpStatus.CONFLICT, "이미 답변이 완료된 문의입니다."),

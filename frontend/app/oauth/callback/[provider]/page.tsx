@@ -1,6 +1,6 @@
 "use client";
 import { ApiError, oauthLogin } from "@/lib/api";
-import { consumeNaverState, OAuthProvider } from "@/lib/oauth";
+import { consumeOAuthState, OAuthProvider } from "@/lib/oauth";
 import { useStore } from "@/lib/store";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
@@ -39,9 +39,18 @@ function OAuthCallbackContent() {
       return;
     }
 
-    const state = provider === "naver" ? consumeNaverState() || undefined : undefined;
+    const returnedState = searchParams.get("state");
+    const expectedState = consumeOAuthState(provider);
+    // Login CSRF guard: reject unless the state this tab generated before redirecting
+    // matches what the provider echoed back. A forged callback URL (attacker's own
+    // authorization code, no matching sessionStorage entry in the victim's tab) fails
+    // here and never reaches the backend token exchange.
+    if (!expectedState || !returnedState || returnedState !== expectedState) {
+      setError("로그인 요청이 유효하지 않아요. 다시 시도해 주세요.");
+      return;
+    }
 
-    oauthLogin(provider, code, state)
+    oauthLogin(provider, code, returnedState)
       .then((res) => {
         login(res.accessToken, res.user);
         router.replace("/");

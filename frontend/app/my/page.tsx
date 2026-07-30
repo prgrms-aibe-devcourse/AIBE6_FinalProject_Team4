@@ -3,19 +3,25 @@ import {
   ApiError,
   changePassword,
   checkNicknameAvailability,
+  createAddress,
+  deleteAddress,
+  getAddresses,
   getMe,
+  setDefaultAddress,
+  updateAddress,
   updateProfile,
   verifyPassword,
   withdraw,
+  type UserAddress,
   type UserResponse,
 } from "@/lib/api";
-import { ADDRESSES } from "@/lib/data";
+import { embedAddressSearch } from "@/lib/daumPostcode";
 import { levelTitle } from "@/lib/levels";
 import { useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const LINKS = [
   { icon: "receipt_long", label: "주문 내역", href: "/my/orders" },
@@ -34,12 +40,14 @@ const PHONE_REGEX = /^(010|011)\d{7,8}$/;
 const NICKNAME_MAX_LENGTH = 12;
 const NAME_MAX_LENGTH = 10;
 const PASSWORD_MIN_LENGTH = 8;
+const MAX_ADDRESSES = 5;
 
 export default function MyPage() {
   const { showToast } = useUI();
   const { state, set, logout } = useStore();
   const router = useRouter();
-  const [addresses, setAddresses] = useState(ADDRESSES);
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
 
   const [profile, setProfile] = useState<UserResponse | null>(null);
   const [editing, setEditing] = useState(false);
@@ -69,6 +77,11 @@ export default function MyPage() {
         // 헤더의 캐시된 정보로도 화면은 그릴 수 있으니 토스트 정도만 남김
         showToast("프로필을 불러오지 못했어요.", "err");
       });
+
+    getAddresses()
+      .then(setAddresses)
+      .catch(() => showToast("배송지 목록을 불러오지 못했어요.", "err"))
+      .finally(() => setAddressesLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -294,9 +307,151 @@ export default function MyPage() {
     }
   };
 
-  const setDefault = (id: number) => {
-    setAddresses(addresses.map((a) => ({ ...a, isDefault: a.id === id })));
-    showToast("기본 배송지를 변경했어요.");
+  const [addressFormOpen, setAddressFormOpen] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
+  const [addressReceiverName, setAddressReceiverName] = useState("");
+  const [addressReceiverPhone, setAddressReceiverPhone] = useState("");
+  const [addressZipCode, setAddressZipCode] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [addressDetail, setAddressDetail] = useState("");
+  const [addressIsDefault, setAddressIsDefault] = useState(false);
+  const [addressSubmitting, setAddressSubmitting] = useState(false);
+  const [addressFormError, setAddressFormError] = useState("");
+  const [addressActionId, setAddressActionId] = useState<number | null>(null);
+
+  const openAddressCreate = () => {
+    setEditingAddressId(null);
+    // 배송지 등록은 보통 본인 앞으로 받는 경우가 많아, 프로필의 이름·번호가 있으면 미리 채워준다.
+    setAddressReceiverName(profile?.name ?? "");
+    setAddressReceiverPhone(profile?.phoneNumber ?? "");
+    setAddressZipCode("");
+    setAddressLine("");
+    setAddressDetail("");
+    setAddressIsDefault(addresses.length === 0);
+    setAddressFormError("");
+    setAddressFormOpen(true);
+  };
+
+  const openAddressEdit = (a: UserAddress) => {
+    setEditingAddressId(a.id);
+    setAddressReceiverName(a.receiverName);
+    setAddressReceiverPhone(a.receiverPhone.replace(/\D/g, ""));
+    setAddressZipCode(a.zipCode);
+    setAddressLine(a.address);
+    setAddressDetail(a.addressDetail ?? "");
+    setAddressIsDefault(a.isDefault);
+    setAddressFormError("");
+    setAddressFormOpen(true);
+  };
+
+  const closeAddressForm = () => {
+    setAddressFormOpen(false);
+    setEditingAddressId(null);
+  };
+
+  const [postcodeOpen, setPostcodeOpen] = useState(false);
+  const [postcodeError, setPostcodeError] = useState("");
+  const postcodeContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!postcodeOpen || !postcodeContainerRef.current) return;
+    embedAddressSearch(postcodeContainerRef.current, ({ zipCode, address }) => {
+      setAddressZipCode(zipCode);
+      setAddressLine(address);
+      setPostcodeOpen(false);
+    }).catch(() => setPostcodeError("주소 검색을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."));
+  }, [postcodeOpen]);
+
+  const searchAddress = () => {
+    setPostcodeError("");
+    setPostcodeOpen(true);
+  };
+
+  const changeAddressReceiverPhone = (value: string) => {
+    setAddressReceiverPhone(value.replace(/\D/g, "").slice(0, PHONE_MAX_LENGTH));
+  };
+
+  const submitAddressForm = async () => {
+    setAddressFormError("");
+    if (!addressReceiverName || !addressReceiverPhone || !addressZipCode || !addressLine) {
+      setAddressFormError("필수 항목을 모두 입력해 주세요.");
+      return;
+    }
+    if (!PHONE_REGEX.test(addressReceiverPhone)) {
+      setAddressFormError("연락처는 010 또는 011로 시작하는 숫자 10~11자리여야 해요.");
+      return;
+    }
+    const payload = {
+      receiverName: addressReceiverName,
+      receiverPhone: addressReceiverPhone,
+      zipCode: addressZipCode,
+      address: addressLine,
+      addressDetail: addressDetail || undefined,
+      isDefault: addressIsDefault,
+    };
+    setAddressSubmitting(true);
+    try {
+      if (editingAddressId) {
+        const updated = await updateAddress(editingAddressId, payload);
+        setAddresses((prev) =>
+          prev
+            .map((a) => (a.id === updated.id ? updated : updated.isDefault ? { ...a, isDefault: false } : a))
+            .sort((a, b) => Number(b.isDefault) - Number(a.isDefault)),
+        );
+        showToast("배송지를 수정했어요.");
+      } else {
+        const created = await createAddress(payload);
+        setAddresses((prev) =>
+          [created, ...(created.isDefault ? prev.map((a) => ({ ...a, isDefault: false })) : prev)].sort(
+            (a, b) => Number(b.isDefault) - Number(a.isDefault),
+          ),
+        );
+        showToast("배송지를 등록했어요.");
+      }
+      closeAddressForm();
+    } catch (e) {
+      setAddressFormError(
+        e instanceof ApiError ? e.message : "배송지 저장에 실패했어요. 다시 시도해 주세요.",
+      );
+    } finally {
+      setAddressSubmitting(false);
+    }
+  };
+
+  const removeAddress = async (id: number) => {
+    setAddressActionId(id);
+    try {
+      await deleteAddress(id);
+      setAddresses((prev) => prev.filter((a) => a.id !== id));
+      showToast("배송지를 삭제했어요.");
+    } catch (e) {
+      showToast(
+        e instanceof ApiError ? e.message : "배송지 삭제에 실패했어요.",
+        "err",
+      );
+    } finally {
+      setAddressActionId(null);
+    }
+  };
+
+  const setDefault = async (id: number) => {
+    setAddressActionId(id);
+    try {
+      await setDefaultAddress(id);
+      setAddresses((prev) =>
+        prev
+          .map((a) => ({ ...a, isDefault: a.id === id }))
+          .sort((a, b) => Number(b.isDefault) - Number(a.isDefault)),
+      );
+      showToast("기본 배송지를 변경했어요.");
+    } catch (e) {
+      showToast(
+        e instanceof ApiError ? e.message : "기본 배송지 변경에 실패했어요.",
+        "err",
+      );
+    } finally {
+      setAddressActionId(null);
+    }
   };
 
   const doLogout = () => {
@@ -565,6 +720,16 @@ export default function MyPage() {
 
       <h2 className="mb-3.5 text-lg font-extrabold">배송지 관리</h2>
       <div className="flex flex-col gap-3">
+        {addressesLoading && (
+          <div className="rounded-[14px] bg-white px-[18px] py-4 text-sm text-sub shadow-card">
+            배송지를 불러오는 중이에요...
+          </div>
+        )}
+        {!addressesLoading && addresses.length === 0 && (
+          <div className="rounded-[14px] bg-white px-[18px] py-4 text-sm text-sub shadow-card">
+            등록된 배송지가 없어요.
+          </div>
+        )}
         {addresses.map((a) => (
           <div
             key={a.id}
@@ -572,7 +737,7 @@ export default function MyPage() {
           >
             <div className="min-w-[180px] flex-1">
               <div className="flex items-center gap-2 font-bold">
-                {a.name}
+                {a.receiverName}
                 {a.isDefault && (
                   <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand-dark">
                     기본
@@ -580,33 +745,172 @@ export default function MyPage() {
                 )}
               </div>
               <div className="mt-1 text-[13.5px] text-sub">
-                {a.phone} · {a.addr}
+                {a.receiverPhone} · {a.address}
+                {a.addressDetail ? ` ${a.addressDetail}` : ""}
               </div>
             </div>
             {!a.isDefault && (
               <button
                 type="button"
+                disabled={addressActionId === a.id}
                 onClick={() => setDefault(a.id)}
-                className="cursor-pointer rounded-[10px] border-[1.5px] border-[#cfe0b6] bg-white px-3.5 py-2 text-[13px] font-bold text-brand-dark"
+                className="cursor-pointer rounded-[10px] border-[1.5px] border-[#cfe0b6] bg-white px-3.5 py-2 text-[13px] font-bold text-brand-dark disabled:opacity-60"
               >
                 기본으로
               </button>
             )}
             <button
               type="button"
+              onClick={() => openAddressEdit(a)}
               className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-[13px] font-bold text-sub"
             >
               수정
             </button>
+            <button
+              type="button"
+              disabled={addressActionId === a.id}
+              onClick={() => removeAddress(a.id)}
+              className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-[13px] font-bold text-danger disabled:opacity-60"
+            >
+              삭제
+            </button>
           </div>
         ))}
-        <button
-          type="button"
-          className="cursor-pointer rounded-[14px] border-[1.5px] border-dashed border-[#cfe0b6] bg-white p-3.5 text-center font-bold text-brand-dark"
-        >
-          + 새 배송지 추가
-        </button>
+        {!addressFormOpen && addresses.length < MAX_ADDRESSES && (
+          <button
+            type="button"
+            onClick={openAddressCreate}
+            className="cursor-pointer rounded-[14px] border-[1.5px] border-dashed border-[#cfe0b6] bg-white p-3.5 text-center font-bold text-brand-dark"
+          >
+            + 새 배송지 추가
+          </button>
+        )}
+        {!addressFormOpen && addresses.length >= MAX_ADDRESSES && (
+          <div className="rounded-[14px] bg-[#F8FAF3] px-[18px] py-3.5 text-center text-sm text-sub">
+            배송지는 최대 {MAX_ADDRESSES}개까지 등록할 수 있어요.
+          </div>
+        )}
       </div>
+
+      {addressFormOpen && (
+        <div className="mt-3 rounded-[20px] bg-white p-6 shadow-card">
+          <h2 className="mb-4 text-lg font-extrabold">
+            {editingAddressId ? "배송지 수정" : "배송지 등록"}
+          </h2>
+          <div className="flex flex-col gap-3.5">
+            <div>
+              <label className={LABEL}>받는 사람</label>
+              <input
+                value={addressReceiverName}
+                onChange={(e) => setAddressReceiverName(e.target.value)}
+                maxLength={50}
+                className={`${FIELD} mt-1.5`}
+              />
+            </div>
+            <div>
+              <label className={LABEL}>연락처</label>
+              <input
+                value={addressReceiverPhone}
+                onChange={(e) => changeAddressReceiverPhone(e.target.value)}
+                maxLength={PHONE_MAX_LENGTH}
+                inputMode="numeric"
+                placeholder="01012345678"
+                className={`${FIELD} mt-1.5`}
+              />
+            </div>
+            <div>
+              <label className={LABEL}>우편번호</label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  value={addressZipCode}
+                  readOnly
+                  placeholder="주소 검색으로 입력돼요"
+                  className={`${FIELD} bg-[#F8FAF3]`}
+                />
+                <button
+                  type="button"
+                  onClick={searchAddress}
+                  className="w-[104px] shrink-0 cursor-pointer whitespace-nowrap rounded-xl border-[1.5px] border-line bg-white text-[13px] font-bold text-[#5b6a54] transition-colors duration-150 hover:bg-brand-soft hover:text-brand-dark"
+                >
+                  주소 검색
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className={LABEL}>주소</label>
+              <input
+                value={addressLine}
+                readOnly
+                placeholder="주소 검색 버튼으로 입력해 주세요"
+                className={`${FIELD} mt-1.5 bg-[#F8FAF3]`}
+              />
+            </div>
+            <div>
+              <label className={LABEL}>상세 주소</label>
+              <input
+                value={addressDetail}
+                onChange={(e) => setAddressDetail(e.target.value)}
+                maxLength={100}
+                className={`${FIELD} mt-1.5`}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-sub">
+              <input
+                type="checkbox"
+                checked={addressIsDefault}
+                onChange={(e) => setAddressIsDefault(e.target.checked)}
+              />
+              기본 배송지로 설정
+            </label>
+          </div>
+
+          {addressFormError && (
+            <div className="mt-3.5 rounded-[11px] bg-danger-soft px-[13px] py-[11px] text-[13px] font-semibold text-danger">
+              {addressFormError}
+            </div>
+          )}
+
+          <div className="mt-5 flex gap-2.5">
+            <button
+              type="button"
+              disabled={addressSubmitting}
+              onClick={submitAddressForm}
+              className="flex-1 cursor-pointer rounded-xl bg-brand p-3 font-bold text-white transition-colors duration-150 hover:bg-brand-dark disabled:opacity-60"
+            >
+              저장
+            </button>
+            <button
+              type="button"
+              onClick={closeAddressForm}
+              className="flex-1 cursor-pointer rounded-xl border-[1.5px] border-line bg-white p-3 font-bold text-sub"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {postcodeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex max-h-[80vh] w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] bg-white shadow-card">
+            <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+              <h2 className="text-base font-extrabold">주소 검색</h2>
+              <button
+                type="button"
+                onClick={() => setPostcodeOpen(false)}
+                className="cursor-pointer text-sm font-bold text-sub"
+              >
+                닫기
+              </button>
+            </div>
+            {postcodeError ? (
+              <div className="p-5 text-sm text-danger">{postcodeError}</div>
+            ) : (
+              <div ref={postcodeContainerRef} className="h-[450px] w-full" />
+            )}
+          </div>
+        </div>
+      )}
 
       <button
         type="button"
