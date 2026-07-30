@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class WalletService {
 
+	private static final long JOURNAL_REWARD_AMOUNT = 100L;
 	private static final long ORDER_FREE_POINT_UNIT = 100L;
 
 	private final WalletRepository walletRepository;
@@ -44,6 +45,33 @@ public class WalletService {
 		Wallet wallet = walletRepository.findByUserId(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 		return WalletResponse.from(wallet);
+	}
+
+	/** 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다. */
+	@Transactional
+	public void rewardJournal(Long userId, Long journalId) {
+		validateJournalRewardRequest(userId, journalId);
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+
+		if (hasJournalTransaction(
+				PointTxType.JOURNAL_REWARD,
+				PointRefType.JOURNAL_COMPLETION,
+				journalId
+		)) {
+			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
+		}
+
+		long balanceAfter = wallet.increaseFreePoint(JOURNAL_REWARD_AMOUNT);
+		saveTransaction(
+				wallet,
+				PointTxType.JOURNAL_REWARD,
+				CurrencyType.FREE,
+				JOURNAL_REWARD_AMOUNT,
+				balanceAfter,
+				PointRefType.JOURNAL_COMPLETION,
+				journalId
+		);
 	}
 
 	/**
@@ -172,10 +200,10 @@ public class WalletService {
 	/**
 	 * 포인트 증감 공통 프리미티브: 지갑 행을 비관적 락으로 잠근 뒤 한 통화(currency)의 잔액에
 	 * 부호 있는 delta를 적용하고, 불변 원장(balance_after 스냅샷)을 같은 트랜잭션에 기록한다.
-	 * deduct/credit/reward/clawback 등 상위 흐름(POINT-03~08)이 이 메서드를 조합해 사용한다.
+	 * deduct/credit/reward 등 상위 흐름이 이 메서드를 조합해 사용한다.
 	 *
-	 * <p>정책: paid_point는 항상 음수 불가. free_point는 CLAWBACK·ADMIN_ADJUST만 음수(부채)
-	 * 허용하고, 그 외(PURCHASE 등)의 무상 차감은 하한 0을 지킨다. 하한 위반 시
+	 * <p>정책: paid_point는 항상 음수 불가. free_point는 ADMIN_ADJUST만 음수(부채)
+	 * 허용하고, 그 외 거래의 무상 차감은 하한 0을 지킨다. 하한 위반 시
 	 * {@code POINT_INSUFFICIENT_BALANCE}.
 	 */
 	@Transactional
@@ -192,8 +220,8 @@ public class WalletService {
 			}
 		} else {
 			balanceAfter = wallet.increaseFreePoint(amount);
-			// CLAWBACK·ADMIN_ADJUST만 free_point 음수(부채) 허용. 그 외(PURCHASE 등)의
-			// 무상 차감은 잔액 하한(0)을 지켜야 하므로 부족하면 거절한다.
+			// ADMIN_ADJUST만 free_point 음수(부채) 허용. 그 외 거래의 무상 차감은
+			// 잔액 하한(0)을 지켜야 하므로 부족하면 거절한다.
 			if (balanceAfter < 0 && !type.allowsNegativeFree()) {
 				throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
 			}
@@ -287,6 +315,24 @@ public class WalletService {
 				|| refId == null || refId < 1) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+	}
+
+	private void validateJournalRewardRequest(Long userId, Long journalId) {
+		if (userId == null || userId < 1 || journalId == null || journalId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+	}
+
+	private boolean hasJournalTransaction(
+			PointTxType type,
+			PointRefType refType,
+			Long journalId
+	) {
+		return pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				type,
+				refType,
+				journalId
+		);
 	}
 
 	private PurchasePointUsage getRecordedPurchaseUsage(

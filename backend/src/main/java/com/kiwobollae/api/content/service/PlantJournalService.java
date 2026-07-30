@@ -17,9 +17,6 @@ import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
-import com.kiwobollae.api.point.entity.enums.CurrencyType;
-import com.kiwobollae.api.point.entity.enums.PointRefType;
-import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,9 +38,6 @@ public class PlantJournalService {
 
 	// 작성일·하루 경계는 KST 기준으로 판정한다 (중복검사·완료 판정의 "같은 날" 기준).
 	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
-	// 일지 완료 보상 포인트. 임시값 — 추후 팀 협의 후 조정 예정.
-	private static final long JOURNAL_REWARD_AMOUNT = 100L;
 
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
@@ -76,8 +70,7 @@ public class PlantJournalService {
 		LocalDateTime startOfToday = today.atStartOfDay();
 		GachaRewardReservation gachaReservation = GachaRewardReservation.none();
 		if (plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1) {
-			walletService.applyDelta(userId, PointTxType.JOURNAL_REWARD, CurrencyType.FREE,
-					JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_COMPLETION, profile.getId());
+			walletService.rewardJournal(userId, journal.getId());
 			gachaReservation = gachaRewardReservationService.reserveDailyJournalReward(userId, today);
 		}
 		return PlantJournalResponse.from(journal, images, GachaRewardResponse.from(gachaReservation));
@@ -129,24 +122,9 @@ public class PlantJournalService {
 	public void deleteJournal(Long userId, Long journalId) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
-		LocalDateTime now = LocalDateTime.now(KST);
-		journal.softDelete(now);
-
-		// 자정 기준 회수: 오늘 지급된 보상이 있고, 오늘 작성된 활성 일지가 이 삭제로 0이 되면
-		// (다른 날 작성된 일지가 남아있어도 오늘자 보상 근거는 아니므로 회수 대상) 원자적으로
-		// 클레임을 해제한 뒤에만 point 도메인에 회수를 요청한다.
-		PlantProfile profile = journal.getPlantProfile();
-		LocalDateTime grantedAt = profile.getJournalRewardGrantedAt();
-		LocalDate today = now.toLocalDate();
-		boolean grantedToday = grantedAt != null && grantedAt.toLocalDate().equals(today);
-		boolean hasTodayActiveJournal =
-				plantJournalRepository.existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(profile.getId(), today);
-		if (grantedToday && !hasTodayActiveJournal) {
-			if (plantProfileRepository.clearJournalRewardIfMatches(profile.getId(), grantedAt) == 1) {
-				walletService.applyDelta(userId, PointTxType.CLAWBACK, CurrencyType.FREE,
-						-JOURNAL_REWARD_AMOUNT, PointRefType.JOURNAL_REVOCATION, profile.getId());
-			}
-		}
+		journal.softDelete(LocalDateTime.now(KST));
+		// 작성 보상은 삭제 여부와 무관하게 확정 지급한다. 당일 클레임도 유지하므로
+		// 삭제 후 같은 식물 프로필로 다시 작성해도 당일 추가 보상은 지급되지 않는다.
 	}
 
 	// 페이지에 담긴 일지들의 이미지를 한 번에 로딩해 journalId로 묶는다 (개별 조회로 인한 N+1 방지).

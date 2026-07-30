@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-// 유상(paid_point)은 실결제 자산이라 음수 불가. free_point는 CLAWBACK으로 음수 허용 → CHECK 없음.
+// 유상(paid_point)은 실결제 자산이라 음수 불가. free_point는 관리자 강제 조정으로 음수 허용 → CHECK 없음.
 @Table(name = "wallets",
 		uniqueConstraints = {
 				@UniqueConstraint(name = "uq_wallets_user_id", columnNames = "user_id")
@@ -51,7 +51,7 @@ public class Wallet extends BaseTimeEntity {
 		return this.paidPoint;
 	}
 
-	/** Applies a signed delta to the free balance and returns the new balance. free는 회수(CLAWBACK)로 음수 허용. */
+	/** Applies a signed delta to the free balance and returns the new balance. 음수 허용 여부는 호출부가 거래 유형별로 검증한다. */
 	public long increaseFreePoint(long delta) {
 		this.freePoint += delta;
 		return this.freePoint;

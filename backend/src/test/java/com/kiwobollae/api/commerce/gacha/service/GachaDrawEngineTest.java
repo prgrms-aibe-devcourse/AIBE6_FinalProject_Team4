@@ -27,6 +27,19 @@ class GachaDrawEngineTest {
   }
 
   @Test
+  void movesTenPercentPointsFromCommonToGoldenForQaOnly() {
+    GachaDrawEngine engine = new GachaDrawEngine(bound -> 0);
+
+    assertThat(engine.rarityFor(1_259_999, true)).isEqualTo(TradingCardRarity.COMMON);
+    assertThat(engine.rarityFor(1_260_000, true)).isEqualTo(TradingCardRarity.GOLDEN_RARE);
+    assertThat(engine.rarityFor(1_469_999, true)).isEqualTo(TradingCardRarity.GOLDEN_RARE);
+    assertThat(engine.rarityFor(1_470_000, true)).isEqualTo(TradingCardRarity.RARE);
+
+    assertThat(engine.rarityFor(1_260_000)).isEqualTo(TradingCardRarity.COMMON);
+    assertThat(engine.rarityFor(1_469_999)).isEqualTo(TradingCardRarity.COMMON);
+  }
+
+  @Test
   void rejectsRollOutsideFixedRange() {
     GachaDrawEngine engine = new GachaDrawEngine(bound -> 0);
 
