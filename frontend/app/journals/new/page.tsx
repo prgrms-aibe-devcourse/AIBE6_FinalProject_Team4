@@ -2,12 +2,12 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useStore } from '@/lib/store';
+import { fmt, useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { ApiError } from '@/lib/api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { plantVisual } from '@/lib/plant-visual';
-import { createJournal, uploadJournalImage } from '@/lib/journal-api';
+import { createJournal, PlantJournalCreateData, uploadJournalImage } from '@/lib/journal-api';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -21,7 +21,7 @@ function NewJournalInner() {
   const params = useSearchParams();
   const router = useRouter();
   const preselect = params.get('plant');
-  const { state, hydrated } = useStore();
+  const { state, hydrated, refreshWallet } = useStore();
   const { showToast } = useUI();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,6 +32,7 @@ function NewJournalInner() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [createResult, setCreateResult] = useState<PlantJournalCreateData | null>(null);
   const [plantModalOpen, setPlantModalOpen] = useState(false);
 
   useEffect(() => {
@@ -73,7 +74,7 @@ function NewJournalInner() {
     setSubmitting(true);
     try {
       const uploaded = await uploadJournalImage(photoFile, state.accessToken);
-      await createJournal(
+      const result = await createJournal(
         {
           plantProfileId: draft.plantId,
           content: draft.content,
@@ -81,6 +82,8 @@ function NewJournalInner() {
         },
         state.accessToken,
       );
+      await refreshWallet();
+      setCreateResult(result);
       setSaved(true);
     } catch (requestError) {
       showToast(
@@ -94,6 +97,7 @@ function NewJournalInner() {
 
   const reset = () => {
     setSaved(false);
+    setCreateResult(null);
     setDraft({ plantId: null, content: '' });
     setPhotoFile(null);
     setPhotoPreview(null);
@@ -118,6 +122,13 @@ function NewJournalInner() {
         <div className="max-w-[640px] rounded-[18px] bg-brand-soft p-6">
           <div className="text-[34px]">🌿</div>
           <div className="mt-2 text-lg font-extrabold text-ink">일지가 저장됐어요!</div>
+          {createResult?.rewardGranted ? (
+            <div className="mt-2 font-bold text-gold-text">
+              일지 보상 {fmt(createResult.rewardAmount)}P가 지급됐어요!
+            </div>
+          ) : (
+            <div className="mt-2 font-bold text-sub">오늘 보상은 이미 완료됐어요.</div>
+          )}
           <div className="mt-[18px] flex flex-wrap gap-2.5">
             <Link href="/journals" className="rounded-[11px] bg-ink px-5 py-[11px] font-bold text-white hover:text-white">
               일지 목록으로

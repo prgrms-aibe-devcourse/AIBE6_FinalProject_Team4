@@ -91,8 +91,14 @@ export interface CreateJournalPayload {
   images: JournalImagePayload[];
 }
 
-export function createJournal(payload: CreateJournalPayload, accessToken: string): Promise<PlantJournalData> {
-  return request<PlantJournalData>('/api/v1/journals', {
+export interface PlantJournalCreateData {
+  journal: PlantJournalData;
+  rewardGranted: boolean;
+  rewardAmount: number;
+}
+
+export function createJournal(payload: CreateJournalPayload, accessToken: string): Promise<PlantJournalCreateData> {
+  return request<PlantJournalCreateData>('/api/v1/journals', {
     method: 'POST',
     accessToken,
     body: JSON.stringify(payload),
