@@ -443,4 +443,60 @@ class WalletServiceTest {
 
 		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
 	}
+
+	@Test
+	void paymentRefundDeductsOnlyPaidPointAndWritesRefundLedger() {
+		Wallet wallet = Wallet.builder().freePoint(900L).paidPoint(5_000L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		walletService.deductPaidPointForPaymentRefund(7L, 3_000L, 41L);
+
+		assertThat(wallet.getPaidPoint()).isEqualTo(2_000L);
+		assertThat(wallet.getFreePoint()).isEqualTo(900L);
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository).save(captor.capture());
+		assertThat(captor.getValue().getType()).isEqualTo(PointTxType.REFUND);
+		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.PAID);
+		assertThat(captor.getValue().getAmount()).isEqualTo(-3_000L);
+		assertThat(captor.getValue().getBalanceAfter()).isEqualTo(2_000L);
+		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.PAYMENT_REFUND);
+		assertThat(captor.getValue().getRefId()).isEqualTo(41L);
+	}
+
+	@Test
+	void paymentRefundRejectsInsufficientPaidPointWithoutUsingFreePoint() {
+		Wallet wallet = Wallet.builder().freePoint(10_000L).paidPoint(2_999L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		assertThatThrownBy(() ->
+				walletService.deductPaidPointForPaymentRefund(7L, 3_000L, 41L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
+
+		assertThat(wallet.getPaidPoint()).isEqualTo(2_999L);
+		assertThat(wallet.getFreePoint()).isEqualTo(10_000L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void paymentRefundRejectsDuplicateRefundLedger() {
+		Wallet wallet = Wallet.builder().freePoint(900L).paidPoint(5_000L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.REFUND,
+				PointRefType.PAYMENT_REFUND,
+				41L
+		)).willReturn(true);
+
+		assertThatThrownBy(() ->
+				walletService.deductPaidPointForPaymentRefund(7L, 3_000L, 41L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.POINT_DUPLICATE_TRANSACTION));
+
+		assertThat(wallet.getPaidPoint()).isEqualTo(5_000L);
+		assertThat(wallet.getFreePoint()).isEqualTo(900L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
 }
