@@ -136,7 +136,12 @@ public class WalletService {
 			long requestedFreePoint,
 			Long orderId
 	) {
-		validatePurchaseRequest(amount, PointRefType.ORDER, orderId);
+		// products.point_price는 0 이상을 허용하므로(docs/AGENTS.md 5), 담긴 상품이 전부 0P인
+		// 주문은 amount==0이 될 수 있다. 카드 구매(항상 유상)와 달리 여기서는 0을 정상 거래로
+		// 취급해야 하므로 공용 validatePurchaseRequest(amount<1 거부)를 쓰지 않는다.
+		if (amount < 0 || orderId == null || orderId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
 		if (requestedFreePoint < 0
 				|| requestedFreePoint > amount
 				|| requestedFreePoint % ORDER_FREE_POINT_UNIT != 0) {
@@ -304,15 +309,20 @@ public class WalletService {
 		}
 	}
 
+	// 카드는 항상 유상이라 (0,0) 원복 요청 자체가 의미 없는 입력이지만, 상품 주문은
+	// point_price==0인 상품만 담겼을 수 있어(docs/AGENTS.md 5) usedFreePoint==usedPaidPoint==0도
+	// 유효한 취소일 수 있다. 실제 방어는 recordedUsage(최초 구매 차감 원장)와 정확히
+	// 일치하는지 대조하는 쪽이 맡는다.
 	private void validateRestoreRequest(
 			long usedFreePoint,
 			long usedPaidPoint,
 			PointRefType refType,
 			Long refId
 	) {
-		if (usedFreePoint < 0 || usedPaidPoint < 0 || (usedFreePoint == 0 && usedPaidPoint == 0)
+		if (usedFreePoint < 0 || usedPaidPoint < 0
 				|| (refType != PointRefType.ORDER && refType != PointRefType.CARD_PURCHASE)
-				|| refId == null || refId < 1) {
+				|| refId == null || refId < 1
+				|| (refType == PointRefType.CARD_PURCHASE && usedFreePoint == 0 && usedPaidPoint == 0)) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 	}

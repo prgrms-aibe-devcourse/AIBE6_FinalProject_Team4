@@ -39,7 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 		if (token != null) {
 			JwtTokenProvider.TokenStatus status = jwtTokenProvider.checkToken(token);
-			if (status == JwtTokenProvider.TokenStatus.VALID) {
+			if (status == JwtTokenProvider.TokenStatus.VALID && jwtTokenProvider.isAccessToken(token)) {
 				Long userId = jwtTokenProvider.getUserId(token);
 				String role = jwtTokenProvider.getRole(token);
 				List<GrantedAuthority> authorities = role != null

@@ -95,7 +95,9 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
     throw new ApiError(code, message, res.status);
   }
 
-  return body?.data as T;
+  // 204 No Content (delete/cancel/confirm 등)처럼 응답 본문이 없는 성공 응답은 body가 null이라
+  // body.data에 접근하면 TypeError가 나서 성공한 요청이 실패로 보인다.
+  return (body ? body.data : undefined) as T;
 }
 
 // Shape of Spring Data's Page<T> as Jackson serializes it by default (content/number/

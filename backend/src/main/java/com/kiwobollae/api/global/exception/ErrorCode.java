@@ -58,6 +58,10 @@ public enum ErrorCode {
 	ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
 	ORDER_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 처리할 수 없는 주문입니다."),
 
+	CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."),
+	CART_QUANTITY_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_CONTENT, "장바구니에는 상품당 최대 99개까지 담을 수 있습니다."),
+	CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "재고보다 많은 수량은 담을 수 없습니다."),
+
 	CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."),
 	CARD_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "교환에 필요한 카드를 보유하고 있지 않습니다."),
 

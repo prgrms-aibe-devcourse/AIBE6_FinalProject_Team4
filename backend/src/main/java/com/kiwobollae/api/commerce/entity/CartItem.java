@@ -9,6 +9,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -35,4 +36,14 @@ public class CartItem extends BaseEntity {
 
 	@Column(nullable = false)
 	private Integer quantity;
+
+	// 동시에 같은 항목에 담기/수량변경이 들어와 lost update가 나지 않도록 낙관적 락을 건다
+	// (정책 #10: 일반 엔티티 갱신은 @Version 기본).
+	@Version
+	@Column(nullable = false)
+	private Long version;
+
+	public void changeQuantity(Integer quantity) {
+		this.quantity = quantity;
+	}
 }
