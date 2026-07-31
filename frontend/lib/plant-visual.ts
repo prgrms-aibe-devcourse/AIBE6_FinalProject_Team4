@@ -20,10 +20,10 @@ export function plantVisual(speciesName: string) {
   return SPECIES_VISUAL[speciesName] || DEFAULT_VISUAL;
 }
 
-// Emoji options offered as a photo substitute when registering a plant.
-// thumbnailUrl has no dedicated column for "emoji instead of a photo", so a
-// chosen emoji is encoded as `${EMOJI_THUMBNAIL_PREFIX}${emoji}` and stored in
-// the same thumbnailUrl string field a real upload would use.
+// 식물 등록 시 대표 사진 대신 고를 수 있는 이모지 옵션.
+// thumbnailUrl에는 "사진 대신 이모지"를 위한 전용 컬럼이 없어서, 선택한 이모지를
+// `${EMOJI_THUMBNAIL_PREFIX}${emoji}` 형태로 인코딩해 실제 업로드 시 쓰는 thumbnailUrl
+// 문자열 필드에 그대로 저장한다.
 export const PROFILE_EMOJI_OPTIONS: [string, string][] = [
   ['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry],
   ['🍅', grads.tomato], ['🌿', grads.basil], ['🥬', grads.lettuce], ['🌶️', grads.pepper],

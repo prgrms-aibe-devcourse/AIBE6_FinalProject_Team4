@@ -138,8 +138,13 @@ public class JournalImageUploadService {
 				GetObjectRequest.builder().bucket(bucket).key(key).build())) {
 			byte[] bytes = object.readAllBytes();
 			String contentType = object.response().contentType();
+			// 파일명은 upload()가 부여한 UUID라 객체 내용이 불변이므로 무기한 캐시해도 안전하다.
+			// nosniff + inline은 API와 같은 오리진에서 서빙되는 사용자 업로드 바이트의 콘텐츠 스니핑 경로를 막는다.
 			return ResponseEntity.ok()
 					.contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
+					.header("X-Content-Type-Options", "nosniff")
+					.header("Content-Disposition", "inline")
+					.header("Cache-Control", "private, max-age=31536000, immutable")
 					.body(bytes);
 		} catch (NoSuchKeyException e) {
 			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);

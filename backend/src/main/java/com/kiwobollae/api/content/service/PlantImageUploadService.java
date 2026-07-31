@@ -21,15 +21,15 @@ import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
- * Bucket is private — mirrors {@link JournalImageUploadService}'s upload/serve
- * pattern, but stores objects under the "plant_profile" prefix instead of
- * "journals" so plant profile photos don't mix with journal images in S3.
+ * 버킷이 private이므로 {@link JournalImageUploadService}의 업로드/서빙 패턴을 그대로 따르되,
+ * S3에서 일지 이미지와 섞이지 않도록 "journals" 대신 "plant_profile" 접두사로 객체를 저장한다.
  */
 @Slf4j
 @Service
@@ -82,14 +82,57 @@ public class PlantImageUploadService {
 				GetObjectRequest.builder().bucket(bucket).key(key).build())) {
 			byte[] bytes = object.readAllBytes();
 			String contentType = object.response().contentType();
+			// 파일명은 upload()가 부여한 UUID라 객체 내용이 불변이므로 무기한 캐시해도 안전하다.
+			// nosniff + inline은 API와 같은 오리진에서 서빙되는 사용자 업로드 바이트의 콘텐츠 스니핑 경로를 막는다.
 			return ResponseEntity.ok()
 					.contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
+					.header("X-Content-Type-Options", "nosniff")
+					.header("Content-Disposition", "inline")
+					.header("Cache-Control", "private, max-age=31536000, immutable")
 					.body(bytes);
 		} catch (NoSuchKeyException e) {
 			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
 		} catch (SdkException | IOException e) {
 			throw new BusinessException(ErrorCode.PLANT_IMAGE_UPLOAD_FAILED);
 		}
+	}
+
+	/**
+	 * 더 이상 참조되지 않는 식물 프로필 이미지(프로필 삭제, 또는 수정으로 thumbnailUrl이 교체된 경우)에
+	 * 대한 best-effort S3 정리. 절대 예외를 던지지 않는다 — 정리에 실패했다고 해서 이를 유발한 프로필
+	 * 쓰기/삭제 자체가 실패해서는 안 되며, 실패 시 고아 객체로 남겨두고 추후 처리한다.
+	 *
+	 * <p>{@code ownerUserId}는 이 정리를 유발한 프로필 작업의 userId여야 한다 — 저장된 URL에서 다시
+	 * 파싱해낸 key에 담긴 userId와 일치하지 않으면 삭제를 거부한다.
+	 */
+	public void delete(String imageUrl, Long ownerUserId) {
+		String key = keyFromUrl(imageUrl);
+		if (key == null) {
+			return;
+		}
+		if (!isOwnedBy(key, ownerUserId)) {
+			log.warn("Refused to delete plant image not owned by user {}: {}", ownerUserId, key);
+			return;
+		}
+		try {
+			s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+		} catch (SdkException e) {
+			log.warn("Failed to delete orphaned plant image from S3: {}", key, e);
+		}
+	}
+
+	private String keyFromUrl(String imageUrl) {
+		int idx = imageUrl.indexOf(SERVE_PATH_MARKER);
+		if (idx < 0) {
+			return null;
+		}
+		return "plant_profile/" + imageUrl.substring(idx + SERVE_PATH_MARKER.length());
+	}
+
+	// key 형태는 항상 "plant_profile/{userId}/{filename}" — 두 번째 세그먼트가 소유자다.
+	private boolean isOwnedBy(String key, Long ownerUserId) {
+		String[] parts = key.split("/");
+		return parts.length == 3 && parts[1].equals(String.valueOf(ownerUserId));
 	}
 
 	private String objectKey(Long userId, String filename) {
