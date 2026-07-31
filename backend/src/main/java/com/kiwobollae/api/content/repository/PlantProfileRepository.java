@@ -26,4 +26,7 @@ public interface PlantProfileRepository extends JpaRepository<PlantProfile, Long
 			+ "where p.id = :id and (p.journalRewardGrantedAt is null or p.journalRewardGrantedAt < :startOfToday)")
 	int claimJournalReward(@Param("id") Long id, @Param("now") LocalDateTime now,
 			@Param("startOfToday") LocalDateTime startOfToday);
+
+	// 이미지 URL이 어떤 프로필의 대표 사진으로 아직 쓰이고 있는지 확인한다 — S3 정리 전 안전 장치.
+	boolean existsByPlantImage(String plantImage);
 }

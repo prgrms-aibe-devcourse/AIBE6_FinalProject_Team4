@@ -7,7 +7,7 @@ import { useUI } from '@/lib/ui';
 import { ApiError } from '@/lib/api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { plantVisual } from '@/lib/plant-visual';
-import { createJournal, PlantJournalCreateData, uploadJournalImage } from '@/lib/journal-api';
+import { createJournal, PlantJournalCreateData, deleteJournalImage, uploadJournalImage } from '@/lib/journal-api';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -62,6 +62,7 @@ function NewJournalInner() {
     if (file.size > MAX_SIZE) {
       return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
     }
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
@@ -74,14 +75,20 @@ function NewJournalInner() {
     setSubmitting(true);
     try {
       const uploaded = await uploadJournalImage(photoFile, state.accessToken);
-      const result = await createJournal(
-        {
-          plantProfileId: draft.plantId,
-          content: draft.content,
-          images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
-        },
-        state.accessToken,
-      );
+      let result;
+      try {
+        result = await createJournal(
+          {
+            plantProfileId: draft.plantId,
+            content: draft.content,
+            images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
+          },
+          state.accessToken,
+        );
+      } catch (createError) {
+        deleteJournalImage(uploaded.imageUrl, state.accessToken).catch(() => {});
+        throw createError;
+      }
       await refreshWallet();
       setCreateResult(result);
 
@@ -101,6 +108,7 @@ function NewJournalInner() {
   };
 
   const reset = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setSaved(false);
     setCreateResult(null);
     setDraft({ plantId: null, content: '' });

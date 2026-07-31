@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { deleteJournal, getJournal, PlantJournalData, updateJournal, uploadJournalImage } from '@/lib/journal-api';
+import { deleteJournal, deleteJournalImage, getJournal, PlantJournalData, updateJournal, uploadJournalImage } from '@/lib/journal-api';
 import { formatDate } from '@/lib/format';
 import { createReport } from '@/lib/report-api';
 
@@ -23,6 +23,11 @@ function representativeJournalImage(journal: PlantJournalData) {
 function representativeImage(journal: PlantJournalData): string | null {
   const url = representativeJournalImage(journal)?.imageUrl || null;
   return url ? resolveImageUrl(url) : null;
+}
+
+// editPreview는 서버 이미지 URL(재사용, 해제하면 안 됨)이나 로컬 blob 미리보기(해제해야 함) 둘 다 담을 수 있다.
+function revokeIfBlobUrl(url: string | null) {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
 }
 
 export default function JournalDetail({ params }: { params: { id: string } }) {
@@ -92,6 +97,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
 
   const openEdit = () => {
     if (!journal) return;
+    revokeIfBlobUrl(editPreview);
     setEditContent(journal.content);
     setEditPhoto(null);
     setEditPreview(representativeImage(journal));
@@ -102,6 +108,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) return showToast('jpg, png, webp 형식만 가능해요.', 'err');
     if (file.size > MAX_SIZE) return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+    revokeIfBlobUrl(editPreview);
     setEditPhoto(file);
     setEditPreview(URL.createObjectURL(file));
   };
@@ -117,14 +124,22 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
         : representativeJournalImage(journal);
       if (!image) return showToast('사진을 선택해 주세요.', 'err');
 
-      const updated = await updateJournal(
-        journal.id,
-        {
-          content: editContent,
-          images: [{ imageUrl: image.imageUrl, imageHash: image.imageHash, representative: true }],
-        },
-        accessToken,
-      );
+      let updated;
+      try {
+        updated = await updateJournal(
+          journal.id,
+          {
+            content: editContent,
+            images: [{ imageUrl: image.imageUrl, imageHash: image.imageHash, representative: true }],
+          },
+          accessToken,
+        );
+      } catch (updateError) {
+        if (editPhoto) {
+          deleteJournalImage(image.imageUrl, accessToken).catch(() => {});
+        }
+        throw updateError;
+      }
       setJournal(updated);
       setEditing(false);
       showToast('일지를 수정했어요 🌿');

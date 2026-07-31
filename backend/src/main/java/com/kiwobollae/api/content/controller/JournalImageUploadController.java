@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,5 +43,16 @@ public class JournalImageUploadController {
 	@GetMapping("/{userId}/{filename}")
 	public ResponseEntity<byte[]> serveImage(@PathVariable Long userId, @PathVariable String filename) {
 		return journalImageUploadService.download(userId, filename);
+	}
+
+	// 사진을 업로드했지만 이어지는 일지 작성/수정이 실패해 일지에 연결되지 못한 이미지를 프론트가
+	// 직접 정리할 수 있도록 제공한다. delete()는 소유권이 다르면 조용히 무시하고 best-effort로 동작한다.
+	@Operation(summary = "성장 일지 이미지 삭제", description = "업로드했지만 일지에 연결되지 못한 이미지를 정리합니다.")
+	@DeleteMapping
+	public ResponseEntity<Void> deleteImage(
+			@AuthenticationPrincipal Long userId,
+			@RequestParam("imageUrl") String imageUrl) {
+		journalImageUploadService.delete(imageUrl, userId);
+		return ResponseEntity.noContent().build();
 	}
 }
