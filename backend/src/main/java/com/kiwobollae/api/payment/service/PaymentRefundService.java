@@ -8,11 +8,13 @@ import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.PaymentRefund;
+import com.kiwobollae.api.payment.entity.enums.PaymentRefundAttemptStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentRefundCommand;
 import com.kiwobollae.api.payment.provider.PaymentRefundResult;
+import com.kiwobollae.api.payment.repository.PaymentRefundAttemptRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.WalletService;
@@ -37,6 +39,8 @@ public class PaymentRefundService {
 
 	private final PaymentRepository paymentRepository;
 	private final PaymentRefundRepository paymentRefundRepository;
+	private final PaymentRefundAttemptRepository paymentRefundAttemptRepository;
+	private final PaymentRefundAttemptService paymentRefundAttemptService;
 	private final WalletService walletService;
 	private final PaymentProvider paymentProvider;
 	private final IdempotencyService idempotencyService;
@@ -75,6 +79,20 @@ public class PaymentRefundService {
 			);
 		}
 
+		// 결과가 확정되지 않은 이전 시도가 남아 있으면 자동 재시도를 막는다. 멱등키 행은 본
+		// 트랜잭션에서 생성되므로 롤백과 함께 사라진다 — 즉 롤백 후 재시도에서 이중 환불을 막는
+		// 실질적 방어선은 멱등키가 아니라 아래에서 커밋하는 시도 기록이다. PG 처리 결과를 알 수
+		// 없는 상태이므로 자동 재환불 대신 사람이 확인하도록 되돌린다.
+		if (paymentRefundAttemptRepository.existsByPaymentIdAndStatus(
+				paymentId,
+				PaymentRefundAttemptStatus.STARTED
+		)) {
+			throw new BusinessException(
+					ErrorCode.PAYMENT_INVALID_STATE,
+					"이전 환불 시도의 처리 결과가 확정되지 않았습니다. 확인 후 다시 시도해 주세요."
+			);
+		}
+
 		PaymentRefund refund = paymentRefundRepository.saveAndFlush(PaymentRefund.builder()
 				.payment(payment)
 				.cashAmount(payment.getCashAmount())
@@ -87,6 +105,17 @@ public class PaymentRefundService {
 				userId,
 				payment.getPointAmount(),
 				refund.getId()
+		);
+
+		// PG 호출 직전에 시도 기록을 별도 트랜잭션으로 커밋한다. 이후 어디서 실패하든
+		// (PG 환불 성공 후 상태 전이·커밋 실패 포함) 이 행이 STARTED로 남아 대조 근거가 되고,
+		// 위 가드가 재시도를 막는다. payments FK가 없어 결제 행을 잠근 상태에서도 INSERT된다.
+		Long attemptId = paymentRefundAttemptService.start(
+				paymentId,
+				userId,
+				payment.getCashAmount(),
+				payment.getPointAmount(),
+				reason
 		);
 
 		PaymentRefundResult providerResult = paymentProvider.refund(new PaymentRefundCommand(
@@ -114,6 +143,18 @@ public class PaymentRefundService {
 				LocalDateTime.now(seoulClock)
 		);
 		if (refundUpdated == 0) {
+			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
+		}
+
+		// 성공 확정은 본 트랜잭션 안에서 한다(REQUIRES_NEW 아님). 이후 커밋이 실패하면 이 갱신도
+		// 함께 롤백돼 기록이 STARTED로 남으므로, 환불 결과와 시도 기록이 항상 같이 움직인다.
+		int attemptSettled = paymentRefundAttemptRepository.settleIfCurrent(
+				attemptId,
+				PaymentRefundAttemptStatus.STARTED,
+				PaymentRefundAttemptStatus.SETTLED,
+				LocalDateTime.now(seoulClock)
+		);
+		if (attemptSettled == 0) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
 		}
 

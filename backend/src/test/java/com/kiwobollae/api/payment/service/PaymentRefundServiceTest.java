@@ -15,11 +15,13 @@ import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.PaymentRefund;
+import com.kiwobollae.api.payment.entity.enums.PaymentRefundAttemptStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentRefundCommand;
 import com.kiwobollae.api.payment.provider.PaymentRefundResult;
+import com.kiwobollae.api.payment.repository.PaymentRefundAttemptRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.WalletService;
@@ -52,6 +54,12 @@ class PaymentRefundServiceTest {
 	private PaymentRefundRepository paymentRefundRepository;
 
 	@Mock
+	private PaymentRefundAttemptRepository paymentRefundAttemptRepository;
+
+	@Mock
+	private PaymentRefundAttemptService paymentRefundAttemptService;
+
+	@Mock
 	private WalletService walletService;
 
 	@Mock
@@ -70,6 +78,8 @@ class PaymentRefundServiceTest {
 		paymentRefundService = new PaymentRefundService(
 				paymentRepository,
 				paymentRefundRepository,
+				paymentRefundAttemptRepository,
+				paymentRefundAttemptService,
 				walletService,
 				paymentProvider,
 				idempotencyService,
@@ -93,9 +103,21 @@ class PaymentRefundServiceTest {
 		)).willReturn(new IdempotencyExecution(key, false));
 		given(paymentRepository.findDetailsByIdAndUserIdForUpdate(21L, 7L))
 				.willReturn(Optional.of(payment));
+		given(paymentRefundAttemptRepository.existsByPaymentIdAndStatus(
+				21L,
+				PaymentRefundAttemptStatus.STARTED
+		)).willReturn(false);
 		given(paymentRefundRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
 				.willReturn(requestedRefund);
 		given(requestedRefund.getId()).willReturn(31L);
+		given(paymentRefundAttemptService.start(21L, 7L, 5_000L, 5_000L, "사용자 요청"))
+				.willReturn(41L);
+		given(paymentRefundAttemptRepository.settleIfCurrent(
+				41L,
+				PaymentRefundAttemptStatus.STARTED,
+				PaymentRefundAttemptStatus.SETTLED,
+				FIXED_KST_TIME
+		)).willReturn(1);
 		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any()))
 				.willReturn(PaymentRefundResult.success("provider-refund-key"));
 		given(paymentRepository.updateStatusOnlyIfCurrent(
@@ -137,6 +159,14 @@ class PaymentRefundServiceTest {
 		assertThat(refundCaptor.getValue().getReason()).isEqualTo("사용자 요청");
 
 		verify(walletService).deductPaidPointForPaymentRefund(7L, 5_000L, 31L);
+		// 시도 기록은 PG 호출 전에 남고, 성공 시 본 트랜잭션에서 SETTLED로 확정된다.
+		verify(paymentRefundAttemptService).start(21L, 7L, 5_000L, 5_000L, "사용자 요청");
+		verify(paymentRefundAttemptRepository).settleIfCurrent(
+				41L,
+				PaymentRefundAttemptStatus.STARTED,
+				PaymentRefundAttemptStatus.SETTLED,
+				FIXED_KST_TIME
+		);
 		ArgumentCaptor<PaymentRefundCommand> commandCaptor =
 				ArgumentCaptor.forClass(PaymentRefundCommand.class);
 		verify(paymentProvider).refund(commandCaptor.capture());
@@ -261,6 +291,10 @@ class PaymentRefundServiceTest {
 		));
 		given(paymentRepository.findDetailsByIdAndUserIdForUpdate(21L, 7L))
 				.willReturn(Optional.of(payment));
+		given(paymentRefundAttemptRepository.existsByPaymentIdAndStatus(
+				21L,
+				PaymentRefundAttemptStatus.STARTED
+		)).willReturn(false);
 		given(paymentRefundRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
 				.willReturn(requestedRefund);
 		given(requestedRefund.getId()).willReturn(31L);
@@ -277,12 +311,59 @@ class PaymentRefundServiceTest {
 				assertThat(exception.getErrorCode())
 						.isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
+		// PG를 호출하기 전에 걸러진 실패라 시도 기록도 남지 않는다 — 충전 후 재시도할 수 있어야 한다.
+		verify(paymentRefundAttemptService, never()).start(
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyString()
+		);
 		verify(paymentProvider, never()).refund(org.mockito.ArgumentMatchers.any());
 		verify(paymentRepository, never()).updateStatusOnlyIfCurrent(
 				org.mockito.ArgumentMatchers.anyLong(),
 				org.mockito.ArgumentMatchers.any(),
 				org.mockito.ArgumentMatchers.any()
 		);
+	}
+
+	@Test
+	void refundBlocksRetryWhileEarlierAttemptIsUnsettled() {
+		Payment payment = payment(PaymentStatus.PAID);
+		given(idempotencyService.start(
+				org.mockito.ArgumentMatchers.eq(7L),
+				org.mockito.ArgumentMatchers.eq("PAYMENT_REFUND"),
+				org.mockito.ArgumentMatchers.eq("refund-key"),
+				org.mockito.ArgumentMatchers.anyString()
+		)).willReturn(new IdempotencyExecution(
+				org.mockito.Mockito.mock(IdempotencyKey.class),
+				false
+		));
+		given(paymentRepository.findDetailsByIdAndUserIdForUpdate(21L, 7L))
+				.willReturn(Optional.of(payment));
+		// 앞선 시도가 STARTED로 남아 있다 = PG 처리 결과 불명. 자동 재환불하면 이중 환불이 된다.
+		given(paymentRefundAttemptRepository.existsByPaymentIdAndStatus(
+				21L,
+				PaymentRefundAttemptStatus.STARTED
+		)).willReturn(true);
+
+		assertThatThrownBy(() -> paymentRefundService.refund(
+				7L,
+				"refund-key",
+				21L,
+				new PaymentRefundRequest("사용자 요청")
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PAYMENT_INVALID_STATE));
+
+		verify(paymentRefundRepository, never()).saveAndFlush(org.mockito.ArgumentMatchers.any());
+		verify(paymentRefundAttemptService, never()).start(
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyString()
+		);
+		verify(paymentProvider, never()).refund(org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test
@@ -300,9 +381,15 @@ class PaymentRefundServiceTest {
 		));
 		given(paymentRepository.findDetailsByIdAndUserIdForUpdate(21L, 7L))
 				.willReturn(Optional.of(payment));
+		given(paymentRefundAttemptRepository.existsByPaymentIdAndStatus(
+				21L,
+				PaymentRefundAttemptStatus.STARTED
+		)).willReturn(false);
 		given(paymentRefundRepository.saveAndFlush(org.mockito.ArgumentMatchers.any()))
 				.willReturn(requestedRefund);
 		given(requestedRefund.getId()).willReturn(31L);
+		given(paymentRefundAttemptService.start(21L, 7L, 5_000L, 5_000L, "사용자 요청"))
+				.willReturn(41L);
 		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any()))
 				.willReturn(PaymentRefundResult.failure("환불이 거절되었습니다."));
 
@@ -316,6 +403,14 @@ class PaymentRefundServiceTest {
 			assertThat(exception.getMessage()).isEqualTo("환불이 거절되었습니다.");
 		});
 
+		// PG 거절이라도 시도 기록은 이미 커밋돼 있어 대조 근거가 남는다(SETTLED로는 가지 않는다).
+		verify(paymentRefundAttemptService).start(21L, 7L, 5_000L, 5_000L, "사용자 요청");
+		verify(paymentRefundAttemptRepository, never()).settleIfCurrent(
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.any(),
+				org.mockito.ArgumentMatchers.any(),
+				org.mockito.ArgumentMatchers.any()
+		);
 		verify(paymentRepository, never()).updateStatusOnlyIfCurrent(
 				org.mockito.ArgumentMatchers.anyLong(),
 				org.mockito.ArgumentMatchers.any(),
