@@ -10,7 +10,11 @@ import { createPlant, getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
-const REG_PHOTOS = [['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry]];
+const REG_PHOTOS = [
+  ['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry],
+  ['🍅', grads.tomato], ['🌿', grads.basil], ['🥬', grads.lettuce], ['🌶️', grads.pepper],
+  ['🥕', grads.carrot], ['🥔', grads.potato],
+];
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
@@ -253,7 +257,7 @@ export default function PlantsPage() {
                 </button>
               ))}
             </div>
-            <div className="text-xs text-[#a9b3a0]">jpg · png · webp / 5MB 이하</div>
+            <div className="text-xs text-[#a9b3a0]">마음에 드는 색상과 이모지를 골라주세요.</div>
 
             <button type="button" onClick={submit} disabled={submitting} className="mt-[22px] w-full cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white disabled:opacity-60">
               {submitting ? '등록 중...' : '등록하기'}
