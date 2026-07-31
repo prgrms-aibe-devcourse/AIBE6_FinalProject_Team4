@@ -72,6 +72,8 @@ public class PlantProfileService {
 	public void deleteProfile(Long userId, Long profileId) {
 		PlantProfile profile = findOwned(userId, profileId);
 		List<JournalImage> journalImages = journalImageRepository.findByProfileId(profileId);
+		// 삭제 순서와 무관하게 안전하도록, DB 삭제 전에 정리에 필요한 값을 미리 뽑아둔다.
+		String thumbnailUrl = profile.getPlantImage();
 
 		journalImageRepository.deleteAllByProfileId(profileId);
 		plantJournalRepository.deleteAllByProfileId(profileId);
@@ -79,7 +81,7 @@ public class PlantProfileService {
 
 		// DB 삭제가 끝난 뒤 S3 정리 — 정리 실패가 프로필 삭제 자체를 막지 않도록 delete()는 항상 예외 없이 반환한다.
 		journalImages.forEach(image -> plantImageUploadService.delete(image.getImageUrl(), userId));
-		deleteThumbnailIfUploaded(profile.getPlantImage(), userId);
+		deleteThumbnailIfUploaded(thumbnailUrl, userId);
 	}
 
 	private void deleteThumbnailIfUploaded(String thumbnailUrl, Long userId) {

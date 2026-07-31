@@ -33,4 +33,7 @@ public interface JournalImageRepository extends JpaRepository<JournalImage, Long
 	@Modifying
 	@Query("delete from JournalImage i where i.journal.id = :journalId")
 	int deleteByJournalId(@Param("journalId") Long journalId);
+
+	// 이미지 URL이 어떤 일지에 아직 쓰이고 있는지 확인한다 — S3 정리 전 안전 장치.
+	boolean existsByImageUrl(String imageUrl);
 }

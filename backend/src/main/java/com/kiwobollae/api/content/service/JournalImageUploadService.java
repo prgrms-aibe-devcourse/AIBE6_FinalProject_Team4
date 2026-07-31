@@ -1,6 +1,7 @@
 package com.kiwobollae.api.content.service;
 
 import com.kiwobollae.api.content.dto.response.JournalImageUploadResponse;
+import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
@@ -53,6 +54,7 @@ public class JournalImageUploadService {
 	private static final String SERVE_PATH_MARKER = ApiVersion.V1 + "/journals/images/";
 
 	private final S3Client s3Client;
+	private final JournalImageRepository journalImageRepository;
 
 	@Value("${aws.s3.bucket}")
 	private String bucket;
@@ -109,6 +111,13 @@ public class JournalImageUploadService {
 		}
 		if (!isOwnedBy(key, ownerUserId)) {
 			log.warn("Refused to delete journal image not owned by user {}: {}", ownerUserId, key);
+			return;
+		}
+		// 아직 어떤 일지에 쓰이고 있다면 지우지 않는다 — DB 참조가 남은 채로 S3 객체만 사라지면
+		// 영구히 깨진 이미지가 된다. 이 호출부보다 앞서 참조를 이미 지운 경우(updateJournal/
+		// deleteJournal)에는 항상 false라 정상적으로 삭제가 진행된다.
+		if (journalImageRepository.existsByImageUrl(imageUrl)) {
+			log.warn("Refused to delete journal image still referenced by a journal: {}", key);
 			return;
 		}
 		try {
