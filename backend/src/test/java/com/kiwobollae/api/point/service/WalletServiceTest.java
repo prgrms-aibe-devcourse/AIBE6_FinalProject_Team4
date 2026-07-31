@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.PointTransaction;
@@ -64,8 +65,9 @@ class WalletServiceTest {
 		Wallet wallet = Wallet.builder().freePoint(200L).paidPoint(500L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
 
-		walletService.rewardJournal(7L, 31L);
+		JournalRewardResult result = walletService.rewardJournal(7L, 31L);
 
+		assertThat(result.rewardAmount()).isEqualTo(100L);
 		assertThat(wallet.getFreePoint()).isEqualTo(300L);
 		assertThat(wallet.getPaidPoint()).isEqualTo(500L);
 		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);

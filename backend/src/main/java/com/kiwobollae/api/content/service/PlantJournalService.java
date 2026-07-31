@@ -5,6 +5,7 @@ import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
+import com.kiwobollae.api.content.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantJournal;
@@ -14,6 +15,7 @@ import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -45,7 +47,7 @@ public class PlantJournalService {
 	private final JournalImageUploadService journalImageUploadService;
 
 	@Transactional
-	public PlantJournalResponse createJournal(Long userId, PlantJournalRequest request) {
+	public PlantJournalCreateResponse createJournal(Long userId, PlantJournalRequest request) {
 		PlantProfile profile = plantProfileRepository.findByIdAndUserId(request.plantProfileId(), userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 		validateRepresentative(request.images());
@@ -66,10 +68,19 @@ public class PlantJournalService {
 		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
 		LocalDateTime now = LocalDateTime.now(KST);
 		LocalDateTime startOfToday = today.atStartOfDay();
-		if (plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1) {
-			walletService.rewardJournal(userId, journal.getId());
+		boolean rewardGranted =
+				plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1;
+		long rewardAmount = 0L;
+		if (rewardGranted) {
+			JournalRewardResult rewardResult = walletService.rewardJournal(userId, journal.getId());
+			rewardAmount = rewardResult.rewardAmount();
 		}
-		return PlantJournalResponse.from(journal, images);
+		return PlantJournalCreateResponse.from(
+				journal,
+				images,
+				rewardGranted,
+				rewardAmount
+		);
 	}
 
 	public Page<PlantJournalResponse> getJournals(Long userId, Long profileId, Integer year, Integer month,
