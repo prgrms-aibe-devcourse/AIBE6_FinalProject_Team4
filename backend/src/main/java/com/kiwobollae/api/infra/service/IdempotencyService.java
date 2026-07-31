@@ -15,6 +15,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class IdempotencyService {
 
+	private static final long DEFAULT_RETENTION_HOURS = 24L;
+	private static final long PAYMENT_RETENTION_HOURS = 24L * 7L;
+
 	private final IdempotencyKeyRepository idempotencyKeyRepository;
 	private final UserRepository userRepository;
 
@@ -36,12 +39,14 @@ public class IdempotencyService {
 			String resourceType,
 			Long resourceId
 	) {
+		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 		key.succeed(
 				httpStatus,
 				responseSnapshot,
 				resourceType,
 				resourceId,
-				LocalDateTime.now(ZoneOffset.UTC)
+				now,
+				now.plusHours(retentionHours(key.getApiType()))
 		);
 		idempotencyKeyRepository.save(key);
 	}
@@ -69,9 +74,15 @@ public class IdempotencyService {
 				.clientKey(clientKey)
 				.requestHash(requestHash)
 				.status(IdempotencyStatus.IN_PROGRESS)
-				.expiresAt(now.plusHours(24))
+				.expiresAt(now.plusHours(retentionHours(apiType)))
 				.createdAt(now)
 				.build();
 		return new IdempotencyExecution(idempotencyKeyRepository.saveAndFlush(key), false);
+	}
+
+	private long retentionHours(String apiType) {
+		return apiType != null && apiType.startsWith("PAYMENT_")
+				? PAYMENT_RETENTION_HOURS
+				: DEFAULT_RETENTION_HOURS;
 	}
 }
