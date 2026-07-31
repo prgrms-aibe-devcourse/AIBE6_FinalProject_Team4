@@ -142,7 +142,14 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     <div className="container">
       <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
 
-      <div className="mt-4 grid items-start gap-[26px] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+      <div className="relative mt-4 grid items-start gap-[26px] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+        <button
+          type="button"
+          onClick={remove}
+          className="absolute right-0 top-0 z-10 cursor-pointer text-xs font-bold text-[#b5502f]"
+        >
+          삭제
+        </button>
         {thumb.type === 'image' ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={resolveImageUrl(thumb.url)} alt="" className="h-[300px] w-full rounded-[22px] object-cover" />
@@ -229,20 +236,9 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
                 </button>
               ))}
             </div>
-            {editStatus === 'FAILED' ? (
-              <div className="flex gap-2.5">
-                <button type="button" onClick={saveStatus} disabled={saving} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:opacity-60">
-                  {saving ? '저장 중...' : '저장하기'}
-                </button>
-                <button type="button" onClick={remove} disabled={saving} className="cursor-pointer rounded-xl border-[1.5px] border-[#e8bdad] bg-white px-5 py-[13px] font-bold text-[#b5502f] disabled:opacity-60">
-                  삭제
-                </button>
-              </div>
-            ) : (
-              <button type="button" onClick={saveStatus} disabled={saving} className="w-full cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:opacity-60">
-                {saving ? '저장 중...' : '저장하기'}
-              </button>
-            )}
+            <button type="button" onClick={saveStatus} disabled={saving} className="w-full cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:opacity-60">
+              {saving ? '저장 중...' : '저장하기'}
+            </button>
           </div>
         </div>
       )}
