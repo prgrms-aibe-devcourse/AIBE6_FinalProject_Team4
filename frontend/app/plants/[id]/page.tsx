@@ -128,6 +128,34 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     setStatusOpen(true);
   };
 
+  const closeStatusModal = () => {
+    if (!plant) {
+      setStatusOpen(false);
+      return;
+    }
+    const original = plantThumbnail(plant.thumbnailUrl, plant.speciesName);
+    const originalMode = original.type === 'image' ? 'upload' : 'emoji';
+    const photoChanged =
+      photoFile !== null ||
+      photoMode !== originalMode ||
+      (photoMode === 'emoji' && original.type === 'emoji' && PROFILE_EMOJI_OPTIONS[selectedEmojiIdx][0] !== original.emoji);
+    const hasChanges = editNick !== plant.nickname || editStatus !== plant.status || photoChanged;
+
+    if (!hasChanges) {
+      revokeIfBlobUrl(photoPreview);
+      setStatusOpen(false);
+      return;
+    }
+    askConfirm({
+      icon: 'delete',
+      title: '변경사항을 취소할까요?',
+      body: '수정한 내용이 사라지고 되돌릴 수 없어요.',
+      ok: '닫기',
+      danger: true,
+      onOk: () => { revokeIfBlobUrl(photoPreview); setStatusOpen(false); },
+    });
+  };
+
   const pickPhoto = (file: File | null) => {
     if (!file) return;
     if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
@@ -279,7 +307,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       </div>
 
       {statusOpen && (
-        <div onClick={() => !saving && setStatusOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
+        <div onClick={() => !saving && closeStatusModal()} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[400px] animate-pop rounded-[20px] bg-white p-6">
             <h3 className="mb-4 text-lg font-extrabold">상태·정보 수정</h3>
             <label className="text-[13px] font-bold text-[#6d7a68]">별명</label>
@@ -346,7 +374,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
                     key={i}
                     type="button"
                     onClick={() => setSelectedEmojiIdx(i)}
-                    className={`flex h-14 w-14 cursor-pointer items-center justify-center rounded-xl border-[3px] text-2xl ${
+                    className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] text-[28px] ${
                       selectedEmojiIdx === i ? 'border-brand' : 'border-transparent'
                     }`}
                     style={{ background: grad }}
