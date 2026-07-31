@@ -6,8 +6,8 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.entity.IdempotencyKey;
 import com.kiwobollae.api.infra.entity.enums.IdempotencyStatus;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
+import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,8 +15,12 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class IdempotencyService {
 
+	private static final long DEFAULT_RETENTION_HOURS = 24L;
+	private static final long PAYMENT_RETENTION_HOURS = 24L * 7L;
+
 	private final IdempotencyKeyRepository idempotencyKeyRepository;
 	private final UserRepository userRepository;
+	private final Clock seoulClock;
 
 	public IdempotencyExecution start(
 			Long userId,
@@ -36,12 +40,14 @@ public class IdempotencyService {
 			String resourceType,
 			Long resourceId
 	) {
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		key.succeed(
 				httpStatus,
 				responseSnapshot,
 				resourceType,
 				resourceId,
-				LocalDateTime.now(ZoneOffset.UTC)
+				now,
+				now.plusHours(retentionHours(key.getApiType()))
 		);
 		idempotencyKeyRepository.save(key);
 	}
@@ -62,16 +68,22 @@ public class IdempotencyService {
 			String clientKey,
 			String requestHash
 	) {
-		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		IdempotencyKey key = IdempotencyKey.builder()
 				.user(userRepository.getReferenceById(userId))
 				.apiType(apiType)
 				.clientKey(clientKey)
 				.requestHash(requestHash)
 				.status(IdempotencyStatus.IN_PROGRESS)
-				.expiresAt(now.plusHours(24))
+				.expiresAt(now.plusHours(retentionHours(apiType)))
 				.createdAt(now)
 				.build();
 		return new IdempotencyExecution(idempotencyKeyRepository.saveAndFlush(key), false);
+	}
+
+	private long retentionHours(String apiType) {
+		return apiType != null && apiType.startsWith("PAYMENT_")
+				? PAYMENT_RETENTION_HOURS
+				: DEFAULT_RETENTION_HOURS;
 	}
 }

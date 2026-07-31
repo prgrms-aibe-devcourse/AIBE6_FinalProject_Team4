@@ -3,8 +3,9 @@ package com.kiwobollae.api.point.service;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
-import com.kiwobollae.api.point.dto.response.WalletResponse;
+import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.dto.response.PointDeductionResult;
+import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
@@ -49,7 +50,7 @@ public class WalletService {
 
 	/** 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다. */
 	@Transactional
-	public void rewardJournal(Long userId, Long journalId) {
+	public JournalRewardResult rewardJournal(Long userId, Long journalId) {
 		validateJournalRewardRequest(userId, journalId);
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
@@ -72,6 +73,7 @@ public class WalletService {
 				PointRefType.JOURNAL_COMPLETION,
 				journalId
 		);
+		return new JournalRewardResult(JOURNAL_REWARD_AMOUNT);
 	}
 
 	/**
@@ -200,6 +202,45 @@ public class WalletService {
 			long balanceAfter = wallet.increasePaidPoint(usedPaidPoint);
 			saveTransaction(wallet, PointTxType.RESTORE, CurrencyType.PAID, usedPaidPoint, balanceAfter, refType, refId);
 		}
+	}
+
+	/**
+	 * 충전 결제 전액 환불을 위해 유상 포인트만 회수한다.
+	 * 무상 포인트는 사용하지 않으며, 환불 건별 원장을 한 번만 기록한다.
+	 */
+	@Transactional
+	public void deductPaidPointForPaymentRefund(
+			Long userId,
+			long pointAmount,
+			Long paymentRefundId
+	) {
+		if (pointAmount < 1 || paymentRefundId == null || paymentRefundId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		if (pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.REFUND,
+				PointRefType.PAYMENT_REFUND,
+				paymentRefundId
+		)) {
+			throw new BusinessException(ErrorCode.POINT_DUPLICATE_TRANSACTION);
+		}
+		if (wallet.getPaidPoint() < pointAmount) {
+			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
+		}
+
+		long balanceAfter = wallet.increasePaidPoint(-pointAmount);
+		saveTransaction(
+				wallet,
+				PointTxType.REFUND,
+				CurrencyType.PAID,
+				-pointAmount,
+				balanceAfter,
+				PointRefType.PAYMENT_REFUND,
+				paymentRefundId
+		);
 	}
 
 	/**

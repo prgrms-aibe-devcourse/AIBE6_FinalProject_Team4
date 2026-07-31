@@ -76,7 +76,8 @@ public class IdempotencyKey extends BaseEntity {
 			String response,
 			String responseResourceType,
 			Long responseResourceId,
-			LocalDateTime now
+			LocalDateTime now,
+			LocalDateTime responseExpiration
 	) {
 		this.status = IdempotencyStatus.SUCCEEDED;
 		this.httpStatus = statusCode;
@@ -84,6 +85,6 @@ public class IdempotencyKey extends BaseEntity {
 		this.resourceType = responseResourceType;
 		this.resourceId = responseResourceId;
 		this.completedAt = now;
-		this.responseExpiresAt = now.plusHours(24);
+		this.responseExpiresAt = responseExpiration;
 	}
 }
