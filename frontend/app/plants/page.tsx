@@ -96,6 +96,15 @@ export default function PlantsPage() {
     setPhotoPreview(URL.createObjectURL(file));
   };
 
+  const resetRegisterForm = () => {
+    setReg({ nick: '', speciesId: null, photoIdx: 0, startDate: today() });
+    setQuery('');
+    setPhotoMode('upload');
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const closeRegisterModal = () => {
     const hasInput = reg.nick.trim() !== '' || reg.speciesId !== null || photoFile !== null;
     if (!hasInput) {
@@ -108,7 +117,7 @@ export default function PlantsPage() {
       body: '입력한 내용이 사라지고 되돌릴 수 없어요.',
       ok: '닫기',
       danger: true,
-      onOk: () => setOpen(false),
+      onOk: () => { setOpen(false); resetRegisterForm(); },
     });
   };
 
@@ -139,12 +148,7 @@ export default function PlantsPage() {
       setPlants([created, ...plants]);
       set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
       setOpen(false);
-      setReg({ nick: '', speciesId: null, photoIdx: 0, startDate: today() });
-      setQuery('');
-      setPhotoMode('upload');
-      setPhotoFile(null);
-      setPhotoPreview(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      resetRegisterForm();
       showToast(`'${created.nickname}'와의 여정이 시작됐어요! 🌿`);
     } catch (requestError) {
       showToast(
