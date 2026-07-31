@@ -134,6 +134,7 @@ class PaymentRefundServiceTest {
 
 	@Test
 	void successfulIdempotentRefundReplaysStoredResponse() throws Exception {
+		Payment payment = payment(PaymentStatus.REFUNDED);
 		IdempotencyKey key = org.mockito.Mockito.mock(IdempotencyKey.class);
 		PaymentRefundResponse stored = new PaymentRefundResponse(
 				31L,
@@ -146,6 +147,8 @@ class PaymentRefundServiceTest {
 				LocalDateTime.of(2026, 7, 31, 10, 0),
 				LocalDateTime.of(2026, 7, 31, 10, 0)
 		);
+		given(paymentRepository.findDetailsByIdAndUserIdForUpdate(21L, 7L))
+				.willReturn(Optional.of(payment));
 		given(idempotencyService.start(
 				org.mockito.ArgumentMatchers.eq(7L),
 				org.mockito.ArgumentMatchers.eq("PAYMENT_REFUND"),
@@ -164,24 +167,12 @@ class PaymentRefundServiceTest {
 		);
 
 		assertThat(response).isEqualTo(stored);
-		verify(paymentRepository, never()).findDetailsByIdAndUserIdForUpdate(
-				org.mockito.ArgumentMatchers.anyLong(),
-				org.mockito.ArgumentMatchers.anyLong()
-		);
+		verify(paymentRepository).findDetailsByIdAndUserIdForUpdate(21L, 7L);
 		verify(paymentProvider, never()).refund(org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test
 	void refundRejectsPaymentOwnedByAnotherUserWithoutRevealingIt() {
-		given(idempotencyService.start(
-				org.mockito.ArgumentMatchers.eq(7L),
-				org.mockito.ArgumentMatchers.eq("PAYMENT_REFUND"),
-				org.mockito.ArgumentMatchers.eq("refund-key"),
-				org.mockito.ArgumentMatchers.anyString()
-		)).willReturn(new IdempotencyExecution(
-				org.mockito.Mockito.mock(IdempotencyKey.class),
-				false
-		));
 		given(paymentRepository.findDetailsByIdAndUserIdForUpdate(21L, 7L))
 				.willReturn(Optional.empty());
 
@@ -198,6 +189,12 @@ class PaymentRefundServiceTest {
 				org.mockito.ArgumentMatchers.anyLong(),
 				org.mockito.ArgumentMatchers.anyLong(),
 				org.mockito.ArgumentMatchers.anyLong()
+		);
+		verify(idempotencyService, never()).start(
+				org.mockito.ArgumentMatchers.anyLong(),
+				org.mockito.ArgumentMatchers.anyString(),
+				org.mockito.ArgumentMatchers.anyString(),
+				org.mockito.ArgumentMatchers.anyString()
 		);
 	}
 

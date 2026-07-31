@@ -50,6 +50,9 @@ public class PaymentRefundService {
 	) {
 		validateRequest(userId, paymentId, idempotencyKey);
 		String reason = request.reason().trim();
+		Payment payment = paymentRepository.findDetailsByIdAndUserIdForUpdate(paymentId, userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
 		IdempotencyExecution idempotency = idempotencyService.start(
 				userId,
 				REFUND_API_TYPE,
@@ -60,8 +63,6 @@ public class PaymentRefundService {
 			return readSnapshot(idempotency.key().getResponseSnapshot());
 		}
 
-		Payment payment = paymentRepository.findDetailsByIdAndUserIdForUpdate(paymentId, userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
 		if (payment.getStatus() != PaymentStatus.PAID) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
 		}

@@ -11,6 +11,7 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
 import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
+import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.entity.ChargeProduct;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
@@ -34,6 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,13 +84,7 @@ class PaymentRefundServiceMySqlIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
-		idempotencyKeyRepository.deleteAllInBatch();
-		pointTransactionRepository.deleteAllInBatch();
-		paymentRefundRepository.deleteAllInBatch();
-		paymentRepository.deleteAllInBatch();
-		chargeProductRepository.deleteAllInBatch();
-		walletRepository.deleteAllInBatch();
-		userRepository.deleteAllInBatch();
+		clearData();
 
 		User user = userRepository.saveAndFlush(User.builder()
 				.email("payment-refund-integration@example.test")
@@ -130,6 +126,21 @@ class PaymentRefundServiceMySqlIntegrationTest {
 				.build());
 	}
 
+	@AfterEach
+	void tearDown() {
+		clearData();
+	}
+
+	private void clearData() {
+		idempotencyKeyRepository.deleteAllInBatch();
+		pointTransactionRepository.deleteAllInBatch();
+		paymentRefundRepository.deleteAllInBatch();
+		paymentRepository.deleteAllInBatch();
+		chargeProductRepository.deleteAllInBatch();
+		walletRepository.deleteAllInBatch();
+		userRepository.deleteAllInBatch();
+	}
+
 	@Test
 	void concurrentFullRefundsCompleteOnlyOnce() throws Exception {
 		CountDownLatch ready = new CountDownLatch(2);
@@ -167,6 +178,33 @@ class PaymentRefundServiceMySqlIntegrationTest {
 				.satisfies(this::assertRefundTransaction);
 	}
 
+	@Test
+	void concurrentFullRefundsWithSameIdempotencyKeyReplaySameResponse() throws Exception {
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch start = new CountDownLatch(1);
+
+		List<PaymentRefundResponse> responses = runConcurrently(
+				refundResponseAttempt("refund-same-key", ready, start),
+				refundResponseAttempt("refund-same-key", ready, start),
+				ready,
+				start
+		);
+
+		assertThat(responses)
+				.extracting(PaymentRefundResponse::id)
+				.containsOnly(responses.getFirst().id());
+		assertThat(responses)
+				.extracting(PaymentRefundResponse::status)
+				.containsOnly(PaymentRefundStatus.COMPLETED);
+		assertThat(idempotencyKeyRepository.count()).isEqualTo(1L);
+		assertThat(paymentRefundRepository.count()).isEqualTo(1L);
+		assertThat(pointTransactionRepository.count()).isEqualTo(1L);
+
+		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
+		assertThat(wallet.getPaidPoint()).isZero();
+		assertThat(wallet.getFreePoint()).isEqualTo(2_000L);
+	}
+
 	private Callable<AttemptResult> refundAttempt(
 			String idempotencyKey,
 			CountDownLatch ready,
@@ -191,16 +229,32 @@ class PaymentRefundServiceMySqlIntegrationTest {
 		};
 	}
 
-	private List<AttemptResult> runConcurrently(
-			Callable<AttemptResult> first,
-			Callable<AttemptResult> second,
+	private Callable<PaymentRefundResponse> refundResponseAttempt(
+			String idempotencyKey,
+			CountDownLatch ready,
+			CountDownLatch start
+	) {
+		return () -> {
+			awaitStart(ready, start);
+			return paymentRefundService.refund(
+					userId,
+					idempotencyKey,
+					paymentId,
+					new PaymentRefundRequest("동시 환불 멱등성 테스트")
+			);
+		};
+	}
+
+	private <T> List<T> runConcurrently(
+			Callable<T> first,
+			Callable<T> second,
 			CountDownLatch ready,
 			CountDownLatch start
 	) throws Exception {
 		ExecutorService executor = Executors.newFixedThreadPool(2);
 		try {
-			Future<AttemptResult> firstFuture = executor.submit(first);
-			Future<AttemptResult> secondFuture = executor.submit(second);
+			Future<T> firstFuture = executor.submit(first);
+			Future<T> secondFuture = executor.submit(second);
 			assertThat(ready.await(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
 			start.countDown();
 			return List.of(
