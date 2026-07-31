@@ -77,3 +77,18 @@ export function deletePlant(plantId: number, accessToken: string): Promise<void>
     accessToken,
   });
 }
+
+export interface PlantImageUploadData {
+  imageUrl: string;
+  imageHash: string;
+}
+
+export function uploadPlantImage(file: File, accessToken: string): Promise<PlantImageUploadData> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request<PlantImageUploadData>('/api/v1/plants/images', {
+    method: 'POST',
+    accessToken,
+    body: formData,
+  });
+}

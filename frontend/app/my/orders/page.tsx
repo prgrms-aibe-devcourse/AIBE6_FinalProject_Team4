@@ -1,9 +1,17 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { ApiError } from '@/lib/api';
+import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { grads } from '@/lib/theme';
-import { fmt } from '@/lib/store';
 import PointPrice from '@/components/PointPrice';
+import {
+  cancelOrder,
+  confirmOrder,
+  getOrder,
+  getOrders,
+  OrderData,
+  OrderItemData,
+} from '@/lib/order-api';
 
 const PAY: Record<string, [string, string]> = {
   PAID: ['결제완료', 'bg-[#E8F3D8] text-brand-text'],
@@ -16,94 +24,184 @@ const DEL: Record<string, [string, string]> = {
   DELIVERED: ['배송완료', 'bg-[#E8F3D8] text-brand-text'],
 };
 
-interface OrderItem {
-  name: string;
-  emoji: string;
-  grad: string;
-  qty: number;
-}
-
-interface Order {
-  id: number;
-  orderNo: string;
-  date: string;
-  status: string;
-  delivery: string;
-  total: number;
-  free: number;
-  paid: number;
-  items: OrderItem[];
-}
-
-const INITIAL: Order[] = [
-  { id: 1, orderNo: 'ORD-20260721-0043', date: '2026.07.21', status: 'PAID', delivery: 'PREPARING', total: 2100, free: 1100, paid: 1000, items: [{ name: '새싹 재배 키트', emoji: '🌱', grad: grads.sprout, qty: 1 }, { name: '바질 모종', emoji: '🌿', grad: grads.basil, qty: 1 }] },
-  { id: 2, orderNo: 'ORD-20260714-0031', date: '2026.07.14', status: 'PAID', delivery: 'DELIVERED', total: 1500, free: 500, paid: 1000, items: [{ name: '미니 화분 세트', emoji: '🪴', grad: grads.mint, qty: 1 }] },
-  { id: 3, orderNo: 'ORD-20260709-0022', date: '2026.07.09', status: 'PAID', delivery: 'SHIPPING', total: 1200, free: 1200, paid: 0, items: [{ name: '방울토마토 모종', emoji: '🍅', grad: grads.tomato, qty: 1 }] },
-  { id: 4, orderNo: 'ORD-20260702-0014', date: '2026.07.02', status: 'CANCELLED', delivery: 'PREPARING', total: 800, free: 800, paid: 0, items: [{ name: '상추 모종', emoji: '🥬', grad: grads.lettuce, qty: 1 }] },
-];
-
 const CHIP = 'rounded-full px-[11px] py-1 text-xs font-extrabold';
 
-export default function Orders() {
-  const { showToast, askConfirm } = useUI();
-  const [orders, setOrders] = useState<Order[]>(INITIAL);
+const formatDate = (iso: string) => iso.slice(0, 10).replaceAll('-', '.');
 
-  const cancel = (o: Order) => askConfirm({ icon: 'undo', title: '주문을 취소할까요?', ok: '주문 취소', danger: true, body: '포인트와 재고가 다시 돌아와요. 취소할까요?',
-    onOk: () => { setOrders(orders.map((x) => x.id === o.id ? { ...x, status: 'CANCELLED' } : x)); showToast('주문을 취소하고 포인트를 돌려드렸어요.'); } });
-  const confirm = (o: Order) => askConfirm({ icon: 'check_circle', title: '구매를 확정할까요?', ok: '구매 확정', body: '구매 확정 후에는 취소할 수 없어요.',
-    onOk: () => { setOrders(orders.map((x) => x.id === o.id ? { ...x, status: 'PURCHASE_CONFIRMED' } : x)); showToast('구매를 확정했어요. 고마워요 🌿'); } });
+export default function Orders() {
+  const { state, hydrated, refreshWallet } = useStore();
+  const { showToast, askConfirm } = useUI();
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  const [itemsByOrderId, setItemsByOrderId] = useState<Record<number, OrderItemData[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyIds, setBusyIds] = useState<Record<number, boolean>>({});
+
+  const load = useCallback(async () => {
+    if (!state.accessToken) return;
+    setLoading(true);
+    setError('');
+    try {
+      const page = await getOrders(state.accessToken);
+      setOrders(page.content);
+      const details = await Promise.all(
+        page.content.map((order) => getOrder(order.id, state.accessToken)),
+      );
+      const map: Record<number, OrderItemData[]> = {};
+      details.forEach((detail) => { map[detail.order.id] = detail.items; });
+      setItemsByOrderId(map);
+    } catch (requestError) {
+      setError(
+        requestError instanceof ApiError
+          ? requestError.message
+          : '주문 내역을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [state.accessToken]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void load();
+  }, [hydrated, load]);
+
+  const setBusy = (id: number, value: boolean) => setBusyIds((prev) => ({ ...prev, [id]: value }));
+
+  const cancel = (order: OrderData) => askConfirm({
+    icon: 'undo',
+    title: '주문을 취소할까요?',
+    ok: '주문 취소',
+    danger: true,
+    body: '포인트와 재고가 다시 돌아와요. 취소할까요?',
+    onOk: async () => {
+      setBusy(order.id, true);
+      try {
+        await cancelOrder(order.id, state.accessToken);
+        await Promise.all([load(), refreshWallet()]);
+        showToast('주문을 취소하고 포인트를 돌려드렸어요.');
+      } catch (requestError) {
+        showToast(
+          requestError instanceof ApiError ? requestError.message : '취소에 실패했어요.',
+          'err',
+        );
+      } finally {
+        setBusy(order.id, false);
+      }
+    },
+  });
+
+  const confirm = (order: OrderData) => askConfirm({
+    icon: 'check_circle',
+    title: '구매를 확정할까요?',
+    ok: '구매 확정',
+    body: '구매 확정 후에는 취소할 수 없어요.',
+    onOk: async () => {
+      setBusy(order.id, true);
+      try {
+        await confirmOrder(order.id, state.accessToken);
+        await load();
+        showToast('구매를 확정했어요. 고마워요 🌿');
+      } catch (requestError) {
+        showToast(
+          requestError instanceof ApiError ? requestError.message : '확정에 실패했어요.',
+          'err',
+        );
+      } finally {
+        setBusy(order.id, false);
+      }
+    },
+  });
+
+  if (!hydrated) return <div className="container" />;
+
+  if (!state.accessToken) {
+    return (
+      <div className="container max-w-[960px]">
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
+          주문 내역은 로그인 후 확인할 수 있어요.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-[960px]">
       <h1 className="mb-5 text-2xl font-extrabold">주문 내역</h1>
-      <div className="flex flex-col gap-4">
-        {orders.map((o) => {
-          const pay = PAY[o.status], del = DEL[o.delivery];
-          const canCancel = o.status === 'PAID' && o.delivery === 'PREPARING';
-          const canConfirm = o.status === 'PAID' && o.delivery === 'DELIVERED';
-          const shipLocked = o.status === 'PAID' && o.delivery === 'SHIPPING';
-          return (
-            <div key={o.id} className="rounded-[18px] bg-white p-5 shadow-card">
-              <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <span className="font-extrabold">{o.orderNo}</span>
-                  <span className="ml-2 text-[13px] text-faint">{o.date}</span>
-                </div>
-                <div className="flex gap-1.5">
-                  <span className={`${CHIP} ${pay[1]}`}>{pay[0]}</span>
-                  <span className={`${CHIP} ${del[1]}`}>{del[0]}</span>
-                </div>
-              </div>
 
-              <div className="mb-3.5 flex flex-col gap-2">
-                {o.items.map((it, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-[11px] text-[22px]" style={{ background: it.grad }}>{it.emoji}</div>
-                    <div className="flex-1 text-sm font-semibold">{it.name} <span className="text-faint">× {it.qty}</span></div>
+      {loading ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">주문 내역을 불러오고 있어요 🌱</div>
+      ) : error ? (
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">{error}</div>
+      ) : orders.length === 0 ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">아직 주문 내역이 없어요.</div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {orders.map((order) => {
+            const pay = PAY[order.status];
+            const del = DEL[order.deliveryStatus];
+            const shipLocked = order.status === 'PAID' && order.deliveryStatus === 'SHIPPING';
+            const items = itemsByOrderId[order.id] || [];
+            const busy = busyIds[order.id];
+            return (
+              <div key={order.id} className="rounded-[18px] bg-white p-5 shadow-card">
+                <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-extrabold">주문 #{order.id}</span>
+                    <span className="ml-2 text-[13px] text-faint">{formatDate(order.orderedAt)}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex gap-1.5">
+                    <span className={`${CHIP} ${pay[1]}`}>{pay[0]}</span>
+                    <span className={`${CHIP} ${del[1]}`}>{del[0]}</span>
+                  </div>
+                </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[#f2f3ec] pt-3.5">
-                <div className="flex items-center gap-1.5 font-extrabold text-gold-text">
-                  총 <PointPrice value={o.total} size="sm" />
-                  <span className="text-xs font-semibold text-faint">(보상 {fmt(o.free)}P · 충전 {fmt(o.paid)}P)</span>
+                <div className="mb-3.5 flex flex-col gap-2">
+                  {items.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand-soft text-[22px]">🌱</div>
+                      <div className="flex-1 text-sm font-semibold">{item.productName} <span className="text-faint">× {item.quantity}</span></div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  {canCancel && (
-                    <button type="button" onClick={() => cancel(o)} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[9px] font-bold text-[#b5502f]">주문 취소</button>
-                  )}
-                  {canConfirm && (
-                    <button type="button" onClick={() => confirm(o)} className="cursor-pointer rounded-[11px] bg-brand px-4 py-[9px] font-bold text-white">구매 확정</button>
-                  )}
-                  {shipLocked && <span className="text-[12.5px] text-faint">배송이 시작되어 취소할 수 없어요</span>}
+
+                <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[#f2f3ec] pt-3.5">
+                  <div className="flex items-center gap-1.5 font-extrabold text-gold-text">
+                    총 <PointPrice value={order.totalPoint} size="sm" />
+                    <span className="text-xs font-semibold text-faint">
+                      (무상 {fmt(order.usedFreePoint)}P · 유상 {fmt(order.usedPaidPoint)}P)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {order.cancellable && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => cancel(order)}
+                        className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[9px] font-bold text-[#b5502f] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        주문 취소
+                      </button>
+                    )}
+                    {order.confirmable && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => confirm(order)}
+                        className="cursor-pointer rounded-[11px] bg-brand px-4 py-[9px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        구매 확정
+                      </button>
+                    )}
+                    {shipLocked && <span className="text-[12.5px] text-faint">배송이 시작되어 취소할 수 없어요</span>}
+                  </div>
                 </div>
+                {order.confirmable && <div className="mt-2 text-[12.5px] text-faint">배송완료 7일 후 자동으로 확정돼요.</div>}
               </div>
-              {canConfirm && <div className="mt-2 text-[12.5px] text-faint">배송완료 7일 후 자동으로 확정돼요.</div>}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

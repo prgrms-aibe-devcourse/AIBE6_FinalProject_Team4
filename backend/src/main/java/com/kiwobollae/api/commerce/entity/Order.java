@@ -5,6 +5,7 @@ import com.kiwobollae.api.commerce.entity.enums.ConfirmedBy;
 import com.kiwobollae.api.commerce.entity.enums.DeliveryStatus;
 import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
 import com.kiwobollae.api.global.common.BaseEntity;
+import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -81,4 +82,33 @@ public class Order extends BaseEntity {
 	@Enumerated(EnumType.STRING)
 	@Column(name = "confirmed_by", length = 10)
 	private ConfirmedBy confirmedBy;
+
+	public static Order create(
+			User user,
+			Long totalPoint,
+			String receiverName,
+			String receiverPhone,
+			String address,
+			String addressDetail,
+			LocalDateTime orderedAt
+	) {
+		return Order.builder()
+				.user(user)
+				.totalPoint(totalPoint)
+				.usedFreePoint(0L)
+				.usedPaidPoint(0L)
+				.status(OrderStatus.PAID)
+				.deliveryStatus(DeliveryStatus.PREPARING)
+				.receiverName(receiverName)
+				.receiverPhone(receiverPhone)
+				.address(address)
+				.addressDetail(addressDetail)
+				.orderedAt(orderedAt)
+				.build();
+	}
+
+	public void applyPointUsage(PointDeductionResult result) {
+		this.usedFreePoint = result.usedFreePoint();
+		this.usedPaidPoint = result.usedPaidPoint();
+	}
 }

@@ -22,9 +22,15 @@ public record OrderResponse(
 		LocalDateTime deliveredAt,
 		LocalDateTime cancelledAt,
 		LocalDateTime confirmedAt,
-		ConfirmedBy confirmedBy
+		ConfirmedBy confirmedBy,
+		boolean cancellable,
+		boolean confirmable
 ) {
 	public static OrderResponse from(Order order) {
+		boolean cancellable = order.getStatus() == OrderStatus.PAID
+				&& order.getDeliveryStatus() == DeliveryStatus.PREPARING;
+		boolean confirmable = order.getStatus() == OrderStatus.PAID
+				&& order.getDeliveryStatus() == DeliveryStatus.DELIVERED;
 		return new OrderResponse(
 				order.getId(),
 				order.getUser().getId(),
@@ -41,7 +47,9 @@ public record OrderResponse(
 				order.getDeliveredAt(),
 				order.getCancelledAt(),
 				order.getConfirmedAt(),
-				order.getConfirmedBy()
+				order.getConfirmedBy(),
+				cancellable,
+				confirmable
 		);
 	}
 }

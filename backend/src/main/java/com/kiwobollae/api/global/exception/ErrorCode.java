@@ -58,6 +58,10 @@ public enum ErrorCode {
 	ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
 	ORDER_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 처리할 수 없는 주문입니다."),
 
+	CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."),
+	CART_QUANTITY_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_CONTENT, "장바구니에는 상품당 최대 99개까지 담을 수 있습니다."),
+	CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "재고보다 많은 수량은 담을 수 없습니다."),
+
 	CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."),
 	CARD_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "교환에 필요한 카드를 보유하고 있지 않습니다."),
 
@@ -86,6 +90,8 @@ public enum ErrorCode {
 	JOURNAL_DUPLICATE_IMAGE(HttpStatus.UNPROCESSABLE_CONTENT, "같은 날 이미 사용한 사진입니다."),
 	JOURNAL_IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 형식의 이미지만 업로드할 수 있습니다."),
 	JOURNAL_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요."),
+	PLANT_IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 형식의 이미지만 업로드할 수 있습니다."),
+	PLANT_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요."),
 
 	// --- 마이페이지 / 배송지 도메인 ---
 	ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "배송지를 찾을 수 없습니다."),
