@@ -58,7 +58,13 @@ public class PlantProfileService {
 	@Transactional
 	public PlantProfileResponse updateProfile(Long userId, Long profileId, PlantProfileUpdateRequest request) {
 		PlantProfile profile = findOwned(userId, profileId);
+		String previousThumbnailUrl = profile.getPlantImage();
 		profile.updateProfile(request.nickname(), request.thumbnailUrl(), request.status());
+
+		// updateProfile()은 thumbnailUrl이 null이면 기존 값을 유지하므로, 실제로 교체된 경우에만 이전 이미지를 정리한다.
+		if (request.thumbnailUrl() != null && !request.thumbnailUrl().equals(previousThumbnailUrl)) {
+			deleteThumbnailIfUploaded(previousThumbnailUrl, userId);
+		}
 		return PlantProfileResponse.from(profile);
 	}
 
