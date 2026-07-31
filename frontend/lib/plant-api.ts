@@ -92,3 +92,12 @@ export function uploadPlantImage(file: File, accessToken: string): Promise<Plant
     body: formData,
   });
 }
+
+// 업로드는 성공했지만 뒤이은 등록/수정이 실패해 프로필에 연결되지 못한 이미지를 정리한다.
+// best-effort 정리이므로 실패해도 호출부의 에러 처리를 방해하지 않도록 별도로 호출한다.
+export function deletePlantImage(imageUrl: string, accessToken: string): Promise<void> {
+  return request<void>(`/api/v1/plants/images?imageUrl=${encodeURIComponent(imageUrl)}`, {
+    method: 'DELETE',
+    accessToken,
+  });
+}

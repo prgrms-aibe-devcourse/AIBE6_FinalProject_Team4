@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { SPECIES, BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
-import { createPlant, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
+import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
@@ -92,11 +92,13 @@ export default function PlantsPage() {
     if (file.size > MAX_PHOTO_SIZE) {
       return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
     }
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
 
   const resetRegisterForm = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setReg({ nick: '', speciesId: null, photoIdx: 0, startDate: today() });
     setQuery('');
     setPhotoMode('upload');
@@ -130,21 +132,31 @@ export default function PlantsPage() {
     setSubmitting(true);
     try {
       let thumbnailUrl: string | undefined;
+      let uploadedThisAttempt = false;
       if (photoMode === 'upload' && photoFile) {
         const uploaded = await uploadPlantImage(photoFile, state.accessToken);
         thumbnailUrl = uploaded.imageUrl;
+        uploadedThisAttempt = true;
       } else if (photoMode === 'emoji') {
         thumbnailUrl = EMOJI_THUMBNAIL_PREFIX + PROFILE_EMOJI_OPTIONS[reg.photoIdx][0];
       }
-      const created = await createPlant(
-        {
-          speciesId: reg.speciesId,
-          nickname: reg.nick,
-          startDate: reg.startDate,
-          ...(thumbnailUrl ? { thumbnailUrl } : {}),
-        },
-        state.accessToken,
-      );
+      let created;
+      try {
+        created = await createPlant(
+          {
+            speciesId: reg.speciesId,
+            nickname: reg.nick,
+            startDate: reg.startDate,
+            ...(thumbnailUrl ? { thumbnailUrl } : {}),
+          },
+          state.accessToken,
+        );
+      } catch (createError) {
+        if (uploadedThisAttempt && thumbnailUrl) {
+          deletePlantImage(thumbnailUrl, state.accessToken).catch(() => {});
+        }
+        throw createError;
+      }
       setPlants([created, ...plants]);
       set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
       setOpen(false);

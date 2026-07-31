@@ -6,7 +6,7 @@ import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
-import { deletePlant, getPlant, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
+import { deletePlant, deletePlantImage, getPlant, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 
@@ -16,6 +16,11 @@ const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 function representativeImage(journal: PlantJournalData): string | null {
   const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
   return url ? resolveImageUrl(url) : null;
+}
+
+// photoPreview는 서버 이미지 URL(재사용, 해제하면 안 됨)이나 로컬 blob 미리보기(해제해야 함) 둘 다 담을 수 있다.
+function revokeIfBlobUrl(url: string | null) {
+  if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
 }
 
 export default function PlantDetail({ params }: { params: { id: string } }) {
@@ -106,6 +111,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
 
   const openStatusModal = () => {
     if (!plant) return;
+    revokeIfBlobUrl(photoPreview);
     setEditNick(plant.nickname);
     setEditStatus(plant.status);
     const thumb = plantThumbnail(plant.thumbnailUrl, plant.speciesName);
@@ -130,6 +136,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     if (file.size > MAX_PHOTO_SIZE) {
       return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
     }
+    revokeIfBlobUrl(photoPreview);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
@@ -139,21 +146,31 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     setSaving(true);
     try {
       let thumbnailUrl: string | undefined;
+      let uploadedThisAttempt = false;
       if (photoMode === 'upload' && photoFile) {
         const uploaded = await uploadPlantImage(photoFile, state.accessToken);
         thumbnailUrl = uploaded.imageUrl;
+        uploadedThisAttempt = true;
       } else if (photoMode === 'emoji') {
         thumbnailUrl = EMOJI_THUMBNAIL_PREFIX + PROFILE_EMOJI_OPTIONS[selectedEmojiIdx][0];
       }
-      const updated = await updatePlant(
-        plant.id,
-        {
-          nickname: editNick || plant.nickname,
-          status: editStatus,
-          ...(thumbnailUrl ? { thumbnailUrl } : {}),
-        },
-        state.accessToken,
-      );
+      let updated;
+      try {
+        updated = await updatePlant(
+          plant.id,
+          {
+            nickname: editNick || plant.nickname,
+            status: editStatus,
+            ...(thumbnailUrl ? { thumbnailUrl } : {}),
+          },
+          state.accessToken,
+        );
+      } catch (updateError) {
+        if (uploadedThisAttempt && thumbnailUrl) {
+          deletePlantImage(thumbnailUrl, state.accessToken).catch(() => {});
+        }
+        throw updateError;
+      }
       setPlant(updated);
       setStatusOpen(false);
       setPhotoFile(null);
