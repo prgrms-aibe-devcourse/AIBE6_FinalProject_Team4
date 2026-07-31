@@ -33,6 +33,7 @@ public class PlantProfileService {
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
 	private final PlantImageUploadService plantImageUploadService;
+	private final JournalImageUploadService journalImageUploadService;
 	private final UserRepository userRepository;
 
 	@Transactional
@@ -80,7 +81,9 @@ public class PlantProfileService {
 		plantProfileRepository.delete(profile);
 
 		// DB 삭제가 끝난 뒤 S3 정리 — 정리 실패가 프로필 삭제 자체를 막지 않도록 delete()는 항상 예외 없이 반환한다.
-		journalImages.forEach(image -> plantImageUploadService.delete(image.getImageUrl(), userId));
+		// 일지 이미지는 journals/ 경로로 업로드되므로 JournalImageUploadService로 지워야 한다
+		// (plants/ 경로만 인식하는 PlantImageUploadService로는 조용히 무시된다).
+		journalImages.forEach(image -> journalImageUploadService.delete(image.getImageUrl(), userId));
 		deleteThumbnailIfUploaded(thumbnailUrl, userId);
 	}
 

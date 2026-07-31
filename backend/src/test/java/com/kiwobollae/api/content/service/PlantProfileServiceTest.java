@@ -33,6 +33,7 @@ class PlantProfileServiceTest {
 	@Mock private PlantJournalRepository plantJournalRepository;
 	@Mock private JournalImageRepository journalImageRepository;
 	@Mock private PlantImageUploadService plantImageUploadService;
+	@Mock private JournalImageUploadService journalImageUploadService;
 	@Mock private com.kiwobollae.api.auth.repository.UserRepository userRepository;
 
 	@InjectMocks
@@ -50,9 +51,13 @@ class PlantProfileServiceTest {
 
 		plantProfileService.deleteProfile(7L, 21L);
 
-		verify(plantImageUploadService).delete("https://cdn.test/journals/7/a.jpg", 7L);
-		verify(plantImageUploadService).delete("https://cdn.test/journals/7/b.jpg", 7L);
+		// 일지 이미지는 journals/ 경로라 JournalImageUploadService로 지워야 한다.
+		verify(journalImageUploadService).delete("https://cdn.test/journals/7/a.jpg", 7L);
+		verify(journalImageUploadService).delete("https://cdn.test/journals/7/b.jpg", 7L);
+		// 프로필 자체의 대표 사진은 plants/ 경로라 PlantImageUploadService로 지운다.
 		verify(plantImageUploadService).delete("https://cdn.test/plants/7/thumb.jpg", 7L);
+		verify(plantImageUploadService, never()).delete("https://cdn.test/journals/7/a.jpg", 7L);
+		verify(plantImageUploadService, never()).delete("https://cdn.test/journals/7/b.jpg", 7L);
 	}
 
 	@Test
@@ -65,6 +70,7 @@ class PlantProfileServiceTest {
 		plantProfileService.deleteProfile(7L, 21L);
 
 		verifyNoInteractions(plantImageUploadService);
+		verifyNoInteractions(journalImageUploadService);
 	}
 
 	@Test
