@@ -7,13 +7,14 @@ import { saveGachaBatch } from '@/features/gacha/batch-session';
 import { withTopicParticle } from '@/lib/korean';
 import { purchaseGachaPacks } from '@/lib/gacha-api';
 import { getProduct, ProductDetail as ProductDetailData } from '@/lib/product-api';
+import { addCartItem, getCart } from '@/lib/order-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
 
 export default function ProductDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { state, hydrated, set, refreshWallet, walletLoaded, walletLoading } = useStore();
+  const { state, hydrated, refreshWallet, walletLoaded, walletLoading, refreshCartCount } = useStore();
   const { showToast, askConfirm } = useUI();
   const productId = Number(params.id);
   const [product, setProduct] = useState<ProductDetailData | null>(null);
@@ -22,6 +23,9 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState('');
   const purchaseAttempt = useRef<{ signature: string; key: string } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [alreadyInCart, setAlreadyInCart] = useState(false);
+  const [checkingCart, setCheckingCart] = useState(true);
 
   useEffect(() => {
     if (!Number.isInteger(productId) || productId < 1) {
@@ -52,6 +56,32 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
     return () => controller.abort();
   }, [productId]);
 
+  // 로그인 상태면 이 상품이 이미 장바구니에 있는지 확인해서 중복 담기를 막는다. 확인이 끝나기
+  // 전까지는 버튼을 눌러도 진행되지 않게 막아서, 조회가 끝나기 전에 클릭해 중복 담기가
+  // 통과해버리는 경쟁 상태를 막는다.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!state.accessToken) {
+      setAlreadyInCart(false);
+      setCheckingCart(false);
+      return;
+    }
+    let cancelled = false;
+    setCheckingCart(true);
+    getCart(state.accessToken)
+      .then((cart) => {
+        if (cancelled) return;
+        setAlreadyInCart(cart.items.some((item) => item.productId === productId));
+      })
+      .catch(() => {
+        // 조회 실패해도 담기 자체는 서버가 다시 검증하니 조용히 무시한다.
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingCart(false);
+      });
+    return () => { cancelled = true; };
+  }, [hydrated, state.accessToken, productId]);
+
   if (loading) {
     return (
       <div className="container">
@@ -78,18 +108,36 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
     );
   }
 
-  const addToCart = () => {
+  // 서버가 실제 소유권·재고·1~99 범위를 다시 검증하므로 여기서는 로그인 여부와 중복 담기만 먼저 막는다.
+  const addToCart = async (): Promise<boolean> => {
     if (!hydrated || !state.accessToken) {
       showToast('장바구니와 구매 기능은 로그인 후 이용할 수 있어요.', 'err');
       return false;
     }
-    if (qty > product.stock) {
-      showToast(`지금은 최대 ${product.stock}개까지 담을 수 있어요.`, 'err');
+    if (checkingCart) {
+      showToast('장바구니 확인 중이에요. 잠시 후 다시 시도해 주세요.', 'err');
       return false;
     }
-    set((storeState) => ({ cartCount: storeState.cartCount + 1 }));
-    showToast('장바구니에 담았어요 🛒');
-    return true;
+    if (alreadyInCart) {
+      showToast('이미 장바구니에 있는 상품이에요.', 'err');
+      return false;
+    }
+    setAdding(true);
+    try {
+      await addCartItem(product.id, qty, state.accessToken);
+      await refreshCartCount();
+      setAlreadyInCart(true);
+      showToast('장바구니에 담았어요 🛒');
+      return true;
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '장바구니에 담지 못했어요.',
+        'err',
+      );
+      return false;
+    } finally {
+      setAdding(false);
+    }
   };
 
   const isGachaPack = product.category === 'GACHA_PACK';
@@ -251,24 +299,34 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
                     : `${totalPoint.toLocaleString()}P로 ${qty}팩 구매하고 개봉하기`}
                 </button>
               ) : (
-                <div className="flex flex-wrap gap-2.5">
-                  <button
-                    type="button"
-                    onClick={addToCart}
-                    className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand-soft p-[15px] font-extrabold text-brand-dark"
-                  >
-                    장바구니 담기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (addToCart()) router.push('/checkout');
-                    }}
-                    className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white"
-                  >
-                    바로 구매
-                  </button>
-                </div>
+                <>
+                  {alreadyInCart && (
+                    <div className="mb-3.5 rounded-[11px] bg-brand-soft px-[13px] py-[11px] text-[13px] font-semibold text-brand-dark">
+                      이미 장바구니에 있는 상품이에요.{' '}
+                      <Link href="/cart" className="font-extrabold underline">장바구니 보기</Link>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      type="button"
+                      disabled={adding || checkingCart || alreadyInCart}
+                      onClick={addToCart}
+                      className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand-soft p-[15px] font-extrabold text-brand-dark disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {alreadyInCart ? '이미 담겨있어요' : '장바구니 담기'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={adding || checkingCart || alreadyInCart}
+                      onClick={async () => {
+                        if (await addToCart()) router.push('/cart');
+                      }}
+                      className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      바로 구매
+                    </button>
+                  </div>
+                </>
               )}
             </>
           )}

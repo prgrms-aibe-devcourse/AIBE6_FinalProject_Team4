@@ -10,6 +10,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
 import { ApiError, AUTH_EXPIRED_EVENT, reissue, logout as apiLogout, setAccessToken, setUnauthorizedHandler } from '@/lib/api';
 import { getWallet } from '@/features/point/api';
+import { getCart } from '@/lib/order-api';
 
 const KEY = 'kwb_store_v1';
 
@@ -78,6 +79,7 @@ export interface StoreContextValue {
   login: (accessToken: string, user: CurrentUser) => void;
   logout: () => void;
   refreshWallet: () => Promise<void>;
+  refreshCartCount: () => Promise<void>;
 }
 
 const EMPTY_WALLET: Wallet = { free: 0, paid: 0 };
@@ -92,7 +94,7 @@ const DEFAULTS: StoreState = {
   growingCount: 3,
   plantCount: 5,
   readyCards: 2,
-  cartCount: 4,
+  cartCount: 0,
   lastReward: 30,
   notifications: [
     { id: 1, type: 'DELIVERY', title: '주문하신 상품이 배송을 시작했어요 📦', content: 'ORD-20260709-0022 · 방울토마토 모종', date: '오늘', unread: true },
@@ -113,6 +115,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [walletLoaded, setWalletLoaded] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
   const walletRequestId = useRef(0);
+  const cartCountRequestId = useRef(0);
 
   const clearAuthentication = useCallback((expired: boolean) => {
     walletRequestId.current += 1;
@@ -217,6 +220,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void refreshWallet();
   }, [hydrated, refreshWallet]);
 
+  // 네비바 장바구니 배지는 실제 장바구니 항목 수를 반영한다. 담기/수량변경/삭제/주문 완료 등
+  // 카트를 바꾸는 동작 뒤에 호출해서 동기화한다 — 클라이언트에서 임의로 +1/-1 하지 않는다.
+  const refreshCartCount = useCallback(async () => {
+    const requestId = ++cartCountRequestId.current;
+    if (!state.authed || !state.accessToken) {
+      setState((s) => ({ ...s, cartCount: 0 }));
+      return;
+    }
+    try {
+      const cart = await getCart(state.accessToken);
+      if (requestId !== cartCountRequestId.current) return;
+      setState((s) => ({ ...s, cartCount: cart.items.length }));
+    } catch {
+      // 배지 갱신 실패는 조용히 무시한다 — 다음 갱신 시점에 다시 시도된다.
+    }
+  }, [state.accessToken, state.authed]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void refreshCartCount();
+  }, [hydrated, refreshCartCount]);
+
   const set = useCallback((patch: StorePatch) => {
     setState((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) }));
   }, []);
@@ -315,6 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         refreshWallet,
+        refreshCartCount,
       }}
     >
       {children}

@@ -30,12 +30,16 @@ public class JwtTokenProvider {
 		this.refreshExpirationMs = refreshExpirationMs;
 	}
 
+	private static final String CLAIM_TYPE = "typ";
+	private static final String TYPE_ACCESS = "access";
+	private static final String TYPE_REFRESH = "refresh";
+
 	public String generateAccessToken(Long userId, String role) {
-		return generateToken(userId, role, accessExpirationMs);
+		return generateToken(userId, role, accessExpirationMs, TYPE_ACCESS);
 	}
 
 	public String generateRefreshToken(Long userId) {
-		return generateToken(userId, null, refreshExpirationMs);
+		return generateToken(userId, null, refreshExpirationMs, TYPE_REFRESH);
 	}
 
 	public long getAccessExpirationMs() {
@@ -46,13 +50,14 @@ public class JwtTokenProvider {
 		return refreshExpirationMs;
 	}
 
-	private String generateToken(Long userId, String role, long expirationMs) {
+	private String generateToken(Long userId, String role, long expirationMs, String type) {
 		Date now = new Date();
 		Date expiry = new Date(now.getTime() + expirationMs);
 
 		JwtBuilder builder = Jwts.builder()
 				.id(UUID.randomUUID().toString())
 				.subject(String.valueOf(userId))
+				.claim(CLAIM_TYPE, type)
 				.issuedAt(now)
 				.expiration(expiry);
 		if (role != null) {
@@ -91,6 +96,11 @@ public class JwtTokenProvider {
 
 	public String getRole(String token) {
 		return parseClaims(token).get("role", String.class);
+	}
+
+	/** Rejects refresh tokens presented as bearer access tokens; only {@link #generateAccessToken} output passes. */
+	public boolean isAccessToken(String token) {
+		return TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
 	}
 
 	private Claims parseClaims(String token) {
