@@ -195,33 +195,39 @@ export default function PlantsPage() {
               placeholder="종을 검색하세요 (예: 토마토)"
               className={`${FIELD} mb-2.5 mt-1.5`}
             />
-            <div className="mb-[18px] flex flex-wrap gap-2">
-              {spResults.map((sp) => {
-                const selected = reg.speciesId === sp.id;
-                return (
-                  <button
-                    key={sp.id}
-                    type="button"
-                    onClick={() => { setReg({ ...reg, speciesId: sp.id }); setQuery(sp.name); }}
-                    className={`cursor-pointer rounded-[10px] border-[1.5px] px-[13px] py-2 text-[13.5px] font-bold ${
-                      selected ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
-                    }`}
-                  >
-                    {sp.emoji} {sp.name}
-                    {selected && (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); clearSpeciesSelection(); }}
-                        className="ml-1.5 text-[#a9b3a0]"
-                      >
-                        ×
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {spResults.length === 0 && query.trim() ? (
+              <div className="mb-[18px] text-[13.5px] text-faint">
+                일치하는 종이 없어요. 다른 이름으로 검색해 보세요.
+              </div>
+            ) : (
+              <div className="mb-[18px] flex flex-wrap gap-2">
+                {spResults.map((sp) => {
+                  const selected = reg.speciesId === sp.id;
+                  return (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      onClick={() => { setReg({ ...reg, speciesId: sp.id }); setQuery(sp.name); }}
+                      className={`cursor-pointer rounded-[10px] border-[1.5px] px-[13px] py-2 text-[13.5px] font-bold ${
+                        selected ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
+                      }`}
+                    >
+                      {sp.emoji} {sp.name}
+                      {selected && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => { e.stopPropagation(); clearSpeciesSelection(); }}
+                          className="ml-1.5 text-[#a9b3a0]"
+                        >
+                          ×
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             <label className={LABEL}>재배 시작일</label>
             <input
