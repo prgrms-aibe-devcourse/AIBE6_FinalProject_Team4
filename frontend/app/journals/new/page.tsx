@@ -75,14 +75,20 @@ function NewJournalInner() {
     setSubmitting(true);
     try {
       const uploaded = await uploadJournalImage(photoFile, state.accessToken);
-      const result = await createJournal(
-        {
-          plantProfileId: draft.plantId,
-          content: draft.content,
-          images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
-        },
-        state.accessToken,
-      );
+      let result;
+      try {
+        result = await createJournal(
+          {
+            plantProfileId: draft.plantId,
+            content: draft.content,
+            images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
+          },
+          state.accessToken,
+        );
+      } catch (createError) {
+        deleteJournalImage(uploaded.imageUrl, state.accessToken).catch(() => {});
+        throw createError;
+      }
       await refreshWallet();
       setCreateResult(result);
       setSaved(true);
