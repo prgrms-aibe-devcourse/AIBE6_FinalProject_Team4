@@ -1,9 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api';
+import { saveGachaBatch } from '@/features/gacha/batch-session';
 import { withTopicParticle } from '@/lib/korean';
+import { purchaseGachaPacks } from '@/lib/gacha-api';
 import { getProduct, ProductDetail as ProductDetailData } from '@/lib/product-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
@@ -11,13 +13,15 @@ import PointPrice from '@/components/PointPrice';
 
 export default function ProductDetail({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { state, hydrated, set } = useStore();
-  const { showToast } = useUI();
+  const { state, hydrated, set, refreshWallet, walletLoaded, walletLoading } = useStore();
+  const { showToast, askConfirm } = useUI();
   const productId = Number(params.id);
   const [product, setProduct] = useState<ProductDetailData | null>(null);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState('');
+  const purchaseAttempt = useRef<{ signature: string; key: string } | null>(null);
 
   useEffect(() => {
     if (!Number.isInteger(productId) || productId < 1) {
@@ -88,6 +92,71 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
     return true;
   };
 
+  const isGachaPack = product.category === 'GACHA_PACK';
+  const maxQuantity = isGachaPack ? 100 : product.stock;
+  const totalPoint = product.pointPrice * qty;
+
+  const purchaseGachaPack = () => {
+    if (!hydrated || !state.accessToken) {
+      showToast('가챠 팩 구매는 로그인 후 이용할 수 있어요.', 'err');
+      return;
+    }
+    if (!walletLoaded) {
+      showToast(
+        walletLoading
+          ? '포인트 잔액을 확인하고 있어요.'
+          : '포인트 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+      return;
+    }
+    if (state.wallet.free + state.wallet.paid < totalPoint) {
+      showToast('사용 가능한 포인트가 부족해요.', 'err');
+      return;
+    }
+
+    askConfirm({
+      icon: 'casino',
+      title: `가챠 팩 ${qty}개를 구매할까요?`,
+      body: `총 ${totalPoint.toLocaleString()}P를 사용하고 구매 즉시 개봉합니다.`,
+      ok: '구매하고 개봉하기',
+      onOk: async () => {
+        setPurchasing(true);
+        try {
+          const signature = `${product.id}:${qty}`;
+          const idempotencyKey =
+            purchaseAttempt.current?.signature === signature
+              ? purchaseAttempt.current.key
+              : crypto.randomUUID();
+          purchaseAttempt.current = { signature, key: idempotencyKey };
+          const response = await purchaseGachaPacks(
+            product.id,
+            qty,
+            state.accessToken!,
+            idempotencyKey,
+          );
+          purchaseAttempt.current = null;
+          await refreshWallet().catch(() => undefined);
+          showToast(`${response.quantity}팩 구매가 완료됐어요!`);
+          if (response.drawIds.length === 1) {
+            router.push(`/gacha/open/${response.drawIds[0]}`);
+          } else {
+            router.push(`/gacha/open/batch/${saveGachaBatch(response.drawIds)}`);
+          }
+        } catch (purchaseError) {
+          showToast(
+            purchaseError instanceof ApiError
+              ? purchaseError.message
+              : '가챠 팩을 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
+            'err',
+          );
+        } finally {
+          setPurchasing(false);
+        }
+      },
+    });
+  };
+
   return (
     <div className="container">
       <Link href="/shop" className="text-sm font-semibold text-sub">
@@ -95,7 +164,9 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
       </Link>
       <div className="mt-4 grid items-start gap-7 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <div
-          className={`flex h-[320px] items-center justify-center overflow-hidden rounded-[22px] bg-brand-soft bg-cover bg-center text-[130px] ${
+          className={`flex h-[320px] items-center justify-center overflow-hidden rounded-[22px] bg-brand-soft bg-center text-[130px] ${
+            isGachaPack ? 'bg-contain bg-no-repeat' : 'bg-cover'
+          } ${
             product.soldOut ? 'opacity-65 grayscale' : ''
           }`}
           style={
@@ -108,7 +179,11 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
         </div>
         <div>
           <div className="mb-2.5 inline-block rounded-full bg-brand-soft px-[11px] py-1 text-xs font-extrabold text-brand-dark">
-            {product.category === 'KIT' ? '키트' : '모종'}
+            {product.category === 'KIT'
+              ? '키트'
+              : product.category === 'SEEDLING'
+                ? '모종'
+                : '가챠 팩'}
           </div>
           <h1 className="mb-2 text-[26px] font-extrabold">{product.name}</h1>
           <PointPrice value={product.pointPrice} size="lg" className="mb-3.5" />
@@ -118,7 +193,9 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           <div className={`mb-[18px] text-[13px] font-bold ${product.soldOut ? 'text-danger' : 'text-brand'}`}>
             {product.soldOut
               ? '품절 · 곧 다시 채워둘게요'
-              : `재고 ${product.stock}개 남았어요`}
+              : isGachaPack
+                ? '한 번에 최대 100팩까지 구매할 수 있어요'
+                : `재고 ${product.stock}개 남았어요`}
           </div>
 
           {product.category === 'SEEDLING' && product.plantGuide && (
@@ -155,31 +232,44 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
                   <div className="w-[46px] text-center text-base font-extrabold">{qty}</div>
                   <button
                     type="button"
-                    onClick={() => setQty(Math.min(product.stock, qty + 1))}
+                    onClick={() => setQty(Math.min(maxQuantity, qty + 1))}
                     className="flex h-10 w-10 cursor-pointer items-center justify-center text-xl text-[#6d7a68]"
                   >
                     +
                   </button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2.5">
+              {isGachaPack ? (
                 <button
                   type="button"
-                  onClick={addToCart}
-                  className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand-soft p-[15px] font-extrabold text-brand-dark"
+                  disabled={purchasing}
+                  onClick={purchaseGachaPack}
+                  className="w-full cursor-pointer rounded-[13px] bg-[#6750a4] p-[15px] font-extrabold text-white disabled:cursor-wait disabled:opacity-60"
                 >
-                  장바구니 담기
+                  {purchasing
+                    ? '팩을 준비하고 있어요...'
+                    : `${totalPoint.toLocaleString()}P로 ${qty}팩 구매하고 개봉하기`}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (addToCart()) router.push('/checkout');
-                  }}
-                  className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white"
-                >
-                  바로 구매
-                </button>
-              </div>
+              ) : (
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    onClick={addToCart}
+                    className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand-soft p-[15px] font-extrabold text-brand-dark"
+                  >
+                    장바구니 담기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (addToCart()) router.push('/checkout');
+                    }}
+                    className="min-w-[130px] flex-1 cursor-pointer rounded-[13px] bg-brand p-[15px] font-extrabold text-white"
+                  >
+                    바로 구매
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

@@ -15,6 +15,7 @@ const TABS = [
   { key: 'all', label: '전체' },
   { key: 'KIT', label: '키트' },
   { key: 'SEEDLING', label: '모종' },
+  { key: 'GACHA_PACK', label: '가챠' },
 ];
 
 const SORTS = [
@@ -23,7 +24,11 @@ const SORTS = [
   { key: 'high', label: '가격 높은순' },
 ];
 
-const CAT_LABEL: Record<ProductCategory, string> = { KIT: '키트', SEEDLING: '모종' };
+const CAT_LABEL: Record<ProductCategory, string> = {
+  KIT: '키트',
+  SEEDLING: '모종',
+  GACHA_PACK: '가챠 팩',
+};
 const SORT_QUERY: Record<string, ProductSort> = {
   new: 'LATEST',
   low: 'PRICE_ASC',
@@ -115,7 +120,11 @@ export default function Shop() {
                 className="block overflow-hidden rounded-[20px] bg-white text-ink shadow-card hover:text-ink"
               >
                 <div
-                  className={`relative grid h-[150px] place-items-center bg-brand-soft bg-cover bg-center text-[46px] ${
+                  className={`relative grid h-[150px] place-items-center bg-brand-soft bg-center text-[46px] ${
+                    product.category === 'GACHA_PACK'
+                      ? 'bg-contain bg-no-repeat'
+                      : 'bg-cover'
+                  } ${
                     product.soldOut ? 'opacity-70 grayscale' : ''
                   }`}
                   style={
