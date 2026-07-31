@@ -2,6 +2,7 @@ package com.kiwobollae.api.content.controller;
 
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
+import com.kiwobollae.api.content.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.content.service.PlantJournalService;
 import com.kiwobollae.api.global.common.ApiResponse;
@@ -42,7 +43,7 @@ public class JournalController {
 
 	@Operation(summary = "성장 일지 작성", description = "선택한 식물 프로필에 이미지(1~3장)와 내용으로 일지를 작성합니다.")
 	@PostMapping
-	public ResponseEntity<ApiResponse<PlantJournalResponse>> createJournal(
+	public ResponseEntity<ApiResponse<PlantJournalCreateResponse>> createJournal(
 			@AuthenticationPrincipal Long userId,
 			@Valid @RequestBody PlantJournalRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED)

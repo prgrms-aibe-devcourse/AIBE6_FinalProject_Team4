@@ -1,6 +1,7 @@
 package com.kiwobollae.api.payment.provider;
 
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -22,5 +23,10 @@ public class MockPaymentProvider implements PaymentProvider {
 			case FAILURE -> PaymentConfirmResult.failure();
 			case CANCEL -> PaymentConfirmResult.canceled();
 		};
+	}
+
+	@Override
+	public PaymentRefundResult refund(PaymentRefundCommand command) {
+		return PaymentRefundResult.success("MOCK-REFUND-" + UUID.randomUUID());
 	}
 }

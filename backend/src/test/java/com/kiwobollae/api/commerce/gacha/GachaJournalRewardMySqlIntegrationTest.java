@@ -12,7 +12,7 @@ import com.kiwobollae.api.commerce.gacha.repository.TradingCardRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
-import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
+import com.kiwobollae.api.content.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
@@ -61,23 +61,23 @@ class GachaJournalRewardMySqlIntegrationTest {
         plantProfileRepository.save(
             PlantProfile.create(user, species, "두 번째 QA 식물", LocalDate.now().minusDays(2), null));
 
-    PlantJournalResponse first =
+    PlantJournalCreateResponse first =
         plantJournalService.createJournal(
             user.getId(),
             request(firstProfile.getId(), "/journal-demo/photo-1.svg", "1".repeat(64)));
-    PlantJournalResponse second =
+    PlantJournalCreateResponse second =
         plantJournalService.createJournal(
             user.getId(),
             request(secondProfile.getId(), "/journal-demo/photo-2.svg", "2".repeat(64)));
 
-    assertThat(first.gachaReward().granted()).isTrue();
-    assertThat(first.gachaReward().drawId()).isNotNull();
-    assertThat(second.gachaReward().granted()).isFalse();
-    assertThat(second.gachaReward().drawId()).isEqualTo(first.gachaReward().drawId());
+    assertThat(first.journal().gachaReward().granted()).isTrue();
+    assertThat(first.journal().gachaReward().drawId()).isNotNull();
+    assertThat(second.journal().gachaReward().granted()).isFalse();
+    assertThat(second.journal().gachaReward().drawId()).isEqualTo(first.journal().gachaReward().drawId());
     assertThat(tradingCardRepository.count()).isEqualTo(43);
     assertThat(gachaDrawRepository.count()).isEqualTo(1);
 
-    GachaDraw draw = gachaDrawRepository.findById(first.gachaReward().drawId()).orElseThrow();
+    GachaDraw draw = gachaDrawRepository.findById(first.journal().gachaReward().drawId()).orElseThrow();
     assertThat(draw.getStatus()).isEqualTo(GachaDrawStatus.COMPLETED);
     assertThat(gachaDrawItemRepository.findAllByGachaDraw_IdOrderByDrawSeqAsc(draw.getId()))
         .hasSize(5);

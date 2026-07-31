@@ -14,8 +14,7 @@ export type PaymentStatus =
   | 'PAID'
   | 'FAILED'
   | 'CANCELED'
-  | 'REFUNDED'
-  | 'PARTIAL_REFUNDED';
+  | 'REFUNDED';
 
 export interface PaymentData {
   id: number;
@@ -99,5 +98,19 @@ export function getPaymentHistory(accessToken: string, signal?: AbortSignal): Pr
   return request<PaymentHistory[]>('/api/v1/payments', {
     accessToken,
     signal,
+  });
+}
+
+export function refundPayment(
+  accessToken: string,
+  paymentId: number,
+  reason: string,
+  idempotencyKey: string,
+): Promise<PaymentRefundData> {
+  return request<PaymentRefundData>(`/api/v1/payments/${paymentId}/refund`, {
+    method: 'POST',
+    accessToken,
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ reason }),
   });
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStore, fmt } from '@/lib/store';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { getJournals } from '@/lib/journal-api';
 import { dPlus, plantVisual } from '@/lib/plant-visual';
 
 const CONFETTI = [
@@ -18,20 +19,45 @@ const FEATURES = [
   { emoji: '🍉', title: '진짜 열매 받기', desc: '모은 카드를 진짜 과일·채소로 교환해요' },
 ];
 
+function kstToday(): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export default function Home() {
   const { state, hydrated, balance } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  const [wroteToday, setWroteToday] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
     const accessToken = state.accessToken;
     const controller = new AbortController();
+    const today = kstToday();
+    const [year, month] = today.split('-').map(Number);
 
     getMyPlants(accessToken, controller.signal)
-      .then((data) => setPlants(data.slice(0, 4)))
+      .then((plantList) => {
+        setPlants(plantList.slice(0, 4));
+      })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setPlants([]);
+      });
+
+    getJournals({ year, month, size: 1 }, accessToken, controller.signal)
+      .then((journalPage) => {
+        setWroteToday(journalPage.content.some((journal) => journal.writtenDate === today));
+      })
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setWroteToday(false);
       });
 
     return () => controller.abort();
@@ -113,7 +139,7 @@ export default function Home() {
 
         <div className="rounded-[18px] bg-white p-[22px] shadow-card">
           <div className="text-[13px] font-bold text-sub">오늘의 일지</div>
-          {state.wroteToday ? (
+          {wroteToday ? (
             <>
               <div className="my-3.5 text-[19px] font-extrabold text-brand">오늘 기록 완료 ✓</div>
               <Link href="/journals" className="inline-block rounded-[10px] bg-brand-soft px-4 py-[9px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white">일지 보기</Link>

@@ -13,11 +13,13 @@ import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservation;
 import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservationService;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
+import com.kiwobollae.api.content.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.content.entity.PlantJournal;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
+import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -73,11 +75,16 @@ class PlantJournalServiceTest {
 				any(LocalDateTime.class),
 				any(LocalDateTime.class)
 		)).willReturn(1);
+		given(walletService.rewardJournal(7L, 31L))
+				.willReturn(new JournalRewardResult(100L));
 		given(gachaRewardReservationService.reserveDailyJournalReward(eq(7L), any(LocalDate.class)))
 				.willReturn(GachaRewardReservation.none());
 
-		plantJournalService.createJournal(7L, request);
+		PlantJournalCreateResponse response = plantJournalService.createJournal(7L, request);
 
+		assertThat(response.journal().id()).isEqualTo(31L);
+		assertThat(response.rewardGranted()).isTrue();
+		assertThat(response.rewardAmount()).isEqualTo(100L);
 		verify(walletService).rewardJournal(7L, 31L);
 		verify(gachaRewardReservationService).reserveDailyJournalReward(eq(7L), any(LocalDate.class));
 	}
@@ -110,8 +117,11 @@ class PlantJournalServiceTest {
 				any(LocalDateTime.class)
 		)).willReturn(0);
 
-		plantJournalService.createJournal(7L, request);
+		PlantJournalCreateResponse response = plantJournalService.createJournal(7L, request);
 
+		assertThat(response.journal().id()).isEqualTo(32L);
+		assertThat(response.rewardGranted()).isFalse();
+		assertThat(response.rewardAmount()).isZero();
 		verifyNoInteractions(walletService);
 	}
 

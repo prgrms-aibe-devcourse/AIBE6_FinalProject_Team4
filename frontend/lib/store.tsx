@@ -47,13 +47,10 @@ export interface StoreState {
   accessToken: string | null;
   user: CurrentUser | null;
   wallet: Wallet;
-  rewardedToday: boolean;
-  wroteToday: boolean;
   growingCount: number;
   plantCount: number;
   readyCards: number;
   cartCount: number;
-  lastReward: number;
   notifications: NotificationItem[];
 }
 
@@ -67,10 +64,6 @@ export interface StoreContextValue {
   walletLoaded: boolean;
   walletError: string | null;
   set: (patch: StorePatch) => void;
-  spend: (amount: number) => void;
-  spendForOrder: (amount: number, requestedFreePoint: number) => void;
-  creditFree: (amount: number) => void;
-  creditPaid: (amount: number) => void;
   reset: () => void;
   balance: number;
   unreadCount: number;
@@ -89,16 +82,13 @@ const DEFAULTS: StoreState = {
   accessToken: null,
   user: null,
   wallet: EMPTY_WALLET,
-  rewardedToday: false,
-  wroteToday: false,
   growingCount: 3,
   plantCount: 5,
   readyCards: 2,
   cartCount: 0,
-  lastReward: 30,
   notifications: [
     { id: 1, type: 'DELIVERY', title: '주문하신 상품이 배송을 시작했어요 📦', content: 'ORD-20260709-0022 · 방울토마토 모종', date: '오늘', unread: true },
-    { id: 2, type: 'POINT', title: '일지 보상 30P가 지급됐어요 ☀️', content: '토실이의 오늘 기록', date: '오늘', unread: true },
+    { id: 2, type: 'POINT', title: '일지 보상 100P가 지급됐어요 ☀️', content: '토실이의 오늘 기록', date: '오늘', unread: true },
     { id: 3, type: 'JOURNAL_REMINDER', title: '오늘 쌈싸리의 모습을 남겨볼까요? 🌱', content: '아직 오늘의 일지를 쓰지 않으셨어요', date: '오늘', unread: true },
     { id: 4, type: 'INQUIRY', title: '문의하신 내용에 답변이 도착했어요 💬', content: '배송 관련 문의', date: '어제', unread: false, broken: false },
     { id: 5, type: 'NOTICE', title: '새로운 카드가 상점에 입고됐어요 📢', content: '감자 카드를 만나보세요', date: '어제', unread: false, broken: true },
@@ -246,35 +236,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) }));
   }, []);
 
-  // 무상 포인트 먼저 차감
-  const spend = useCallback((amount: number) => {
-    setState((s) => {
-      let { free, paid } = s.wallet;
-      const uf = Math.min(free, amount);
-      free -= uf; paid -= (amount - uf);
-      return { ...s, wallet: { free: Math.max(0, free), paid: Math.max(0, paid) } };
-    });
-  }, []);
-
-  // 상품 주문 목 흐름 전용. 실제 주문 API가 연결되면 서버 응답 후 refreshWallet()로 대체한다.
-  const spendForOrder = useCallback((amount: number, requestedFreePoint: number) => {
-    setState((s) => ({
-      ...s,
-      wallet: {
-        free: s.wallet.free - requestedFreePoint,
-        paid: s.wallet.paid - (amount - requestedFreePoint),
-      },
-    }));
-  }, []);
-
-  const creditFree = useCallback((amount: number) => {
-    setState((s) => ({ ...s, wallet: { free: s.wallet.free + amount, paid: s.wallet.paid } }));
-  }, []);
-
-  const creditPaid = useCallback((amount: number) => {
-    setState((s) => ({ ...s, wallet: { free: s.wallet.free, paid: s.wallet.paid + amount } }));
-  }, []);
-
   const reset = useCallback(() => {
     walletRequestId.current += 1;
     setWalletLoading(false);
@@ -328,10 +289,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         walletLoaded,
         walletError,
         set,
-        spend,
-        spendForOrder,
-        creditFree,
-        creditPaid,
         reset,
         balance,
         unreadCount,
