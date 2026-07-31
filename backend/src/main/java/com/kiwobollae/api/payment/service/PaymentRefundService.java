@@ -19,6 +19,7 @@ import com.kiwobollae.api.point.service.WalletService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class PaymentRefundService {
 	private final PaymentProvider paymentProvider;
 	private final IdempotencyService idempotencyService;
 	private final ObjectMapper objectMapper;
+	private final Clock seoulClock;
 
 	@Transactional
 	public PaymentRefundResponse refund(
@@ -109,7 +111,7 @@ public class PaymentRefundService {
 				PaymentRefundStatus.REQUESTED,
 				PaymentRefundStatus.COMPLETED,
 				providerResult.refundKey(),
-				LocalDateTime.now()
+				LocalDateTime.now(seoulClock)
 		);
 		if (refundUpdated == 0) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);

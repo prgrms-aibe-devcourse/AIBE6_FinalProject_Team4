@@ -6,8 +6,8 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.entity.IdempotencyKey;
 import com.kiwobollae.api.infra.entity.enums.IdempotencyStatus;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
+import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +20,7 @@ public class IdempotencyService {
 
 	private final IdempotencyKeyRepository idempotencyKeyRepository;
 	private final UserRepository userRepository;
+	private final Clock seoulClock;
 
 	public IdempotencyExecution start(
 			Long userId,
@@ -39,7 +40,7 @@ public class IdempotencyService {
 			String resourceType,
 			Long resourceId
 	) {
-		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		key.succeed(
 				httpStatus,
 				responseSnapshot,
@@ -67,7 +68,7 @@ public class IdempotencyService {
 			String clientKey,
 			String requestHash
 	) {
-		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		IdempotencyKey key = IdempotencyKey.builder()
 				.user(userRepository.getReferenceById(userId))
 				.apiType(apiType)

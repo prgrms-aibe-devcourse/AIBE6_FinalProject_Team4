@@ -7,16 +7,24 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.infra.entity.IdempotencyKey;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class IdempotencyServiceTest {
+
+	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+	private static final Clock FIXED_KST_CLOCK =
+			Clock.fixed(Instant.parse("2026-07-31T01:00:00Z"), KST);
 
 	@Mock
 	private IdempotencyKeyRepository idempotencyKeyRepository;
@@ -24,8 +32,16 @@ class IdempotencyServiceTest {
 	@Mock
 	private UserRepository userRepository;
 
-	@InjectMocks
 	private IdempotencyService idempotencyService;
+
+	@BeforeEach
+	void setUp() {
+		idempotencyService = new IdempotencyService(
+				idempotencyKeyRepository,
+				userRepository,
+				FIXED_KST_CLOCK
+		);
+	}
 
 	@Test
 	void paymentRefundKeyAndResponseAreRetainedForSevenDays() {
@@ -46,6 +62,7 @@ class IdempotencyServiceTest {
 		);
 		IdempotencyKey key = execution.key();
 
+		assertThat(key.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 7, 31, 10, 0));
 		assertThat(Duration.between(key.getCreatedAt(), key.getExpiresAt()))
 				.isEqualTo(Duration.ofDays(7));
 
@@ -57,6 +74,7 @@ class IdempotencyServiceTest {
 				31L
 		);
 
+		assertThat(key.getCompletedAt()).isEqualTo(LocalDateTime.of(2026, 7, 31, 10, 0));
 		assertThat(Duration.between(key.getCompletedAt(), key.getResponseExpiresAt()))
 				.isEqualTo(Duration.ofDays(7));
 	}

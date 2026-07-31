@@ -23,18 +23,27 @@ import com.kiwobollae.api.payment.provider.PaymentRefundResult;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.WalletService;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentRefundServiceTest {
+
+	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+	private static final Clock FIXED_KST_CLOCK =
+			Clock.fixed(Instant.parse("2026-07-31T01:00:00Z"), KST);
+	private static final LocalDateTime FIXED_KST_TIME =
+			LocalDateTime.of(2026, 7, 31, 10, 0);
 
 	@Mock
 	private PaymentRepository paymentRepository;
@@ -54,8 +63,20 @@ class PaymentRefundServiceTest {
 	@Mock
 	private ObjectMapper objectMapper;
 
-	@InjectMocks
 	private PaymentRefundService paymentRefundService;
+
+	@BeforeEach
+	void setUp() {
+		paymentRefundService = new PaymentRefundService(
+				paymentRepository,
+				paymentRefundRepository,
+				walletService,
+				paymentProvider,
+				idempotencyService,
+				objectMapper,
+				FIXED_KST_CLOCK
+		);
+	}
 
 	@Test
 	void fullRefundDeductsPaidPointAndCompletesPaymentAndRefund() throws Exception {
@@ -87,7 +108,7 @@ class PaymentRefundServiceTest {
 				org.mockito.ArgumentMatchers.eq(PaymentRefundStatus.REQUESTED),
 				org.mockito.ArgumentMatchers.eq(PaymentRefundStatus.COMPLETED),
 				org.mockito.ArgumentMatchers.eq("provider-refund-key"),
-				org.mockito.ArgumentMatchers.any(LocalDateTime.class)
+				org.mockito.ArgumentMatchers.eq(FIXED_KST_TIME)
 		)).willReturn(1);
 		given(paymentRefundRepository.findDetailsById(31L))
 				.willReturn(Optional.of(completedRefund));
