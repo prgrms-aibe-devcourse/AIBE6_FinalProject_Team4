@@ -402,28 +402,166 @@ module.exports = {
             backgroundPosition: '-120% 0',
           },
         },
+        goldenCelebrationBackdrop: {
+          '0%': { opacity: '0' },
+          '12%': { opacity: '1' },
+          '78%': { opacity: '.92' },
+          '100%': { opacity: '.78' },
+        },
+        goldenCelebrationVignette: {
+          '0%, 10%': { opacity: '1' },
+          '32%': { opacity: '.38' },
+          '100%': { opacity: '.58' },
+        },
+        goldenFanfareRays: {
+          '0%, 18%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) rotate(-16deg) scale(.34)',
+          },
+          '42%': { opacity: '.82' },
+          '72%': {
+            opacity: '.48',
+            transform: 'translate(-50%, -50%) rotate(8deg) scale(1.02)',
+          },
+          '100%': {
+            opacity: '.26',
+            transform: 'translate(-50%, -50%) rotate(20deg) scale(1.12)',
+          },
+        },
+        goldenCelebrationRing: {
+          '0%, 28%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(.15)',
+          },
+          '43%': { opacity: '1' },
+          '72%': {
+            opacity: '.62',
+            transform: 'translate(-50%, -50%) scale(1.06)',
+          },
+          '100%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(1.46)',
+          },
+        },
+        goldenCelebrationBloom: {
+          '0%, 24%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(.12)',
+          },
+          '39%': {
+            opacity: '1',
+            transform: 'translate(-50%, -50%) scale(.72)',
+          },
+          '62%': {
+            opacity: '.74',
+            transform: 'translate(-50%, -50%) scale(1.15)',
+          },
+          '100%': {
+            opacity: '.18',
+            transform: 'translate(-50%, -50%) scale(1.34)',
+          },
+        },
+        goldenLightBeam: {
+          '0%, 24%': {
+            opacity: '0',
+            transform:
+              'translateX(-50%) rotate(var(--beam-angle)) scaleY(.05)',
+          },
+          '42%': { opacity: '.74' },
+          '72%': {
+            opacity: '.38',
+            transform:
+              'translateX(-50%) rotate(var(--beam-angle)) scaleY(1)',
+          },
+          '100%': {
+            opacity: '.12',
+            transform:
+              'translateX(-50%) rotate(var(--beam-angle)) scaleY(1.08)',
+          },
+        },
+        goldenFanfareTitle: {
+          '0%, 20%': {
+            opacity: '0',
+            filter: 'blur(12px) brightness(2)',
+            transform: 'translateY(18px) scale(.56)',
+          },
+          '38%': {
+            opacity: '1',
+            filter: 'blur(0) brightness(1.8)',
+            transform: 'translateY(0) scale(1.12)',
+          },
+          '52%': {
+            filter: 'brightness(1)',
+            transform: 'translateY(0) scale(1)',
+          },
+          '82%': { opacity: '1' },
+          '100%': {
+            opacity: '.72',
+            transform: 'translateY(-4px) scale(.98)',
+          },
+        },
+        goldenFireworkSpark: {
+          '0%, 40%': {
+            opacity: '0',
+            transform: 'translate3d(0, 0, 0) scale(.2)',
+          },
+          '45%': { opacity: '1' },
+          '82%': {
+            opacity: '.85',
+            transform:
+              'translate3d(var(--firework-x), var(--firework-y), 0) scale(1)',
+          },
+          '100%': {
+            opacity: '0',
+            transform:
+              'translate3d(var(--firework-x), calc(var(--firework-y) + 28px), 0) scale(.25)',
+          },
+        },
+        goldenConfetti: {
+          '0%': {
+            opacity: '0',
+            transform: 'translate3d(0, -4vh, 0) rotate(0deg)',
+          },
+          '12%': { opacity: '1' },
+          '100%': {
+            opacity: '0',
+            transform:
+              'translate3d(var(--confetti-drift), 108vh, 0) rotate(var(--confetti-turn))',
+          },
+        },
+        goldenFanfareFlash: {
+          '0%, 25%, 35%, 46%, 100%': { opacity: '0' },
+          '29%': { opacity: '.96' },
+          '32%': { opacity: '.35' },
+          '40%': { opacity: '.62' },
+          '43%': { opacity: '.12' },
+        },
         goldenCardReveal: {
           '0%': {
             opacity: '1',
-            filter: 'brightness(.45)',
-            transform: 'rotateY(-180deg) translateY(18px) scale(.72)',
+            filter: 'brightness(.24) saturate(.55)',
+            transform: 'rotateY(-180deg) translateY(26px) scale(.68)',
           },
-          '34%': {
+          '25%': {
             opacity: '1',
-            filter: 'brightness(.52)',
-            transform: 'rotateY(-180deg) translateY(10px) scale(.76)',
+            filter: 'brightness(.38) saturate(.7)',
+            transform: 'rotateY(-180deg) translateY(14px) scale(.72)',
           },
-          '49%': {
-            filter: 'brightness(1.8)',
-            transform: 'rotateY(-168deg) translateY(0) scale(.84)',
+          '38%': {
+            filter: 'brightness(2.4) saturate(1.2)',
+            transform: 'rotateY(-180deg) translateY(-2px) scale(.82)',
           },
-          '68%': {
-            filter: 'brightness(1.16)',
-            transform: 'rotateY(-34deg) translateY(-7px) scale(1.06)',
+          '55%': {
+            filter: 'brightness(1.5) saturate(1.22)',
+            transform: 'rotateY(-86deg) translateY(-12px) scale(1.09)',
+          },
+          '69%': {
+            filter: 'brightness(1.12) saturate(1.08)',
+            transform: 'rotateY(8deg) translateY(-8px) scale(1.075)',
           },
           '82%': {
-            filter: 'brightness(1.03)',
-            transform: 'rotateY(4deg) translateY(-2px) scale(1.025)',
+            filter: 'brightness(1.04)',
+            transform: 'rotateY(-3deg) translateY(-3px) scale(1.025)',
           },
           '100%': {
             opacity: '1',
@@ -515,8 +653,25 @@ module.exports = {
         premiumSpark:
           'premiumSpark 1.25s cubic-bezier(.14,.68,.18,1) both',
         premiumFoil: 'premiumFoil 2.35s ease-out both',
+        goldenCelebrationBackdrop: 'goldenCelebrationBackdrop 3.4s ease-out both',
+        goldenCelebrationVignette:
+          'goldenCelebrationVignette 3.4s ease-out both',
+        goldenFanfareRays:
+          'goldenFanfareRays 3.4s cubic-bezier(.16,.72,.18,1) both',
+        goldenCelebrationRing:
+          'goldenCelebrationRing 2.8s cubic-bezier(.12,.72,.18,1) both',
+        goldenCelebrationBloom:
+          'goldenCelebrationBloom 3.4s cubic-bezier(.16,.72,.2,1) both',
+        goldenLightBeam:
+          'goldenLightBeam 3.2s cubic-bezier(.16,.72,.2,1) both',
+        goldenFanfareTitle:
+          'goldenFanfareTitle 3.4s cubic-bezier(.16,.72,.18,1) both',
+        goldenFireworkSpark:
+          'goldenFireworkSpark 1.5s cubic-bezier(.12,.68,.2,1) both',
+        goldenConfetti: 'goldenConfetti 2.2s ease-in both',
+        goldenFanfareFlash: 'goldenFanfareFlash 3.4s ease-out both',
         goldenCardReveal:
-          'goldenCardReveal 2.45s cubic-bezier(.16,.72,.18,1) both',
+          'goldenCardReveal 3.4s cubic-bezier(.16,.72,.18,1) both',
         hyperCardReveal:
           'hyperCardReveal 1.85s cubic-bezier(.16,.72,.18,1) both',
         stageEnter: 'stageEnter .24s ease-out both',

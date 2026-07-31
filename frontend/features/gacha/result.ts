@@ -26,7 +26,6 @@ export interface GroupedGachaResult {
   newCount: number;
   downgradedCount: number;
   ownedCountAfter: number;
-  goldenOriginRanks: number[];
 }
 
 export function sortGachaItemsByRarity(items: GachaDrawItem[]) {
@@ -56,8 +55,6 @@ export function groupGachaDrawResults(
           newCount: item.new ? 1 : 0,
           downgradedCount: item.downgraded ? 1 : 0,
           ownedCountAfter: item.ownedCountAfter,
-          goldenOriginRanks:
-            item.goldenOriginRank === null ? [] : [item.goldenOriginRank],
         });
         continue;
       }
@@ -69,9 +66,6 @@ export function groupGachaDrawResults(
         current.ownedCountAfter,
         item.ownedCountAfter,
       );
-      if (item.goldenOriginRank !== null) {
-        current.goldenOriginRanks.push(item.goldenOriginRank);
-      }
     }
   }
 

@@ -75,6 +75,19 @@ export interface GachaDrawDetail {
   items: GachaDrawItem[];
 }
 
+export interface GachaPackPurchaseData {
+  purchaseId: number;
+  productId: number;
+  productName: string;
+  quantity: number;
+  unitPoint: number;
+  totalPoint: number;
+  usedFreePoint: number;
+  usedPaidPoint: number;
+  remainingBalance: number;
+  drawIds: number[];
+}
+
 export function getGachaCatalog(
   rarity?: GachaRarity,
   signal?: AbortSignal,
@@ -129,6 +142,22 @@ export function markGachaDrawViewed(
   return request<GachaDrawDetail>(`/api/v1/card/gacha/draws/${drawId}/viewed`, {
     method: "PATCH",
     accessToken,
+  });
+}
+
+export function purchaseGachaPacks(
+  productId: number,
+  quantity: number,
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<GachaPackPurchaseData> {
+  return request<GachaPackPurchaseData>("/api/v1/card/gacha/purchases", {
+    method: "POST",
+    accessToken,
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({ productId, quantity }),
   });
 }
 

@@ -171,51 +171,104 @@ const REVEAL_CHORDS: Record<GachaRarity, readonly number[]> = {
   GOLDEN_RARE: [392, 523, 659, 784, 1_047],
 };
 
-export function playRarityRevealSound(rarity: GachaRarity, muted: boolean) {
-  const context = getAudioContext(muted);
-  if (!context) return;
-
-  const golden = rarity === "GOLDEN_RARE";
-  const master = createMaster(context, golden ? 0.68 : 0.46);
-  const chord = REVEAL_CHORDS[rarity];
+function playGoldenFanfare(context: AudioContext) {
+  const master = createMaster(context, 0.58);
+  const fanfareChords = [
+    { start: 0.12, notes: [392, 523, 659], duration: 0.3 },
+    { start: 0.42, notes: [440, 554, 659], duration: 0.3 },
+    { start: 0.72, notes: [523, 659, 784], duration: 0.34 },
+    { start: 1.06, notes: [523, 659, 784, 1_047], duration: 1.45 },
+  ] as const;
 
   playTone(context, master, {
-    frequency: golden ? 72 : 105,
-    endFrequency: golden ? 42 : 72,
+    frequency: 82,
+    endFrequency: 46,
     start: 0,
-    duration: golden ? 0.6 : 0.34,
-    volume: golden ? 0.52 : 0.24,
+    duration: 0.5,
+    volume: 0.5,
     type: "triangle",
   });
 
-  chord.forEach((frequency, index) => {
-    playTone(context, master, {
-      frequency,
-      endFrequency: frequency * (golden ? 1.5 : 1.18),
-      start: golden ? 0.38 + index * 0.12 : index * 0.055,
-      duration: golden ? 1.15 : 0.58,
-      volume: golden ? 0.16 : 0.11,
-      type: index % 2 === 0 ? "sine" : "triangle",
+  fanfareChords.forEach((chord, chordIndex) => {
+    chord.notes.forEach((frequency, noteIndex) => {
+      playTone(context, master, {
+        frequency,
+        endFrequency:
+          frequency * (chordIndex === fanfareChords.length - 1 ? 1.015 : 1.06),
+        start: chord.start + noteIndex * 0.012,
+        duration: chord.duration,
+        volume: chordIndex === fanfareChords.length - 1 ? 0.13 : 0.1,
+        type: noteIndex % 2 === 0 ? "sawtooth" : "triangle",
+      });
     });
   });
 
-  if (golden) {
+  [0.08, 0.4, 0.7, 1.02].forEach((start, index) => {
     const source = context.createBufferSource();
     const filter = context.createBiquadFilter();
     const gain = context.createGain();
-    const startsAt = context.currentTime + 0.4;
-    const endsAt = startsAt + 0.95;
+    const startsAt = context.currentTime + start;
+    const endsAt = startsAt + (index === 3 ? 1.35 : 0.18);
 
     source.buffer = getNoiseBuffer(context);
-    filter.type = "highpass";
-    filter.frequency.value = 4_200;
+    filter.type = index === 3 ? "highpass" : "bandpass";
+    filter.frequency.value = index === 3 ? 4_800 : 1_300 + index * 180;
+    filter.Q.value = index === 3 ? 0.7 : 1.8;
     gain.gain.setValueAtTime(0.0001, startsAt);
-    gain.gain.exponentialRampToValueAtTime(0.18, startsAt + 0.08);
+    gain.gain.exponentialRampToValueAtTime(
+      index === 3 ? 0.2 : 0.12,
+      startsAt + 0.025,
+    );
     gain.gain.exponentialRampToValueAtTime(0.0001, endsAt);
     source.connect(filter);
     filter.connect(gain);
     gain.connect(master);
     source.start(startsAt);
     source.stop(endsAt);
+  });
+
+  [1_318, 1_568, 2_093].forEach((frequency, index) => {
+    playTone(context, master, {
+      frequency,
+      endFrequency: frequency * 1.35,
+      start: 1.15 + index * 0.13,
+      duration: 0.9,
+      volume: 0.055,
+      type: "sine",
+    });
+  });
+}
+
+export function playRarityRevealSound(rarity: GachaRarity, muted: boolean) {
+  const context = getAudioContext(muted);
+  if (!context) return;
+
+  const golden = rarity === "GOLDEN_RARE";
+  if (golden) {
+    playGoldenFanfare(context);
+    return;
   }
+
+  const master = createMaster(context, 0.46);
+  const chord = REVEAL_CHORDS[rarity];
+
+  playTone(context, master, {
+    frequency: 105,
+    endFrequency: 72,
+    start: 0,
+    duration: 0.34,
+    volume: 0.24,
+    type: "triangle",
+  });
+
+  chord.forEach((frequency, index) => {
+    playTone(context, master, {
+      frequency,
+      endFrequency: frequency * 1.18,
+      start: index * 0.055,
+      duration: 0.58,
+      volume: 0.11,
+      type: index % 2 === 0 ? "sine" : "triangle",
+    });
+  });
 }

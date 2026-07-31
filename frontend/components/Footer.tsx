@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const COLS = [
-  { title: '서비스', links: [['홈', '/'], ['내 식물', '/plants'], ['성장 일지', '/journals'], ['상점', '/shop'], ['카드', '/cards']] },
+  { title: '서비스', links: [['홈', '/'], ['내 식물', '/plants'], ['성장 일지', '/journals'], ['상점', '/shop'], ['카드', '/cards'], ['가챠', '/gacha']] },
   { title: '내 정보', links: [['마이페이지', '/my'], ['주문 내역', '/my/orders'], ['포인트', '/my/points'], ['카드', '/cards']] },
   { title: '고객지원', links: [['1:1 문의', '/my/inquiries'], ['알림 설정', '/my/settings/notifications']] },
 ];
