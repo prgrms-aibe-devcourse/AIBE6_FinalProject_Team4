@@ -12,6 +12,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
+	boolean existsByCategory(ProductCategory category);
+
 	@EntityGraph(attributePaths = "plant")
 	Page<Product> findAllByStatusAndCategoryIn(
 			ProductStatus status,

@@ -24,10 +24,10 @@ public class ProductController {
 
 	private final ProductService productService;
 
-	@Operation(summary = "상품 목록 조회", description = "활성 상태인 키트와 모종 상품을 페이지 단위로 조회합니다.")
+	@Operation(summary = "상품 목록 조회", description = "활성 상태인 키트, 모종, 가챠 팩 상품을 페이지 단위로 조회합니다.")
 	@GetMapping
 	public ResponseEntity<ApiResponse<ProductPageResponse>> getProducts(
-			@Parameter(description = "상품 카테고리: KIT 또는 SEEDLING")
+			@Parameter(description = "상품 카테고리: KIT, SEEDLING 또는 GACHA_PACK")
 			@RequestParam(required = false) String category,
 			@Parameter(description = "정렬: LATEST, PRICE_ASC, PRICE_DESC")
 			@RequestParam(defaultValue = "LATEST") String sort,

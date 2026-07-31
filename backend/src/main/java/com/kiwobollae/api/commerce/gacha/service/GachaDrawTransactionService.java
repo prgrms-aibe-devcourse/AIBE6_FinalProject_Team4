@@ -44,8 +44,8 @@ public class GachaDrawTransactionService {
   private final GachaDrawEngine drawEngine;
   private final GachaMasterValidator masterValidator;
 
-  @Value("${app.gacha.qa.hyper-rate-boost-enabled:false}")
-  private boolean qaHyperRateBoostEnabled;
+  @Value("${app.gacha.qa.golden-rate-boost-enabled:false}")
+  private boolean qaGoldenRateBoostEnabled;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void process(Long drawId) {
@@ -87,9 +87,9 @@ public class GachaDrawTransactionService {
       int sequence,
       Map<TradingCardRarity, List<TradingCard>> cardsByRarity,
       LocalDateTime now) {
-    boolean useQaHyperRate =
-        qaHyperRateBoostEnabled && draw.getSourceType() == GachaSourceType.ADMIN;
-    GachaDrawEngine.RolledGrade rolled = drawEngine.rollGrade(useQaHyperRate);
+    boolean useQaGoldenRate =
+        qaGoldenRateBoostEnabled && draw.getSourceType() == GachaSourceType.ADMIN;
+    GachaDrawEngine.RolledGrade rolled = drawEngine.rollGrade(useQaGoldenRate);
     TradingCardRarity finalRarity = rolled.rarity();
     TradingCard card;
     GoldenCardInstance goldenInstance = null;

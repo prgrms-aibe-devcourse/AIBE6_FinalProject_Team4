@@ -28,7 +28,7 @@ import lombok.NoArgsConstructor;
 		},
 		check = {
 				@CheckConstraint(name = "chk_products_point_price_by_category",
-						constraint = "((category IN ('KIT', 'SEEDLING') AND point_price IS NOT NULL AND point_price >= 0) "
+						constraint = "((category IN ('KIT', 'SEEDLING', 'GACHA_PACK') AND point_price IS NOT NULL AND point_price >= 0) "
 								+ "OR (category = 'EXCHANGE' AND point_price IS NULL))")
 		})
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

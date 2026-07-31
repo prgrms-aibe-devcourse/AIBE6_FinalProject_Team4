@@ -151,6 +151,27 @@ class WalletServiceTest {
 	}
 
 	@Test
+	void gachaPackPurchaseUsesFreePointFirstAndRecordsGachaReference() {
+		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(1_000L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForGachaPurchase(7L, 200L, 501L);
+
+		assertThat(result.usedFreePoint()).isEqualTo(100L);
+		assertThat(result.usedPaidPoint()).isEqualTo(100L);
+		assertThat(result.remainingBalance()).isEqualTo(900L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getRefType)
+				.containsOnly(PointRefType.GACHA_PURCHASE);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getRefId)
+				.containsOnly(501L);
+	}
+
+	@Test
 	void cardPurchaseUsesOnlyPaidPointWhenFreePointIsNegative() {
 		Wallet wallet = Wallet.builder().freePoint(-100L).paidPoint(200L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));

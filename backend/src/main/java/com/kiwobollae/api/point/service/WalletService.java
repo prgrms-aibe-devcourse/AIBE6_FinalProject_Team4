@@ -125,6 +125,33 @@ public class WalletService {
 		);
 	}
 
+	/** 가챠 팩 구매 금액을 무상 포인트에서 먼저 차감하고 부족분을 유상 포인트에서 차감한다. */
+	@Transactional
+	public PointDeductionResult deductForGachaPurchase(
+			Long userId,
+			long amount,
+			Long gachaPurchaseId
+	) {
+		validatePurchaseRequest(amount, PointRefType.GACHA_PURCHASE, gachaPurchaseId);
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+
+		long availableFreePoint = Math.max(wallet.getFreePoint(), 0L);
+		long usedFreePoint = Math.min(availableFreePoint, amount);
+		long usedPaidPoint = amount - usedFreePoint;
+		if (wallet.getPaidPoint() < usedPaidPoint) {
+			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
+		}
+
+		return deductPoints(
+				wallet,
+				usedFreePoint,
+				usedPaidPoint,
+				PointRefType.GACHA_PURCHASE,
+				gachaPurchaseId
+		);
+	}
+
 	/**
 	 * 상품 주문에 요청한 무상 포인트를 100P 단위로 차감하고, 나머지 금액을 유상 포인트로
 	 * 차감한다. requestedFreePoint가 0이면 유상 포인트만 사용한다.
