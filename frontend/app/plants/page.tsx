@@ -26,7 +26,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PlantsPage() {
   const { state, hydrated, set } = useStore();
-  const { showToast } = useUI();
+  const { showToast, askConfirm } = useUI();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -94,6 +94,22 @@ export default function PlantsPage() {
     }
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const closeRegisterModal = () => {
+    const hasInput = reg.nick.trim() !== '' || reg.speciesId !== null || photoFile !== null;
+    if (!hasInput) {
+      setOpen(false);
+      return;
+    }
+    askConfirm({
+      icon: 'delete',
+      title: '입력을 취소할까요?',
+      body: '입력한 내용이 사라지고 되돌릴 수 없어요.',
+      ok: '닫기',
+      danger: true,
+      onOk: () => setOpen(false),
+    });
   };
 
   const submit = async () => {
@@ -206,7 +222,7 @@ export default function PlantsPage() {
       </button>
 
       {open && (
-        <div onClick={() => !submitting && setOpen(false)} className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10">
+        <div onClick={() => !submitting && closeRegisterModal()} className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]">
             <h3 className="mb-1 text-xl font-extrabold">새 식물 등록 🌿</h3>
             <p className="mb-5 text-[13.5px] text-sub">새 친구의 정보를 알려주세요.</p>
