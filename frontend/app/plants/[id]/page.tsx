@@ -143,7 +143,12 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
 
       <div className="mt-4 grid items-start gap-[26px] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-[22px] text-[140px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+        {plant.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={resolveImageUrl(plant.thumbnailUrl)} alt="" className="h-[300px] w-full rounded-[22px] object-cover" />
+        ) : (
+          <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-[22px] text-[140px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+        )}
         <div>
           <div className="mb-2.5 inline-block rounded-full px-3 py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
           <h1 className="mb-1.5 text-[28px] font-extrabold">{plant.nickname}</h1>

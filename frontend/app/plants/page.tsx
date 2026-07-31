@@ -1,15 +1,17 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { SPECIES, BADGE } from '@/lib/data';
 import { grads } from '@/lib/theme';
-import { ApiError } from '@/lib/api';
-import { createPlant, getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { ApiError, resolveImageUrl } from '@/lib/api';
+import { createPlant, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
 import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const REG_PHOTOS = [
   ['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry],
   ['🍅', grads.tomato], ['🌿', grads.basil], ['🥬', grads.lettuce], ['🌶️', grads.pepper],
@@ -41,6 +43,10 @@ export default function PlantsPage() {
     nick: '', speciesId: null, photoIdx: 0, startDate: today(),
   });
   const [query, setQuery] = useState('');
+  const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -84,6 +90,18 @@ export default function PlantsPage() {
     setQuery('');
   };
 
+  const pickPhoto = (file: File | null) => {
+    if (!file) return;
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+    }
+    if (file.size > MAX_PHOTO_SIZE) {
+      return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
   const submit = async () => {
     if (!state.accessToken) return;
     if (!regV.ok) return showToast(regV.msg, 'err');
@@ -92,8 +110,18 @@ export default function PlantsPage() {
 
     setSubmitting(true);
     try {
+      let thumbnailUrl: string | undefined;
+      if (photoMode === 'upload' && photoFile) {
+        const uploaded = await uploadPlantImage(photoFile, state.accessToken);
+        thumbnailUrl = uploaded.imageUrl;
+      }
       const created = await createPlant(
-        { speciesId: reg.speciesId, nickname: reg.nick, startDate: reg.startDate },
+        {
+          speciesId: reg.speciesId,
+          nickname: reg.nick,
+          startDate: reg.startDate,
+          ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        },
         state.accessToken,
       );
       setPlants([created, ...plants]);
@@ -101,6 +129,10 @@ export default function PlantsPage() {
       setOpen(false);
       setReg({ nick: '', speciesId: null, photoIdx: 0, startDate: today() });
       setQuery('');
+      setPhotoMode('upload');
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       showToast(`'${created.nickname}'와의 여정이 시작됐어요! 🌿`);
     } catch (requestError) {
       showToast(
@@ -149,7 +181,12 @@ export default function PlantsPage() {
             const visual = plantVisual(p.speciesName);
             return (
               <Link key={p.id} href={`/plants/${p.id}`} className="relative block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-                <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+                {p.thumbnailUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={resolveImageUrl(p.thumbnailUrl)} alt="" className="h-[150px] w-full object-cover" />
+                ) : (
+                  <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+                )}
                 <div className="absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
                 <div className="p-[15px]">
                   <div className="text-base font-extrabold">{p.nickname}</div>
@@ -241,23 +278,76 @@ export default function PlantsPage() {
               className={`${FIELD} mb-[18px] mt-1.5`}
             />
 
-            <label className={LABEL}>대표 사진</label>
-            <div className="mb-1.5 mt-2 flex flex-wrap gap-2.5">
-              {REG_PHOTOS.map(([emoji, grad], i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setReg({ ...reg, photoIdx: i })}
-                  className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] text-[28px] ${
-                    reg.photoIdx === i ? 'border-brand' : 'border-transparent'
-                  }`}
-                  style={{ background: grad }}
-                >
-                  {emoji}
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <label className={LABEL}>대표 사진</label>
+              <button
+                type="button"
+                onClick={() => setPhotoMode(photoMode === 'upload' ? 'emoji' : 'upload')}
+                className="cursor-pointer text-xs font-bold text-brand-dark"
+              >
+                {photoMode === 'upload' ? '이모지로 대신할게요' : '사진 업로드로 전환'}
+              </button>
             </div>
-            <div className="text-xs text-[#a9b3a0]">마음에 드는 색상과 이모지를 골라주세요.</div>
+
+            {photoMode === 'upload' ? (
+              <div className="mt-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
+                      photoPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
+                    }`}
+                  >
+                    {photoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                        <span className="text-[11px] font-bold">사진 선택</span>
+                      </>
+                    )}
+                  </button>
+                  {photoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
+                    >
+                      <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-[#a9b3a0]">jpg · png · webp / 5MB 이하</div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-1.5 mt-2 flex flex-wrap gap-2.5">
+                  {REG_PHOTOS.map(([emoji, grad], i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setReg({ ...reg, photoIdx: i })}
+                      className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] text-[28px] ${
+                        reg.photoIdx === i ? 'border-brand' : 'border-transparent'
+                      }`}
+                      style={{ background: grad }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-xs text-[#a9b3a0]">마음에 드는 색상과 이모지를 골라주세요.</div>
+              </>
+            )}
 
             <button type="button" onClick={submit} disabled={submitting} className="mt-[22px] w-full cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white disabled:opacity-60">
               {submitting ? '등록 중...' : '등록하기'}
