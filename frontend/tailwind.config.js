@@ -278,129 +278,183 @@ module.exports = {
             backgroundPosition: '-130% 0',
           },
         },
-        goldenFlash: {
-          '0%, 56%, 100%': {
-            opacity: '0',
-          },
-          '62%': {
-            opacity: '.72',
-          },
+        premiumBackdrop: {
+          '0%': { opacity: '0' },
+          '18%, 82%': { opacity: '1' },
+          '100%': { opacity: '.72' },
         },
-        goldenBackdrop: {
-          '0%': {
-            opacity: '0',
-          },
-          '28%, 100%': {
-            opacity: '1',
-          },
+        premiumVignette: {
+          '0%': { opacity: '0' },
+          '22%': { opacity: '.9' },
+          '100%': { opacity: '.34' },
         },
-        goldenVeil: {
-          '0%, 20%': {
-            opacity: '.94',
-          },
-          '38%': {
-            opacity: '.7',
-          },
-          '58%, 100%': {
-            opacity: '0',
-          },
-        },
-        goldenOmenLine: {
-          '0%': {
-            opacity: '0',
-            transform: 'scaleX(0)',
-          },
-          '18%': {
-            opacity: '1',
-            transform: 'scaleX(.12)',
-          },
-          '42%': {
-            opacity: '.9',
-            transform: 'scaleX(.78)',
-          },
-          '58%, 100%': {
-            opacity: '0',
-            transform: 'scaleX(1)',
-          },
-        },
-        goldenBeamLeft: {
+        goldenRadiance: {
           '0%, 34%': {
             opacity: '0',
-            transform: 'translate(-50%, -50%) skewX(-12deg) scaleX(.3)',
+            transform: 'translate(-50%, -50%) rotate(-12deg) scale(.34)',
           },
-          '64%': {
-            opacity: '.8',
-            transform: 'translate(-82%, -50%) skewX(-12deg) scaleX(1)',
-          },
+          '52%': { opacity: '.86' },
           '100%': {
-            opacity: '.16',
-            transform: 'translate(-105%, -50%) skewX(-12deg) scaleX(1.2)',
+            opacity: '.24',
+            transform: 'translate(-50%, -50%) rotate(16deg) scale(1.18)',
           },
         },
-        goldenBeamRight: {
-          '0%, 34%': {
+        hyperRadiance: {
+          '0%, 22%': {
             opacity: '0',
-            transform: 'translate(-50%, -50%) skewX(12deg) scaleX(.3)',
+            transform: 'translate(-50%, -50%) rotate(-20deg) scale(.42)',
           },
-          '64%': {
-            opacity: '.72',
-            transform: 'translate(-18%, -50%) skewX(12deg) scaleX(1)',
-          },
+          '46%': { opacity: '.82' },
           '100%': {
-            opacity: '.14',
-            transform: 'translate(5%, -50%) skewX(12deg) scaleX(1.2)',
+            opacity: '.2',
+            transform: 'translate(-50%, -50%) rotate(22deg) scale(1.14)',
           },
         },
-        goldenHalo: {
+        goldenBurstRing: {
           '0%, 38%': {
             opacity: '0',
-            transform: 'translate(-50%, -50%) scale(.88)',
+            transform: 'translate(-50%, -50%) scale(.28)',
           },
-          '68%': {
-            opacity: '.75',
-          },
+          '53%': { opacity: '1' },
           '100%': {
-            opacity: '.32',
-            transform: 'translate(-50%, -50%) scale(1.035)',
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(1.55)',
           },
         },
-        goldenFoil: {
+        hyperBurstRing: {
+          '0%, 26%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(.34)',
+          },
+          '44%': { opacity: '1' },
+          '100%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(1.45)',
+          },
+        },
+        goldenBloom: {
+          '0%, 34%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(.2)',
+          },
+          '50%': { opacity: '1' },
+          '68%': {
+            opacity: '.7',
+            transform: 'translate(-50%, -50%) scale(1.12)',
+          },
+          '100%': {
+            opacity: '.2',
+            transform: 'translate(-50%, -50%) scale(1.32)',
+          },
+        },
+        hyperBloom: {
+          '0%, 22%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(.24)',
+          },
+          '42%': { opacity: '1' },
+          '64%': {
+            opacity: '.58',
+            transform: 'translate(-50%, -50%) scale(1.08)',
+          },
+          '100%': {
+            opacity: '.18',
+            transform: 'translate(-50%, -50%) scale(1.26)',
+          },
+        },
+        goldenFlash: {
+          '0%, 43%, 58%, 100%': { opacity: '0' },
+          '49%': { opacity: '.96' },
+          '52%': { opacity: '.72' },
+        },
+        hyperFlash: {
+          '0%, 31%, 49%, 100%': { opacity: '0' },
+          '38%': { opacity: '.9' },
+          '42%': { opacity: '.48' },
+        },
+        premiumSpark: {
+          '0%': {
+            opacity: '0',
+            transform: 'translate(-50%, -50%) scale(.2)',
+          },
+          '12%': { opacity: '1' },
+          '72%': { opacity: '.85' },
+          '100%': {
+            opacity: '0',
+            transform:
+              'translate(calc(-50% + var(--spark-x)), calc(-50% + var(--spark-y))) scale(.15)',
+          },
+        },
+        premiumFoil: {
           '0%': {
             opacity: '0',
             backgroundPosition: '180% 0',
           },
-          '62%': {
+          '48%': {
             opacity: '0',
             backgroundPosition: '180% 0',
           },
-          '78%': {
-            opacity: '.65',
+          '66%': {
+            opacity: '.78',
           },
           '100%': {
-            opacity: '.16',
+            opacity: '.1',
             backgroundPosition: '-120% 0',
           },
         },
         goldenCardReveal: {
           '0%': {
             opacity: '1',
-            transform: 'rotateY(-180deg) translateY(12px) scale(.82)',
+            filter: 'brightness(.45)',
+            transform: 'rotateY(-180deg) translateY(18px) scale(.72)',
           },
-          '28%': {
+          '34%': {
             opacity: '1',
-            transform: 'rotateY(-180deg) translateY(8px) scale(.82)',
+            filter: 'brightness(.52)',
+            transform: 'rotateY(-180deg) translateY(10px) scale(.76)',
           },
-          '44%': {
-            transform: 'rotateY(-176deg) translateY(0) scale(.86)',
+          '49%': {
+            filter: 'brightness(1.8)',
+            transform: 'rotateY(-168deg) translateY(0) scale(.84)',
           },
-          '70%': {
-            transform: 'rotateY(-50deg) translateY(-2px) scale(1.015)',
+          '68%': {
+            filter: 'brightness(1.16)',
+            transform: 'rotateY(-34deg) translateY(-7px) scale(1.06)',
           },
           '82%': {
-            transform: 'rotateY(3deg) translateY(0) scale(1.02)',
+            filter: 'brightness(1.03)',
+            transform: 'rotateY(4deg) translateY(-2px) scale(1.025)',
           },
           '100%': {
             opacity: '1',
+            filter: 'brightness(1)',
+            transform: 'rotateY(0deg) translateY(0) scale(1)',
+          },
+        },
+        hyperCardReveal: {
+          '0%': {
+            opacity: '1',
+            filter: 'brightness(.55) saturate(.7)',
+            transform: 'rotateY(-180deg) translateY(22px) scale(.74)',
+          },
+          '24%': {
+            filter: 'brightness(.7) saturate(.85)',
+            transform: 'rotateY(-178deg) translateY(9px) scale(.78)',
+          },
+          '40%': {
+            filter: 'brightness(1.65) saturate(1.35)',
+            transform: 'rotateY(-154deg) translateY(-4px) scale(.88)',
+          },
+          '67%': {
+            filter: 'brightness(1.14) saturate(1.14)',
+            transform: 'rotateY(-20deg) translateY(-8px) scale(1.055)',
+          },
+          '82%': {
+            transform: 'rotateY(5deg) translateY(-2px) scale(1.02)',
+          },
+          '100%': {
+            opacity: '1',
+            filter: 'brightness(1) saturate(1)',
             transform: 'rotateY(0deg) translateY(0) scale(1)',
           },
         },
@@ -444,19 +498,27 @@ module.exports = {
         rarityParticle:
           'rarityParticle 1.25s cubic-bezier(.12,.68,.2,1) both',
         goldenSweep: 'goldenSweep 1.5s ease-out both',
-        goldenFlash: 'goldenFlash 2.05s ease-out both',
-        goldenBackdrop: 'goldenBackdrop 2.1s ease-out both',
-        goldenVeil: 'goldenVeil 2.05s ease-out both',
-        goldenOmenLine:
-          'goldenOmenLine 2.05s cubic-bezier(.18,.7,.2,1) both',
-        goldenBeamLeft:
-          'goldenBeamLeft 2.1s cubic-bezier(.18,.7,.2,1) both',
-        goldenBeamRight:
-          'goldenBeamRight 2.1s cubic-bezier(.18,.7,.2,1) both',
-        goldenHalo: 'goldenHalo 2.1s cubic-bezier(.18,.7,.2,1) both',
-        goldenFoil: 'goldenFoil 2.3s ease-out both',
+        premiumBackdrop: 'premiumBackdrop 2.45s ease-out both',
+        premiumVignette: 'premiumVignette 2.45s ease-out both',
+        goldenRadiance:
+          'goldenRadiance 2.45s cubic-bezier(.16,.72,.18,1) both',
+        hyperRadiance:
+          'hyperRadiance 1.85s cubic-bezier(.16,.72,.18,1) both',
+        goldenBurstRing:
+          'goldenBurstRing 2.15s cubic-bezier(.12,.72,.18,1) both',
+        hyperBurstRing:
+          'hyperBurstRing 1.6s cubic-bezier(.12,.72,.18,1) both',
+        goldenBloom: 'goldenBloom 2.45s cubic-bezier(.16,.72,.2,1) both',
+        hyperBloom: 'hyperBloom 1.85s cubic-bezier(.16,.72,.2,1) both',
+        goldenFlash: 'goldenFlash 2.45s ease-out both',
+        hyperFlash: 'hyperFlash 1.85s ease-out both',
+        premiumSpark:
+          'premiumSpark 1.25s cubic-bezier(.14,.68,.18,1) both',
+        premiumFoil: 'premiumFoil 2.35s ease-out both',
         goldenCardReveal:
-          'goldenCardReveal 2.05s cubic-bezier(.16,.7,.18,1) both',
+          'goldenCardReveal 2.45s cubic-bezier(.16,.72,.18,1) both',
+        hyperCardReveal:
+          'hyperCardReveal 1.85s cubic-bezier(.16,.72,.18,1) both',
         stageEnter: 'stageEnter .24s ease-out both',
       },
     },

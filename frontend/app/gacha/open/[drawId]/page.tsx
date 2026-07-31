@@ -352,15 +352,17 @@ function RevealCard({
   onNext: () => void;
 }) {
   const golden = item.finalRarity === "GOLDEN_RARE";
+  const hyper = item.finalRarity === "HYPER_RARE";
+  const premium = golden || hyper;
   const revealStyle = RARITY_REVEAL_STYLE[item.finalRarity];
-  const [revealComplete, setRevealComplete] = useState(!golden);
+  const [revealComplete, setRevealComplete] = useState(!premium);
 
   useEffect(() => {
     playRarityRevealSound(item.finalRarity, muted);
   }, [item.finalRarity, muted]);
 
   useEffect(() => {
-    if (!golden) {
+    if (!premium) {
       setRevealComplete(true);
       return;
     }
@@ -369,16 +371,16 @@ function RevealCard({
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const timer = window.setTimeout(
       () => setRevealComplete(true),
-      reducedMotion ? 0 : 2_150,
+      reducedMotion ? 0 : golden ? 2_450 : 1_850,
     );
     return () => window.clearTimeout(timer);
-  }, [golden, item.sequence]);
+  }, [golden, item.sequence, premium]);
 
   return (
     <section
       aria-live="polite"
       className={`flex w-full flex-col items-center text-center ${
-        golden ? "" : "motion-safe:animate-stageEnter"
+        premium ? "" : "motion-safe:animate-stageEnter"
       }`}
     >
       <div
@@ -403,20 +405,10 @@ function RevealCard({
         <div
           className={`pointer-events-none absolute h-[82%] w-[115%] rounded-full blur-3xl motion-safe:animate-revealAura ${revealStyle.aura}`}
         />
-        {golden && (
-          <>
-            <div className="pointer-events-none fixed inset-0 z-[-2] bg-[radial-gradient(ellipse_at_50%_44%,rgba(196,148,39,.16),rgba(5,9,6,.97)_66%)] motion-safe:animate-goldenBackdrop" />
-            <div className="pointer-events-none fixed inset-0 z-[3] bg-black motion-safe:animate-goldenVeil" />
-            <div className="pointer-events-none fixed inset-x-0 top-1/2 z-[4] h-px bg-gradient-to-r from-transparent via-[#f5d97e] to-transparent shadow-[0_0_18px_rgba(245,217,126,.7)] motion-safe:animate-goldenOmenLine" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[125%] w-[18%] -translate-x-1/2 -translate-y-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-[#f4d87a]/30 to-transparent blur-xl motion-safe:animate-goldenBeamLeft" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[125%] w-[18%] -translate-x-1/2 -translate-y-1/2 skew-x-12 bg-gradient-to-r from-transparent via-[#fff1b0]/24 to-transparent blur-xl motion-safe:animate-goldenBeamRight" />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -z-[1] h-[104%] w-[112%] -translate-x-1/2 -translate-y-1/2 rounded-[32px] border border-[#f0d170]/45 shadow-[0_0_65px_rgba(226,185,69,.24)] motion-safe:animate-goldenHalo" />
-            <div className="pointer-events-none fixed inset-0 z-[2] bg-[#fff8d0]/45 motion-safe:animate-goldenFlash" />
-          </>
-        )}
+        {premium && <PremiumRevealEffects golden={golden} />}
 
         {Array.from(
-          { length: golden ? 0 : revealStyle.particleCount },
+          { length: premium ? 0 : revealStyle.particleCount },
           (_, particleIndex) => {
             const angle =
               (particleIndex / revealStyle.particleCount) * Math.PI * 2;
@@ -439,12 +431,14 @@ function RevealCard({
           },
         )}
 
-        <div className="relative aspect-[1122/1402] w-[min(84vw,51vh,400px)] [perspective:1500px]">
+        <div className="relative z-10 aspect-[1122/1402] w-[min(84vw,51vh,400px)] [perspective:1500px]">
           <div
             className={`absolute inset-0 [transform-style:preserve-3d] ${
               golden
                 ? "motion-safe:animate-goldenCardReveal"
-                : "motion-safe:animate-cardReveal3d"
+                : hyper
+                  ? "motion-safe:animate-hyperCardReveal"
+                  : "motion-safe:animate-cardReveal3d"
             }`}
           >
             <div
@@ -462,7 +456,10 @@ function RevealCard({
               )}
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,transparent_28%,rgba(255,255,255,.28)_45%,transparent_62%)] bg-[length:240%_100%] opacity-70 mix-blend-screen motion-safe:animate-goldenSweep" />
               {golden && (
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(108deg,transparent_30%,rgba(255,246,188,.2)_45%,transparent_58%)] bg-[length:280%_100%] mix-blend-screen motion-safe:animate-goldenFoil" />
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(108deg,transparent_30%,rgba(255,248,211,.28)_45%,transparent_58%)] bg-[length:280%_100%] mix-blend-screen motion-safe:animate-premiumFoil" />
+              )}
+              {hyper && (
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(108deg,transparent_24%,rgba(114,239,255,.24)_39%,rgba(255,255,255,.38)_47%,rgba(255,112,230,.2)_55%,transparent_70%)] bg-[length:300%_100%] mix-blend-screen motion-safe:animate-premiumFoil" />
               )}
               {item.new && (
                 <span className="absolute left-4 top-4 rounded-full bg-[#ffda52] px-3 py-1.5 text-xs font-black text-[#4e3a00] shadow-[0_5px_20px_rgba(255,218,82,.35)]">
@@ -513,5 +510,76 @@ function RevealCard({
         </button>
       </div>
     </section>
+  );
+}
+
+function PremiumRevealEffects({ golden }: { golden: boolean }) {
+  const sparkCount = golden ? 22 : 16;
+  const color = golden ? "#fff0a8" : "#b8f7ff";
+
+  return (
+    <>
+      <div
+        className={`pointer-events-none fixed inset-0 z-0 motion-reduce:hidden motion-safe:animate-premiumBackdrop ${
+          golden
+            ? "bg-[radial-gradient(circle_at_50%_46%,rgba(245,208,96,.18),rgba(8,10,8,.96)_64%)]"
+            : "bg-[radial-gradient(circle_at_50%_46%,rgba(91,86,210,.2),rgba(7,8,18,.96)_66%)]"
+        }`}
+      />
+      <div className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_center,transparent_30%,rgba(0,0,0,.62)_82%)] motion-reduce:hidden motion-safe:animate-premiumVignette" />
+
+      <div
+        className={`pointer-events-none absolute left-1/2 top-1/2 -z-[1] aspect-square w-[185%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[2px] motion-reduce:hidden ${
+          golden
+            ? "bg-[repeating-conic-gradient(from_0deg,rgba(255,237,151,.48)_0deg,transparent_7deg,transparent_19deg)] motion-safe:animate-goldenRadiance"
+            : "bg-[repeating-conic-gradient(from_12deg,rgba(103,236,255,.38)_0deg,transparent_8deg,rgba(255,104,227,.25)_14deg,transparent_25deg)] motion-safe:animate-hyperRadiance"
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute left-1/2 top-1/2 -z-[1] aspect-square w-[132%] -translate-x-1/2 -translate-y-1/2 rounded-full border motion-reduce:hidden ${
+          golden
+            ? "border-[#fff0a6]/75 shadow-[0_0_28px_rgba(255,224,122,.8),inset_0_0_28px_rgba(255,242,184,.32)] motion-safe:animate-goldenBurstRing"
+            : "border-[#9ff5ff]/70 shadow-[0_0_30px_rgba(83,221,255,.65),inset_0_0_25px_rgba(255,96,221,.24)] motion-safe:animate-hyperBurstRing"
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute left-1/2 top-1/2 -z-[1] aspect-square w-[104%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl motion-reduce:hidden ${
+          golden
+            ? "bg-[radial-gradient(circle,rgba(255,255,244,.96)_0%,rgba(255,229,125,.48)_28%,transparent_68%)] motion-safe:animate-goldenBloom"
+            : "bg-[radial-gradient(circle,rgba(255,255,255,.92)_0%,rgba(117,235,255,.42)_25%,rgba(238,91,255,.2)_48%,transparent_70%)] motion-safe:animate-hyperBloom"
+        }`}
+      />
+
+      {Array.from({ length: sparkCount }, (_, sparkIndex) => {
+        const angle = (sparkIndex / sparkCount) * Math.PI * 2;
+        const distance = 170 + (sparkIndex % 5) * 30;
+        const size = 3 + (sparkIndex % 3) * 2;
+        return (
+          <span
+            key={sparkIndex}
+            className="pointer-events-none absolute left-1/2 top-1/2 z-[12] rounded-full motion-reduce:hidden motion-safe:animate-premiumSpark"
+            style={
+              {
+                "--spark-x": `${Math.cos(angle) * distance}px`,
+                "--spark-y": `${Math.sin(angle) * distance * 0.78}px`,
+                width: `${size}px`,
+                height: `${size}px`,
+                backgroundColor: color,
+                boxShadow: `0 0 ${size * 3}px ${color}`,
+                animationDelay: `${golden ? 980 : 650 + (sparkIndex % 4) * 24}ms`,
+              } as CSSProperties
+            }
+          />
+        );
+      })}
+
+      <div
+        className={`pointer-events-none fixed inset-0 z-20 opacity-0 motion-reduce:hidden ${
+          golden
+            ? "bg-[#fffbe2] motion-safe:animate-goldenFlash"
+            : "bg-[#f5fbff] motion-safe:animate-hyperFlash"
+        }`}
+      />
+    </>
   );
 }
