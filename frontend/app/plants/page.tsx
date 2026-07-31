@@ -4,19 +4,13 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { SPECIES, BADGE } from '@/lib/data';
-import { grads } from '@/lib/theme';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { createPlant, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
-import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
+import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const REG_PHOTOS = [
-  ['🌱', grads.sprout], ['☀️', grads.sun], ['🪴', grads.mint], ['🌸', grads.strawberry],
-  ['🍅', grads.tomato], ['🌿', grads.basil], ['🥬', grads.lettuce], ['🌶️', grads.pepper],
-  ['🥕', grads.carrot], ['🥔', grads.potato],
-];
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
@@ -114,6 +108,8 @@ export default function PlantsPage() {
       if (photoMode === 'upload' && photoFile) {
         const uploaded = await uploadPlantImage(photoFile, state.accessToken);
         thumbnailUrl = uploaded.imageUrl;
+      } else if (photoMode === 'emoji') {
+        thumbnailUrl = EMOJI_THUMBNAIL_PREFIX + PROFILE_EMOJI_OPTIONS[reg.photoIdx][0];
       }
       const created = await createPlant(
         {
@@ -178,14 +174,14 @@ export default function PlantsPage() {
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
           {list.map((p) => {
             const b = (BADGE as Record<string, { label: string; bg: string; color: string }>)[p.status];
-            const visual = plantVisual(p.speciesName);
+            const thumb = plantThumbnail(p.thumbnailUrl, p.speciesName);
             return (
               <Link key={p.id} href={`/plants/${p.id}`} className="relative block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-                {p.thumbnailUrl ? (
+                {thumb.type === 'image' ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={resolveImageUrl(p.thumbnailUrl)} alt="" className="h-[150px] w-full object-cover" />
+                  <img src={resolveImageUrl(thumb.url)} alt="" className="h-[150px] w-full object-cover" />
                 ) : (
-                  <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+                  <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
                 )}
                 <div className="absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
                 <div className="p-[15px]">
@@ -331,7 +327,7 @@ export default function PlantsPage() {
             ) : (
               <>
                 <div className="mb-1.5 mt-2 flex flex-wrap gap-2.5">
-                  {REG_PHOTOS.map(([emoji, grad], i) => (
+                  {PROFILE_EMOJI_OPTIONS.map(([emoji, grad], i) => (
                     <button
                       key={i}
                       type="button"

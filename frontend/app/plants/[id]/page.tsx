@@ -7,7 +7,7 @@ import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { deletePlant, getPlant, PlantProfileData, PlantStatus, updatePlant } from '@/lib/plant-api';
-import { dPlus, formatDate, plantVisual } from '@/lib/plant-visual';
+import { dPlus, formatDate, plantThumbnail } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 
 function representativeImage(journal: PlantJournalData): string | null {
@@ -136,18 +136,18 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   }
 
   const b = (BADGE as Record<string, { label: string; bg: string; color: string }>)[plant.status];
-  const visual = plantVisual(plant.speciesName);
+  const thumb = plantThumbnail(plant.thumbnailUrl, plant.speciesName);
 
   return (
     <div className="container">
       <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
 
       <div className="mt-4 grid items-start gap-[26px] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        {plant.thumbnailUrl ? (
+        {thumb.type === 'image' ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={resolveImageUrl(plant.thumbnailUrl)} alt="" className="h-[300px] w-full rounded-[22px] object-cover" />
+          <img src={resolveImageUrl(thumb.url)} alt="" className="h-[300px] w-full rounded-[22px] object-cover" />
         ) : (
-          <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-[22px] text-[140px]" style={{ background: visual.grad }}>{visual.emoji}</div>
+          <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-[22px] text-[140px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
         )}
         <div>
           <div className="mb-2.5 inline-block rounded-full px-3 py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
