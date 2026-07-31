@@ -67,6 +67,19 @@ export default function PlantsPage() {
   const regV = nickValid(reg.nick);
   const spResults = SPECIES.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
 
+  const handleSpeciesQueryChange = (value: string) => {
+    setQuery(value);
+    const selected = SPECIES.find((sp) => sp.id === reg.speciesId);
+    if (selected && selected.name !== value) {
+      setReg({ ...reg, speciesId: null });
+    }
+  };
+
+  const clearSpeciesSelection = () => {
+    setReg({ ...reg, speciesId: null });
+    setQuery('');
+  };
+
   const submit = async () => {
     if (!state.accessToken) return;
     if (!regV.ok) return showToast(regV.msg, 'err');
@@ -178,23 +191,36 @@ export default function PlantsPage() {
             <label className={LABEL}>식물 종 <span className="text-[#e5533b]">*</span></label>
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => handleSpeciesQueryChange(e.target.value)}
               placeholder="종을 검색하세요 (예: 토마토)"
               className={`${FIELD} mb-2.5 mt-1.5`}
             />
             <div className="mb-[18px] flex flex-wrap gap-2">
-              {spResults.map((sp) => (
-                <button
-                  key={sp.id}
-                  type="button"
-                  onClick={() => { setReg({ ...reg, speciesId: sp.id }); setQuery(sp.name); }}
-                  className={`cursor-pointer rounded-[10px] border-[1.5px] px-[13px] py-2 text-[13.5px] font-bold ${
-                    reg.speciesId === sp.id ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
-                  }`}
-                >
-                  {sp.emoji} {sp.name}
-                </button>
-              ))}
+              {spResults.map((sp) => {
+                const selected = reg.speciesId === sp.id;
+                return (
+                  <button
+                    key={sp.id}
+                    type="button"
+                    onClick={() => { setReg({ ...reg, speciesId: sp.id }); setQuery(sp.name); }}
+                    className={`cursor-pointer rounded-[10px] border-[1.5px] px-[13px] py-2 text-[13.5px] font-bold ${
+                      selected ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
+                    }`}
+                  >
+                    {sp.emoji} {sp.name}
+                    {selected && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); clearSpeciesSelection(); }}
+                        className="ml-1.5 text-[#a9b3a0]"
+                      >
+                        ×
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             <label className={LABEL}>재배 시작일</label>
