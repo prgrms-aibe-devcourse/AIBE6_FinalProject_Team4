@@ -1,14 +1,17 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
-import { deletePlant, getPlant, PlantProfileData, PlantStatus, updatePlant } from '@/lib/plant-api';
-import { dPlus, formatDate, plantThumbnail } from '@/lib/plant-visual';
+import { deletePlant, getPlant, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
+import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
+
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 function representativeImage(journal: PlantJournalData): string | null {
   const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
@@ -30,6 +33,11 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   const [editStatus, setEditStatus] = useState<PlantStatus>('GROWING');
   const [saving, setSaving] = useState(false);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
+  const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [selectedEmojiIdx, setSelectedEmojiIdx] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -96,17 +104,59 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     });
   };
 
+  const openStatusModal = () => {
+    if (!plant) return;
+    setEditNick(plant.nickname);
+    setEditStatus(plant.status);
+    const thumb = plantThumbnail(plant.thumbnailUrl, plant.speciesName);
+    if (thumb.type === 'image') {
+      setPhotoMode('upload');
+      setPhotoPreview(resolveImageUrl(thumb.url));
+    } else {
+      setPhotoMode('emoji');
+      const idx = PROFILE_EMOJI_OPTIONS.findIndex(([emoji]) => emoji === thumb.emoji);
+      setSelectedEmojiIdx(idx >= 0 ? idx : 0);
+      setPhotoPreview(null);
+    }
+    setPhotoFile(null);
+    setStatusOpen(true);
+  };
+
+  const pickPhoto = (file: File | null) => {
+    if (!file) return;
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+    }
+    if (file.size > MAX_PHOTO_SIZE) {
+      return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
   const saveStatus = async () => {
     if (!plant || !state.accessToken) return;
     setSaving(true);
     try {
+      let thumbnailUrl: string | undefined;
+      if (photoMode === 'upload' && photoFile) {
+        const uploaded = await uploadPlantImage(photoFile, state.accessToken);
+        thumbnailUrl = uploaded.imageUrl;
+      } else if (photoMode === 'emoji') {
+        thumbnailUrl = EMOJI_THUMBNAIL_PREFIX + PROFILE_EMOJI_OPTIONS[selectedEmojiIdx][0];
+      }
       const updated = await updatePlant(
         plant.id,
-        { nickname: editNick || plant.nickname, status: editStatus },
+        {
+          nickname: editNick || plant.nickname,
+          status: editStatus,
+          ...(thumbnailUrl ? { thumbnailUrl } : {}),
+        },
         state.accessToken,
       );
       setPlant(updated);
       setStatusOpen(false);
+      setPhotoFile(null);
       showToast('식물 정보를 수정했어요 🌿');
     } catch (requestError) {
       showToast(
@@ -169,7 +219,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           <div className="mt-5 flex flex-wrap gap-2.5">
             <button
               type="button"
-              onClick={() => { setEditNick(plant.nickname); setEditStatus(plant.status); setStatusOpen(true); }}
+              onClick={openStatusModal}
               className="cursor-pointer rounded-[11px] bg-brand-soft px-[18px] py-[11px] font-bold text-brand-dark"
             >
               <span className="material-symbols-outlined text-[17px]">edit</span> 상태·정보 수정
@@ -221,6 +271,75 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
               onChange={(e) => setEditNick(e.target.value)}
               className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
             />
+
+            <div className="flex items-center justify-between">
+              <label className="text-[13px] font-bold text-[#6d7a68]">대표 사진</label>
+              <button
+                type="button"
+                onClick={() => setPhotoMode(photoMode === 'upload' ? 'emoji' : 'upload')}
+                className="cursor-pointer text-xs font-bold text-brand-dark"
+              >
+                {photoMode === 'upload' ? '이모지로 대신할게요' : '사진 업로드로 전환'}
+              </button>
+            </div>
+
+            {photoMode === 'upload' ? (
+              <div className="mb-4 mt-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
+                      photoPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
+                    }`}
+                  >
+                    {photoPreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                        <span className="text-[11px] font-bold">사진 선택</span>
+                      </>
+                    )}
+                  </button>
+                  {photoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
+                    >
+                      <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 text-xs text-[#a9b3a0]">jpg · png · webp / 5MB 이하</div>
+              </div>
+            ) : (
+              <div className="mb-4 mt-2 flex flex-wrap gap-2.5">
+                {PROFILE_EMOJI_OPTIONS.map(([emoji, grad], i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setSelectedEmojiIdx(i)}
+                    className={`flex h-14 w-14 cursor-pointer items-center justify-center rounded-xl border-[3px] text-2xl ${
+                      selectedEmojiIdx === i ? 'border-brand' : 'border-transparent'
+                    }`}
+                    style={{ background: grad }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <label className="text-[13px] font-bold text-[#6d7a68]">상태</label>
             <div className="mb-5 mt-2 flex flex-wrap gap-2">
               {(['GROWING', 'HARVESTED', 'FAILED'] as const).map((k) => (
