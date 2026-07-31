@@ -5,6 +5,7 @@ import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.content.dto.request.PlantProfileRequest;
 import com.kiwobollae.api.content.dto.request.PlantProfileUpdateRequest;
 import com.kiwobollae.api.content.dto.response.PlantProfileResponse;
+import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
@@ -23,10 +24,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PlantProfileService {
 
+	// 프론트엔드가 "사진 대신 이모지"를 thumbnailUrl에 인코딩할 때 쓰는 접두사(frontend/lib/plant-visual.ts의
+	// EMOJI_THUMBNAIL_PREFIX와 값이 같아야 한다) — 실제 S3 업로드 URL이 아니므로 정리 대상에서 제외한다.
+	private static final String EMOJI_THUMBNAIL_PREFIX = "emoji:";
+
 	private final PlantProfileRepository plantProfileRepository;
 	private final PlantSpeciesRepository plantSpeciesRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
+	private final PlantImageUploadService plantImageUploadService;
 	private final UserRepository userRepository;
 
 	@Transactional
@@ -59,10 +65,21 @@ public class PlantProfileService {
 	@Transactional
 	public void deleteProfile(Long userId, Long profileId) {
 		PlantProfile profile = findOwned(userId, profileId);
+		List<JournalImage> journalImages = journalImageRepository.findByProfileId(profileId);
 
 		journalImageRepository.deleteAllByProfileId(profileId);
 		plantJournalRepository.deleteAllByProfileId(profileId);
 		plantProfileRepository.delete(profile);
+
+		// DB 삭제가 끝난 뒤 S3 정리 — 정리 실패가 프로필 삭제 자체를 막지 않도록 delete()는 항상 예외 없이 반환한다.
+		journalImages.forEach(image -> plantImageUploadService.delete(image.getImageUrl(), userId));
+		deleteThumbnailIfUploaded(profile.getPlantImage(), userId);
+	}
+
+	private void deleteThumbnailIfUploaded(String thumbnailUrl, Long userId) {
+		if (thumbnailUrl != null && !thumbnailUrl.startsWith(EMOJI_THUMBNAIL_PREFIX)) {
+			plantImageUploadService.delete(thumbnailUrl, userId);
+		}
 	}
 
 	private PlantProfile findOwned(Long userId, Long profileId) {
