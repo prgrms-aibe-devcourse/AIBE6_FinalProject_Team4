@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -11,6 +12,8 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
+import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
+import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantJournal;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
@@ -39,6 +42,7 @@ class PlantJournalServiceTest {
 	@Mock private PlantProfileRepository plantProfileRepository;
 	@Mock private UserRepository userRepository;
 	@Mock private WalletService walletService;
+	@Mock private JournalImageUploadService journalImageUploadService;
 
 	@InjectMocks
 	private PlantJournalService plantJournalService;
@@ -123,6 +127,58 @@ class PlantJournalServiceTest {
 		assertThat(journal.getDeletedAt()).isNotNull();
 		assertThat(profile.getJournalRewardGrantedAt()).isEqualTo(grantedAt);
 		verifyNoInteractions(walletService);
+	}
+
+	@Test
+	void deleteJournalCleansUpAllImages() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, null);
+		PlantJournal journal = journal(31L, user, profile);
+		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
+		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
+				journalImage("https://example.test/a.jpg"),
+				journalImage("https://example.test/b.jpg")
+		));
+
+		plantJournalService.deleteJournal(7L, 31L);
+
+		verify(journalImageUploadService).delete("https://example.test/a.jpg", 7L);
+		verify(journalImageUploadService).delete("https://example.test/b.jpg", 7L);
+	}
+
+	@Test
+	void updateJournalDeletesOnlyReplacedImages() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, null);
+		PlantJournal journal = journal(31L, user, profile);
+		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
+		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
+				journalImage("https://example.test/kept.jpg"),
+				journalImage("https://example.test/replaced.jpg")
+		));
+		PlantJournalUpdateRequest request = new PlantJournalUpdateRequest(
+				"수정된 기록",
+				List.of(
+						new JournalImageRequest("https://example.test/kept.jpg", "hash-kept", true),
+						new JournalImageRequest("https://example.test/new.jpg", "hash-new", false)
+				)
+		);
+		given(journalImageRepository.findExistingHashes(
+				eq(7L), eq(List.of("hash-kept", "hash-new")), any(LocalDate.class)
+		)).willReturn(List.of());
+		given(userRepository.getReferenceById(7L)).willReturn(user);
+
+		plantJournalService.updateJournal(7L, 31L, request);
+
+		verify(journalImageUploadService).delete("https://example.test/replaced.jpg", 7L);
+		verify(journalImageUploadService, never()).delete("https://example.test/kept.jpg", 7L);
+		verify(journalImageUploadService, never()).delete("https://example.test/new.jpg", 7L);
+	}
+
+	private JournalImage journalImage(String imageUrl) {
+		return JournalImage.builder()
+				.imageUrl(imageUrl)
+				.build();
 	}
 
 	private User user(Long id) {
