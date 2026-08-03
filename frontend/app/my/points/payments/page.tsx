@@ -14,9 +14,8 @@ import {
 
 const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   PENDING: '결제 진행 중',
-  PAID: '결제완료',
+  COMPLETED: '결제완료',
   FAILED: '실패',
-  CANCELED: '취소',
   REFUNDED: '환불완료',
 };
 
@@ -40,7 +39,7 @@ function formatDate(value: string): string {
 }
 
 function paymentStatusClass(status: PaymentStatus): string {
-  if (status === 'PAID') return 'bg-[#E8F3D8] text-brand-text';
+  if (status === 'COMPLETED') return 'bg-[#E8F3D8] text-brand-text';
   if (status === 'REFUNDED') return 'bg-[#fff1eb] text-danger';
   return 'bg-[#f0f1ea] text-[#8a8a8a]';
 }
@@ -159,7 +158,7 @@ export default function Payments() {
         <div className="flex flex-col gap-3">
           {history.map(({ payment, refunds }) => {
             const canRefund =
-              payment.status === 'PAID' &&
+              payment.status === 'COMPLETED' &&
               walletLoaded &&
               state.wallet.paid >= payment.pointAmount;
             const isRefunding = refundingPaymentId === payment.id;
@@ -199,7 +198,7 @@ export default function Payments() {
                   </div>
                 )}
 
-                {payment.status === 'PAID' && (
+                {payment.status === 'COMPLETED' && (
                   <div className="mt-3 border-t border-[#f4f5ee] pt-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs text-faint">

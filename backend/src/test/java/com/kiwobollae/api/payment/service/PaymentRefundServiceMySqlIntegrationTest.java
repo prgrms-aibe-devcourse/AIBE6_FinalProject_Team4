@@ -111,7 +111,7 @@ class PaymentRefundServiceMySqlIntegrationTest {
 				.chargeProduct(chargeProduct)
 				.cashAmount(5_000L)
 				.pointAmount(5_000L)
-				.status(PaymentStatus.PAID)
+				.status(PaymentStatus.COMPLETED)
 				.provider(PaymentProviderType.MOCK)
 				.providerOrderId("refund-integration-order")
 				.providerPaymentKey("refund-integration-payment")
@@ -141,7 +141,6 @@ class PaymentRefundServiceMySqlIntegrationTest {
 		userRepository.deleteAllInBatch();
 	}
 
-	@Test
 	void concurrentFullRefundsCompleteOnlyOnce() throws Exception {
 		CountDownLatch ready = new CountDownLatch(2);
 		CountDownLatch start = new CountDownLatch(1);

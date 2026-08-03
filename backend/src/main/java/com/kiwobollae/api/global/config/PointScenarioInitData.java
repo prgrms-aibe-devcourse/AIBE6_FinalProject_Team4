@@ -25,7 +25,6 @@ import com.kiwobollae.api.payment.dto.request.PaymentRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentResponse;
 import com.kiwobollae.api.payment.entity.ChargeProduct;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
-import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentScenario;
 import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.service.PaymentRefundService;
@@ -55,8 +54,8 @@ import org.springframework.stereotype.Component;
  * {@code test@test.com} 사용자의 포인트 내역 화면을 로컬에서 바로 확인하기 위한 시나리오 시드다.
  *
  * <p>각 쓰기는 해당 도메인의 application service를 통해 실행한다. 고정 멱등키와 데이터 표식으로
- * 애플리케이션 재시작 시 같은 거래가 중복 생성되지 않으며, 결제 제공자가 MOCK이 아니면 충전·환불
- * 시나리오는 실행하지 않는다.
+ * 애플리케이션 재시작 시 같은 거래가 중복 생성되지 않는다. 충전·환불 시드는 로컬 기본 결제 제공자와
+ * 무관하게 Mock 제공자를 명시해 실행한다.
  */
 @Slf4j
 @Component
@@ -84,7 +83,6 @@ public class PointScenarioInitData implements ApplicationRunner {
 	private final WalletService walletService;
 	private final PaymentService paymentService;
 	private final PaymentRefundService paymentRefundService;
-	private final PaymentProvider paymentProvider;
 
 	@Override
 	public void run(ApplicationArguments args) {
@@ -213,10 +211,6 @@ public class PointScenarioInitData implements ApplicationRunner {
 	}
 
 	private void seedMockPaymentAndRefund(Long userId) {
-		if (paymentProvider.getType() != PaymentProviderType.MOCK) {
-			log.warn("충전·환불 시나리오를 건너뜁니다: 결제 제공자가 MOCK이 아닙니다.");
-			return;
-		}
 		ChargeProduct chargeProduct = chargeProductRepository.findAllByIsActiveTrueOrderByPriceAsc().stream()
 				.filter(product -> product.getPointAmount() == 1_000L)
 				.findFirst()
@@ -229,7 +223,7 @@ public class PointScenarioInitData implements ApplicationRunner {
 		PaymentResponse requested = paymentService.requestCharge(
 				userId,
 				"seed-point-payment-request-v1",
-				new PaymentRequest(chargeProduct.getId())
+				new PaymentRequest(chargeProduct.getId(), PaymentProviderType.MOCK)
 		);
 		PaymentResponse confirmed = paymentService.confirmPayment(
 				userId,

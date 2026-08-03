@@ -8,6 +8,7 @@ import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
 import com.kiwobollae.api.payment.dto.request.ChargeProductRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentConfirmRequest;
+import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRequest;
 import com.kiwobollae.api.payment.dto.response.ChargeProductResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentHistoryResponse;
@@ -15,10 +16,12 @@ import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentResponse;
 import com.kiwobollae.api.payment.entity.ChargeProduct;
 import com.kiwobollae.api.payment.entity.Payment;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentConfirmCommand;
 import com.kiwobollae.api.payment.provider.PaymentConfirmResult;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
+import com.kiwobollae.api.payment.provider.PaymentProviderRegistry;
 import com.kiwobollae.api.payment.provider.PaymentScenario;
 import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
@@ -44,12 +47,14 @@ public class PaymentService {
 
 	private static final String CHARGE_API_TYPE = "PAYMENT_CHARGE";
 	private static final String CONFIRM_API_TYPE = "PAYMENT_CONFIRM";
+	private static final String FAILURE_API_TYPE = "PAYMENT_FAILURE";
+	private static final String USER_CANCELED_CODE = "PAY_PROCESS_CANCELED";
 
 	private final ChargeProductRepository chargeProductRepository;
 	private final PaymentRepository paymentRepository;
 	private final PaymentRefundRepository paymentRefundRepository;
 	private final UserRepository userRepository;
-	private final PaymentProvider paymentProvider;
+	private final PaymentProviderRegistry paymentProviderRegistry;
 	private final PointCreditService pointCreditService;
 	private final IdempotencyService idempotencyService;
 	private final PaymentStateService paymentStateService;
@@ -65,11 +70,13 @@ public class PaymentService {
 	public PaymentResponse requestCharge(Long userId, String idempotencyKey, PaymentRequest request) {
 		User user = userRepository.getReferenceById(userId);
 		validateIdempotencyKey(idempotencyKey);
+		PaymentProvider paymentProvider = paymentProviderRegistry.resolve(request.provider());
 		IdempotencyExecution idempotency = idempotencyService.start(
 				userId,
 				CHARGE_API_TYPE,
 				idempotencyKey,
-				sha256("chargeProductId=" + request.chargeProductId())
+				sha256("chargeProductId=" + request.chargeProductId()
+						+ "&provider=" + paymentProvider.getType())
 		);
 		if (idempotency.replay()) {
 			return readSnapshot(idempotency.key().getResponseSnapshot());
@@ -111,6 +118,8 @@ public class PaymentService {
 		if (payment.getStatus() != PaymentStatus.PENDING) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
 		}
+		PaymentProvider paymentProvider = paymentProviderRegistry.get(payment.getProvider());
+		validateConfirmRequest(request, paymentProvider.getType());
 
 		if (!payment.getCashAmount().equals(request.amount())) {
 			paymentStateService.failPendingPayment(payment.getId());
@@ -136,7 +145,7 @@ public class PaymentService {
 		if (confirmResult.result() == PaymentScenario.CANCEL) {
 			return finishWithoutCredit(
 					payment,
-					PaymentStatus.CANCELED,
+					PaymentStatus.FAILED,
 					null,
 					confirmResult.message(),
 					idempotency
@@ -144,13 +153,47 @@ public class PaymentService {
 		}
 
 		LocalDateTime approvedAt = LocalDateTime.now();
-		changePendingStatus(payment.getId(), PaymentStatus.PAID, request.paymentKey(), approvedAt);
+		changePendingStatus(payment.getId(), PaymentStatus.COMPLETED, request.paymentKey(), approvedAt);
 		pointCreditService.creditPaidPoint(userId, payment.getPointAmount(), payment.getId());
 
 		PaymentResponse response = PaymentResponse.from(
 				getPaymentDetails(payment.getId()),
 				confirmResult.message()
 		);
+		completeIdempotency(idempotency, 200, response, payment.getId());
+		return response;
+	}
+
+	@Transactional
+	public PaymentResponse failPayment(
+			Long userId,
+			String idempotencyKey,
+			PaymentFailureRequest request
+	) {
+		validateIdempotencyKey(idempotencyKey);
+		IdempotencyExecution idempotency = idempotencyService.start(
+				userId,
+				FAILURE_API_TYPE,
+				idempotencyKey,
+				sha256("providerOrderId=" + request.providerOrderId() + "&code=" + request.code())
+		);
+		if (idempotency.replay()) {
+			return readSnapshot(idempotency.key().getResponseSnapshot());
+		}
+
+		Payment payment = paymentRepository
+				.findDetailsByProviderOrderIdAndUserId(request.providerOrderId(), userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+		if (payment.getStatus() == PaymentStatus.PENDING) {
+			changePendingStatus(payment.getId(), PaymentStatus.FAILED, null, null);
+		} else if (payment.getStatus() != PaymentStatus.FAILED) {
+			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
+		}
+
+		String message = USER_CANCELED_CODE.equals(request.code())
+				? "결제를 취소했어요."
+				: "결제를 완료하지 못했어요.";
+		PaymentResponse response = PaymentResponse.from(getPaymentDetails(payment.getId()), message);
 		completeIdempotency(idempotency, 200, response, payment.getId());
 		return response;
 	}
@@ -243,6 +286,16 @@ public class PaymentService {
 				+ "&paymentKey=" + request.paymentKey()
 				+ "&amount=" + request.amount()
 				+ "&scenario=" + request.scenario();
+	}
+
+	private void validateConfirmRequest(
+			PaymentConfirmRequest request,
+			PaymentProviderType providerType
+	) {
+		if (request.amount() == null
+				|| (providerType == PaymentProviderType.MOCK && request.scenario() == null)) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
 	}
 
 	private void validateIdempotencyKey(String idempotencyKey) {

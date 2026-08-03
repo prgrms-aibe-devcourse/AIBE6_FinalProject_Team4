@@ -2,13 +2,11 @@ package com.kiwobollae.api.payment.provider;
 
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
 @Profile("!prod")
-@ConditionalOnProperty(prefix = "payment", name = "provider", havingValue = "MOCK", matchIfMissing = true)
 public class MockPaymentProvider implements PaymentProvider {
 
 	@Override

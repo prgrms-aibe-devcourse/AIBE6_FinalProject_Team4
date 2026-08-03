@@ -5,6 +5,7 @@ import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.payment.dto.request.PaymentConfirmRequest;
+import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRequest;
 import com.kiwobollae.api.payment.dto.response.ChargeProductResponse;
@@ -58,7 +59,7 @@ public class PaymentController {
 	}
 
 	@Operation(summary = "결제 승인 확정",
-			description = "Mock 승인 결과와 금액을 확인하고 성공 시 유상 포인트를 적립합니다. [PAY-03/POINT-05]")
+			description = "결제 대행사의 승인 결과와 금액을 확인하고 성공 시 유상 포인트를 적립합니다. [PAY-03/POINT-05]")
 	@PostMapping("/confirm")
 	public ResponseEntity<ApiResponse<PaymentResponse>> confirmPayment(
 			@AuthenticationPrincipal Long userId,
@@ -67,6 +68,21 @@ public class PaymentController {
 	) {
 		return ResponseEntity.ok(ApiResponse.success(
 				paymentService.confirmPayment(userId, idempotencyKey, request)
+		));
+	}
+
+	@Operation(
+			summary = "결제 인증 실패·취소 반영",
+			description = "Toss 실패 콜백을 소유한 PENDING 결제에 반영합니다."
+	)
+	@PostMapping("/fail")
+	public ResponseEntity<ApiResponse<PaymentResponse>> failPayment(
+			@AuthenticationPrincipal Long userId,
+			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+			@Valid @RequestBody PaymentFailureRequest request
+	) {
+		return ResponseEntity.ok(ApiResponse.success(
+				paymentService.failPayment(userId, idempotencyKey, request)
 		));
 	}
 

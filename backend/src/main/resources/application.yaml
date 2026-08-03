@@ -74,6 +74,9 @@ app:
 
 payment:
   provider: ${PAYMENT_PROVIDER:MOCK}
+  toss:
+    base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
+    secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
 
 aws:
   s3:

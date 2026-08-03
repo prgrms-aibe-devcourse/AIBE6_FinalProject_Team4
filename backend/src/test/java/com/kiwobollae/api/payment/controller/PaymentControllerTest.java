@@ -7,9 +7,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
+import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
+import com.kiwobollae.api.payment.dto.response.PaymentResponse;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
+import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.service.PaymentRefundService;
 import com.kiwobollae.api.payment.service.PaymentService;
 import java.time.LocalDateTime;
@@ -115,6 +119,45 @@ class PaymentControllerTest {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"))
 				.andExpect(jsonPath("$.fieldErrors[0].field").value("reason"));
+	}
+
+	@Test
+	void canceledCallbackMarksPendingPaymentFailed() throws Exception {
+		PaymentResponse response = new PaymentResponse(
+				21L,
+				7L,
+				3L,
+				"1,000P 충전",
+				1_000L,
+				1_000L,
+				PaymentStatus.FAILED,
+				PaymentProviderType.TOSS,
+				"KWB-order-21",
+				null,
+				null,
+				LocalDateTime.of(2026, 8, 3, 14, 0),
+				"결제를 취소했어요."
+		);
+		given(paymentService.failPayment(
+				7L,
+				"failure-KWB-order-21",
+				new PaymentFailureRequest("KWB-order-21", "PAY_PROCESS_CANCELED")
+		)).willReturn(response);
+
+		mockMvc.perform(post("/api/v1/payments/fail")
+						.header("Idempotency-Key", "failure-KWB-order-21")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"providerOrderId":"KWB-order-21","code":"PAY_PROCESS_CANCELED"}
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.status").value("FAILED"));
+
+		verify(paymentService).failPayment(
+				7L,
+				"failure-KWB-order-21",
+				new PaymentFailureRequest("KWB-order-21", "PAY_PROCESS_CANCELED")
+		);
 	}
 
 	private static final class AuthenticatedUserArgumentResolver

@@ -12,6 +12,7 @@ import com.kiwobollae.api.payment.entity.enums.PaymentRefundAttemptStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
+import com.kiwobollae.api.payment.provider.PaymentProviderRegistry;
 import com.kiwobollae.api.payment.provider.PaymentRefundCommand;
 import com.kiwobollae.api.payment.provider.PaymentRefundResult;
 import com.kiwobollae.api.payment.repository.PaymentRefundAttemptRepository;
@@ -42,7 +43,7 @@ public class PaymentRefundService {
 	private final PaymentRefundAttemptRepository paymentRefundAttemptRepository;
 	private final PaymentRefundAttemptService paymentRefundAttemptService;
 	private final WalletService walletService;
-	private final PaymentProvider paymentProvider;
+	private final PaymentProviderRegistry paymentProviderRegistry;
 	private final IdempotencyService idempotencyService;
 	private final ObjectMapper objectMapper;
 	private final Clock seoulClock;
@@ -69,7 +70,7 @@ public class PaymentRefundService {
 			return readSnapshot(idempotency.key().getResponseSnapshot());
 		}
 
-		if (payment.getStatus() != PaymentStatus.PAID) {
+		if (payment.getStatus() != PaymentStatus.COMPLETED) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
 		}
 		if (payment.getProviderPaymentKey() == null || payment.getProviderPaymentKey().isBlank()) {
@@ -118,6 +119,7 @@ public class PaymentRefundService {
 				reason
 		);
 
+		PaymentProvider paymentProvider = paymentProviderRegistry.get(payment.getProvider());
 		PaymentRefundResult providerResult = paymentProvider.refund(new PaymentRefundCommand(
 				payment.getProviderOrderId(),
 				payment.getProviderPaymentKey(),
@@ -128,7 +130,7 @@ public class PaymentRefundService {
 
 		int paymentUpdated = paymentRepository.updateStatusOnlyIfCurrent(
 				payment.getId(),
-				PaymentStatus.PAID,
+				PaymentStatus.COMPLETED,
 				PaymentStatus.REFUNDED
 		);
 		if (paymentUpdated == 0) {

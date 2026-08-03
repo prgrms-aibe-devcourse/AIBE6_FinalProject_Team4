@@ -10,6 +10,6 @@ public record PaymentConfirmRequest(
 		@NotBlank @Size(max = 100) String providerOrderId,
 		@NotBlank @Size(max = 200) String paymentKey,
 		@NotNull @Positive Long amount,
-		@NotNull PaymentScenario scenario
+		PaymentScenario scenario
 ) {
 }

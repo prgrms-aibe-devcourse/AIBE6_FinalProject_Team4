@@ -12,6 +12,10 @@ public record PaymentConfirmResult(
 		return new PaymentConfirmResult(PaymentScenario.FAILURE, "Mock 결제가 실패했습니다.");
 	}
 
+	public static PaymentConfirmResult failure(String message) {
+		return new PaymentConfirmResult(PaymentScenario.FAILURE, message);
+	}
+
 	public static PaymentConfirmResult canceled() {
 		return new PaymentConfirmResult(PaymentScenario.CANCEL, "Mock 결제가 취소되었습니다.");
 	}
