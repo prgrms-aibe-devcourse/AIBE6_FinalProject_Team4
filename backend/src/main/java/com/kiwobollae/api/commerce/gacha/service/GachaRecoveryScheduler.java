@@ -1,9 +1,10 @@
 package com.kiwobollae.api.commerce.gacha.service;
 
+import static com.kiwobollae.api.commerce.gacha.GachaTimeZone.KST;
+
 import com.kiwobollae.api.commerce.gacha.entity.enums.GachaDrawStatus;
 import com.kiwobollae.api.commerce.gacha.repository.GachaDrawRepository;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -22,7 +23,7 @@ public class GachaRecoveryScheduler {
 
   @Scheduled(fixedDelay = 30_000)
   public void processWaitingDraws() {
-    LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.now(KST);
     List<Long> drawIds =
         gachaDrawRepository.findProcessableIds(
             GachaDrawStatus.PENDING,
@@ -34,7 +35,7 @@ public class GachaRecoveryScheduler {
 
   @Scheduled(fixedDelay = 30_000)
   public void recoverStaleDraws() {
-    LocalDateTime staleBefore = LocalDateTime.now(ZoneOffset.UTC).minusMinutes(5);
+    LocalDateTime staleBefore = LocalDateTime.now(KST).minusMinutes(5);
     List<Long> drawIds =
         gachaDrawRepository.findStaleProcessingIds(
             GachaDrawStatus.PROCESSING, staleBefore, PageRequest.of(0, BATCH_SIZE));

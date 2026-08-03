@@ -1,5 +1,6 @@
 package com.kiwobollae.api.commerce.gacha.entity;
 
+import static com.kiwobollae.api.commerce.gacha.GachaTimeZone.KST;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kiwobollae.api.commerce.gacha.entity.enums.GachaDrawStatus;
@@ -7,6 +8,18 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 
 class GachaDrawTest {
+
+  @Test
+  void auditTimestampsUseKst() {
+    GachaDraw draw = GachaDraw.builder().build();
+    LocalDateTime before = LocalDateTime.now(KST);
+
+    draw.onCreate();
+
+    LocalDateTime after = LocalDateTime.now(KST);
+    assertThat(draw.getCreatedAt()).isBetween(before, after);
+    assertThat(draw.getUpdatedAt()).isEqualTo(draw.getCreatedAt());
+  }
 
   @Test
   void movesToManualReviewAfterInitialAttemptAndThreeRetriesFail() {

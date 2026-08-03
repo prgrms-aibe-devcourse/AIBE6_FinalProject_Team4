@@ -1,5 +1,7 @@
 package com.kiwobollae.api.commerce.gacha.service;
 
+import static com.kiwobollae.api.commerce.gacha.GachaTimeZone.KST;
+
 import com.kiwobollae.api.commerce.gacha.dto.GachaCardResponse;
 import com.kiwobollae.api.commerce.gacha.dto.GachaCollectionResponse;
 import com.kiwobollae.api.commerce.gacha.dto.GachaDrawDetailResponse;
@@ -21,7 +23,6 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -142,7 +143,7 @@ public class GachaQueryService {
       throw new BusinessException(ErrorCode.GACHA_DRAW_NOT_COMPLETED);
     }
     gachaDrawRepository.markViewedIfAbsent(
-        drawId, userId, GachaDrawStatus.COMPLETED, LocalDateTime.now(ZoneOffset.UTC));
+        drawId, userId, GachaDrawStatus.COMPLETED, LocalDateTime.now(KST));
     return getDraw(userId, drawId);
   }
 

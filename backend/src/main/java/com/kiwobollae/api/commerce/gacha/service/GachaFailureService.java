@@ -1,11 +1,12 @@
 package com.kiwobollae.api.commerce.gacha.service;
 
+import static com.kiwobollae.api.commerce.gacha.GachaTimeZone.KST;
+
 import com.kiwobollae.api.commerce.gacha.entity.GachaDraw;
 import com.kiwobollae.api.commerce.gacha.entity.enums.GachaDrawStatus;
 import com.kiwobollae.api.commerce.gacha.repository.GachaDrawRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,7 +28,7 @@ public class GachaFailureService {
         || draw.getStatus() == GachaDrawStatus.MANUAL_REVIEW) {
       return;
     }
-    LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.now(KST);
     int backoffIndex = Math.min(draw.getAttemptCount(), BACKOFF_MINUTES.length - 1);
     String errorCode =
         exception instanceof BusinessException business
@@ -42,6 +43,6 @@ public class GachaFailureService {
     if (draw == null || draw.getStatus() != GachaDrawStatus.PROCESSING) {
       return;
     }
-    draw.markRetryable("PROCESSING_TIMEOUT", LocalDateTime.now(ZoneOffset.UTC).plusMinutes(1));
+    draw.markRetryable("PROCESSING_TIMEOUT", LocalDateTime.now(KST).plusMinutes(1));
   }
 }

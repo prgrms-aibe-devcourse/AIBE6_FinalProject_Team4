@@ -67,7 +67,7 @@
 --   UNIQUE (card_id, golden_origin_rank) 가 순번 중복의 최종 방어선이다.
 --
 -- [주의] FOREIGN KEY 제약에는 COMMENT 를 붙이지 않는다 (ERDCloud FK 파싱 실패)
--- [주의] 모든 시각은 UTC DATETIME(6) 으로 저장한다
+-- [주의] 모든 시각은 KST(Asia/Seoul) 기준 DATETIME(6) 으로 저장한다
 -- [확률 스케일] 전체 2,100,000
 --   등급          등급합계     카드수   카드당 weight   확률
 --   COMMON        1,470,000      15         98,000      70%

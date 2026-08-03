@@ -1,5 +1,7 @@
 package com.kiwobollae.api.commerce.gacha.service;
 
+import static com.kiwobollae.api.commerce.gacha.GachaTimeZone.KST;
+
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.commerce.gacha.entity.GachaDraw;
 import com.kiwobollae.api.commerce.gacha.entity.GachaDrawItem;
@@ -18,7 +20,6 @@ import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,7 +45,7 @@ public class GachaDrawTransactionService {
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void process(Long drawId) {
-    LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.now(KST);
     int claimed =
         gachaDrawRepository.claimForProcessing(
             drawId,
