@@ -8,8 +8,6 @@ export interface ChargeProduct {
   isActive: boolean;
 }
 
-export type PaymentScenario = "SUCCESS" | "FAILURE" | "CANCEL";
-export type PaymentProvider = "MOCK" | "TOSS";
 export type PaymentStatus =
   "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
@@ -21,7 +19,7 @@ export interface PaymentData {
   cashAmount: number;
   pointAmount: number;
   status: PaymentStatus;
-  provider: "MOCK" | "TOSS";
+  provider: "TOSS";
   providerOrderId: string;
   providerPaymentKey: string | null;
   approvedAt: string | null;
@@ -62,13 +60,12 @@ export function requestCharge(
   accessToken: string,
   chargeProductId: number,
   idempotencyKey: string,
-  provider?: PaymentProvider,
 ): Promise<PaymentData> {
   return request<PaymentData>("/api/v1/payments/charge", {
     method: "POST",
     accessToken,
     headers: { "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify({ chargeProductId, provider }),
+    body: JSON.stringify({ chargeProductId }),
   });
 }
 
@@ -90,7 +87,6 @@ interface ConfirmPaymentInput {
   providerOrderId: string;
   paymentKey: string;
   amount: number;
-  scenario?: PaymentScenario;
 }
 
 export function confirmPayment(

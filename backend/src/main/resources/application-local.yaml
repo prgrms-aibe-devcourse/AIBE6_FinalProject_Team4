@@ -33,7 +33,6 @@ app:
       enabled: true
     point-scenario:
       # Seeds test@test.com's point history with admin adjustments, a mixed-point
-      # order and cancellation, a mixed-point card purchase, a journal reward,
-      # and a mock charge/refund. The local Mock provider is selected explicitly
-      # for the seeded payment even when Toss is the default browser payment mode.
+      # order and cancellation, a mixed-point card purchase, and a journal reward.
+      # Charge/refund history is created through Toss Payments test transactions.
       enabled: true

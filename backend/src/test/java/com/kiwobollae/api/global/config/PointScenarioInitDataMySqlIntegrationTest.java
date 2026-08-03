@@ -15,10 +15,6 @@ import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.content.service.PlantJournalService;
-import com.kiwobollae.api.payment.dto.response.PaymentHistoryResponse;
-import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
-import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
-import com.kiwobollae.api.payment.service.PaymentService;
 import com.kiwobollae.api.point.dto.response.PointActivityResponse;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
@@ -43,7 +39,7 @@ import org.springframework.test.context.ActiveProfiles;
 						+ "?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8",
 				"spring.jpa.hibernate.ddl-auto=create-drop",
 				"spring.jpa.show-sql=false",
-				"payment.provider=MOCK",
+				"payment.toss.secret-key=test_sk_point_scenario_context",
 				"app.seed.point-scenario.enabled=true"
 		}
 )
@@ -56,7 +52,6 @@ class PointScenarioInitDataMySqlIntegrationTest {
 	@Autowired private PointTransactionService pointTransactionService;
 	@Autowired private WalletService walletService;
 	@Autowired private OrderService orderService;
-	@Autowired private PaymentService paymentService;
 	@Autowired private PointScenarioInitData pointScenarioInitData;
 
 	@Test
@@ -78,16 +73,14 @@ class PointScenarioInitDataMySqlIntegrationTest {
 				.extracting(PlantProfile::getJournalRewardGrantedAt)
 				.containsOnlyNulls();
 
-		assertThat(activities).hasSize(9);
+		assertThat(activities).hasSize(7);
 		assertThat(activities)
 				.extracting(PointActivityResponse::type)
 				.contains(
 						PointTxType.ADMIN_ADJUST,
 						PointTxType.PURCHASE,
 						PointTxType.RESTORE,
-						PointTxType.JOURNAL_REWARD,
-						PointTxType.CHARGE,
-						PointTxType.REFUND
+						PointTxType.JOURNAL_REWARD
 				);
 
 		PointActivityResponse journalReward = find(
@@ -122,19 +115,13 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(cancelledOrder.usedFreePoint()).isEqualTo(300L);
 		assertThat(cancelledOrder.usedPaidPoint()).isEqualTo(900L);
 
-		List<PaymentHistoryResponse> paymentHistory = paymentService.getPaymentHistory(user.getId());
-		assertThat(paymentHistory).hasSize(1);
-		assertThat(paymentHistory.getFirst().payment().status()).isEqualTo(PaymentStatus.REFUNDED);
-		assertThat(paymentHistory.getFirst().refunds().getFirst().status())
-				.isEqualTo(PaymentRefundStatus.COMPLETED);
-
 		WalletResponse wallet = walletService.getWallet(user.getId());
 		assertThat(wallet.freePoint()).isEqualTo(100L);
 		assertThat(wallet.paidPoint()).isEqualTo(7_840L);
 
 		pointScenarioInitData.run(new DefaultApplicationArguments(new String[0]));
 
-		assertThat(activities(user.getId())).hasSize(9);
+		assertThat(activities(user.getId())).hasSize(7);
 		assertThat(walletService.getWallet(user.getId()).freePoint()).isEqualTo(100L);
 		assertThat(walletService.getWallet(user.getId()).paidPoint()).isEqualTo(7_840L);
 
@@ -154,7 +141,7 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(todayJournal.journal().writtenDate()).isEqualTo(today);
 		assertThat(todayJournal.rewardGranted()).isTrue();
 		assertThat(todayJournal.rewardAmount()).isEqualTo(100L);
-		assertThat(activities(user.getId())).hasSize(10);
+		assertThat(activities(user.getId())).hasSize(8);
 		assertThat(walletService.getWallet(user.getId()).freePoint()).isEqualTo(200L);
 	}
 

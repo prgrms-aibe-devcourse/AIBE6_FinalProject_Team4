@@ -27,7 +27,7 @@ class PaymentResponseJsonTest {
 				1_000L,
 				1_000L,
 				PaymentStatus.PENDING,
-				PaymentProviderType.MOCK,
+				PaymentProviderType.TOSS,
 				"KWB-order",
 				null,
 				null,

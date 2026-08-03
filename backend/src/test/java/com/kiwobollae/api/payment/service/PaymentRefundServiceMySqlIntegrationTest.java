@@ -1,6 +1,7 @@
 package com.kiwobollae.api.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.entity.enums.AuthProvider;
@@ -17,6 +18,8 @@ import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
+import com.kiwobollae.api.payment.provider.PaymentProvider;
+import com.kiwobollae.api.payment.provider.PaymentRefundResult;
 import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
@@ -41,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @ActiveProfiles("test")
 @SpringBootTest(
@@ -79,12 +83,18 @@ class PaymentRefundServiceMySqlIntegrationTest {
 	@Autowired
 	private UserRepository userRepository;
 
+	@MockitoBean
+	private PaymentProvider paymentProvider;
+
 	private Long userId;
 	private Long paymentId;
 
 	@BeforeEach
 	void setUp() {
 		clearData();
+		given(paymentProvider.getType()).willReturn(PaymentProviderType.TOSS);
+		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any()))
+				.willReturn(PaymentRefundResult.success("integration-refund-key"));
 
 		User user = userRepository.saveAndFlush(User.builder()
 				.email("payment-refund-integration@example.test")
@@ -112,7 +122,7 @@ class PaymentRefundServiceMySqlIntegrationTest {
 				.cashAmount(5_000L)
 				.pointAmount(5_000L)
 				.status(PaymentStatus.COMPLETED)
-				.provider(PaymentProviderType.MOCK)
+				.provider(PaymentProviderType.TOSS)
 				.providerOrderId("refund-integration-order")
 				.providerPaymentKey("refund-integration-payment")
 				.approvedAt(LocalDateTime.now())

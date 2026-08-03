@@ -15,7 +15,7 @@ import com.kiwobollae.api.payment.entity.ChargeProduct;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
-import com.kiwobollae.api.payment.provider.PaymentProviderRegistry;
+import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
@@ -36,7 +36,7 @@ class PaymentServiceFailureTest {
 	@Mock private PaymentRepository paymentRepository;
 	@Mock private PaymentRefundRepository paymentRefundRepository;
 	@Mock private UserRepository userRepository;
-	@Mock private PaymentProviderRegistry paymentProviderRegistry;
+	@Mock private PaymentProvider paymentProvider;
 	@Mock private PointCreditService pointCreditService;
 	@Mock private IdempotencyService idempotencyService;
 	@Mock private PaymentStateService paymentStateService;
@@ -51,7 +51,7 @@ class PaymentServiceFailureTest {
 				paymentRepository,
 				paymentRefundRepository,
 				userRepository,
-				paymentProviderRegistry,
+				paymentProvider,
 				pointCreditService,
 				idempotencyService,
 				paymentStateService,

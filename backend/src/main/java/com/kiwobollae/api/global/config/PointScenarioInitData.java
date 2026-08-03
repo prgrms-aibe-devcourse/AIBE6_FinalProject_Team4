@@ -19,16 +19,6 @@ import com.kiwobollae.api.commerce.service.CartService;
 import com.kiwobollae.api.commerce.service.OrderService;
 import com.kiwobollae.api.content.entity.PlantJournal;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
-import com.kiwobollae.api.payment.dto.request.PaymentConfirmRequest;
-import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
-import com.kiwobollae.api.payment.dto.request.PaymentRequest;
-import com.kiwobollae.api.payment.dto.response.PaymentResponse;
-import com.kiwobollae.api.payment.entity.ChargeProduct;
-import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
-import com.kiwobollae.api.payment.provider.PaymentScenario;
-import com.kiwobollae.api.payment.repository.ChargeProductRepository;
-import com.kiwobollae.api.payment.service.PaymentRefundService;
-import com.kiwobollae.api.payment.service.PaymentService;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentRequest;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
@@ -54,8 +44,7 @@ import org.springframework.stereotype.Component;
  * {@code test@test.com} 사용자의 포인트 내역 화면을 로컬에서 바로 확인하기 위한 시나리오 시드다.
  *
  * <p>각 쓰기는 해당 도메인의 application service를 통해 실행한다. 고정 멱등키와 데이터 표식으로
- * 애플리케이션 재시작 시 같은 거래가 중복 생성되지 않는다. 충전·환불 시드는 로컬 기본 결제 제공자와
- * 무관하게 Mock 제공자를 명시해 실행한다.
+ * 애플리케이션 재시작 시 같은 거래가 중복 생성되지 않는다.
  */
 @Slf4j
 @Component
@@ -73,7 +62,6 @@ public class PointScenarioInitData implements ApplicationRunner {
 	private final UserRepository userRepository;
 	private final ProductRepository productRepository;
 	private final CardRepository cardRepository;
-	private final ChargeProductRepository chargeProductRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final PointTransactionRepository pointTransactionRepository;
 	private final AdminPointAdjustmentService adminPointAdjustmentService;
@@ -81,8 +69,6 @@ public class PointScenarioInitData implements ApplicationRunner {
 	private final OrderService orderService;
 	private final CardPurchaseService cardPurchaseService;
 	private final WalletService walletService;
-	private final PaymentService paymentService;
-	private final PaymentRefundService paymentRefundService;
 
 	@Override
 	public void run(ApplicationArguments args) {
@@ -97,7 +83,6 @@ public class PointScenarioInitData implements ApplicationRunner {
 		seedSafely("상품 주문 혼합 결제·취소", () -> seedOrderAndCancellation(testUser.getId()));
 		seedSafely("카드 혼합 결제", () -> seedCardPurchase(testUser.getId()));
 		seedSafely("성장일지 작성 보상", () -> seedJournalReward(testUser.getId()));
-		seedSafely("포인트 충전·환불", () -> seedMockPaymentAndRefund(testUser.getId()));
 	}
 
 	private void seedAdminAdjustments(Long adminUserId, Long userId) {
@@ -215,39 +200,6 @@ public class PointScenarioInitData implements ApplicationRunner {
 		if (updated != 1) {
 			log.warn("성장일지 보상 시각을 과거 일자로 조정하지 못했습니다: journalId={}", journal.getId());
 		}
-	}
-
-	private void seedMockPaymentAndRefund(Long userId) {
-		ChargeProduct chargeProduct = chargeProductRepository.findAllByIsActiveTrueOrderByPriceAsc().stream()
-				.filter(product -> product.getPointAmount() == 1_000L)
-				.findFirst()
-				.orElse(null);
-		if (chargeProduct == null) {
-			log.warn("충전·환불 시나리오를 건너뜁니다: 1,000P 충전 상품이 없습니다.");
-			return;
-		}
-
-		PaymentResponse requested = paymentService.requestCharge(
-				userId,
-				"seed-point-payment-request-v1",
-				new PaymentRequest(chargeProduct.getId(), PaymentProviderType.MOCK)
-		);
-		PaymentResponse confirmed = paymentService.confirmPayment(
-				userId,
-				"seed-point-payment-confirm-v1",
-				new PaymentConfirmRequest(
-						requested.providerOrderId(),
-						"MOCK-POINT-SCENARIO-PAYMENT-V1",
-						requested.cashAmount(),
-						PaymentScenario.SUCCESS
-				)
-		);
-		paymentRefundService.refund(
-				userId,
-				"seed-point-payment-refund-v1",
-				confirmed.id(),
-				new PaymentRefundRequest("로컬 포인트 내역 시나리오")
-		);
 	}
 
 	private void seedSafely(String scenario, Runnable seed) {

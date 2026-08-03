@@ -39,7 +39,6 @@ app:
       redirect-uri: ${NAVER_REDIRECT_URI}
 
 payment:
-  provider: TOSS
   toss:
     base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
     secret-key: ${TOSS_PAYMENTS_SECRET_KEY}

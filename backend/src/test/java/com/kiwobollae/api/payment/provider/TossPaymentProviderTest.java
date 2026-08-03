@@ -67,11 +67,11 @@ class TossPaymentProviderTest {
 						""", MediaType.APPLICATION_JSON));
 
 		PaymentConfirmResult result = provider.confirm(
-				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L, null)
+				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L)
 		);
 
 		assertThat(provider.getType()).isEqualTo(PaymentProviderType.TOSS);
-		assertThat(result.result()).isEqualTo(PaymentScenario.SUCCESS);
+		assertThat(result.successful()).isTrue();
 		server.verify();
 	}
 
@@ -88,7 +88,7 @@ class TossPaymentProviderTest {
 						""", MediaType.APPLICATION_JSON));
 
 		assertThatThrownBy(() -> provider.confirm(
-				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L, null)
+				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L)
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode())
@@ -105,10 +105,10 @@ class TossPaymentProviderTest {
 				.andRespond(withResourceNotFound());
 
 		PaymentConfirmResult result = provider.confirm(
-				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L, null)
+				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L)
 		);
 
-		assertThat(result.result()).isEqualTo(PaymentScenario.FAILURE);
+		assertThat(result.successful()).isFalse();
 		server.verify();
 	}
 
@@ -121,7 +121,7 @@ class TossPaymentProviderTest {
 				.andRespond(withResourceNotFound());
 
 		assertThatThrownBy(() -> provider.confirm(
-				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L, null)
+				new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L)
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode())
@@ -188,7 +188,6 @@ class TossPaymentProviderTest {
 		new ApplicationContextRunner()
 				.withUserConfiguration(TossPaymentProvider.class)
 				.withPropertyValues(
-						"payment.provider=TOSS",
 						"payment.toss.base-url=" + BASE_URL,
 						"payment.toss.secret-key=" + SECRET_KEY
 				)

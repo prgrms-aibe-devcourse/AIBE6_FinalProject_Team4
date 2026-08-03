@@ -20,7 +20,6 @@ import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
-import com.kiwobollae.api.payment.provider.PaymentProviderRegistry;
 import com.kiwobollae.api.payment.provider.PaymentRefundCommand;
 import com.kiwobollae.api.payment.provider.PaymentRefundResult;
 import com.kiwobollae.api.payment.repository.PaymentRefundAttemptRepository;
@@ -68,9 +67,6 @@ class PaymentRefundServiceTest {
 	private PaymentProvider paymentProvider;
 
 	@Mock
-	private PaymentProviderRegistry paymentProviderRegistry;
-
-	@Mock
 	private IdempotencyService idempotencyService;
 
 	@Mock
@@ -81,15 +77,15 @@ class PaymentRefundServiceTest {
 	@BeforeEach
 	void setUp() {
 		org.mockito.Mockito.lenient()
-				.when(paymentProviderRegistry.get(PaymentProviderType.MOCK))
-				.thenReturn(paymentProvider);
+				.when(paymentProvider.getType())
+				.thenReturn(PaymentProviderType.TOSS);
 		paymentRefundService = new PaymentRefundService(
 				paymentRepository,
 				paymentRefundRepository,
 				paymentRefundAttemptRepository,
 				paymentRefundAttemptService,
 				walletService,
-				paymentProviderRegistry,
+				paymentProvider,
 				idempotencyService,
 				objectMapper,
 				FIXED_KST_CLOCK
@@ -445,7 +441,7 @@ class PaymentRefundServiceTest {
 			org.mockito.Mockito.lenient().when(payment.getProviderPaymentKey())
 					.thenReturn("provider-payment-21");
 			org.mockito.Mockito.lenient().when(payment.getProvider())
-					.thenReturn(PaymentProviderType.MOCK);
+					.thenReturn(PaymentProviderType.TOSS);
 		}
 		return payment;
 	}

@@ -21,8 +21,6 @@ import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentConfirmCommand;
 import com.kiwobollae.api.payment.provider.PaymentConfirmResult;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
-import com.kiwobollae.api.payment.provider.PaymentProviderRegistry;
-import com.kiwobollae.api.payment.provider.PaymentScenario;
 import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
@@ -54,7 +52,7 @@ public class PaymentService {
 	private final PaymentRepository paymentRepository;
 	private final PaymentRefundRepository paymentRefundRepository;
 	private final UserRepository userRepository;
-	private final PaymentProviderRegistry paymentProviderRegistry;
+	private final PaymentProvider paymentProvider;
 	private final PointCreditService pointCreditService;
 	private final IdempotencyService idempotencyService;
 	private final PaymentStateService paymentStateService;
@@ -70,13 +68,11 @@ public class PaymentService {
 	public PaymentResponse requestCharge(Long userId, String idempotencyKey, PaymentRequest request) {
 		User user = userRepository.getReferenceById(userId);
 		validateIdempotencyKey(idempotencyKey);
-		PaymentProvider paymentProvider = paymentProviderRegistry.resolve(request.provider());
 		IdempotencyExecution idempotency = idempotencyService.start(
 				userId,
 				CHARGE_API_TYPE,
 				idempotencyKey,
-				sha256("chargeProductId=" + request.chargeProductId()
-						+ "&provider=" + paymentProvider.getType())
+				sha256("chargeProductId=" + request.chargeProductId())
 		);
 		if (idempotency.replay()) {
 			return readSnapshot(idempotency.key().getResponseSnapshot());
@@ -118,8 +114,7 @@ public class PaymentService {
 		if (payment.getStatus() != PaymentStatus.PENDING) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
 		}
-		PaymentProvider paymentProvider = paymentProviderRegistry.get(payment.getProvider());
-		validateConfirmRequest(request, paymentProvider.getType());
+		validateTossPayment(payment);
 
 		if (!payment.getCashAmount().equals(request.amount())) {
 			paymentStateService.failPendingPayment(payment.getId());
@@ -129,20 +124,10 @@ public class PaymentService {
 		PaymentConfirmResult confirmResult = paymentProvider.confirm(new PaymentConfirmCommand(
 				request.providerOrderId(),
 				request.paymentKey(),
-				request.amount(),
-				request.scenario()
+				request.amount()
 		));
 
-		if (confirmResult.result() == PaymentScenario.FAILURE) {
-			return finishWithoutCredit(
-					payment,
-					PaymentStatus.FAILED,
-					null,
-					confirmResult.message(),
-					idempotency
-			);
-		}
-		if (confirmResult.result() == PaymentScenario.CANCEL) {
+		if (!confirmResult.successful()) {
 			return finishWithoutCredit(
 					payment,
 					PaymentStatus.FAILED,
@@ -284,17 +269,16 @@ public class PaymentService {
 	private String normalizedConfirmRequest(PaymentConfirmRequest request) {
 		return "providerOrderId=" + request.providerOrderId()
 				+ "&paymentKey=" + request.paymentKey()
-				+ "&amount=" + request.amount()
-				+ "&scenario=" + request.scenario();
+				+ "&amount=" + request.amount();
 	}
 
-	private void validateConfirmRequest(
-			PaymentConfirmRequest request,
-			PaymentProviderType providerType
-	) {
-		if (request.amount() == null
-				|| (providerType == PaymentProviderType.MOCK && request.scenario() == null)) {
-			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+	private void validateTossPayment(Payment payment) {
+		if (payment.getProvider() != PaymentProviderType.TOSS
+				|| paymentProvider.getType() != PaymentProviderType.TOSS) {
+			throw new BusinessException(
+					ErrorCode.PAYMENT_INVALID_STATE,
+					"Toss 결제만 승인할 수 있습니다."
+			);
 		}
 	}
 
