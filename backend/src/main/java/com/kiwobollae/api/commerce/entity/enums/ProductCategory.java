@@ -1,5 +1,5 @@
 package com.kiwobollae.api.commerce.entity.enums;
 
 public enum ProductCategory {
-	KIT, SEEDLING, EXCHANGE
+	KIT, SEEDLING, EXCHANGE, GACHA_PACK
 }

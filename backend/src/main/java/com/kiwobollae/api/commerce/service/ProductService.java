@@ -1,7 +1,9 @@
 package com.kiwobollae.api.commerce.service;
 
 import com.kiwobollae.api.commerce.dto.response.ProductDetailResponse;
+import com.kiwobollae.api.commerce.dto.response.GachaPackProductQuote;
 import com.kiwobollae.api.commerce.dto.response.ProductPageResponse;
+import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductSort;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
@@ -25,7 +27,8 @@ public class ProductService {
 	private static final int MAX_PAGE_SIZE = 100;
 	private static final List<ProductCategory> SHOP_CATEGORIES = List.of(
 			ProductCategory.KIT,
-			ProductCategory.SEEDLING
+			ProductCategory.SEEDLING,
+			ProductCategory.GACHA_PACK
 	);
 
 	private final ProductRepository productRepository;
@@ -50,15 +53,28 @@ public class ProductService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 	}
 
+	public GachaPackProductQuote getActiveGachaPack(Long productId) {
+		Product product = productRepository.findByIdAndStatus(productId, ProductStatus.ACTIVE)
+				.filter(candidate -> candidate.getCategory() == ProductCategory.GACHA_PACK)
+				.filter(candidate -> candidate.getPointPrice() != null && candidate.getPointPrice() > 0)
+				.orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_AVAILABLE));
+		return new GachaPackProductQuote(
+				product.getId(),
+				product.getName(),
+				product.getPointPrice(),
+				GachaPackProductQuote.MAX_PURCHASE_QUANTITY
+		);
+	}
+
 	private ProductCategory parseShopCategory(String value) {
 		try {
 			ProductCategory category = ProductCategory.valueOf(value.trim().toUpperCase(Locale.ROOT));
 			if (!SHOP_CATEGORIES.contains(category)) {
-				throw invalidParameter("category", value, "KIT 또는 SEEDLING만 사용할 수 있습니다.");
+				throw invalidParameter("category", value, "KIT, SEEDLING 또는 GACHA_PACK만 사용할 수 있습니다.");
 			}
 			return category;
 		} catch (IllegalArgumentException exception) {
-			throw invalidParameter("category", value, "KIT 또는 SEEDLING만 사용할 수 있습니다.");
+			throw invalidParameter("category", value, "KIT, SEEDLING 또는 GACHA_PACK만 사용할 수 있습니다.");
 		}
 	}
 

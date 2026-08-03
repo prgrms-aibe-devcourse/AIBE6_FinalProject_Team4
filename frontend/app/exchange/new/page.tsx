@@ -123,7 +123,7 @@ function ExchangeNewInner() {
 
   return (
     <div className="container">
-      <Link href="/cards?scope=mine" className="text-sm font-semibold text-sub">← 내 카드</Link>
+      <Link href="/cards" className="text-sm font-semibold text-sub">← 카드 목록</Link>
       <h1 className="mb-5 mt-3.5 text-[26px] font-extrabold">실물 교환 신청</h1>
       <div className="grid items-start gap-[22px] [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <div>

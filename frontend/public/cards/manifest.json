@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "idPolicy": "IDs from 900001 are shared gacha UI assets (pack front/back, card back). The 43 individual card illustrations (IDs 1-43) now live in S3 (see backend TradingCard.imageKey) and are no longer shipped in this repo.",
+  "uuidPolicy": "UUIDv5 using the DNS namespace and the stable asset code.",
+  "assets": [
+    {
+      "id": 900001,
+      "type": "GACHA_PACK_FRONT",
+      "code": "season_01_pack_front",
+      "path": "/cards/900001/0005fbe2-236e-5543-a4d4-69f8b57bd3f7.svg"
+    },
+    {
+      "id": 900002,
+      "type": "GACHA_CARD_BACK",
+      "code": "season_01_card_back",
+      "path": "/cards/900002/61de4f73-7b73-541c-9dfe-5bfc5ae6dc0c.svg"
+    },
+    {
+      "id": 900003,
+      "type": "GACHA_PACK_BACK",
+      "code": "season_01_pack_back",
+      "path": "/cards/900003/ada07292-dc4b-58f0-ba69-1386fc040e56.svg"
+    }
+  ]
+}

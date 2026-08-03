@@ -153,6 +153,27 @@ class WalletServiceTest {
 	}
 
 	@Test
+	void gachaPackPurchaseUsesFreePointFirstAndRecordsGachaReference() {
+		Wallet wallet = Wallet.builder().freePoint(100L).paidPoint(1_000L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+
+		PointDeductionResult result = walletService.deductForGachaPurchase(7L, 200L, 501L);
+
+		assertThat(result.usedFreePoint()).isEqualTo(100L);
+		assertThat(result.usedPaidPoint()).isEqualTo(100L);
+		assertThat(result.remainingBalance()).isEqualTo(900L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getRefType)
+				.containsOnly(PointRefType.GACHA_PURCHASE);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getRefId)
+				.containsOnly(501L);
+	}
+
+	@Test
 	void cardPurchaseUsesOnlyPaidPointWhenFreePointIsNegative() {
 		Wallet wallet = Wallet.builder().freePoint(-100L).paidPoint(200L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
@@ -444,6 +465,54 @@ class WalletServiceTest {
 				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
 
 		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+	}
+
+	@Test
+	void restoresGachaPurchaseUsingRecordedFreeAndPaidPointAmounts() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(0L).build();
+		PointTransaction freePurchase = mock(PointTransaction.class);
+		PointTransaction paidPurchase = mock(PointTransaction.class);
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.findAllByWalletAndTypeAndRefTypeAndRefId(
+				wallet,
+				PointTxType.PURCHASE,
+				PointRefType.GACHA_PURCHASE,
+				501L
+		)).willReturn(List.of(freePurchase, paidPurchase));
+		given(freePurchase.getAmount()).willReturn(-60L);
+		given(freePurchase.getCurrencyType()).willReturn(CurrencyType.FREE);
+		given(paidPurchase.getAmount()).willReturn(-40L);
+		given(paidPurchase.getCurrencyType()).willReturn(CurrencyType.PAID);
+
+		walletService.restoreGachaPurchasePoints(7L, 501L);
+
+		assertThat(wallet.getFreePoint()).isEqualTo(60L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(40L);
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getAmount)
+				.containsExactly(60L, 40L);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getRefType)
+				.containsOnly(PointRefType.GACHA_PURCHASE);
+	}
+
+	@Test
+	void duplicateGachaPurchaseRestoreIsIdempotent() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(0L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.RESTORE,
+				PointRefType.GACHA_PURCHASE,
+				501L
+		)).willReturn(true);
+
+		walletService.restoreGachaPurchasePoints(7L, 501L);
+
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isZero();
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test

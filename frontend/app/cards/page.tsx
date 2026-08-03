@@ -4,7 +4,7 @@ import Link from 'next/link';
 import FilterBar from '@/components/FilterBar';
 import PointPrice from '@/components/PointPrice';
 import { ApiError } from '@/lib/api';
-import { CardData, getCards, getMyCards } from '@/lib/card-api';
+import { CardData, getCards } from '@/lib/card-api';
 import { useStore } from '@/lib/store';
 
 const TABS = [
@@ -23,23 +23,14 @@ const SORTS = [
 const progress = (card: CardData) =>
   (card.ownedCount ?? 0) / card.requiredCountForExchange;
 
-export default function Cards({
-  searchParams,
-}: {
-  searchParams?: { scope?: string };
-}) {
+export default function Cards() {
   const { state, hydrated } = useStore();
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('new');
   const [cards, setCards] = useState<CardData[]>([]);
-  const [myCards, setMyCards] = useState<CardData[]>([]);
-  const [scope, setScope] = useState<'all' | 'mine'>(
-    searchParams?.scope === 'mine' ? 'mine' : 'all',
-  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const personalized = cards.some((card) => card.ownedCount !== null);
-  const activeScope = scope === 'mine' && personalized ? 'mine' : 'all';
 
   useEffect(() => {
     if (!hydrated) return;
@@ -48,20 +39,13 @@ export default function Cards({
     setLoading(true);
     setError('');
 
-    Promise.all([
-      getCards(state.accessToken, controller.signal),
-      state.accessToken
-        ? getMyCards(state.accessToken, controller.signal)
-        : Promise.resolve([]),
-    ])
-      .then(([allCards, ownedCards]) => {
+    getCards(state.accessToken, controller.signal)
+      .then((allCards) => {
         setCards(allCards);
-        setMyCards(ownedCards);
       })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setCards([]);
-        setMyCards([]);
         setError(
           requestError instanceof ApiError
             ? requestError.message
@@ -77,75 +61,42 @@ export default function Cards({
 
   useEffect(() => {
     if (!hydrated || state.accessToken) return;
-    setScope('all');
     setFilter('all');
     if (sort === 'progress') setSort('new');
   }, [hydrated, state.accessToken, sort]);
 
-  let list = [...myCards];
-  if (activeScope === 'all') {
-    list = cards.filter((card) => {
-      if (!personalized) return true;
-      if (filter === 'ready') {
-        return (card.ownedCount ?? 0) >= card.requiredCountForExchange;
-      }
-      if (filter === 'collecting') {
-        return (card.ownedCount ?? 0) < card.requiredCountForExchange;
-      }
-      return true;
-    });
-
-    if (sort === 'low') list = [...list].sort((a, b) => a.pointPrice - b.pointPrice);
-    else if (sort === 'high') list = [...list].sort((a, b) => b.pointPrice - a.pointPrice);
-    else if (sort === 'progress') list = [...list].sort((a, b) => progress(b) - progress(a));
-    else {
-      list = [...list].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+  let list = cards.filter((card) => {
+    if (!personalized) return true;
+    if (filter === 'ready') {
+      return (card.ownedCount ?? 0) >= card.requiredCountForExchange;
     }
+    if (filter === 'collecting') {
+      return (card.ownedCount ?? 0) < card.requiredCountForExchange;
+    }
+    return true;
+  });
+
+  if (sort === 'low') list = [...list].sort((a, b) => a.pointPrice - b.pointPrice);
+  else if (sort === 'high') list = [...list].sort((a, b) => b.pointPrice - a.pointPrice);
+  else if (sort === 'progress') list = [...list].sort((a, b) => progress(b) - progress(a));
+  else {
+    list = [...list].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 
   return (
     <div className="container animate-upIn">
       <h1 className="mb-4 text-2xl font-extrabold">카드</h1>
 
-      <div className="mb-4 flex w-fit gap-1.5 rounded-xl bg-[#F0F2E8] p-[5px]">
-        <button
-          type="button"
-          onClick={() => setScope('all')}
-          className={`cursor-pointer rounded-[9px] px-4 py-2 text-sm font-bold ${
-            activeScope === 'all'
-              ? 'bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,.06)]'
-              : 'bg-transparent text-sub'
-          }`}
-        >
-          전체 카드
-        </button>
-        {personalized && (
-          <button
-            type="button"
-            onClick={() => setScope('mine')}
-            className={`cursor-pointer rounded-[9px] px-4 py-2 text-sm font-bold ${
-              activeScope === 'mine'
-                ? 'bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,.06)]'
-                : 'bg-transparent text-sub'
-            }`}
-          >
-            내 카드
-          </button>
-        )}
-      </div>
-
-      {activeScope === 'all' && (
-        <FilterBar
-          tabs={personalized ? TABS : TABS.slice(0, 1)}
-          activeTab={filter}
-          onTab={setFilter}
-          sorts={personalized ? SORTS : SORTS.filter((item) => item.key !== 'progress')}
-          activeSort={sort}
-          onSort={setSort}
-        />
-      )}
+      <FilterBar
+        tabs={personalized ? TABS : TABS.slice(0, 1)}
+        activeTab={filter}
+        onTab={setFilter}
+        sorts={personalized ? SORTS : SORTS.filter((item) => item.key !== 'progress')}
+        activeSort={sort}
+        onSort={setSort}
+      />
 
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
@@ -157,9 +108,7 @@ export default function Cards({
         </div>
       ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
-          {activeScope === 'mine'
-            ? '아직 보유한 카드가 없어요. 전체 카드에서 첫 카드를 구매해 보세요!'
-            : '해당하는 카드가 없어요. 일지를 기록하고 포인트를 모아보세요!'}
+          해당하는 카드가 없어요. 일지를 기록하고 포인트를 모아보세요!
         </div>
       ) : (
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">

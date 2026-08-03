@@ -23,15 +23,16 @@ const NAV = [
   { key: 'journal', label: '일지', href: '/journals' },
   { key: 'shop', label: '상점', href: '/shop' },
   { key: 'cards', label: '카드', href: '/cards' },
+  { key: 'gacha', label: '가챠', href: '/gacha' },
   { key: 'exchange', label: '교환', href: '/my/exchanges' },
 ];
 
-// 모바일 하단 탭은 5칸 제한이라 식물/일지를 "식물" 하나로 합쳐(일지는 식물 상세에서
-// 접근) 카드가 들어갈 자리를 확보했다. 데스크톱 상단 NAV는 그대로 둘 다 유지.
+// 모바일 하단 탭은 식물/일지를 "식물" 하나로 합치고 카드 수집과 가챠를 각각 바로 접근하게 한다.
 const BOTTOM = [
   { key: 'home', label: '홈', icon: 'home', href: '/' },
   { key: 'plants', label: '식물', icon: 'potted_plant', href: '/plants' },
   { key: 'cards', label: '카드', icon: 'style', href: '/cards' },
+  { key: 'gacha', label: '가챠', icon: 'casino', href: '/gacha' },
   { key: 'shop', label: '상점', icon: 'storefront', href: '/shop' },
   { key: 'account', label: 'MY', icon: 'person', href: '/my' },
 ];
@@ -41,6 +42,7 @@ function activeKey(pathname: string) {
   if (pathname.startsWith('/plants')) return 'plants';
   if (pathname.startsWith('/journals')) return 'journal';
   if (pathname.startsWith('/cards')) return 'cards';
+  if (pathname.startsWith('/gacha')) return 'gacha';
   if (pathname.startsWith('/shop')) return 'shop';
   if (pathname.startsWith('/my/exchanges') || pathname.startsWith('/exchange')) return 'exchange';
   if (pathname.startsWith('/my')) return 'account';

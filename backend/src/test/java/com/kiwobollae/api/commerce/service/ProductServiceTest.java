@@ -61,7 +61,11 @@ class ProductServiceTest {
 				categoriesCaptor.capture(),
 				pageableCaptor.capture()
 		);
-		assertThat(categoriesCaptor.getValue()).containsExactly(ProductCategory.KIT, ProductCategory.SEEDLING);
+		assertThat(categoriesCaptor.getValue()).containsExactly(
+				ProductCategory.KIT,
+				ProductCategory.SEEDLING,
+				ProductCategory.GACHA_PACK
+		);
 		assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
 		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
 		assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt").getDirection())
@@ -91,6 +95,54 @@ class ProductServiceTest {
 		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
 		assertThat(pageableCaptor.getValue().getSort().getOrderFor("pointPrice").getDirection())
 				.isEqualTo(Sort.Direction.ASC);
+	}
+
+	@Test
+	void getProductsAcceptsGachaPackCategory() {
+		given(productRepository.findAllByStatusAndCategoryIn(
+				eq(ProductStatus.ACTIVE),
+				anyCollection(),
+				any(Pageable.class)
+		)).willReturn(new PageImpl<>(List.of()));
+
+		productService.getProducts("gacha_pack", "LATEST", 0, 20);
+
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<ProductCategory>> categoriesCaptor = ArgumentCaptor.forClass(List.class);
+		verify(productRepository).findAllByStatusAndCategoryIn(
+				eq(ProductStatus.ACTIVE),
+				categoriesCaptor.capture(),
+				any(Pageable.class)
+		);
+		assertThat(categoriesCaptor.getValue()).containsExactly(ProductCategory.GACHA_PACK);
+	}
+
+	@Test
+	void getActiveGachaPackReturnsServerPriceAndMaximumQuantity() {
+		Product product = org.mockito.Mockito.mock(Product.class);
+		given(product.getId()).willReturn(9L);
+		given(product.getName()).willReturn("시즌 1 가챠 카드팩");
+		given(product.getCategory()).willReturn(ProductCategory.GACHA_PACK);
+		given(product.getPointPrice()).willReturn(100L);
+		given(productRepository.findByIdAndStatus(9L, ProductStatus.ACTIVE))
+				.willReturn(Optional.of(product));
+
+		var quote = productService.getActiveGachaPack(9L);
+
+		assertThat(quote.productId()).isEqualTo(9L);
+		assertThat(quote.unitPoint()).isEqualTo(100L);
+		assertThat(quote.maxQuantity()).isEqualTo(1);
+	}
+
+	@Test
+	void getProductTreatsGachaPackAsUnlimitedRegardlessOfStock() {
+		Product product = product(9L, ProductCategory.GACHA_PACK, 0, null);
+		given(productRepository.findByIdAndStatus(9L, ProductStatus.ACTIVE))
+				.willReturn(Optional.of(product));
+
+		var response = productService.getProduct(9L);
+
+		assertThat(response.soldOut()).isFalse();
 	}
 
 	@Test

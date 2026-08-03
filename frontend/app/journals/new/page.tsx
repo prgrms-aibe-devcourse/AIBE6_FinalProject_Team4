@@ -18,8 +18,8 @@ interface Draft {
 }
 
 function NewJournalInner() {
-  const params = useSearchParams();
   const router = useRouter();
+  const params = useSearchParams();
   const preselect = params.get('plant');
   const { state, hydrated, refreshWallet } = useStore();
   const { showToast } = useUI();
@@ -91,6 +91,11 @@ function NewJournalInner() {
       }
       await refreshWallet();
       setCreateResult(result);
+
+      if (result.journal.gachaReward.granted && result.journal.gachaReward.drawId) {
+        router.push(`/gacha/open/${result.journal.gachaReward.drawId}`);
+        return;
+      }
       setSaved(true);
     } catch (requestError) {
       showToast(
