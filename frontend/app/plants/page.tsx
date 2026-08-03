@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { SPECIES, BADGE } from '@/lib/data';
+import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
-import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
+import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -30,6 +31,9 @@ export default function PlantsPage() {
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
+  const [speciesLoading, setSpeciesLoading] = useState(true);
+  const [speciesError, setSpeciesError] = useState('');
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -67,13 +71,38 @@ export default function PlantsPage() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+    setSpeciesLoading(true);
+    setSpeciesError('');
+
+    getSpecies(accessToken, controller.signal)
+      .then((data) => setSpeciesList(data))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setSpeciesList([]);
+        setSpeciesError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : '식물 종 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSpeciesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
+
   const list = plants.filter((p) => filter === 'all' || p.status === filter);
   const regV = nickValid(reg.nick);
-  const spResults = SPECIES.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
+  const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
 
   const handleSpeciesQueryChange = (value: string) => {
     setQuery(value);
-    const selected = SPECIES.find((sp) => sp.id === reg.speciesId);
+    const selected = speciesList.find((sp) => sp.id === reg.speciesId);
     if (selected && selected.name !== value) {
       setReg({ ...reg, speciesId: null });
     }
@@ -264,7 +293,11 @@ export default function PlantsPage() {
               placeholder="종을 검색하세요 (예: 토마토)"
               className={`${FIELD} mb-2.5 mt-1.5`}
             />
-            {spResults.length === 0 && query.trim() ? (
+            {speciesLoading ? (
+              <div className="mb-[18px] text-[13.5px] text-faint">종 목록을 불러오고 있어요 🌱</div>
+            ) : speciesError ? (
+              <div className="mb-[18px] text-[13.5px] text-faint">{speciesError}</div>
+            ) : spResults.length === 0 && query.trim() ? (
               <div className="mb-[18px] text-[13.5px] text-faint">
                 일치하는 종이 없어요. 다른 이름으로 검색해 보세요.
               </div>
@@ -281,7 +314,7 @@ export default function PlantsPage() {
                         selected ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
                       }`}
                     >
-                      {sp.emoji} {sp.name}
+                      {plantVisual(sp.name).emoji} {sp.name}
                       {selected && (
                         <span
                           role="button"
