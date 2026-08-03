@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useStore, fmt } from '@/lib/store';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
@@ -15,7 +16,14 @@ const CONFETTI = [
 const FEATURES = [
   { emoji: '🌱', title: '매일 기록하기', desc: '식물의 성장을 사진과 함께 일지로 남겨요' },
   { emoji: '☀️', title: '포인트 쌓기', desc: '기록할 때마다 포인트가 차곡차곡 쌓여요' },
-  { emoji: '🎴', title: '카드 모으기', desc: '쌓인 포인트로 특별한 카드를 모아보세요' },
+  {
+    image: {
+      src: 'https://4team-storage-495264909330-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com/cards/8/399f7998-3e24-5d1d-b69c-68da63b839ef.png',
+      alt: '상추 카드',
+    },
+    title: '카드 모으기',
+    desc: '쌓인 포인트로 특별한 카드를 모아보세요',
+  },
   { emoji: '🍉', title: '진짜 열매 받기', desc: '모은 카드를 진짜 과일·채소로 교환해요' },
 ];
 
@@ -95,7 +103,19 @@ export default function Home() {
         <div className="grid gap-4 border-t border-line pb-8 pt-10 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
           {FEATURES.map((f) => (
             <div key={f.title} className="rounded-[18px] bg-white p-5 text-center shadow-card">
-              <div className="text-[34px]">{f.emoji}</div>
+              <div className="flex h-[51px] items-center justify-center text-[34px]">
+                {f.image ? (
+                  <Image
+                    src={f.image.src}
+                    alt={f.image.alt}
+                    width={27}
+                    height={34}
+                    className="h-[34px] w-auto rounded-[2px] object-contain shadow-[0_2px_5px_rgba(120,82,12,.22)]"
+                  />
+                ) : (
+                  f.emoji
+                )}
+              </div>
               <div className="mt-2 font-extrabold">{f.title}</div>
               <div className="mt-1 text-[13px] text-sub">{f.desc}</div>
             </div>
