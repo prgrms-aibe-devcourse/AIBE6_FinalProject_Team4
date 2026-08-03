@@ -86,13 +86,13 @@ export default function Payments() {
     if (!walletLoaded || state.wallet.paid < payment.pointAmount) {
       setRefundError({
         paymentId: payment.id,
-        message: `유상 포인트가 ${fmt(payment.pointAmount)}P 이상 남아 있어야 전액 환불할 수 있어요.`,
+        message: `충전 포인트가 ${fmt(payment.pointAmount)}P 이상 남아 있어야 전액 환불할 수 있어요.`,
       });
       return;
     }
 
     const confirmed = window.confirm(
-      `${fmt(payment.cashAmount)}원을 전액 환불하고 유상 포인트 ${fmt(payment.pointAmount)}P를 회수할까요?`,
+      `${fmt(payment.cashAmount)}원을 전액 환불할까요? 환불이 완료되면 충전으로 지급된 포인트 ${fmt(payment.pointAmount)}P가 함께 차감됩니다.`,
     );
     if (!confirmed) return;
 
@@ -204,8 +204,8 @@ export default function Payments() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs text-faint">
                         {canRefund
-                          ? `결제 금액 전액 환불 · 유상 ${fmt(payment.pointAmount)}P 회수`
-                          : `유상 포인트 ${fmt(payment.pointAmount)}P가 남아 있어야 전액 환불할 수 있어요.`}
+                          ? `결제 금액 전액 환불 · 충전 포인트 ${fmt(payment.pointAmount)}P 차감`
+                          : `충전 포인트 ${fmt(payment.pointAmount)}P가 남아 있어야 전액 환불할 수 있어요.`}
                       </p>
                       <button
                         type="button"

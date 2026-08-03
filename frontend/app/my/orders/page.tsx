@@ -66,6 +66,15 @@ export default function Orders() {
     void load();
   }, [hydrated, load]);
 
+  useEffect(() => {
+    if (loading || orders.length === 0 || !window.location.hash) return;
+    const targetId = decodeURIComponent(window.location.hash.slice(1));
+    if (!targetId.startsWith('order-')) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [loading, orders]);
+
   const setBusy = (id: number, value: boolean) => setBusyIds((prev) => ({ ...prev, [id]: value }));
 
   const cancel = (order: OrderData) => askConfirm({
@@ -144,7 +153,11 @@ export default function Orders() {
             const items = itemsByOrderId[order.id] || [];
             const busy = busyIds[order.id];
             return (
-              <div key={order.id} className="rounded-[18px] bg-white p-5 shadow-card">
+              <div
+                id={`order-${order.id}`}
+                key={order.id}
+                className="scroll-mt-24 rounded-[18px] bg-white p-5 shadow-card target:ring-2 target:ring-brand"
+              >
                 <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span className="font-extrabold">주문 #{order.id}</span>
