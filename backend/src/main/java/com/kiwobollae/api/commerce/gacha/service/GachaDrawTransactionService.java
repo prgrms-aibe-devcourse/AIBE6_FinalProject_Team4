@@ -7,7 +7,6 @@ import com.kiwobollae.api.commerce.gacha.entity.GoldenCardInstance;
 import com.kiwobollae.api.commerce.gacha.entity.TradingCard;
 import com.kiwobollae.api.commerce.gacha.entity.UserCardCollection;
 import com.kiwobollae.api.commerce.gacha.entity.enums.GachaDrawStatus;
-import com.kiwobollae.api.commerce.gacha.entity.enums.GachaSourceType;
 import com.kiwobollae.api.commerce.gacha.entity.enums.GoldenOriginType;
 import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardRarity;
 import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardStatus;
@@ -27,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,9 +41,6 @@ public class GachaDrawTransactionService {
   private final GoldenCardInstanceRepository goldenInstanceRepository;
   private final GachaDrawEngine drawEngine;
   private final GachaMasterValidator masterValidator;
-
-  @Value("${app.gacha.qa.golden-rate-boost-enabled:false}")
-  private boolean qaGoldenRateBoostEnabled;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void process(Long drawId) {
@@ -87,9 +82,7 @@ public class GachaDrawTransactionService {
       int sequence,
       Map<TradingCardRarity, List<TradingCard>> cardsByRarity,
       LocalDateTime now) {
-    boolean useQaGoldenRate =
-        qaGoldenRateBoostEnabled && draw.getSourceType() == GachaSourceType.ADMIN;
-    GachaDrawEngine.RolledGrade rolled = drawEngine.rollGrade(useQaGoldenRate);
+    GachaDrawEngine.RolledGrade rolled = drawEngine.rollGrade();
     TradingCardRarity finalRarity = rolled.rarity();
     TradingCard card;
     GoldenCardInstance goldenInstance = null;

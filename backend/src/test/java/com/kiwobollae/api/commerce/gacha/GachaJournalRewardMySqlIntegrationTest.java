@@ -73,11 +73,13 @@ class GachaJournalRewardMySqlIntegrationTest {
     assertThat(first.journal().gachaReward().granted()).isTrue();
     assertThat(first.journal().gachaReward().drawId()).isNotNull();
     assertThat(second.journal().gachaReward().granted()).isFalse();
-    assertThat(second.journal().gachaReward().drawId()).isEqualTo(first.journal().gachaReward().drawId());
+    assertThat(second.journal().gachaReward().drawId())
+        .isEqualTo(first.journal().gachaReward().drawId());
     assertThat(tradingCardRepository.count()).isEqualTo(43);
     assertThat(gachaDrawRepository.count()).isEqualTo(1);
 
-    GachaDraw draw = gachaDrawRepository.findById(first.journal().gachaReward().drawId()).orElseThrow();
+    GachaDraw draw =
+        gachaDrawRepository.findById(first.journal().gachaReward().drawId()).orElseThrow();
     assertThat(draw.getStatus()).isEqualTo(GachaDrawStatus.COMPLETED);
     assertThat(gachaDrawItemRepository.findAllByGachaDraw_IdOrderByDrawSeqAsc(draw.getId()))
         .hasSize(5);

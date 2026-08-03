@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore, fmt, NotificationType } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { levelTitle } from '@/lib/levels';
-import GachaTestMenuItem from './GachaTestMenuItem';
 import Skeleton from './Skeleton';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
@@ -215,12 +214,6 @@ export default function Navbar() {
                     <Link href="/my/inquiries" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
                       1:1 문의
                     </Link>
-                    {state.accessToken && (
-                      <GachaTestMenuItem
-                        accessToken={state.accessToken}
-                        onNavigate={() => setProfileOpen(false)}
-                      />
-                    )}
                     <button
                       type="button"
                       onClick={doLogout}

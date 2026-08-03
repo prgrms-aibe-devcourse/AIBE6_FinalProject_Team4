@@ -160,31 +160,3 @@ export function purchaseGachaPacks(
     body: JSON.stringify({ productId, quantity }),
   });
 }
-
-export function createGachaQaDraw(
-  accessToken: string,
-  clientKey: string,
-): Promise<{ drawId: number; status: GachaDrawStatus }> {
-  return request<{ drawId: number; status: GachaDrawStatus }>(
-    "/api/v1/card/gacha/qa/draws",
-    {
-      method: "POST",
-      body: JSON.stringify({ clientKey }),
-      accessToken,
-    },
-  );
-}
-
-export function createOneHundredGachaQaDraws(
-  accessToken: string,
-  clientKey: string,
-): Promise<{ drawIds: number[]; packCount: number }> {
-  return request<{ drawIds: number[]; packCount: number }>(
-    "/api/v1/card/gacha/qa/draws/100",
-    {
-      method: "POST",
-      body: JSON.stringify({ clientKey }),
-      accessToken,
-    },
-  );
-}
