@@ -18,6 +18,9 @@ public class PlantSpeciesManagementService {
 
 	@Transactional
 	public PlantSpeciesResponse createSpecies(PlantSpeciesRequest request) {
+		if (plantSpeciesRepository.existsByName(request.name())) {
+			throw new BusinessException(ErrorCode.PLANT_SPECIES_DUPLICATE_NAME);
+		}
 		PlantSpecies species = PlantSpecies.builder()
 				.name(request.name())
 				.category(request.category())
@@ -30,6 +33,9 @@ public class PlantSpeciesManagementService {
 	public PlantSpeciesResponse updateSpecies(Long speciesId, PlantSpeciesRequest request) {
 		PlantSpecies species = plantSpeciesRepository.findById(speciesId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
+		if (plantSpeciesRepository.existsByNameAndIdNot(request.name(), speciesId)) {
+			throw new BusinessException(ErrorCode.PLANT_SPECIES_DUPLICATE_NAME);
+		}
 		species.updateInfo(request.name(), request.category(), request.careGuide());
 		return PlantSpeciesResponse.from(species);
 	}
