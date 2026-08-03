@@ -1,0 +1,17 @@
+# cp terraform.tfvars.example terraform.tfvars 후 값 채우기.
+# terraform.tfvars는 .gitignore 대상입니다 — 민감값을 커밋하지 마세요.
+
+app_domain       = "api.kiwor.site"
+ssh_allowed_cidr = "0.0.0.0/32" # 실제 관리자 IP/32 로 교체
+
+ghcr_owner = "tesalriah" # GitHub 계정 소문자
+
+# 프론트(Vercel) 도메인 기준 OAuth redirect URI
+# GOOGLE_REDIRECT_URI = "https://kiwor.site/oauth/callback/google"
+# KAKAO_REDIRECT_URI  = "https://kiwor.site/oauth/callback/kakao"
+# NAVER_REDIRECT_URI  = "https://kiwor.site/oauth/callback/naver"
+
+# 아래 값은 tfvars 대신 환경변수로 주입하는 걸 권장:
+#   export TF_VAR_db_password=...
+#   export TF_VAR_jwt_secret=...
+#   export TF_VAR_ghcr_token=...

@@ -2,6 +2,7 @@ plugins {
 	java
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
+	id("com.diffplug.spotless") version "7.2.1"
 }
 
 group = "com.kiwobollae"
@@ -20,6 +21,7 @@ repositories {
 dependencies {
 	implementation(platform("software.amazon.awssdk:bom:2.29.52"))
 	implementation("software.amazon.awssdk:s3")
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-mail")
 	implementation("org.springframework.boot:spring-boot-starter-security")
@@ -44,4 +46,16 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+spotless {
+	java {
+		googleJavaFormat("1.35.0")
+		target(
+			"src/main/java/com/kiwobollae/api/commerce/gacha/**/*.java",
+			"src/main/java/com/kiwobollae/api/content/dto/response/GachaRewardResponse.java",
+			"src/main/java/com/kiwobollae/api/global/config/GachaCardInitData.java",
+			"src/test/java/com/kiwobollae/api/commerce/gacha/**/*.java",
+		)
+	}
 }

@@ -1,0 +1,195 @@
+name: deploy-backend
+
+env:
+  IMAGE_REPOSITORY: kiwobollae-backend
+  CONTAINER_1_NAME: kiwobollae_backend_1
+  CONTAINER_2_NAME: kiwobollae_backend_2
+  CONTAINER_PORT: 8080
+  EC2_INSTANCE_TAG_NAME: kiwobollae-ec2-1
+  DOCKER_NETWORK: common
+  BACKEND_DIR: backend
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Buildx 설치
+        uses: docker/setup-buildx-action@v3
+
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set lower case owner
+        run: echo "OWNER_LC=${OWNER,,}" >> "${GITHUB_ENV}"
+        env:
+          OWNER: ${{ github.repository_owner }}
+
+      - name: 빌드 앤 푸시
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.BACKEND_DIR }}
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_REPOSITORY }}:latest
+
+  deploy:
+    name: Blue/Green 무중단 배포
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: 인스턴스 ID 조회
+        run: |
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${{ env.EC2_INSTANCE_TAG_NAME }}" "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].InstanceId" --output text)
+          [[ -n "${INSTANCE_ID}" && "${INSTANCE_ID}" != "None" ]] || { echo "No running instance found"; exit 1; }
+          echo "INSTANCE_ID=${INSTANCE_ID}" >> "${GITHUB_ENV}"
+
+      - name: SSM으로 Blue/Green 스위치
+        uses: peterkimzz/aws-ssm-send-command@master
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          instance-ids: ${{ env.INSTANCE_ID }}
+          working-directory: /
+          comment: Deploy backend
+          command: |
+            set -Eeuo pipefail
+            source /etc/environment || true
+
+            OWNER_LC="${{ github.repository_owner }}"
+            OWNER_LC="${OWNER_LC,,}"
+            IMAGE="ghcr.io/${OWNER_LC}/${{ env.IMAGE_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}"
+            SLOT1="${{ env.CONTAINER_1_NAME }}"
+            SLOT2="${{ env.CONTAINER_2_NAME }}"
+            PORT_IN="${{ env.CONTAINER_PORT }}"
+            NET="${{ env.DOCKER_NETWORK }}"
+
+            echo "Use image: ${IMAGE}"
+            docker pull "${IMAGE}"
+
+            TOKEN=$(curl -s -X POST http://127.0.0.1:81/api/tokens \
+              -H "Content-Type: application/json" \
+              -d "{\"identity\": \"${{ secrets.NPM_ADMIN_EMAIL }}\", \"secret\": \"${{ secrets.NPM_ADMIN_PASSWORD }}\"}" | jq -r '.token')
+            [[ -n "${TOKEN}" && "${TOKEN}" != "null" ]] || { echo "NPM token issue failed"; exit 1; }
+            [[ -n "${APP_DOMAIN:-}" ]] || { echo "APP_DOMAIN is empty"; exit 1; }
+
+            PROXY_ID=$(curl -s -X GET "http://127.0.0.1:81/api/nginx/proxy-hosts" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              | jq ".[] | select(.domain_names[]==\"${APP_DOMAIN}\") | .id")
+            [[ -n "${PROXY_ID}" && "${PROXY_ID}" != "null" ]] || { echo "Proxy host not found for ${APP_DOMAIN}"; exit 1; }
+
+            CURRENT_HOST=$(curl -s -X GET "http://127.0.0.1:81/api/nginx/proxy-hosts/${PROXY_ID}" \
+              -H "Authorization: Bearer ${TOKEN}" | jq -r '.forward_host')
+            echo "CURRENT_HOST: ${CURRENT_HOST:-none}"
+
+            if [[ "${CURRENT_HOST:-}" == "${SLOT1}" ]]; then
+              BLUE="${SLOT1}"; GREEN="${SLOT2}"
+            elif [[ "${CURRENT_HOST:-}" == "${SLOT2}" ]]; then
+              BLUE="${SLOT2}"; GREEN="${SLOT1}"
+            else
+              BLUE="none"; GREEN="${SLOT1}"
+            fi
+            echo "blue(now): ${BLUE}, green(next): ${GREEN}"
+
+            docker rm -f "${GREEN}" >/dev/null 2>&1 || true
+            docker run -d --name "${GREEN}" \
+              --restart unless-stopped \
+              --network "${NET}" \
+              -e TZ=Asia/Seoul \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e DB_URL="${DB_URL}" \
+              -e DB_USERNAME="${DB_USERNAME}" \
+              -e DB_PASSWORD="${DB_PASSWORD}" \
+              -e JWT_SECRET="${JWT_SECRET}" \
+              -e JWT_ACCESS_EXPIRATION=3600000 \
+              -e JWT_REFRESH_EXPIRATION=1209600000 \
+              -e COOKIE_SECURE=true \
+              -e CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://kiwor.site,https://www.kiwor.site}" \
+              -e MAIL_ENABLED="${MAIL_ENABLED:-false}" \
+              -e MAIL_FROM="${MAIL_FROM:-}" \
+              -e MAIL_HOST="${MAIL_HOST:-}" \
+              -e MAIL_PORT="${MAIL_PORT:-587}" \
+              -e MAIL_USERNAME="${MAIL_USERNAME:-}" \
+              -e MAIL_PASSWORD="${MAIL_PASSWORD:-}" \
+              -e GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}" \
+              -e GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET:-}" \
+              -e GOOGLE_REDIRECT_URI="${GOOGLE_REDIRECT_URI:-}" \
+              -e KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
+              -e KAKAO_CLIENT_SECRET="${KAKAO_CLIENT_SECRET:-}" \
+              -e KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
+              -e NAVER_CLIENT_ID="${NAVER_CLIENT_ID:-}" \
+              -e NAVER_CLIENT_SECRET="${NAVER_CLIENT_SECRET:-}" \
+              -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI:-}" \
+              "${IMAGE}"
+
+            echo "health-check: ${GREEN}"
+            TIMEOUT=120; INTERVAL=3; ELAPSED=0
+            sleep 8
+            while (( ELAPSED < TIMEOUT )); do
+              CODE=$(docker exec "${GREEN}" curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${PORT_IN}/actuator/health" || echo 000)
+              [[ "${CODE}" == "200" ]] && { echo "${GREEN} healthy"; break; }
+              sleep "${INTERVAL}"; ELAPSED=$((ELAPSED + INTERVAL))
+            done
+            [[ "${CODE:-000}" == "200" ]] || { echo "${GREEN} health failed"; docker logs --tail=200 "${GREEN}" || true; docker rm -f "${GREEN}" || true; exit 1; }
+
+            NEW_CFG=$(jq -n --arg host "${GREEN}" --argjson port ${PORT_IN} '{forward_host:$host, forward_port:$port}')
+            SWITCH_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "http://127.0.0.1:81/api/nginx/proxy-hosts/${PROXY_ID}" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "${NEW_CFG}")
+            if [[ "${SWITCH_CODE}" != "200" ]]; then
+              echo "upstream switch failed (http ${SWITCH_CODE}) - rolling back, keeping ${BLUE} live"
+              docker rm -f "${GREEN}" || true
+              exit 1
+            fi
+            echo "switch upstream -> ${GREEN}:${PORT_IN}"
+
+            if [[ "${BLUE}" != "none" ]]; then
+              docker stop "${BLUE}" >/dev/null 2>&1 || true
+              docker rm "${BLUE}" >/dev/null 2>&1 || true
+              echo "removed old blue: ${BLUE}"
+            fi
+
+            {
+              docker images --format '{{.Repository}}:{{.Tag}}' \
+                | grep -F "ghcr.io/${OWNER_LC}/${{ env.IMAGE_REPOSITORY }}:" \
+                | grep -v -F ":${{ needs.build-and-push.outputs.image_tag }}" \
+                | grep -v -F ":latest" \
+                | xargs -r docker rmi
+            } || true
+
+            echo "Blue/Green switch complete. now blue = ${GREEN}"

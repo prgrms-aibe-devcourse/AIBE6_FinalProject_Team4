@@ -2,6 +2,8 @@ package com.kiwobollae.api.content.service;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
+import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservation;
+import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservationService;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalUpdateRequest;
@@ -44,6 +46,7 @@ public class PlantJournalService {
 	private final PlantProfileRepository plantProfileRepository;
 	private final UserRepository userRepository;
 	private final WalletService walletService;
+	private final GachaRewardReservationService gachaRewardReservationService;
 	private final JournalImageUploadService journalImageUploadService;
 
 	@Transactional
@@ -68,18 +71,21 @@ public class PlantJournalService {
 		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
 		LocalDateTime now = LocalDateTime.now(KST);
 		LocalDateTime startOfToday = today.atStartOfDay();
+		GachaRewardReservation gachaReservation = GachaRewardReservation.none();
 		boolean rewardGranted =
 				plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1;
 		long rewardAmount = 0L;
 		if (rewardGranted) {
 			JournalRewardResult rewardResult = walletService.rewardJournal(userId, journal.getId());
 			rewardAmount = rewardResult.rewardAmount();
+			gachaReservation = gachaRewardReservationService.reserveDailyJournalReward(userId, today);
 		}
 		return PlantJournalCreateResponse.from(
 				journal,
 				images,
 				rewardGranted,
-				rewardAmount
+				rewardAmount,
+				gachaReservation
 		);
 	}
 

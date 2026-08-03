@@ -13,6 +13,8 @@ jwt:
   refresh-expiration: ${JWT_REFRESH_EXPIRATION}
 
 app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGINS:https://kiwor.site,https://www.kiwor.site}
   cookie:
     secure: ${COOKIE_SECURE:true}
   mail:

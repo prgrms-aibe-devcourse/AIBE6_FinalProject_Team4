@@ -9,13 +9,15 @@ logging:
 
 app:
   seed:
+    gacha:
+      enabled: true
+    gacha-pack:
+      enabled: true
     charge-product:
       enabled: true
     product:
-      # Set to false when local development should use manually managed or production-like data.
       enabled: true
     card:
-      # Seeds ten cards and their exchange products only when both tables are empty.
       enabled: true
     plant-profile:
       # Seeds sample plant profiles for the InitData test users, so /plants isn't

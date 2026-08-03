@@ -10,6 +10,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
+import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservation;
+import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservationService;
 import com.kiwobollae.api.content.dto.request.JournalImageRequest;
 import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.content.dto.response.PlantJournalCreateResponse;
@@ -44,6 +46,7 @@ class PlantJournalServiceTest {
 	@Mock private PlantProfileRepository plantProfileRepository;
 	@Mock private UserRepository userRepository;
 	@Mock private WalletService walletService;
+	@Mock private GachaRewardReservationService gachaRewardReservationService;
 	@Mock private JournalImageUploadService journalImageUploadService;
 
 	@InjectMocks
@@ -78,6 +81,8 @@ class PlantJournalServiceTest {
 		)).willReturn(1);
 		given(walletService.rewardJournal(7L, 31L))
 				.willReturn(new JournalRewardResult(100L));
+		given(gachaRewardReservationService.reserveDailyJournalReward(eq(7L), any(LocalDate.class)))
+				.willReturn(GachaRewardReservation.none());
 
 		PlantJournalCreateResponse response = plantJournalService.createJournal(7L, request);
 
@@ -85,6 +90,7 @@ class PlantJournalServiceTest {
 		assertThat(response.rewardGranted()).isTrue();
 		assertThat(response.rewardAmount()).isEqualTo(100L);
 		verify(walletService).rewardJournal(7L, 31L);
+		verify(gachaRewardReservationService).reserveDailyJournalReward(eq(7L), any(LocalDate.class));
 	}
 
 	@Test

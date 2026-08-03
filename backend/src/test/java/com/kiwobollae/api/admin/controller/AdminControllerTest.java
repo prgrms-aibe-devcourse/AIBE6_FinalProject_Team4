@@ -5,13 +5,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.kiwobollae.api.admin.service.ExchangeManagementService;
+import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
+import com.kiwobollae.api.content.dto.request.PlantSpeciesRequest;
+import com.kiwobollae.api.content.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
@@ -34,17 +38,66 @@ import tools.jackson.databind.ObjectMapper;
 class AdminControllerTest {
 
 	@Mock private ExchangeManagementService exchangeManagementService;
+	@Mock private PlantSpeciesManagementService plantSpeciesManagementService;
 
 	private MockMvc mockMvc;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@BeforeEach
 	void setUp() {
-		AdminController adminController = new AdminController(exchangeManagementService);
+		AdminController adminController = new AdminController(exchangeManagementService, plantSpeciesManagementService);
 		mockMvc = MockMvcBuilders.standaloneSetup(adminController)
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
 				.build();
+	}
+
+	@Test
+	void createSpeciesReturnsCreatedSpecies() throws Exception {
+		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라", "관엽식물", "적당량의 물을 준다");
+		given(plantSpeciesManagementService.createSpecies(request))
+				.willReturn(new PlantSpeciesResponse(1L, "몬스테라", "관엽식물", "적당량의 물을 준다", null, null));
+
+		mockMvc.perform(post("/api/v1/admin/plants/species")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.name").value("몬스테라"));
+	}
+
+	@Test
+	void createSpeciesRejectsBlankName() throws Exception {
+		PlantSpeciesRequest request = new PlantSpeciesRequest(" ", "관엽식물", null);
+
+		mockMvc.perform(post("/api/v1/admin/plants/species")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void updateSpeciesReturnsUpdatedSpecies() throws Exception {
+		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라 디럭스", "대형 관엽식물", "물을 자주 준다");
+		given(plantSpeciesManagementService.updateSpecies(1L, request))
+				.willReturn(new PlantSpeciesResponse(1L, "몬스테라 디럭스", "대형 관엽식물", "물을 자주 준다", null, null));
+
+		mockMvc.perform(patch("/api/v1/admin/plants/species/1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.name").value("몬스테라 디럭스"));
+	}
+
+	@Test
+	void updateSpeciesReturnsNotFoundError() throws Exception {
+		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라", null, null);
+		given(plantSpeciesManagementService.updateSpecies(99L, request))
+				.willThrow(new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
+
+		mockMvc.perform(patch("/api/v1/admin/plants/species/99")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isNotFound());
 	}
 
 	private ExchangeOrderResponse sampleResponse(Long id, ExchangeStatus status) {

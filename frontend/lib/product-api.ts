@@ -1,6 +1,6 @@
 import { request } from '@/lib/api';
 
-export type ProductCategory = 'KIT' | 'SEEDLING';
+export type ProductCategory = 'KIT' | 'SEEDLING' | 'GACHA_PACK';
 export type ProductSort = 'LATEST' | 'PRICE_ASC' | 'PRICE_DESC';
 
 export interface ProductListItem {

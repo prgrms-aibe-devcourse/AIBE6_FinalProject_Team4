@@ -9,6 +9,7 @@ import {
   prepareExchange,
   shipExchange,
 } from "@/lib/exchange-api";
+import { createSpecies, getSpecies, PlantSpeciesData, updateSpecies } from "@/lib/species-api";
 import { fmt, useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 import { useEffect, useState } from "react";
@@ -106,7 +107,11 @@ export default function Admin() {
     getExchangesForAdmin(accessToken, undefined, 0, 50, controller.signal)
       .then((page) => setExchanges(page.content))
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+        )
+          return;
         setExchanges([]);
         setExchangesError(
           requestError instanceof ApiError
@@ -120,6 +125,41 @@ export default function Admin() {
 
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
+
+  const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
+  const [speciesLoading, setSpeciesLoading] = useState(true);
+  const [speciesError, setSpeciesError] = useState("");
+  const [speciesForm, setSpeciesForm] = useState({ name: "", category: "", careGuide: "" });
+  const [speciesSubmitting, setSpeciesSubmitting] = useState(false);
+  const [editingSpecies, setEditingSpecies] = useState<PlantSpeciesData | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", category: "", careGuide: "" });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+    setSpeciesLoading(true);
+    setSpeciesError("");
+
+    getSpecies(accessToken, controller.signal)
+      .then((data) => setSpeciesList(data))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setSpeciesList([]);
+        setSpeciesError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : "종 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSpeciesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
+
   const [products, setProducts] = useState([
     {
       id: 1,
@@ -207,15 +247,20 @@ export default function Admin() {
     if (!state.accessToken) return;
     try {
       let updated: ExchangeOrderData;
-      if (x.status === "REQUESTED") updated = await prepareExchange(x.id, state.accessToken);
-      else if (x.status === "PREPARING") updated = await shipExchange(x.id, state.accessToken);
-      else if (x.status === "SHIPPING") updated = await deliverExchange(x.id, state.accessToken);
+      if (x.status === "REQUESTED")
+        updated = await prepareExchange(x.id, state.accessToken);
+      else if (x.status === "PREPARING")
+        updated = await shipExchange(x.id, state.accessToken);
+      else if (x.status === "SHIPPING")
+        updated = await deliverExchange(x.id, state.accessToken);
       else return;
       setExchanges((prev) => prev.map((e) => (e.id === x.id ? updated : e)));
       showToast("교환 상태를 업데이트했어요 🍉");
     } catch (requestError) {
       showToast(
-        requestError instanceof ApiError ? requestError.message : "상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        requestError instanceof ApiError
+          ? requestError.message
+          : "상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.",
         "err",
       );
     }
@@ -223,14 +268,81 @@ export default function Admin() {
   const cancelEx = async (id: number) => {
     if (!state.accessToken) return;
     try {
-      const updated = await adminCancelExchange(id, "관리자 취소", state.accessToken);
+      const updated = await adminCancelExchange(
+        id,
+        "관리자 취소",
+        state.accessToken,
+      );
       setExchanges((prev) => prev.map((e) => (e.id === id ? updated : e)));
       showToast("교환을 취소하고 카드를 복원했어요.");
     } catch (requestError) {
       showToast(
-        requestError instanceof ApiError ? requestError.message : "취소에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        requestError instanceof ApiError
+          ? requestError.message
+          : "취소에 실패했어요. 잠시 후 다시 시도해 주세요.",
         "err",
       );
+    }
+  };
+  const addSpecies = async () => {
+    if (!state.accessToken) return;
+    if (!speciesForm.name.trim()) return showToast("종 이름을 입력해 주세요.", "err");
+
+    setSpeciesSubmitting(true);
+    try {
+      const created = await createSpecies(
+        {
+          name: speciesForm.name.trim(),
+          ...(speciesForm.category.trim() ? { category: speciesForm.category.trim() } : {}),
+          ...(speciesForm.careGuide.trim() ? { careGuide: speciesForm.careGuide.trim() } : {}),
+        },
+        state.accessToken,
+      );
+      setSpeciesList([created, ...speciesList]);
+      setSpeciesForm({ name: "", category: "", careGuide: "" });
+      showToast(`'${created.name}' 종을 추가했어요 🌱`);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : "종 추가에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    } finally {
+      setSpeciesSubmitting(false);
+    }
+  };
+  const openEditSpecies = (sp: PlantSpeciesData) => {
+    setEditingSpecies(sp);
+    setEditForm({ name: sp.name, category: sp.category ?? "", careGuide: sp.careGuide ?? "" });
+  };
+  const closeEditSpecies = () => {
+    if (editSubmitting) return;
+    setEditingSpecies(null);
+  };
+  const saveEditSpecies = async () => {
+    if (!state.accessToken || !editingSpecies) return;
+    if (!editForm.name.trim()) return showToast("종 이름을 입력해 주세요.", "err");
+
+    setEditSubmitting(true);
+    try {
+      const updated = await updateSpecies(
+        editingSpecies.id,
+        {
+          name: editForm.name.trim(),
+          ...(editForm.category.trim() ? { category: editForm.category.trim() } : {}),
+          ...(editForm.careGuide.trim() ? { careGuide: editForm.careGuide.trim() } : {}),
+        },
+        state.accessToken,
+      );
+      setSpeciesList(speciesList.map((sp) => (sp.id === updated.id ? updated : sp)));
+      showToast(`'${updated.name}' 정보를 수정했어요 🌱`);
+      setEditingSpecies(null);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : "종 수정에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    } finally {
+      setEditSubmitting(false);
     }
   };
   const toggleProd = (id: number) => {
@@ -252,6 +364,7 @@ export default function Admin() {
     ["products", "상품 관리"],
     ["points", "포인트 관리"],
     ["reports", "신고 관리"],
+    ["species", "종 관리"],
   ];
 
   return (
@@ -263,7 +376,7 @@ export default function Admin() {
         <h1 className="text-[26px] font-extrabold">관리자 콘솔</h1>
       </div>
       <p className="mb-[22px] text-sub">
-        서비스 운영 현황을 한눈에. (데모 — 실제 권한 검증은 서버에서 이뤄져요)
+        서비스 운영 현황을 한눈에. (데모 화면)
       </p>
 
       <div className="mb-7 grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
@@ -339,15 +452,24 @@ export default function Admin() {
             <div className="text-right">처리</div>
           </div>
           {exchangesLoading ? (
-            <div className="px-[18px] py-10 text-center text-sm text-sub">교환 신청을 불러오고 있어요 🍉</div>
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              교환 신청을 불러오고 있어요 🍉
+            </div>
           ) : exchangesError ? (
-            <div className="px-[18px] py-10 text-center text-sm text-sub">{exchangesError}</div>
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              {exchangesError}
+            </div>
           ) : exchanges.length === 0 ? (
-            <div className="px-[18px] py-10 text-center text-sm text-sub">교환 신청이 없어요.</div>
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              교환 신청이 없어요.
+            </div>
           ) : (
             exchanges.map((x) => {
               const m = exMeta[x.status];
-              const advanceable = x.status === "REQUESTED" || x.status === "PREPARING" || x.status === "SHIPPING";
+              const advanceable =
+                x.status === "REQUESTED" ||
+                x.status === "PREPARING" ||
+                x.status === "SHIPPING";
               return (
                 <div
                   key={x.id}
@@ -429,6 +551,128 @@ export default function Admin() {
 
       {tab === "points" && (
         <AdminPointAdjustmentPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "species" && (
+        <div className="flex flex-col gap-5">
+          <div className={`${PANEL} p-5`}>
+            <div className="mb-3.5 text-sm font-extrabold">새 종 추가</div>
+            <div className="grid gap-2.5 sm:grid-cols-3">
+              <input
+                value={speciesForm.name}
+                onChange={(e) => setSpeciesForm({ ...speciesForm, name: e.target.value })}
+                placeholder="이름 (예: 몬스테라)"
+                maxLength={100}
+                className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
+              />
+              <input
+                value={speciesForm.category}
+                onChange={(e) => setSpeciesForm({ ...speciesForm, category: e.target.value })}
+                placeholder="카테고리 (선택)"
+                maxLength={50}
+                className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
+              />
+              <input
+                value={speciesForm.careGuide}
+                onChange={(e) => setSpeciesForm({ ...speciesForm, careGuide: e.target.value })}
+                placeholder="관리 가이드 (선택)"
+                maxLength={500}
+                className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={addSpecies}
+              disabled={speciesSubmitting}
+              className="mt-3.5 cursor-pointer rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {speciesSubmitting ? "추가 중..." : "+ 종 추가"}
+            </button>
+          </div>
+
+          <div className={PANEL}>
+            <div className={`grid grid-cols-[1.2fr_1fr_2fr] ${HEAD}`}>
+              <div>이름</div>
+              <div>카테고리</div>
+              <div>관리 가이드</div>
+            </div>
+            {speciesLoading ? (
+              <div className="px-[18px] py-10 text-center text-sm text-sub">종 목록을 불러오고 있어요 🌱</div>
+            ) : speciesError ? (
+              <div className="px-[18px] py-10 text-center text-sm text-sub">{speciesError}</div>
+            ) : speciesList.length === 0 ? (
+              <div className="px-[18px] py-10 text-center text-sm text-sub">등록된 종이 없어요.</div>
+            ) : (
+              speciesList.map((sp) => (
+                <button
+                  key={sp.id}
+                  type="button"
+                  onClick={() => openEditSpecies(sp)}
+                  className={`grid w-full grid-cols-[1.2fr_1fr_2fr] ${ROW} cursor-pointer text-left transition-colors duration-150 hover:bg-[#f9faf6]`}
+                >
+                  <div className="font-bold">{sp.name}</div>
+                  <div className="text-[#6d7a68]">{sp.category ?? "-"}</div>
+                  <div className="truncate text-[#6d7a68]">{sp.careGuide ?? "-"}</div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {editingSpecies && (
+        <div
+          onClick={closeEditSpecies}
+          className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]">
+            <h3 className="mb-5 text-xl font-extrabold">종 정보 수정 🌿</h3>
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">이름</label>
+            <input
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              maxLength={100}
+              className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            />
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">카테고리</label>
+            <input
+              value={editForm.category}
+              onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+              maxLength={50}
+              className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            />
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">관리 가이드</label>
+            <textarea
+              value={editForm.careGuide}
+              onChange={(e) => setEditForm({ ...editForm, careGuide: e.target.value })}
+              maxLength={500}
+              rows={5}
+              className="mb-5 mt-1.5 w-full resize-none rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            />
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={saveEditSpecies}
+                disabled={editSubmitting}
+                className="flex-1 cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white disabled:opacity-60"
+              >
+                {editSubmitting ? "저장 중..." : "저장"}
+              </button>
+              <button
+                type="button"
+                onClick={closeEditSpecies}
+                disabled={editSubmitting}
+                className="flex-1 cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white p-3.5 text-base font-bold text-[#6d7a68] disabled:opacity-60"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === "reports" && (

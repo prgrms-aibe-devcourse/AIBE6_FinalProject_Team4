@@ -27,7 +27,7 @@ const LINKS = [
   { icon: "receipt_long", label: "주문 내역", href: "/my/orders" },
   { icon: "redeem", label: "교환 내역", href: "/my/exchanges" },
   { icon: "paid", label: "포인트 내역", href: "/my/points" },
-  { icon: "style", label: "내 카드", href: "/my/cards" },
+  { icon: "style", label: "카드 목록", href: "/cards" },
   { icon: "menu_book", label: "내 일지", href: "/journals" },
   { icon: "mail", label: "1:1 문의", href: "/my/inquiries" },
 ];
