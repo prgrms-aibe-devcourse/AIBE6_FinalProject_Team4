@@ -42,6 +42,7 @@ public class GachaDrawTransactionService {
   private final GoldenCardInstanceRepository goldenInstanceRepository;
   private final GachaDrawEngine drawEngine;
   private final GachaMasterValidator masterValidator;
+  private final GachaCollectionAcquisitionService collectionAcquisitionService;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void process(Long drawId) {
@@ -94,7 +95,8 @@ public class GachaDrawTransactionService {
       if (golden == null) {
         finalRarity = TradingCardRarity.HYPER_RARE;
         card = drawEngine.chooseCard(requiredCandidates(cardsByRarity, finalRarity));
-        ownedCountAfter = acquireNormal(draw.getUser().getId(), card.getId(), now);
+        ownedCountAfter =
+            collectionAcquisitionService.acquireNormal(draw.getUser().getId(), card.getId(), now);
       } else {
         card = golden.card();
         goldenInstance = golden.instance();
@@ -102,7 +104,8 @@ public class GachaDrawTransactionService {
       }
     } else {
       card = drawEngine.chooseCard(requiredCandidates(cardsByRarity, finalRarity));
-      ownedCountAfter = acquireNormal(draw.getUser().getId(), card.getId(), now);
+      ownedCountAfter =
+          collectionAcquisitionService.acquireNormal(draw.getUser().getId(), card.getId(), now);
     }
 
     gachaDrawItemRepository.save(
@@ -163,13 +166,6 @@ public class GachaDrawTransactionService {
       return new GoldenAcquisition(selected, instance, ownedCountAfter);
     }
     return null;
-  }
-
-  private int acquireNormal(Long userId, Long cardId, LocalDateTime now) {
-    collectionRepository.incrementOwnedCount(userId, cardId, now);
-    return collectionRepository
-        .findOwnedCount(userId, cardId)
-        .orElseThrow(() -> new BusinessException(ErrorCode.GACHA_MASTER_DATA_INVALID));
   }
 
   private List<TradingCard> requiredCandidates(
