@@ -19,6 +19,7 @@ import com.kiwobollae.api.auth.repository.RefreshTokenRepository;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
 import com.kiwobollae.api.global.security.TokenHasher;
+import com.kiwobollae.api.notification.service.NotificationService;
 import com.kiwobollae.api.point.service.WalletService;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +42,7 @@ class AuthServiceTest {
 	@Mock private EmailVerificationService emailVerificationService;
 	@Mock private OAuthClient oAuthClient;
 	@Mock private WalletService walletService;
+	@Mock private NotificationService notificationService;
 
 	private AuthService authService;
 
@@ -54,7 +56,8 @@ class AuthServiceTest {
 				tokenHasher,
 				emailVerificationService,
 				List.of(oAuthClient),
-				walletService
+				walletService,
+				notificationService
 		);
 	}
 

@@ -22,10 +22,10 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "notification", indexes = {
-		@Index(name = "idx_notification_user_id_created_at", columnList = "user_id, create_at"),
+		@Index(name = "idx_notification_user_id_created_at", columnList = "user_id, created_at"),
 		@Index(name = "idx_notification_user_id_is_read", columnList = "user_id, is_read"),
 		@Index(name = "idx_notification_user_type_ref", columnList = "user_id, type, ref_type, ref_id"),
-		@Index(name = "idx_notification_created_at", columnList = "create_at")
+		@Index(name = "idx_notification_created_at", columnList = "created_at")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -62,6 +62,34 @@ public class Notification extends BaseEntity {
 	@Column(name = "read_at")
 	private LocalDateTime readAt;
 
-	@Column(name = "create_at", nullable = false)
+	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
+
+	public static Notification create(
+			User user,
+			NotificationType type,
+			String title,
+			String content,
+			String linkUrl,
+			String refType,
+			Long refId,
+			LocalDateTime createdAt
+	) {
+		return Notification.builder()
+				.user(user)
+				.type(type)
+				.title(title)
+				.content(content)
+				.linkUrl(linkUrl)
+				.refType(refType)
+				.refId(refId)
+				.isRead(false)
+				.createdAt(createdAt)
+				.build();
+	}
+
+	public void markRead(LocalDateTime readAt) {
+		this.isRead = true;
+		this.readAt = readAt;
+	}
 }

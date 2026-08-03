@@ -2,13 +2,15 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { useStore, fmt, NotificationType } from '@/lib/store';
+import { useStore, fmt } from '@/lib/store';
+import { NotificationData, NotificationType } from '@/lib/notification-api';
 import { useUI } from '@/lib/ui';
 import { levelTitle } from '@/lib/levels';
 import Skeleton from './Skeleton';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
   DELIVERY: '📦',
+  COMMUNITY: '💬',
   POINT: '☀️',
   JOURNAL_REMINDER: '🌱',
   INQUIRY: '💬',
@@ -69,10 +71,10 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', onClick);
   }, [bellOpen, profileOpen]);
 
-  const openNotif = (n: (typeof state.notifications)[number]) => {
-    markNotifRead(n.id);
-    if (n.broken) showToast('연결된 내용을 찾을 수 없어요.', 'err');
+  const openNotif = (n: NotificationData) => {
     setBellOpen(false);
+    void markNotifRead(n.id);
+    if (n.linkUrl) router.push(n.linkUrl);
   };
 
   const doLogout = () => {
@@ -153,16 +155,19 @@ export default function Navbar() {
                   <div className="absolute right-0 top-[48px] w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-[0_14px_40px_-12px_rgba(85,139,47,.35)]">
                     <div className="flex items-center justify-between border-b border-[#F2ECDD] px-4 py-3.5">
                       <b className="text-[15px] font-bold">알림</b>
-                      <button type="button" onClick={markAllNotifsRead} className="cursor-pointer text-[13px] font-bold text-brand hover:text-brand-dark">
+                      <button type="button" onClick={() => void markAllNotifsRead()} className="cursor-pointer text-[13px] font-bold text-brand hover:text-brand-dark">
                         모두 읽음
                       </button>
                     </div>
-                    {state.notifications.slice(0, 4).map((n) => (
+                    {state.notifications.length === 0 && (
+                      <div className="px-4 py-6 text-center text-[13px] text-faint">알림이 없어요.</div>
+                    )}
+                    {state.notifications.map((n) => (
                       <button
                         key={n.id}
                         type="button"
                         onClick={() => openNotif(n)}
-                        className={`flex w-full cursor-pointer items-start gap-[11px] border-b border-[#F7F2E7] px-4 py-3 text-left transition-colors duration-150 hover:bg-brand-soft ${n.unread ? 'bg-[#FFFBEB]' : 'bg-white'}`}
+                        className={`flex w-full cursor-pointer items-start gap-[11px] border-b border-[#F7F2E7] px-4 py-3 text-left transition-colors duration-150 hover:bg-brand-soft ${!n.isRead ? 'bg-[#FFFBEB]' : 'bg-white'}`}
                       >
                         <span className="text-[18px]">{NOTIF_ICON[n.type]}</span>
                         <div className="min-w-0">

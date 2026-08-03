@@ -27,3 +27,7 @@ app:
       # profiles exist, so /journals isn't empty while real journal creation is
       # still blocked on image upload. Depends on PlantProfileInitData having run.
       enabled: true
+    notification:
+      # Seeds one sample alert per NotificationType for each InitData test user,
+      # so the notification bell/목록/설정 화면 isn't empty on a fresh local DB.
+      enabled: true

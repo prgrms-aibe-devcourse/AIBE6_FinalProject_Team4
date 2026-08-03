@@ -102,7 +102,10 @@ public enum ErrorCode {
 	INQUIRY_INVALID_STATE(HttpStatus.CONFLICT, "이미 답변이 완료된 문의입니다."),
 	REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "신고를 찾을 수 없습니다."),
 	REPORT_INVALID_STATE(HttpStatus.CONFLICT, "이미 처리가 완료된 신고입니다."),
-	REPORT_DUPLICATE_PENDING(HttpStatus.CONFLICT, "이미 처리 대기 중인 동일 신고가 있습니다.");
+	REPORT_DUPLICATE_PENDING(HttpStatus.CONFLICT, "이미 처리 대기 중인 동일 신고가 있습니다."),
+
+	// --- 알림 도메인 ---
+	NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String defaultMessage;

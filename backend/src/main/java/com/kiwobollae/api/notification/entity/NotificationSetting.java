@@ -42,4 +42,18 @@ public class NotificationSetting extends BaseEntity {
 
 	@Column(name = "updated_at")
 	private LocalDateTime updatedAt;
+
+	public static NotificationSetting create(User user, NotificationType type, boolean enabled, LocalDateTime updatedAt) {
+		return NotificationSetting.builder()
+				.user(user)
+				.type(type)
+				.enabled(enabled)
+				.updatedAt(updatedAt)
+				.build();
+	}
+
+	public void changeEnabled(boolean enabled, LocalDateTime updatedAt) {
+		this.enabled = enabled;
+		this.updatedAt = updatedAt;
+	}
 }

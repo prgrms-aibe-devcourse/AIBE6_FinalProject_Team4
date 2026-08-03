@@ -11,6 +11,14 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback, Re
 import { ApiError, AUTH_EXPIRED_EVENT, reissue, logout as apiLogout, setAccessToken, setUnauthorizedHandler } from '@/lib/api';
 import { getWallet } from '@/features/point/api';
 import { getCart } from '@/lib/order-api';
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+  NotificationData,
+  NotificationType,
+} from '@/lib/notification-api';
 
 const KEY = 'kwb_store_v1';
 
@@ -19,17 +27,7 @@ export interface Wallet {
   paid: number;
 }
 
-export type NotificationType = 'DELIVERY' | 'POINT' | 'JOURNAL_REMINDER' | 'INQUIRY' | 'NOTICE';
-
-export interface NotificationItem {
-  id: number;
-  type: NotificationType;
-  title: string;
-  content: string;
-  date: string;
-  unread: boolean;
-  broken?: boolean;
-}
+export type { NotificationType, NotificationData };
 
 // Trimmed to just what the UI actually needs (identity, nav display name, role
 // gating) — deliberately not the full UserResponse, so phone/status/etc. never
@@ -51,7 +49,10 @@ export interface StoreState {
   plantCount: number;
   readyCards: number;
   cartCount: number;
-  notifications: NotificationItem[];
+  // 벨 드롭다운 미리보기용 최근 알림 몇 건. 전체 목록·페이지네이션은 /notifications
+  // 페이지가 이 store를 거치지 않고 직접 조회한다(다른 목록형 페이지와 동일한 패턴).
+  notifications: NotificationData[];
+  unreadNotificationCount: number;
 }
 
 export type StorePatch = Partial<StoreState> | ((s: StoreState) => Partial<StoreState>);
@@ -67,12 +68,13 @@ export interface StoreContextValue {
   reset: () => void;
   balance: number;
   unreadCount: number;
-  markNotifRead: (id: number) => void;
-  markAllNotifsRead: () => void;
+  markNotifRead: (id: number) => Promise<void>;
+  markAllNotifsRead: () => Promise<void>;
   login: (accessToken: string, user: CurrentUser) => void;
   logout: () => void;
   refreshWallet: () => Promise<void>;
   refreshCartCount: () => Promise<void>;
+  refreshNotifications: () => Promise<void>;
 }
 
 const EMPTY_WALLET: Wallet = { free: 0, paid: 0 };
@@ -86,13 +88,8 @@ const DEFAULTS: StoreState = {
   plantCount: 5,
   readyCards: 2,
   cartCount: 0,
-  notifications: [
-    { id: 1, type: 'DELIVERY', title: '주문하신 상품이 배송을 시작했어요 📦', content: 'ORD-20260709-0022 · 방울토마토 모종', date: '오늘', unread: true },
-    { id: 2, type: 'POINT', title: '일지 보상 100P가 지급됐어요 ☀️', content: '토실이의 오늘 기록', date: '오늘', unread: true },
-    { id: 3, type: 'JOURNAL_REMINDER', title: '오늘 쌈싸리의 모습을 남겨볼까요? 🌱', content: '아직 오늘의 일지를 쓰지 않으셨어요', date: '오늘', unread: true },
-    { id: 4, type: 'INQUIRY', title: '문의하신 내용에 답변이 도착했어요 💬', content: '배송 관련 문의', date: '어제', unread: false, broken: false },
-    { id: 5, type: 'NOTICE', title: '새로운 카드가 상점에 입고됐어요 📢', content: '감자 카드를 만나보세요', date: '어제', unread: false, broken: true },
-  ],
+  notifications: [],
+  unreadNotificationCount: 0,
 };
 
 const StoreCtx = createContext<StoreContextValue | null>(null);
@@ -106,6 +103,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [walletError, setWalletError] = useState<string | null>(null);
   const walletRequestId = useRef(0);
   const cartCountRequestId = useRef(0);
+  const notificationsRequestId = useRef(0);
 
   const clearAuthentication = useCallback((expired: boolean) => {
     walletRequestId.current += 1;
@@ -119,13 +117,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       accessToken: null,
       user: null,
       wallet: EMPTY_WALLET,
+      notifications: [],
+      unreadNotificationCount: 0,
     }));
   }, []);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) setState({ ...DEFAULTS, ...JSON.parse(raw), wallet: EMPTY_WALLET });
+      if (raw) {
+        setState({
+          ...DEFAULTS,
+          ...JSON.parse(raw),
+          wallet: EMPTY_WALLET,
+          notifications: [],
+          unreadNotificationCount: 0,
+        });
+      }
     } catch (e) {}
     setHydrated(true);
   }, []);
@@ -163,7 +171,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    try { localStorage.setItem(KEY, JSON.stringify({ ...state, wallet: EMPTY_WALLET })); } catch (e) {}
+    try {
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({ ...state, wallet: EMPTY_WALLET, notifications: [], unreadNotificationCount: 0 }),
+      );
+    } catch (e) {}
   }, [state, hydrated]);
 
   useEffect(() => {
@@ -232,6 +245,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void refreshCartCount();
   }, [hydrated, refreshCartCount]);
 
+  // 벨 배지·미리보기용. 읽음/전체읽음/삭제 뒤에도 이걸 다시 호출해 서버 상태로 재동기화한다 —
+  // 장바구니 배지와 같은 이유로 클라이언트에서 카운트를 임의로 -1 하지 않는다.
+  const refreshNotifications = useCallback(async () => {
+    const requestId = ++notificationsRequestId.current;
+    if (!state.authed || !state.accessToken) {
+      setState((s) => ({ ...s, notifications: [], unreadNotificationCount: 0 }));
+      return;
+    }
+    try {
+      // accessToken을 명시적으로 넘기지 않는다 — lib/api.ts의 store-synced 토큰을 쓰게
+      // 해야 access token이 만료됐을 때 조용히 재발급받아 재시도한다. 명시적으로 넘기면
+      // 그 경로를 건너뛰고 바로 401 → 로그아웃으로 빠져, 30초마다 도는 이 폴링이 유효한
+      // refresh token이 있어도 세션을 끊어버릴 수 있다.
+      const [page, unread] = await Promise.all([
+        getNotifications(undefined, undefined, 0, 5),
+        getUnreadNotificationCount(undefined),
+      ]);
+      if (requestId !== notificationsRequestId.current) return;
+      setState((s) => ({ ...s, notifications: page.content, unreadNotificationCount: unread.unreadCount }));
+    } catch {
+      // 배지 갱신 실패는 조용히 무시한다 — 다음 갱신 시점에 다시 시도된다.
+    }
+  }, [state.accessToken, state.authed]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void refreshNotifications();
+  }, [hydrated, refreshNotifications]);
+
+  // 로그인 상태에서만 30초마다 배지를 다시 물어본다 — 실시간 전달(SSE/폴링)은
+  // 아직 결정되지 않았으므로(ALERT-08) 가장 단순한 폴링으로 우선 채워둔다.
+  useEffect(() => {
+    if (!hydrated || !state.authed) return;
+    const timer = setInterval(() => void refreshNotifications(), 30_000);
+    return () => clearInterval(timer);
+  }, [hydrated, state.authed, refreshNotifications]);
+
   const set = useCallback((patch: StorePatch) => {
     setState((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) }));
   }, []);
@@ -260,7 +310,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setWalletLoaded(false);
     setWalletError(null);
     setAuthExpired(false);
-    setState((s) => ({ ...s, authed: true, accessToken, user: trimmed, wallet: EMPTY_WALLET }));
+    setState((s) => ({
+      ...s,
+      authed: true,
+      accessToken,
+      user: trimmed,
+      wallet: EMPTY_WALLET,
+      notifications: [],
+      unreadNotificationCount: 0,
+    }));
   }, []);
 
   const logout = useCallback(() => {
@@ -268,16 +326,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     clearAuthentication(false);
   }, [clearAuthentication]);
 
-  const markNotifRead = useCallback((id: number) => {
-    setState((s) => ({ ...s, notifications: s.notifications.map((n) => (n.id === id ? { ...n, unread: false } : n)) }));
-  }, []);
+  const markNotifRead = useCallback(async (id: number) => {
+    if (!state.accessToken) return;
+    try {
+      await markNotificationRead(id, state.accessToken);
+    } finally {
+      await refreshNotifications();
+    }
+  }, [state.accessToken, refreshNotifications]);
 
-  const markAllNotifsRead = useCallback(() => {
-    setState((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, unread: false })) }));
-  }, []);
+  const markAllNotifsRead = useCallback(async () => {
+    if (!state.accessToken) return;
+    try {
+      await markAllNotificationsRead(state.accessToken);
+    } finally {
+      await refreshNotifications();
+    }
+  }, [state.accessToken, refreshNotifications]);
 
   const balance = state.wallet.free + state.wallet.paid;
-  const unreadCount = state.notifications.filter((n) => n.unread).length;
+  const unreadCount = state.unreadNotificationCount;
 
   return (
     <StoreCtx.Provider
@@ -298,6 +366,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         logout,
         refreshWallet,
         refreshCartCount,
+        refreshNotifications,
       }}
     >
       {children}
