@@ -4,6 +4,8 @@ import com.kiwobollae.api.content.dto.request.PlantSpeciesRequest;
 import com.kiwobollae.api.content.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
+import com.kiwobollae.api.global.exception.BusinessException;
+import com.kiwobollae.api.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,5 +24,13 @@ public class PlantSpeciesManagementService {
 				.careGuide(request.careGuide())
 				.build();
 		return PlantSpeciesResponse.from(plantSpeciesRepository.save(species));
+	}
+
+	@Transactional
+	public PlantSpeciesResponse updateSpecies(Long speciesId, PlantSpeciesRequest request) {
+		PlantSpecies species = plantSpeciesRepository.findById(speciesId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
+		species.updateInfo(request.name(), request.category(), request.careGuide());
+		return PlantSpeciesResponse.from(species);
 	}
 }

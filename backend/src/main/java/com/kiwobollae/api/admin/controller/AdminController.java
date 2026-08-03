@@ -53,6 +53,14 @@ public class AdminController {
 				.body(ApiResponse.success(plantSpeciesManagementService.createSpecies(request)));
 	}
 
+	@Operation(summary = "식물 종 수정", description = "기존 식물 종의 이름/카테고리/관리 가이드를 수정합니다.")
+	@PatchMapping("/plants/species/{id}")
+	public ResponseEntity<ApiResponse<PlantSpeciesResponse>> updateSpecies(
+			@PathVariable Long id,
+			@Valid @RequestBody PlantSpeciesRequest request) {
+		return ResponseEntity.ok(ApiResponse.success(plantSpeciesManagementService.updateSpecies(id, request)));
+	}
+
 	@Operation(summary = "교환 신청 전체 목록 조회", description = "상태(선택)로 필터링해 전체 교환 신청을 조회합니다.")
 	@GetMapping("/exchanges")
 	public ResponseEntity<ApiResponse<Page<ExchangeOrderResponse>>> getExchanges(

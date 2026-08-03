@@ -75,6 +75,31 @@ class AdminControllerTest {
 				.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	void updateSpeciesReturnsUpdatedSpecies() throws Exception {
+		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라 디럭스", "대형 관엽식물", "물을 자주 준다");
+		given(plantSpeciesManagementService.updateSpecies(1L, request))
+				.willReturn(new PlantSpeciesResponse(1L, "몬스테라 디럭스", "대형 관엽식물", "물을 자주 준다", null, null));
+
+		mockMvc.perform(patch("/api/v1/admin/plants/species/1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.name").value("몬스테라 디럭스"));
+	}
+
+	@Test
+	void updateSpeciesReturnsNotFoundError() throws Exception {
+		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라", null, null);
+		given(plantSpeciesManagementService.updateSpecies(99L, request))
+				.willThrow(new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
+
+		mockMvc.perform(patch("/api/v1/admin/plants/species/99")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isNotFound());
+	}
+
 	private ExchangeOrderResponse sampleResponse(Long id, ExchangeStatus status) {
 		return new ExchangeOrderResponse(
 				id, 7L, 1L, "수박 카드", 10L, "텀블러", 3, status, null, null, null, null,

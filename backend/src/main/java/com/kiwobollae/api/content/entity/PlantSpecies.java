@@ -26,4 +26,10 @@ public class PlantSpecies extends BaseTimeEntity {
 
 	@Column(name = "care_guide", length = 500)
 	private String careGuide;
+
+	public void updateInfo(String name, String category, String careGuide) {
+		this.name = name;
+		this.category = category;
+		this.careGuide = careGuide;
+	}
 }

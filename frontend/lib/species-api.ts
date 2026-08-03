@@ -35,3 +35,15 @@ export function createSpecies(
     body: JSON.stringify(payload),
   });
 }
+
+export function updateSpecies(
+  speciesId: number,
+  payload: PlantSpeciesRequest,
+  accessToken: string,
+): Promise<PlantSpeciesData> {
+  return request<PlantSpeciesData>(`/api/v1/admin/plants/species/${speciesId}`, {
+    method: 'PATCH',
+    accessToken,
+    body: JSON.stringify(payload),
+  });
+}

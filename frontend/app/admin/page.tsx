@@ -8,7 +8,7 @@ import {
   prepareExchange,
   shipExchange,
 } from "@/lib/exchange-api";
-import { createSpecies, getSpecies, PlantSpeciesData } from "@/lib/species-api";
+import { createSpecies, getSpecies, PlantSpeciesData, updateSpecies } from "@/lib/species-api";
 import { fmt, useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 import { useEffect, useState } from "react";
@@ -126,6 +126,9 @@ export default function Admin() {
   const [speciesError, setSpeciesError] = useState("");
   const [speciesForm, setSpeciesForm] = useState({ name: "", category: "", careGuide: "" });
   const [speciesSubmitting, setSpeciesSubmitting] = useState(false);
+  const [editingSpecies, setEditingSpecies] = useState<PlantSpeciesData | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", category: "", careGuide: "" });
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -289,6 +292,41 @@ export default function Admin() {
       );
     } finally {
       setSpeciesSubmitting(false);
+    }
+  };
+  const openEditSpecies = (sp: PlantSpeciesData) => {
+    setEditingSpecies(sp);
+    setEditForm({ name: sp.name, category: sp.category ?? "", careGuide: sp.careGuide ?? "" });
+  };
+  const closeEditSpecies = () => {
+    if (editSubmitting) return;
+    setEditingSpecies(null);
+  };
+  const saveEditSpecies = async () => {
+    if (!state.accessToken || !editingSpecies) return;
+    if (!editForm.name.trim()) return showToast("종 이름을 입력해 주세요.", "err");
+
+    setEditSubmitting(true);
+    try {
+      const updated = await updateSpecies(
+        editingSpecies.id,
+        {
+          name: editForm.name.trim(),
+          ...(editForm.category.trim() ? { category: editForm.category.trim() } : {}),
+          ...(editForm.careGuide.trim() ? { careGuide: editForm.careGuide.trim() } : {}),
+        },
+        state.accessToken,
+      );
+      setSpeciesList(speciesList.map((sp) => (sp.id === updated.id ? updated : sp)));
+      showToast(`'${updated.name}' 정보를 수정했어요 🌱`);
+      setEditingSpecies(null);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : "종 수정에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    } finally {
+      setEditSubmitting(false);
     }
   };
   const toggleProd = (id: number) => {
@@ -536,13 +574,73 @@ export default function Admin() {
               <div className="px-[18px] py-10 text-center text-sm text-sub">등록된 종이 없어요.</div>
             ) : (
               speciesList.map((sp) => (
-                <div key={sp.id} className={`grid grid-cols-[1.2fr_1fr_2fr] ${ROW}`}>
+                <button
+                  key={sp.id}
+                  type="button"
+                  onClick={() => openEditSpecies(sp)}
+                  className={`grid w-full grid-cols-[1.2fr_1fr_2fr] ${ROW} cursor-pointer text-left transition-colors duration-150 hover:bg-[#f9faf6]`}
+                >
                   <div className="font-bold">{sp.name}</div>
                   <div className="text-[#6d7a68]">{sp.category ?? "-"}</div>
                   <div className="truncate text-[#6d7a68]">{sp.careGuide ?? "-"}</div>
-                </div>
+                </button>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {editingSpecies && (
+        <div
+          onClick={closeEditSpecies}
+          className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]">
+            <h3 className="mb-5 text-xl font-extrabold">종 정보 수정 🌿</h3>
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">이름</label>
+            <input
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              maxLength={100}
+              className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            />
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">카테고리</label>
+            <input
+              value={editForm.category}
+              onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+              maxLength={50}
+              className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            />
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">관리 가이드</label>
+            <textarea
+              value={editForm.careGuide}
+              onChange={(e) => setEditForm({ ...editForm, careGuide: e.target.value })}
+              maxLength={500}
+              rows={5}
+              className="mb-5 mt-1.5 w-full resize-none rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            />
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={saveEditSpecies}
+                disabled={editSubmitting}
+                className="flex-1 cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white disabled:opacity-60"
+              >
+                {editSubmitting ? "저장 중..." : "저장"}
+              </button>
+              <button
+                type="button"
+                onClick={closeEditSpecies}
+                disabled={editSubmitting}
+                className="flex-1 cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white p-3.5 text-base font-bold text-[#6d7a68] disabled:opacity-60"
+              >
+                취소
+              </button>
+            </div>
           </div>
         </div>
       )}
