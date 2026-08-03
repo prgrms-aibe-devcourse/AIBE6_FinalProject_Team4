@@ -18,3 +18,20 @@ export function getSpecies(
     signal,
   });
 }
+
+export interface PlantSpeciesRequest {
+  name: string;
+  category?: string;
+  careGuide?: string;
+}
+
+export function createSpecies(
+  payload: PlantSpeciesRequest,
+  accessToken: string,
+): Promise<PlantSpeciesData> {
+  return request<PlantSpeciesData>('/api/v1/admin/plants/species', {
+    method: 'POST',
+    accessToken,
+    body: JSON.stringify(payload),
+  });
+}

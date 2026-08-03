@@ -8,6 +8,7 @@ import {
   prepareExchange,
   shipExchange,
 } from "@/lib/exchange-api";
+import { createSpecies, getSpecies, PlantSpeciesData } from "@/lib/species-api";
 import { fmt, useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 import { useEffect, useState } from "react";
@@ -119,6 +120,38 @@ export default function Admin() {
 
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
+
+  const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
+  const [speciesLoading, setSpeciesLoading] = useState(true);
+  const [speciesError, setSpeciesError] = useState("");
+  const [speciesForm, setSpeciesForm] = useState({ name: "", category: "", careGuide: "" });
+  const [speciesSubmitting, setSpeciesSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+    setSpeciesLoading(true);
+    setSpeciesError("");
+
+    getSpecies(accessToken, controller.signal)
+      .then((data) => setSpeciesList(data))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setSpeciesList([]);
+        setSpeciesError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : "종 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSpeciesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
+
   const [products, setProducts] = useState([
     {
       id: 1,
@@ -232,6 +265,32 @@ export default function Admin() {
       );
     }
   };
+  const addSpecies = async () => {
+    if (!state.accessToken) return;
+    if (!speciesForm.name.trim()) return showToast("종 이름을 입력해 주세요.", "err");
+
+    setSpeciesSubmitting(true);
+    try {
+      const created = await createSpecies(
+        {
+          name: speciesForm.name.trim(),
+          ...(speciesForm.category.trim() ? { category: speciesForm.category.trim() } : {}),
+          ...(speciesForm.careGuide.trim() ? { careGuide: speciesForm.careGuide.trim() } : {}),
+        },
+        state.accessToken,
+      );
+      setSpeciesList([created, ...speciesList]);
+      setSpeciesForm({ name: "", category: "", careGuide: "" });
+      showToast(`'${created.name}' 종을 추가했어요 🌱`);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : "종 추가에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    } finally {
+      setSpeciesSubmitting(false);
+    }
+  };
   const toggleProd = (id: number) => {
     setProducts(
       products.map((p) => (p.id === id ? { ...p, hidden: !p.hidden } : p)),
@@ -250,6 +309,7 @@ export default function Admin() {
     ["exchanges", "교환 관리"],
     ["products", "상품 관리"],
     ["reports", "신고 관리"],
+    ["species", "종 관리"],
   ];
 
   return (
@@ -422,6 +482,68 @@ export default function Admin() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "species" && (
+        <div className="flex flex-col gap-5">
+          <div className={`${PANEL} p-5`}>
+            <div className="mb-3.5 text-sm font-extrabold">새 종 추가</div>
+            <div className="grid gap-2.5 sm:grid-cols-3">
+              <input
+                value={speciesForm.name}
+                onChange={(e) => setSpeciesForm({ ...speciesForm, name: e.target.value })}
+                placeholder="이름 (예: 몬스테라)"
+                maxLength={100}
+                className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
+              />
+              <input
+                value={speciesForm.category}
+                onChange={(e) => setSpeciesForm({ ...speciesForm, category: e.target.value })}
+                placeholder="카테고리 (선택)"
+                maxLength={50}
+                className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
+              />
+              <input
+                value={speciesForm.careGuide}
+                onChange={(e) => setSpeciesForm({ ...speciesForm, careGuide: e.target.value })}
+                placeholder="관리 가이드 (선택)"
+                maxLength={500}
+                className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={addSpecies}
+              disabled={speciesSubmitting}
+              className="mt-3.5 cursor-pointer rounded-[11px] bg-brand px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+            >
+              {speciesSubmitting ? "추가 중..." : "+ 종 추가"}
+            </button>
+          </div>
+
+          <div className={PANEL}>
+            <div className={`grid grid-cols-[1.2fr_1fr_2fr] ${HEAD}`}>
+              <div>이름</div>
+              <div>카테고리</div>
+              <div>관리 가이드</div>
+            </div>
+            {speciesLoading ? (
+              <div className="px-[18px] py-10 text-center text-sm text-sub">종 목록을 불러오고 있어요 🌱</div>
+            ) : speciesError ? (
+              <div className="px-[18px] py-10 text-center text-sm text-sub">{speciesError}</div>
+            ) : speciesList.length === 0 ? (
+              <div className="px-[18px] py-10 text-center text-sm text-sub">등록된 종이 없어요.</div>
+            ) : (
+              speciesList.map((sp) => (
+                <div key={sp.id} className={`grid grid-cols-[1.2fr_1fr_2fr] ${ROW}`}>
+                  <div className="font-bold">{sp.name}</div>
+                  <div className="text-[#6d7a68]">{sp.category ?? "-"}</div>
+                  <div className="truncate text-[#6d7a68]">{sp.careGuide ?? "-"}</div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
 
