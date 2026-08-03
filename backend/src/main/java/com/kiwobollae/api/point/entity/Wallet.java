@@ -19,13 +19,14 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-// 유상(paid_point)은 실결제 자산이라 음수 불가. free_point는 관리자 강제 조정으로 음수 허용 → CHECK 없음.
+// 유상·무상 포인트 모두 음수 불가. 모든 차감은 서비스에서 먼저 검증하고 DB CHECK를 마지막 안전망으로 둔다.
 @Table(name = "wallets",
 		uniqueConstraints = {
 				@UniqueConstraint(name = "uq_wallets_user_id", columnNames = "user_id")
 		},
 		check = {
-				@CheckConstraint(name = "chk_wallets_paid_point", constraint = "paid_point >= 0")
+				@CheckConstraint(name = "chk_wallets_paid_point", constraint = "paid_point >= 0"),
+				@CheckConstraint(name = "chk_wallets_free_point", constraint = "free_point >= 0")
 		})
 // JPA Auditing(@LastModifiedDate)에 더해 Asia/Seoul DB 세션 기준 ON UPDATE 안전망까지 둔다(공용 BaseTimeEntity는 건드리지 않고 override).
 @AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
@@ -51,7 +52,7 @@ public class Wallet extends BaseTimeEntity {
 		return this.paidPoint;
 	}
 
-	/** Applies a signed delta to the free balance and returns the new balance. 음수 허용 여부는 호출부가 거래 유형별로 검증한다. */
+	/** Applies a signed delta to the free balance and returns the new balance. 음수 방지는 호출부와 DB CHECK가 검증한다. */
 	public long increaseFreePoint(long delta) {
 		this.freePoint += delta;
 		return this.freePoint;

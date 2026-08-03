@@ -12,6 +12,7 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
+import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
@@ -207,6 +208,37 @@ class WalletServiceMySqlIntegrationTest {
 				.containsExactlyInAnyOrder(300L, 200L);
 	}
 
+	@Test
+	void concurrentAdminDeductionsDoNotMakePaidPointNegative() throws Exception {
+		CountDownLatch ready = new CountDownLatch(2);
+		CountDownLatch start = new CountDownLatch(1);
+
+		List<AttemptResult> results = runConcurrently(
+				adminAdjustmentAttempt(ready, start),
+				adminAdjustmentAttempt(ready, start),
+				ready,
+				start
+		);
+
+		assertThat(results).containsExactlyInAnyOrder(
+				AttemptResult.SUCCESS,
+				AttemptResult.INSUFFICIENT_BALANCE
+		);
+
+		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
+		assertThat(wallet.getFreePoint()).isEqualTo(500L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(200L);
+
+		List<PointTransaction> transactions = pointTransactionRepository.findAll();
+		assertThat(transactions).hasSize(1);
+		assertThat(transactions.getFirst().getType()).isEqualTo(PointTxType.ADMIN_ADJUST);
+		assertThat(transactions.getFirst().getCurrencyType()).isEqualTo(CurrencyType.PAID);
+		assertThat(transactions.getFirst().getAmount()).isEqualTo(-800L);
+		assertThat(transactions.getFirst().getBalanceAfter()).isEqualTo(200L);
+		assertThat(transactions.getFirst().getRefType()).isEqualTo(PointRefType.ADMIN);
+		assertThat(transactions.getFirst().getRefId()).isNull();
+	}
+
 	private Callable<AttemptResult> orderDeductionAttempt(
 			CountDownLatch ready,
 			CountDownLatch start,
@@ -283,6 +315,24 @@ class WalletServiceMySqlIntegrationTest {
 			} catch (BusinessException exception) {
 				if (exception.getErrorCode() == ErrorCode.POINT_DUPLICATE_TRANSACTION) {
 					return AttemptResult.DUPLICATE_TRANSACTION;
+				}
+				throw exception;
+			}
+		};
+	}
+
+	private Callable<AttemptResult> adminAdjustmentAttempt(
+			CountDownLatch ready,
+			CountDownLatch start
+	) {
+		return () -> {
+			awaitStart(ready, start);
+			try {
+				walletService.adjustByAdmin(userId, CurrencyType.PAID, -800L);
+				return AttemptResult.SUCCESS;
+			} catch (BusinessException exception) {
+				if (exception.getErrorCode() == ErrorCode.POINT_INSUFFICIENT_BALANCE) {
+					return AttemptResult.INSUFFICIENT_BALANCE;
 				}
 				throw exception;
 			}
