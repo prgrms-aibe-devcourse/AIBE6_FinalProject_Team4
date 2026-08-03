@@ -20,6 +20,8 @@ import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.content.service.PlantJournalService;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -78,8 +80,7 @@ class GachaJournalRewardMySqlIntegrationTest {
     assertThat(tradingCardRepository.count()).isEqualTo(43);
     assertThat(gachaDrawRepository.count()).isEqualTo(1);
 
-    GachaDraw draw =
-        gachaDrawRepository.findById(first.journal().gachaReward().drawId()).orElseThrow();
+    GachaDraw draw = awaitCompleted(first.journal().gachaReward().drawId());
     assertThat(draw.getStatus()).isEqualTo(GachaDrawStatus.COMPLETED);
     assertThat(gachaDrawItemRepository.findAllByGachaDraw_IdOrderByDrawSeqAsc(draw.getId()))
         .hasSize(5);
@@ -88,6 +89,16 @@ class GachaJournalRewardMySqlIntegrationTest {
                 .mapToInt(collection -> collection.getOwnedCount())
                 .sum())
         .isEqualTo(5);
+  }
+
+  private GachaDraw awaitCompleted(Long drawId) {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    GachaDraw draw = gachaDrawRepository.findById(drawId).orElseThrow();
+    while (draw.getStatus() != GachaDrawStatus.COMPLETED && System.nanoTime() < deadline) {
+      LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(50));
+      draw = gachaDrawRepository.findById(drawId).orElseThrow();
+    }
+    return draw;
   }
 
   private PlantJournalRequest request(Long profileId, String imageUrl, String imageHash) {
