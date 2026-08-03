@@ -17,6 +17,8 @@ import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
+import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.service.NotificationService;
 import com.kiwobollae.api.point.service.WalletService;
 import com.kiwobollae.api.global.security.TokenHasher;
 import java.security.SecureRandom;
@@ -47,6 +49,26 @@ public class AuthService {
 		return new NicknameAvailabilityResponse(!userRepository.existsByNickname(nickname));
 	}
 	private final WalletService walletService;
+	private final NotificationService notificationService;
+
+	// 소셜/일반 가입 모두 동일한 환영 알림을 보낸다. 일지를 쓰려면 먼저 식물을 등록해야
+	// 하므로(등록은 /journals/new가 아니라 /plants 화면의 모달에서 이뤄진다), 신규
+	// 가입자를 일지 작성 화면이 아니라 식물 등록 화면으로 유도한다.
+	private static final String WELCOME_NOTIFICATION_TITLE = "키워볼래에 오신 걸 환영해요! 🌱";
+	private static final String WELCOME_NOTIFICATION_CONTENT = "첫 식물을 등록하고 오늘의 성장 일지를 남겨보세요.";
+	private static final String WELCOME_NOTIFICATION_LINK_URL = "/plants";
+
+	private void sendWelcomeNotification(User user) {
+		notificationService.notify(
+				user.getId(),
+				NotificationType.JOURNAL_REMINDER,
+				WELCOME_NOTIFICATION_TITLE,
+				WELCOME_NOTIFICATION_CONTENT,
+				WELCOME_NOTIFICATION_LINK_URL,
+				null,
+				null
+		);
+	}
 
 	@Transactional
 	public UserResponse signup(SignupRequest request) {
@@ -72,6 +94,7 @@ public class AuthService {
 
 		User savedUser = userRepository.save(user);
 		walletService.createWallet(savedUser); // POINT-10: 가입 트랜잭션에서 지갑 자동 생성
+		sendWelcomeNotification(savedUser);
 		return UserResponse.from(savedUser);
 	}
 
@@ -133,6 +156,7 @@ public class AuthService {
 				.build();
 		User savedUser = userRepository.save(user);
 		walletService.createWallet(savedUser); // POINT-10: 소셜 자동가입 트랜잭션에서 지갑 생성
+		sendWelcomeNotification(savedUser);
 		return savedUser;
 	}
 
