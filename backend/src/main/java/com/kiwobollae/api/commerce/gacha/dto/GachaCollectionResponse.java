@@ -3,6 +3,7 @@ package com.kiwobollae.api.commerce.gacha.dto;
 import com.kiwobollae.api.commerce.gacha.entity.TradingCard;
 import com.kiwobollae.api.commerce.gacha.entity.UserCardCollection;
 import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardRarity;
+import com.kiwobollae.api.commerce.gacha.service.GachaShardPolicy;
 
 public record GachaCollectionResponse(
     Long id,
@@ -13,6 +14,8 @@ public record GachaCollectionResponse(
     String imageUrl,
     Integer displayOrder,
     Integer ownedCount,
+    Integer dismantleableCount,
+    Integer shardPerCard,
     boolean owned,
     boolean unlocked,
     boolean goldenGachaAcquired) {
@@ -28,6 +31,8 @@ public record GachaCollectionResponse(
         imageUrl,
         card.getDisplayOrder(),
         ownedCount,
+        GachaShardPolicy.dismantleableCount(card.getRarity(), ownedCount),
+        GachaShardPolicy.shardPerCard(card.getRarity()),
         ownedCount > 0,
         collection != null,
         collection != null && collection.getGoldenGachaAcquiredAt() != null);

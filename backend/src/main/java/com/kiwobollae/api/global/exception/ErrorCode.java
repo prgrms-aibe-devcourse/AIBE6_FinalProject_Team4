@@ -70,6 +70,13 @@ public enum ErrorCode {
 	GACHA_PROCESSING_CONFLICT(HttpStatus.CONFLICT, "이미 처리 중인 가챠 요청입니다."),
 	GACHA_REWARD_MANUAL_REVIEW(HttpStatus.INTERNAL_SERVER_ERROR, "가챠 보상에 관리자 확인이 필요합니다."),
 	GACHA_MANUAL_RETRY_INVALID_STATE(HttpStatus.CONFLICT, "관리자 재시도가 가능한 가챠 상태가 아닙니다."),
+	GACHA_DISMANTLE_ITEM_INVALID(HttpStatus.BAD_REQUEST, "분해할 카드 정보가 올바르지 않습니다."),
+	GACHA_CARD_NOT_DISMANTLABLE(HttpStatus.UNPROCESSABLE_CONTENT, "분해할 수 없는 등급의 카드입니다."),
+	GACHA_CARD_KEEP_ONE_REQUIRED(HttpStatus.CONFLICT, "카드는 종류별로 최소 1장을 남겨야 합니다."),
+	GACHA_SHARD_INSUFFICIENT_BALANCE(HttpStatus.UNPROCESSABLE_CONTENT, "카드 조각이 부족합니다."),
+	GACHA_COSMETIC_NOT_FOUND(HttpStatus.NOT_FOUND, "칭호 또는 테두리를 찾을 수 없습니다."),
+	GACHA_COSMETIC_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 해금한 칭호 또는 테두리입니다."),
+	GACHA_COSMETIC_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "해금하지 않은 칭호 또는 테두리입니다."),
 
 	EXCHANGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 상품을 찾을 수 없습니다."),
 	EXCHANGE_PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "교환 상품의 재고가 부족합니다."),
