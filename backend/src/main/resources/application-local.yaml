@@ -27,3 +27,9 @@ app:
       # profiles exist, so /journals isn't empty while real journal creation is
       # still blocked on image upload. Depends on PlantProfileInitData having run.
       enabled: true
+    point-scenario:
+      # Seeds test@test.com's point history with admin adjustments, a mixed-point
+      # order and cancellation, a mixed-point card purchase, a journal reward,
+      # and a mock charge/refund. Payment data is never seeded unless the active
+      # payment provider is MOCK.
+      enabled: true
