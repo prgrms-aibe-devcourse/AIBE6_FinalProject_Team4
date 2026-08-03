@@ -1,6 +1,6 @@
 const STORAGE_PREFIX = "gacha-open-batch:";
 const STORAGE_VERSION = 1;
-const MAX_BATCH_PACKS = 100;
+const MAX_BATCH_PACKS = 30;
 
 interface StoredGachaBatch {
   version: number;

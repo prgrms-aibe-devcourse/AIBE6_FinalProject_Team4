@@ -52,11 +52,22 @@ public class GachaCardInitData implements ApplicationRunner {
           seed.imageKey(),
           seed.weight(),
           seed.order());
-      tradingCardRepository.save(card);
+      TradingCard saved = tradingCardRepository.saveAndFlush(card);
+      validateImageKeyUsesDatabaseId(saved, seed.imageKey());
     }
-    tradingCardRepository.flush();
     masterValidator.validate(
         tradingCardRepository.findAllByStatusOrderByDisplayOrderAsc(TradingCardStatus.ACTIVE));
+  }
+
+  private void validateImageKeyUsesDatabaseId(TradingCard card, String imageKey) {
+    String expectedPrefix = "cards/" + card.getId() + "/";
+    if (imageKey == null || !imageKey.startsWith(expectedPrefix)) {
+      throw new IllegalStateException(
+          "Gacha card image path must use its database id. cardId="
+              + card.getId()
+              + ", imageKey="
+              + imageKey);
+    }
   }
 
   private List<CardSeed> seeds() {

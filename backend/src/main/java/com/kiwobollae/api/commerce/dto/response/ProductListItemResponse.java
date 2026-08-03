@@ -19,7 +19,7 @@ public record ProductListItemResponse(
 				product.getCategory(),
 				product.getPointPrice(),
 				product.getStock(),
-				product.getStock() <= 0,
+				product.getCategory() != ProductCategory.GACHA_PACK && product.getStock() <= 0,
 				product.getImageUrl()
 		);
 	}

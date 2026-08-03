@@ -6,4 +6,5 @@ public record GachaPackProductQuote(
 		Long unitPoint,
 		Integer maxQuantity
 ) {
+	public static final int MAX_PURCHASE_QUANTITY = 30;
 }

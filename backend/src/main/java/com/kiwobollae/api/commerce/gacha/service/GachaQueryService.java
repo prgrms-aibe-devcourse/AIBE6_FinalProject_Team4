@@ -71,7 +71,9 @@ public class GachaQueryService {
     Map<Long, TradingCard> cards = new LinkedHashMap<>();
     active.forEach(card -> cards.put(card.getId(), card));
     collections.values().stream()
-        .filter(collection -> collection.getOwnedCount() > 0)
+        .filter(
+            collection ->
+                collection.getOwnedCount() > 0 || collection.getGoldenGachaAcquiredAt() != null)
         .map(UserCardCollection::getCard)
         .forEach(card -> cards.putIfAbsent(card.getId(), card));
     return cards.values().stream()

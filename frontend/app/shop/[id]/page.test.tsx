@@ -89,7 +89,7 @@ describe("shop gacha pack detail", () => {
     const purchaseButton = await screen.findByRole("button", {
       name: "100P로 1팩 구매하고 개봉하기",
     });
-    expect(screen.getByText("한 번에 최대 100팩까지 구매할 수 있어요")).toBeInTheDocument();
+    expect(screen.getByText("한 번에 최대 30팩까지 구매할 수 있어요")).toBeInTheDocument();
 
     fireEvent.click(purchaseButton);
 

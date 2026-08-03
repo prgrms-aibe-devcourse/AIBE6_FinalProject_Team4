@@ -62,7 +62,7 @@ public class ProductService {
 				product.getId(),
 				product.getName(),
 				product.getPointPrice(),
-				product.getStock()
+				GachaPackProductQuote.MAX_PURCHASE_QUANTITY
 		);
 	}
 

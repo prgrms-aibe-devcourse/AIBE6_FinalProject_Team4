@@ -124,7 +124,6 @@ class ProductServiceTest {
 		given(product.getName()).willReturn("시즌 1 가챠 카드팩");
 		given(product.getCategory()).willReturn(ProductCategory.GACHA_PACK);
 		given(product.getPointPrice()).willReturn(100L);
-		given(product.getStock()).willReturn(100);
 		given(productRepository.findByIdAndStatus(9L, ProductStatus.ACTIVE))
 				.willReturn(Optional.of(product));
 
@@ -132,7 +131,18 @@ class ProductServiceTest {
 
 		assertThat(quote.productId()).isEqualTo(9L);
 		assertThat(quote.unitPoint()).isEqualTo(100L);
-		assertThat(quote.maxQuantity()).isEqualTo(100);
+		assertThat(quote.maxQuantity()).isEqualTo(30);
+	}
+
+	@Test
+	void getProductTreatsGachaPackAsUnlimitedRegardlessOfStock() {
+		Product product = product(9L, ProductCategory.GACHA_PACK, 0, null);
+		given(productRepository.findByIdAndStatus(9L, ProductStatus.ACTIVE))
+				.willReturn(Optional.of(product));
+
+		var response = productService.getProduct(9L);
+
+		assertThat(response.soldOut()).isFalse();
 	}
 
 	@Test

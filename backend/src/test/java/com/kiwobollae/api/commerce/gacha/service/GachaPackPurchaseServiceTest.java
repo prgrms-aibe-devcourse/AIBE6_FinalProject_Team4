@@ -70,7 +70,7 @@ class GachaPackPurchaseServiceTest {
               return new IdempotencyExecution(key, false);
             });
     when(productService.getActiveGachaPack(9L))
-        .thenReturn(new GachaPackProductQuote(9L, "시즌 1 가챠 카드팩", 100L, 100));
+        .thenReturn(new GachaPackProductQuote(9L, "시즌 1 가챠 카드팩", 100L, 30));
     when(walletService.deductForGachaPurchase(7L, 200L, 501L))
         .thenReturn(new PointDeductionResult(150L, 50L, 800L));
     when(userRepository.getReferenceById(7L)).thenReturn(user);
@@ -124,7 +124,7 @@ class GachaPackPurchaseServiceTest {
             new ObjectMapper());
 
     assertThatThrownBy(
-            () -> service.purchase(7L, "purchase-key", new GachaPackPurchaseRequest(9L, 101)))
+            () -> service.purchase(7L, "purchase-key", new GachaPackPurchaseRequest(9L, 31)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -166,9 +166,9 @@ class GachaPackPurchaseServiceTest {
               return new IdempotencyExecution(key, false);
             });
     when(productService.getActiveGachaPack(9L))
-        .thenReturn(new GachaPackProductQuote(9L, "시즌 1 가챠 카드팩", 100L, 100));
-    when(walletService.deductForGachaPurchase(7L, 10_000L, 501L))
-        .thenReturn(new PointDeductionResult(1_000L, 9_000L, 0L));
+        .thenReturn(new GachaPackProductQuote(9L, "시즌 1 가챠 카드팩", 100L, 30));
+    when(walletService.deductForGachaPurchase(7L, 3_000L, 501L))
+        .thenReturn(new PointDeductionResult(1_000L, 2_000L, 0L));
     when(userRepository.getReferenceById(7L)).thenReturn(mock(User.class));
     when(drawRepository.saveAndFlush(any(GachaDraw.class)))
         .thenAnswer(
@@ -178,12 +178,12 @@ class GachaPackPurchaseServiceTest {
               return draw;
             });
 
-    var response = service.purchase(7L, "max-key", new GachaPackPurchaseRequest(9L, 100));
+    var response = service.purchase(7L, "max-key", new GachaPackPurchaseRequest(9L, 30));
 
-    assertThat(response.quantity()).isEqualTo(100);
-    assertThat(response.totalPoint()).isEqualTo(10_000L);
-    assertThat(response.drawIds()).hasSize(100).startsWith(2_000L).endsWith(2_099L);
-    verify(drawRepository, times(100)).saveAndFlush(any(GachaDraw.class));
-    verify(eventPublisher, times(100)).publishEvent(any(GachaRewardCreatedEvent.class));
+    assertThat(response.quantity()).isEqualTo(30);
+    assertThat(response.totalPoint()).isEqualTo(3_000L);
+    assertThat(response.drawIds()).hasSize(30).startsWith(2_000L).endsWith(2_029L);
+    verify(drawRepository, times(30)).saveAndFlush(any(GachaDraw.class));
+    verify(eventPublisher, times(30)).publishEvent(any(GachaRewardCreatedEvent.class));
   }
 }

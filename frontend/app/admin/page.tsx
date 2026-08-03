@@ -105,7 +105,11 @@ export default function Admin() {
     getExchangesForAdmin(accessToken, undefined, 0, 50, controller.signal)
       .then((page) => setExchanges(page.content))
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+        )
+          return;
         setExchanges([]);
         setExchangesError(
           requestError instanceof ApiError
@@ -206,15 +210,20 @@ export default function Admin() {
     if (!state.accessToken) return;
     try {
       let updated: ExchangeOrderData;
-      if (x.status === "REQUESTED") updated = await prepareExchange(x.id, state.accessToken);
-      else if (x.status === "PREPARING") updated = await shipExchange(x.id, state.accessToken);
-      else if (x.status === "SHIPPING") updated = await deliverExchange(x.id, state.accessToken);
+      if (x.status === "REQUESTED")
+        updated = await prepareExchange(x.id, state.accessToken);
+      else if (x.status === "PREPARING")
+        updated = await shipExchange(x.id, state.accessToken);
+      else if (x.status === "SHIPPING")
+        updated = await deliverExchange(x.id, state.accessToken);
       else return;
       setExchanges((prev) => prev.map((e) => (e.id === x.id ? updated : e)));
       showToast("교환 상태를 업데이트했어요 🍉");
     } catch (requestError) {
       showToast(
-        requestError instanceof ApiError ? requestError.message : "상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        requestError instanceof ApiError
+          ? requestError.message
+          : "상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.",
         "err",
       );
     }
@@ -222,12 +231,18 @@ export default function Admin() {
   const cancelEx = async (id: number) => {
     if (!state.accessToken) return;
     try {
-      const updated = await adminCancelExchange(id, "관리자 취소", state.accessToken);
+      const updated = await adminCancelExchange(
+        id,
+        "관리자 취소",
+        state.accessToken,
+      );
       setExchanges((prev) => prev.map((e) => (e.id === id ? updated : e)));
       showToast("교환을 취소하고 카드를 복원했어요.");
     } catch (requestError) {
       showToast(
-        requestError instanceof ApiError ? requestError.message : "취소에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        requestError instanceof ApiError
+          ? requestError.message
+          : "취소에 실패했어요. 잠시 후 다시 시도해 주세요.",
         "err",
       );
     }
@@ -337,15 +352,24 @@ export default function Admin() {
             <div className="text-right">처리</div>
           </div>
           {exchangesLoading ? (
-            <div className="px-[18px] py-10 text-center text-sm text-sub">교환 신청을 불러오고 있어요 🍉</div>
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              교환 신청을 불러오고 있어요 🍉
+            </div>
           ) : exchangesError ? (
-            <div className="px-[18px] py-10 text-center text-sm text-sub">{exchangesError}</div>
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              {exchangesError}
+            </div>
           ) : exchanges.length === 0 ? (
-            <div className="px-[18px] py-10 text-center text-sm text-sub">교환 신청이 없어요.</div>
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              교환 신청이 없어요.
+            </div>
           ) : (
             exchanges.map((x) => {
               const m = exMeta[x.status];
-              const advanceable = x.status === "REQUESTED" || x.status === "PREPARING" || x.status === "SHIPPING";
+              const advanceable =
+                x.status === "REQUESTED" ||
+                x.status === "PREPARING" ||
+                x.status === "SHIPPING";
               return (
                 <div
                   key={x.id}

@@ -138,7 +138,7 @@ public class GachaPackPurchaseService {
         || request.productId() == null
         || request.quantity() == null
         || request.quantity() < 1
-        || request.quantity() > 100) {
+        || request.quantity() > GachaPackProductQuote.MAX_PURCHASE_QUANTITY) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
   }

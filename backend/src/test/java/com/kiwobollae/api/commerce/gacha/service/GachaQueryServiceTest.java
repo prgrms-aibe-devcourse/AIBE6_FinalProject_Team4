@@ -80,6 +80,39 @@ class GachaQueryServiceTest {
             org.assertj.core.groups.Tuple.tuple(2L, false, false, null));
   }
 
+  @Test
+  void collectionIncludesHiddenGoldenCardWhenGachaAcquisitionHistoryRemains() {
+    TradingCard hiddenGolden = card(41L, "GOLDEN_CORN", "황금 옥수수");
+    ReflectionTestUtils.setField(hiddenGolden, "rarity", TradingCardRarity.GOLDEN_RARE);
+    ReflectionTestUtils.setField(hiddenGolden, "status", TradingCardStatus.HIDDEN);
+    LocalDateTime acquiredAt = LocalDateTime.of(2026, 7, 30, 12, 0);
+    UserCardCollection collection =
+        UserCardCollection.builder()
+            .card(hiddenGolden)
+            .ownedCount(0)
+            .firstAcquiredAt(acquiredAt)
+            .goldenGachaAcquiredAt(acquiredAt)
+            .updatedAt(acquiredAt)
+            .build();
+
+    when(cardRepository.findAllByStatusOrderByDisplayOrderAsc(TradingCardStatus.ACTIVE))
+        .thenReturn(List.of());
+    when(collectionRepository.findAllByUser_Id(7L)).thenReturn(List.of(collection));
+
+    List<GachaCollectionResponse> response = service.getCollection(7L);
+
+    assertThat(response)
+        .singleElement()
+        .satisfies(
+            card -> {
+              assertThat(card.id()).isEqualTo(41L);
+              assertThat(card.unlocked()).isTrue();
+              assertThat(card.owned()).isFalse();
+              assertThat(card.goldenGachaAcquired()).isTrue();
+              assertThat(card.imageUrl()).isEqualTo("/cards/41/art.png");
+            });
+  }
+
   private TradingCard card(Long id, String code, String name) {
     TradingCard card =
         TradingCard.builder()

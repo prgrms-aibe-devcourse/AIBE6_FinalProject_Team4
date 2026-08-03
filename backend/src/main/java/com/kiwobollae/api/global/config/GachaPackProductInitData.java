@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GachaPackProductInitData implements ApplicationRunner {
 
+	// GACHA_PACK은 재고를 차감하지 않는다. NOT NULL인 공용 stock 컬럼에는 미사용 값만 둔다.
+	private static final int UNLIMITED_STOCK_PLACEHOLDER = 0;
 	private static final String PACK_IMAGE =
 			"/cards/900001/0005fbe2-236e-5543-a4d4-69f8b57bd3f7.svg";
 
@@ -36,7 +38,7 @@ public class GachaPackProductInitData implements ApplicationRunner {
 						.name("시즌 1 가챠 카드팩")
 						.category(ProductCategory.GACHA_PACK)
 						.pointPrice(100L)
-						.stock(100)
+						.stock(UNLIMITED_STOCK_PLACEHOLDER)
 						.description("식물 캐릭터 카드 5장이 즉시 개봉되는 시즌 1 카드팩입니다.")
 						.imageUrl(PACK_IMAGE)
 						.status(ProductStatus.ACTIVE)
