@@ -5,5 +5,6 @@ public enum GachaDrawStatus {
   PROCESSING,
   COMPLETED,
   RETRYABLE_FAILED,
-  MANUAL_REVIEW
+  MANUAL_REVIEW,
+  REFUNDED
 }

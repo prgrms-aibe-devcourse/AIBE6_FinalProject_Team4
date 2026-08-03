@@ -532,28 +532,49 @@ export default function GachaPage() {
           </h2>
           {history?.content.length ? (
             <div className="space-y-3">
-              {history.content.map((draw) => (
-                <Link
-                  key={draw.drawId}
-                  href={`/gacha/open/${draw.drawId}`}
-                  className="flex items-center justify-between rounded-2xl border border-line bg-white px-5 py-4 text-ink shadow-sm hover:text-ink"
-                >
-                  <div>
-                    <p className="font-black">카드팩 #{draw.drawId}</p>
-                    <p className="mt-1 text-xs text-sub">
-                      {new Date(draw.createdAt).toLocaleString("ko-KR")}
-                    </p>
+              {history.content.map((draw) => {
+                const content = (
+                  <>
+                    <div>
+                      <p className="font-black">카드팩 #{draw.drawId}</p>
+                      <p className="mt-1 text-xs text-sub">
+                        {new Date(draw.createdAt).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold">
+                        {draw.status === "COMPLETED"
+                          ? "5장 확정"
+                          : draw.status === "REFUNDED"
+                            ? "포인트 반환"
+                            : draw.status}
+                      </p>
+                      <p className="mt-1 text-xs text-brand">
+                        {draw.status === "REFUNDED"
+                          ? "구매가 취소됐어요"
+                          : draw.resultViewedAt
+                            ? "다시 보기"
+                            : "결과 확인"}
+                      </p>
+                    </div>
+                  </>
+                );
+                const className =
+                  "flex items-center justify-between rounded-2xl border border-line bg-white px-5 py-4 text-ink shadow-sm";
+                return draw.status === "REFUNDED" ? (
+                  <div key={draw.drawId} className={className}>
+                    {content}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold">
-                      {draw.status === "COMPLETED" ? "5장 확정" : draw.status}
-                    </p>
-                    <p className="mt-1 text-xs text-brand">
-                      {draw.resultViewedAt ? "다시 보기" : "결과 확인"}
-                    </p>
-                  </div>
-                </Link>
-              ))}
+                ) : (
+                  <Link
+                    key={draw.drawId}
+                    href={`/gacha/open/${draw.drawId}`}
+                    className={`${className} hover:text-ink`}
+                  >
+                    {content}
+                  </Link>
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-2xl bg-white p-12 text-center text-sub">

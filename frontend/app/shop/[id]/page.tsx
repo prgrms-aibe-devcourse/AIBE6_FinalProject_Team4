@@ -141,7 +141,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
   };
 
   const isGachaPack = product.category === 'GACHA_PACK';
-  const maxQuantity = isGachaPack ? 30 : product.stock;
+  const maxQuantity = isGachaPack ? 1 : product.stock;
   const totalPoint = product.pointPrice * qty;
 
   const purchaseGachaPack = () => {
@@ -242,7 +242,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
             {product.soldOut
               ? '품절 · 곧 다시 채워둘게요'
               : isGachaPack
-                ? '한 번에 최대 30팩까지 구매할 수 있어요'
+                ? '팩은 한 번에 1개씩 구매할 수 있어요'
                 : `재고 ${product.stock}개 남았어요`}
           </div>
 

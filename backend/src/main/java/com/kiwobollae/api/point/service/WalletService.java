@@ -221,14 +221,30 @@ public class WalletService {
 			throw purchaseUsageMismatch(recordedUsage, usedFreePoint, usedPaidPoint);
 		}
 
-		if (usedFreePoint > 0) {
-			long balanceAfter = wallet.increaseFreePoint(usedFreePoint);
-			saveTransaction(wallet, PointTxType.RESTORE, CurrencyType.FREE, usedFreePoint, balanceAfter, refType, refId);
+		restoreRecordedPoints(wallet, recordedUsage, refType, refId);
+	}
+
+	/** 가챠 구매 원장을 정본으로 유상·무상 포인트를 정확히 한 번 원복한다. */
+	@Transactional
+	public void restoreGachaPurchasePoints(Long userId, Long gachaPurchaseId) {
+		if (userId == null || userId < 1 || gachaPurchaseId == null || gachaPurchaseId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
-		if (usedPaidPoint > 0) {
-			long balanceAfter = wallet.increasePaidPoint(usedPaidPoint);
-			saveTransaction(wallet, PointTxType.RESTORE, CurrencyType.PAID, usedPaidPoint, balanceAfter, refType, refId);
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		if (pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.RESTORE, PointRefType.GACHA_PURCHASE, gachaPurchaseId)) {
+			return;
 		}
+
+		PurchasePointUsage recordedUsage =
+				getRecordedPurchaseUsage(wallet, PointRefType.GACHA_PURCHASE, gachaPurchaseId);
+		if (recordedUsage.freePoint() == 0 && recordedUsage.paidPoint() == 0) {
+			throw new BusinessException(
+					ErrorCode.COMMON_DATA_CONFLICT, "가챠 구매 차감 원장을 찾을 수 없습니다.");
+		}
+		restoreRecordedPoints(
+				wallet, recordedUsage, PointRefType.GACHA_PURCHASE, gachaPurchaseId);
 	}
 
 	/**
@@ -330,6 +346,26 @@ public class WalletService {
 				.refType(refType)
 				.refId(refId)
 				.build());
+	}
+
+	private void restoreRecordedPoints(
+			Wallet wallet,
+			PurchasePointUsage recordedUsage,
+			PointRefType refType,
+			Long refId
+	) {
+		if (recordedUsage.freePoint() > 0) {
+			long balanceAfter = wallet.increaseFreePoint(recordedUsage.freePoint());
+			saveTransaction(
+					wallet, PointTxType.RESTORE, CurrencyType.FREE,
+					recordedUsage.freePoint(), balanceAfter, refType, refId);
+		}
+		if (recordedUsage.paidPoint() > 0) {
+			long balanceAfter = wallet.increasePaidPoint(recordedUsage.paidPoint());
+			saveTransaction(
+					wallet, PointTxType.RESTORE, CurrencyType.PAID,
+					recordedUsage.paidPoint(), balanceAfter, refType, refId);
+		}
 	}
 
 	private PointDeductionResult deductPoints(

@@ -109,7 +109,7 @@ public class GachaQueryService {
     requireUser(userId);
     Page<GachaDrawSummaryResponse> result =
         gachaDrawRepository
-            .findHistory(userId, viewed, pageable)
+            .findHistory(userId, viewed, GachaDrawStatus.REFUNDED, pageable)
             .map(GachaDrawSummaryResponse::from);
     return GachaDrawPageResponse.from(result);
   }

@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GachaOpenPage from "./page";
 import { getGachaDraw, markGachaDrawViewed } from "@/lib/gacha-api";
 
@@ -42,6 +42,7 @@ const mockedMarkViewed = vi.mocked(markGachaDrawViewed);
 
 describe("GachaOpenPage", () => {
   afterEach(cleanup);
+  beforeEach(() => vi.clearAllMocks());
 
   it("실제 카드 비율을 유지하고 원본 전체를 잘리지 않게 표시한다", async () => {
     mockedGetDraw.mockResolvedValue({
@@ -95,5 +96,30 @@ describe("GachaOpenPage", () => {
     expect(
       screen.getByRole("button", { name: "다음 카드 보기" }),
     ).toBeInTheDocument();
+  });
+
+  it("환불된 팩은 포인트 반환 안내 후 대기를 종료한다", async () => {
+    mockedGetDraw.mockResolvedValue({
+      drawId: 22,
+      status: "REFUNDED",
+      sourceType: "PURCHASE",
+      rateVersion: 1,
+      createdAt: "2026-07-30T03:00:00Z",
+      completedAt: null,
+      resultViewedAt: null,
+      items: [],
+    });
+
+    render(<GachaOpenPage params={{ drawId: "22" }} />);
+
+    expect(
+      await screen.findByText(
+        "팩을 준비하지 못해 사용한 포인트를 돌려드렸어요.",
+      ),
+    ).toBeInTheDocument();
+    expect(mockedMarkViewed).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText("카드 5장을 준비하고 있어요"),
+    ).not.toBeInTheDocument();
   });
 });

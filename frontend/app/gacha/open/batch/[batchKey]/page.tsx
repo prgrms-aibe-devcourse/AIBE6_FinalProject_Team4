@@ -91,6 +91,10 @@ export default function GachaBatchOpenPage({
           );
           return;
         }
+        if (loaded.some((detail) => detail.status === "REFUNDED")) {
+          setError("준비하지 못한 팩의 사용 포인트를 돌려드렸어요.");
+          return;
+        }
 
         const allCompleted = loaded.every(
           (detail) => detail.status === "COMPLETED",

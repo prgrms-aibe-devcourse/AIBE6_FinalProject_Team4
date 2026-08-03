@@ -468,6 +468,54 @@ class WalletServiceTest {
 	}
 
 	@Test
+	void restoresGachaPurchaseUsingRecordedFreeAndPaidPointAmounts() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(0L).build();
+		PointTransaction freePurchase = mock(PointTransaction.class);
+		PointTransaction paidPurchase = mock(PointTransaction.class);
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.findAllByWalletAndTypeAndRefTypeAndRefId(
+				wallet,
+				PointTxType.PURCHASE,
+				PointRefType.GACHA_PURCHASE,
+				501L
+		)).willReturn(List.of(freePurchase, paidPurchase));
+		given(freePurchase.getAmount()).willReturn(-60L);
+		given(freePurchase.getCurrencyType()).willReturn(CurrencyType.FREE);
+		given(paidPurchase.getAmount()).willReturn(-40L);
+		given(paidPurchase.getCurrencyType()).willReturn(CurrencyType.PAID);
+
+		walletService.restoreGachaPurchasePoints(7L, 501L);
+
+		assertThat(wallet.getFreePoint()).isEqualTo(60L);
+		assertThat(wallet.getPaidPoint()).isEqualTo(40L);
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getAmount)
+				.containsExactly(60L, 40L);
+		assertThat(captor.getAllValues())
+				.extracting(PointTransaction::getRefType)
+				.containsOnly(PointRefType.GACHA_PURCHASE);
+	}
+
+	@Test
+	void duplicateGachaPurchaseRestoreIsIdempotent() {
+		Wallet wallet = Wallet.builder().freePoint(0L).paidPoint(0L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.RESTORE,
+				PointRefType.GACHA_PURCHASE,
+				501L
+		)).willReturn(true);
+
+		walletService.restoreGachaPurchasePoints(7L, 501L);
+
+		assertThat(wallet.getFreePoint()).isZero();
+		assertThat(wallet.getPaidPoint()).isZero();
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
 	void paymentRefundDeductsOnlyPaidPointAndWritesRefundLedger() {
 		Wallet wallet = Wallet.builder().freePoint(900L).paidPoint(5_000L).build();
 		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));

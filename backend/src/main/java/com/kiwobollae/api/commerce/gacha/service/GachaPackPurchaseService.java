@@ -19,7 +19,6 @@ import com.kiwobollae.api.point.service.WalletService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +32,6 @@ import tools.jackson.databind.ObjectMapper;
 public class GachaPackPurchaseService {
 
   private static final String API_TYPE = "GACHA_PACK_PURCHASE";
-  private static final String PACK_API_TYPE = "GACHA_PACK_PURCHASE_ITEM";
 
   private final ProductService productService;
   private final WalletService walletService;
@@ -70,7 +68,7 @@ public class GachaPackPurchaseService {
 
     PointDeductionResult pointUsage =
         walletService.deductForGachaPurchase(userId, totalPoint, execution.key().getId());
-    List<Long> drawIds = reservePacks(userId, execution.key().getId(), request.quantity());
+    Long drawId = reservePack(userId, execution.key().getId());
     GachaPackPurchaseResponse response =
         new GachaPackPurchaseResponse(
             execution.key().getId(),
@@ -82,49 +80,26 @@ public class GachaPackPurchaseService {
             pointUsage.usedFreePoint(),
             pointUsage.usedPaidPoint(),
             pointUsage.remainingBalance(),
-            drawIds);
+            List.of(drawId));
     idempotencyService.succeed(
         execution.key(), 200, serialize(response), "GACHA_PACK_PURCHASE", execution.key().getId());
     return response;
   }
 
-  private List<Long> reservePacks(Long userId, Long purchaseId, int quantity) {
+  private Long reservePack(Long userId, Long purchaseId) {
     User user = userRepository.getReferenceById(userId);
-    List<Long> drawIds = new ArrayList<>(quantity);
-    for (int index = 0; index < quantity; index++) {
-      String packKey = "purchase-" + purchaseId + "-" + index;
-      IdempotencyExecution packExecution =
-          idempotencyService.start(
-              userId, PACK_API_TYPE, packKey, sha256(userId + ":" + purchaseId + ":" + index));
-      if (packExecution.replay()) {
-        Long drawId = packExecution.key().getResourceId();
-        if (drawId == null) {
-          throw new BusinessException(ErrorCode.GACHA_PROCESSING_CONFLICT);
-        }
-        drawIds.add(drawId);
-        continue;
-      }
-
-      GachaDraw draw =
-          gachaDrawRepository.saveAndFlush(
-              GachaDraw.builder()
-                  .user(user)
-                  .sourceType(GachaSourceType.PURCHASE)
-                  .sourceId(packExecution.key().getId())
-                  .status(GachaDrawStatus.PENDING)
-                  .drawCount(5)
-                  .rateVersion(1)
-                  .build());
-      drawIds.add(draw.getId());
-      idempotencyService.succeed(
-          packExecution.key(),
-          201,
-          "{\"drawId\":" + draw.getId() + "}",
-          "GACHA_DRAW",
-          draw.getId());
-      eventPublisher.publishEvent(new GachaRewardCreatedEvent(draw.getId()));
-    }
-    return List.copyOf(drawIds);
+    GachaDraw draw =
+        gachaDrawRepository.saveAndFlush(
+            GachaDraw.builder()
+                .user(user)
+                .sourceType(GachaSourceType.PURCHASE)
+                .sourceId(purchaseId)
+                .status(GachaDrawStatus.PENDING)
+                .drawCount(5)
+                .rateVersion(1)
+                .build());
+    eventPublisher.publishEvent(new GachaRewardCreatedEvent(draw.getId()));
+    return draw.getId();
   }
 
   private void validate(Long userId, String idempotencyKey, GachaPackPurchaseRequest request) {
@@ -137,8 +112,7 @@ public class GachaPackPurchaseService {
     if (request == null
         || request.productId() == null
         || request.quantity() == null
-        || request.quantity() < 1
-        || request.quantity() > GachaPackProductQuote.MAX_PURCHASE_QUANTITY) {
+        || request.quantity() != GachaPackProductQuote.MAX_PURCHASE_QUANTITY) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
   }

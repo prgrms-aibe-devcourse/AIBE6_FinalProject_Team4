@@ -131,7 +131,7 @@ class ProductServiceTest {
 
 		assertThat(quote.productId()).isEqualTo(9L);
 		assertThat(quote.unitPoint()).isEqualTo(100L);
-		assertThat(quote.maxQuantity()).isEqualTo(30);
+		assertThat(quote.maxQuantity()).isEqualTo(1);
 	}
 
 	@Test

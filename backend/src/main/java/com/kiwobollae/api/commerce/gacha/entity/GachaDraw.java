@@ -86,4 +86,10 @@ public class GachaDraw extends GachaTimeEntity {
     this.nextRetryAt = status == GachaDrawStatus.RETRYABLE_FAILED ? nextRetryAt : null;
     lastErrorCode = errorCode;
   }
+
+  public void refund(String errorCode) {
+    status = GachaDrawStatus.REFUNDED;
+    nextRetryAt = null;
+    lastErrorCode = errorCode;
+  }
 }

@@ -4,7 +4,12 @@ export type GachaRarity =
   "COMMON" | "RARE" | "SUPER_RARE" | "HYPER_RARE" | "GOLDEN_RARE";
 
 export type GachaDrawStatus =
-  "PENDING" | "PROCESSING" | "COMPLETED" | "RETRYABLE_FAILED" | "MANUAL_REVIEW";
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "RETRYABLE_FAILED"
+  | "MANUAL_REVIEW"
+  | "REFUNDED";
 
 export interface GachaCard {
   id: number;

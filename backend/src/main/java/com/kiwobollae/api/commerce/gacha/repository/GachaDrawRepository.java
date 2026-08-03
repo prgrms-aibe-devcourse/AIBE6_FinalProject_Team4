@@ -64,11 +64,14 @@ public interface GachaDrawRepository extends JpaRepository<GachaDraw, Long> {
 			where d.user.id = :userId
 			  and (:viewed is null
 			       or (:viewed = true and d.resultViewedAt is not null)
-			       or (:viewed = false and d.resultViewedAt is null))
+			       or (:viewed = false and d.resultViewedAt is null and d.status <> :refunded))
 			order by d.createdAt desc
 			""")
   Page<GachaDraw> findHistory(
-      @Param("userId") Long userId, @Param("viewed") Boolean viewed, Pageable pageable);
+      @Param("userId") Long userId,
+      @Param("viewed") Boolean viewed,
+      @Param("refunded") GachaDrawStatus refunded,
+      Pageable pageable);
 
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(

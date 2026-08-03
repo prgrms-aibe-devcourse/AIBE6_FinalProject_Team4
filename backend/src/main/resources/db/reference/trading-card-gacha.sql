@@ -216,7 +216,7 @@ CREATE TABLE gacha_draws (
     source_id BIGINT NOT NULL
         COMMENT 'LOG_REWARD=idempotency_keys.id, PURCHASE=idempotency_keys.id, ADMIN=idempotency_keys.id',
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
-        COMMENT 'PENDING / PROCESSING / COMPLETED / RETRYABLE_FAILED / MANUAL_REVIEW',
+        COMMENT 'PENDING / PROCESSING / COMPLETED / RETRYABLE_FAILED / MANUAL_REVIEW / REFUNDED',
     draw_count INT NOT NULL DEFAULT 5,
     rate_version INT NOT NULL,
     result_viewed_at DATETIME(6) NULL,
@@ -260,7 +260,8 @@ CREATE TABLE gacha_draws (
             'PROCESSING',
             'COMPLETED',
             'RETRYABLE_FAILED',
-            'MANUAL_REVIEW'
+            'MANUAL_REVIEW',
+            'REFUNDED'
         )
     ),
 

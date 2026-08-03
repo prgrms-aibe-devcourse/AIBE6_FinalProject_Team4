@@ -13,23 +13,23 @@ describe("gacha api", () => {
     vi.clearAllMocks();
   });
 
-  it("상점에서 선택한 수량과 멱등키로 가챠 팩을 구매한다", async () => {
+  it("상점에서 1팩과 멱등키로 가챠 팩을 구매한다", async () => {
     mockedRequest.mockResolvedValueOnce({
       purchaseId: 501,
       productId: 9,
       productName: "시즌 1 가챠 카드팩",
-      quantity: 2,
+      quantity: 1,
       unitPoint: 100,
-      totalPoint: 200,
-      usedFreePoint: 200,
+      totalPoint: 100,
+      usedFreePoint: 100,
       usedPaidPoint: 0,
-      remainingBalance: 800,
-      drawIds: [701, 702],
+      remainingBalance: 900,
+      drawIds: [701],
     });
 
     const response = await purchaseGachaPacks(
       9,
-      2,
+      1,
       "access-token",
       "purchase-key",
     );
@@ -40,8 +40,8 @@ describe("gacha api", () => {
       headers: {
         "Idempotency-Key": "purchase-key",
       },
-      body: JSON.stringify({ productId: 9, quantity: 2 }),
+      body: JSON.stringify({ productId: 9, quantity: 1 }),
     });
-    expect(response.drawIds).toEqual([701, 702]);
+    expect(response.drawIds).toEqual([701]);
   });
 });

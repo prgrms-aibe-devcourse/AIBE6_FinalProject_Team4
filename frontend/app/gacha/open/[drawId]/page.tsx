@@ -92,6 +92,11 @@ export default function GachaOpenPage({
       if (!state.accessToken || !Number.isInteger(drawId) || drawId < 1) return;
       try {
         const data = await getGachaDraw(drawId, state.accessToken, signal);
+        if (data.status === "REFUNDED") {
+          setDetail(data);
+          setError("팩을 준비하지 못해 사용한 포인트를 돌려드렸어요.");
+          return;
+        }
         if (data.status === "COMPLETED" && data.items.length !== 5) {
           setError(
             "카드 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -137,7 +142,13 @@ export default function GachaOpenPage({
   }, [hydrated, load, state.accessToken]);
 
   useEffect(() => {
-    if (!state.accessToken || !detail || detail.status === "COMPLETED") return;
+    if (
+      !state.accessToken ||
+      !detail ||
+      detail.status === "COMPLETED" ||
+      detail.status === "REFUNDED"
+    )
+      return;
     const controller = new AbortController();
     const timer = window.setInterval(() => void load(controller.signal), 1500);
     return () => {
