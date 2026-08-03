@@ -199,15 +199,22 @@ public class PointScenarioInitData implements ApplicationRunner {
 			log.warn("성장일지 보상 시나리오를 건너뜁니다: 과거 식물일지가 없습니다.");
 			return;
 		}
-		if (pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+		boolean rewardAlreadyExists = pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
 				PointTxType.JOURNAL_REWARD,
 				PointRefType.JOURNAL_COMPLETION,
 				journal.getId()
-		)) {
-			return;
+		);
+		if (!rewardAlreadyExists) {
+			walletService.rewardJournal(userId, journal.getId());
 		}
 
-		walletService.rewardJournal(userId, journal.getId());
+		int updated = pointTransactionRepository.backdateLocalSeedJournalReward(
+				journal.getId(),
+				journal.getWrittenDate().atTime(9, 0)
+		);
+		if (updated != 1) {
+			log.warn("성장일지 보상 시각을 과거 일자로 조정하지 못했습니다: journalId={}", journal.getId());
+		}
 	}
 
 	private void seedMockPaymentAndRefund(Long userId) {

@@ -90,6 +90,13 @@ class PointScenarioInitDataMySqlIntegrationTest {
 						PointTxType.REFUND
 				);
 
+		PointActivityResponse journalReward = find(
+				activities,
+				PointTxType.JOURNAL_REWARD,
+				PointRefType.JOURNAL_COMPLETION
+		);
+		assertThat(journalReward.createdAt()).isEqualTo(today.minusDays(1).atTime(9, 0));
+
 		PointActivityResponse orderPurchase = find(
 				activities,
 				PointTxType.PURCHASE,
