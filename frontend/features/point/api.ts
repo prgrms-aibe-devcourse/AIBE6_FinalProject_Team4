@@ -18,6 +18,20 @@ export type PointTransactionType =
 
 export type PointCurrencyType = 'FREE' | 'PAID';
 
+export interface AdminPointAdjustmentInput {
+  userId: number;
+  currencyType: PointCurrencyType;
+  amount: number;
+}
+
+export interface AdminPointAdjustmentData extends AdminPointAdjustmentInput {
+  transactionId: number;
+  balanceAfter: number;
+  paidPoint: number;
+  freePoint: number;
+  balance: number;
+}
+
 export type PointReferenceType =
   | 'ORDER'
   | 'CARD_PURCHASE'
@@ -88,5 +102,18 @@ export function getPointTransactions({
   return request<PointTransactionPage>(`/api/v1/points/transactions?${query.toString()}`, {
     accessToken,
     signal,
+  });
+}
+
+export function adjustPointByAdmin(
+  accessToken: string,
+  payload: AdminPointAdjustmentInput,
+  idempotencyKey: string,
+): Promise<AdminPointAdjustmentData> {
+  return request<AdminPointAdjustmentData>('/api/v1/admin/point/adjust', {
+    method: 'POST',
+    accessToken,
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify(payload),
   });
 }
