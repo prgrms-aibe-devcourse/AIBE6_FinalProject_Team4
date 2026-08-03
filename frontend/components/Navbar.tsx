@@ -7,6 +7,7 @@ import { NotificationData, NotificationType } from '@/lib/notification-api';
 import { useUI } from '@/lib/ui';
 import { levelTitle } from '@/lib/levels';
 import Skeleton from './Skeleton';
+import { useGachaCosmetics } from '@/features/gacha/use-gacha-cosmetics';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
   DELIVERY: '📦',
@@ -57,6 +58,7 @@ export default function Navbar() {
   const active = activeKey(pathname);
   const cartCount = state.cartCount;
   const isAdmin = state.user?.role === 'ADMIN';
+  const { title: equippedTitle } = useGachaCosmetics(state.accessToken);
 
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -206,6 +208,11 @@ export default function Navbar() {
                         </span>
                       </div>
                       <div className="mt-1 truncate text-[12.5px] text-faint">{state.user?.email}</div>
+                      {equippedTitle && (
+                        <div className="mt-2 inline-flex rounded-full bg-[#edf3e9] px-2.5 py-1 text-[11px] font-extrabold text-brand-dark">
+                          ✦ {equippedTitle.name}
+                        </div>
+                      )}
                     </div>
                     <Link href="/my" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
                       마이페이지

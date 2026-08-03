@@ -22,6 +22,7 @@ import { useUI } from "@/lib/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
 
 const LINKS = [
   { icon: "receipt_long", label: "주문 내역", href: "/my/orders" },
@@ -45,6 +46,7 @@ const MAX_ADDRESSES = 5;
 export default function MyPage() {
   const { showToast } = useUI();
   const { state, set, logout } = useStore();
+  const { title: equippedTitle } = useGachaCosmetics(state.accessToken);
   const router = useRouter();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -478,6 +480,11 @@ export default function MyPage() {
             </span>
           </div>
           <div className="mt-1 text-sm text-sub">{displayEmail}</div>
+          {equippedTitle ? (
+            <div className="mt-2 inline-flex rounded-full border border-[#cfe1c8] bg-[#edf3e9] px-3 py-1 text-xs font-extrabold text-brand-dark">
+              ✦ {equippedTitle.name}
+            </div>
+          ) : null}
         </div>
         <div className="flex gap-2">
           <button

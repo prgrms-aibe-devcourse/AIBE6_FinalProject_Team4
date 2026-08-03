@@ -2,7 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import CardCosmeticFrame from "@/components/gacha/CardCosmeticFrame";
+import GachaWorkshop from "@/features/gacha/GachaWorkshop";
+import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
 import { ApiError } from "@/lib/api";
 import {
   GachaCard,
@@ -49,10 +52,12 @@ const RARITY_ORDER: GachaRarity[] = [
   "GOLDEN_RARE",
 ];
 
-type Tab = "catalog" | "mine" | "history";
+type Tab = "catalog" | "mine" | "workshop" | "history";
 
 type DisplayCard = GachaCard & {
   ownedCount: number;
+  dismantleableCount: number;
+  shardPerCard: number;
   owned: boolean;
   unlocked: boolean;
   goldenGachaAcquired: boolean;
@@ -71,6 +76,8 @@ function lockedCard(card: GachaCard): DisplayCard {
     ...card,
     imageUrl: null,
     ownedCount: 0,
+    dismantleableCount: 0,
+    shardPerCard: 0,
     owned: false,
     unlocked: false,
     goldenGachaAcquired: false,
@@ -91,6 +98,12 @@ export default function GachaPage() {
   const [selectedCard, setSelectedCard] = useState<DisplayCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { border } = useGachaCosmetics(state.accessToken);
+
+  const refreshCollection = useCallback(async () => {
+    if (!state.accessToken) return;
+    setCollection(await getMyGachaCollection(state.accessToken));
+  }, [state.accessToken]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -241,12 +254,13 @@ export default function GachaPage() {
 
       <nav
         aria-label="가챠 메뉴"
-        className="mb-7 grid grid-cols-3 gap-2 rounded-2xl bg-[#e9ede4] p-1.5"
+        className="mb-7 grid grid-cols-2 gap-2 rounded-2xl bg-[#e9ede4] p-1.5 sm:grid-cols-4"
       >
         {(
           [
             ["catalog", "전체 도감", "collections_bookmark"],
             ["mine", "내 카드 갤러리", "auto_awesome"],
+            ["workshop", "조각 공방", "recycling"],
             ["history", "개봉 내역", "history"],
           ] as const
         ).map(([key, label, icon]) => (
@@ -483,19 +497,16 @@ export default function GachaPage() {
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {ownedCards.map((card) => (
-                <article
+                <CardCosmeticFrame
                   key={card.id}
-                  className={`group relative overflow-hidden rounded-[20px] border-2 bg-[#20261f] p-2 shadow-lg ${
-                    card.rarity === "GOLDEN_RARE"
-                      ? "border-[#d8b640]"
-                      : "border-[#303a2e]"
-                  }`}
+                  borderCode={border?.code}
+                  className="group aspect-[1122/1402] rounded-[20px] bg-[#20261f]"
                 >
                   <button
                     type="button"
                     onClick={() => setSelectedCard(card)}
                     aria-label={`${card.name} 원본 일러스트 크게 보기`}
-                    className="relative block aspect-[5/7] w-full overflow-hidden rounded-[14px] bg-black"
+                    className="relative block h-full w-full overflow-hidden rounded-[14px] bg-black"
                   >
                     {card.imageUrl ? (
                       <Image
@@ -503,7 +514,7 @@ export default function GachaPage() {
                         alt={`${card.name} 카드 일러스트`}
                         fill
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                        className="object-cover transition duration-300 group-hover:scale-[1.035]"
+                        className="object-contain transition duration-300 group-hover:scale-[1.035]"
                       />
                     ) : null}
                     <span className="absolute right-2 top-2 min-w-8 rounded-full border border-white/20 bg-black/70 px-2 py-1 text-center text-xs font-black text-white backdrop-blur">
@@ -518,11 +529,19 @@ export default function GachaPage() {
                       </span>
                     </span>
                   </button>
-                </article>
+                </CardCosmeticFrame>
               ))}
             </div>
           )}
         </section>
+      ) : null}
+
+      {!loading && !error && tab === "workshop" && state.accessToken ? (
+        <GachaWorkshop
+          accessToken={state.accessToken}
+          collection={collection}
+          onCollectionRefresh={refreshCollection}
+        />
       ) : null}
 
       {!loading && !error && tab === "history" ? (
@@ -629,7 +648,10 @@ export default function GachaPage() {
             >
               <span className="material-symbols-outlined">close</span>
             </button>
-            <div className="relative aspect-[1122/1402] overflow-hidden rounded-[24px] border border-white/20 bg-white/[.04] shadow-[0_28px_80px_rgba(0,0,0,.38)]">
+            <CardCosmeticFrame
+              borderCode={selectedCard.owned ? border?.code : null}
+              className="aspect-[1122/1402] rounded-[24px] bg-white/[.04] shadow-[0_28px_80px_rgba(0,0,0,.38)]"
+            >
               <Image
                 src={selectedCard.imageUrl}
                 alt={`${selectedCard.name} 원본 카드 일러스트`}
@@ -638,7 +660,7 @@ export default function GachaPage() {
                 sizes="(max-width: 640px) 92vw, 560px"
                 className="object-contain"
               />
-            </div>
+            </CardCosmeticFrame>
             <div className="mt-4 text-center text-white">
               <p className="text-xl font-black">{selectedCard.name}</p>
               <p className="mt-1 text-sm text-white/60">

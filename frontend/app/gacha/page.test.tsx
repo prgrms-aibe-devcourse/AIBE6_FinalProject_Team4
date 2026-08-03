@@ -101,6 +101,8 @@ describe("GachaPage", () => {
         ...card,
         imageUrl: "/cards/1/card.png",
         ownedCount: 3,
+        dismantleableCount: 2,
+        shardPerCard: 1,
         owned: true,
         unlocked: true,
         goldenGachaAcquired: false,

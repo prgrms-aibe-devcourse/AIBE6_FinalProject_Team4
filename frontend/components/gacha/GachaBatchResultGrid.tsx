@@ -1,4 +1,5 @@
 import Image from "next/image";
+import CardCosmeticFrame from "@/components/gacha/CardCosmeticFrame";
 import {
   GACHA_RARITY_LABEL,
   GroupedGachaResult,
@@ -15,8 +16,10 @@ const RARITY_STYLE: Record<GroupedGachaResult["rarity"], string> = {
 
 export default function GachaBatchResultGrid({
   results,
+  borderCode,
 }: {
   results: GroupedGachaResult[];
+  borderCode?: string | null;
 }) {
   return (
     <div className="mx-auto mt-8 grid max-w-[1050px] grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -26,7 +29,10 @@ export default function GachaBatchResultGrid({
           className={`rounded-[22px] border p-2.5 shadow-[0_16px_32px_rgba(0,0,0,.18)] motion-safe:animate-upIn ${RARITY_STYLE[result.rarity]}`}
           style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
         >
-          <div className="relative aspect-[1122/1402] overflow-hidden rounded-[15px] bg-black/15">
+          <CardCosmeticFrame
+            borderCode={borderCode}
+            className="aspect-[1122/1402] rounded-[15px] bg-black/15"
+          >
             {result.imageUrl && (
               <Image
                 src={result.imageUrl}
@@ -44,7 +50,7 @@ export default function GachaBatchResultGrid({
             <span className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2.5 py-1 text-xs font-black text-white backdrop-blur">
               +{result.count}
             </span>
-          </div>
+          </CardCosmeticFrame>
           <div className="px-1 pb-1 pt-2.5">
             <p className="truncate text-sm font-extrabold">{result.name}</p>
             <p className="mt-0.5 text-[11px] font-bold text-[#dfca72]">
