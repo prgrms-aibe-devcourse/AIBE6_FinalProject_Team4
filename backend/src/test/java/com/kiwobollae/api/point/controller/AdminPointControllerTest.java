@@ -2,6 +2,7 @@ package com.kiwobollae.api.point.controller;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,9 +11,15 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentRequest;
+import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentDirection;
+import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentHistoryResponse;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentResponse;
+import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.service.AdminPointAdjustmentService;
+import com.kiwobollae.api.point.service.AdminPointAdjustmentHistoryService;
+import com.kiwobollae.api.point.service.WalletService;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +27,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
+import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -32,17 +43,67 @@ import tools.jackson.databind.ObjectMapper;
 class AdminPointControllerTest {
 
 	@Mock private AdminPointAdjustmentService adminPointAdjustmentService;
+	@Mock private AdminPointAdjustmentHistoryService adminPointAdjustmentHistoryService;
+	@Mock private WalletService walletService;
 
 	private MockMvc mockMvc;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	@BeforeEach
 	void setUp() {
-		AdminPointController controller = new AdminPointController(adminPointAdjustmentService);
+		AdminPointController controller = new AdminPointController(
+				adminPointAdjustmentService,
+				adminPointAdjustmentHistoryService,
+				walletService
+		);
 		mockMvc = MockMvcBuilders.standaloneSetup(controller)
 				.setControllerAdvice(new GlobalExceptionHandler())
-				.setCustomArgumentResolvers(new AdminUserArgumentResolver())
+				.setCustomArgumentResolvers(
+						new AdminUserArgumentResolver(),
+						new PageableHandlerMethodArgumentResolver()
+				)
 				.build();
+	}
+
+	@Test
+	void getAdjustmentsReturnsPagedAdminLedger() throws Exception {
+		AdminPointAdjustmentHistoryResponse history = new AdminPointAdjustmentHistoryResponse(
+				91L, 7L, "green@example.com", "초록", CurrencyType.FREE,
+				-200L, 100L, 1L, LocalDateTime.of(2026, 8, 3, 10, 0)
+		);
+		given(adminPointAdjustmentHistoryService.getAdjustments(
+				org.mockito.ArgumentMatchers.eq(7L),
+				org.mockito.ArgumentMatchers.eq(CurrencyType.FREE),
+				org.mockito.ArgumentMatchers.eq(AdminPointAdjustmentDirection.DEDUCT),
+				org.mockito.ArgumentMatchers.isNull(),
+				org.mockito.ArgumentMatchers.isNull(),
+				org.mockito.ArgumentMatchers.any()
+		)).willReturn(new PageImpl<>(List.of(history), PageRequest.of(0, 20), 1));
+
+		mockMvc.perform(get("/api/v1/admin/point/adjustments")
+						.param("userId", "7")
+						.param("currencyType", "FREE")
+						.param("direction", "DEDUCT"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].transactionId").value(91))
+				.andExpect(jsonPath("$.data.content[0].targetNickname").value("초록"))
+				.andExpect(jsonPath("$.data.content[0].adminUserId").value(1));
+	}
+
+	@Test
+	void getWalletReturnsSelectedUsersBalances() throws Exception {
+		given(walletService.getWallet(7L)).willReturn(new WalletResponse(
+				7L, 900L, 500L, 400L, LocalDateTime.of(2026, 8, 3, 10, 0)
+		));
+
+		mockMvc.perform(get("/api/v1/admin/point/user/7/wallet"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.userId").value(7))
+				.andExpect(jsonPath("$.data.paidPoint").value(500))
+				.andExpect(jsonPath("$.data.freePoint").value(400))
+				.andExpect(jsonPath("$.data.balance").value(900));
+
+		verify(walletService).getWallet(7L);
 	}
 
 	@Test

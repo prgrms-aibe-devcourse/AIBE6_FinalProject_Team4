@@ -2,8 +2,10 @@ package com.kiwobollae.api.point.repository;
 
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
+import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
+import com.kiwobollae.api.point.repository.projection.PointActivityProjection;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -36,4 +38,100 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 			@Param("from") LocalDateTime from,
 			@Param("to") LocalDateTime to,
 			Pageable pageable);
+
+	@Query(
+			value = """
+					SELECT MAX(pt.id) AS id,
+					       pt.type AS type,
+					       pt.ref_type AS refType,
+					       pt.ref_id AS refId,
+					       CAST(SUM(pt.amount) AS SIGNED) AS amount,
+					       CAST(SUM(CASE WHEN pt.currency_type = 'PAID' THEN pt.amount ELSE 0 END) AS SIGNED) AS paidAmount,
+					       CAST(SUM(CASE WHEN pt.currency_type = 'FREE' THEN pt.amount ELSE 0 END) AS SIGNED) AS freeAmount,
+					       MAX(CASE WHEN pt.currency_type = 'PAID' THEN pt.balance_after END) AS paidBalanceAfter,
+					       MAX(CASE WHEN pt.currency_type = 'FREE' THEN pt.balance_after END) AS freeBalanceAfter,
+					       MAX(pt.created_at) AS createdAt
+					FROM point_transactions pt
+					WHERE pt.wallet_id = :walletId
+					  AND (:type IS NULL OR pt.type = :type)
+					  AND (:refType IS NULL OR pt.ref_type = :refType)
+					  AND (:from IS NULL OR pt.created_at >= :from)
+					  AND (:to IS NULL OR pt.created_at < :to)
+					GROUP BY pt.type,
+					         pt.ref_type,
+					         pt.ref_id,
+					         CASE
+					             WHEN pt.ref_id IS NULL OR pt.type = 'ADMIN_ADJUST' THEN pt.id
+					             ELSE 0
+					         END
+					ORDER BY createdAt DESC, id DESC
+					""",
+			countQuery = """
+					SELECT COUNT(*)
+					FROM (
+					    SELECT 1
+					    FROM point_transactions pt
+					    WHERE pt.wallet_id = :walletId
+					      AND (:type IS NULL OR pt.type = :type)
+					      AND (:refType IS NULL OR pt.ref_type = :refType)
+					      AND (:from IS NULL OR pt.created_at >= :from)
+					      AND (:to IS NULL OR pt.created_at < :to)
+					    GROUP BY pt.type,
+					             pt.ref_type,
+					             pt.ref_id,
+					             CASE
+					                 WHEN pt.ref_id IS NULL OR pt.type = 'ADMIN_ADJUST' THEN pt.id
+					                 ELSE 0
+					             END
+					) grouped_activity
+					""",
+			nativeQuery = true
+	)
+	Page<PointActivityProjection> searchActivities(
+			@Param("walletId") Long walletId,
+			@Param("type") String type,
+			@Param("refType") String refType,
+			@Param("from") LocalDateTime from,
+			@Param("to") LocalDateTime to,
+			Pageable pageable
+	);
+
+	@Query(
+			value = """
+					SELECT pt FROM PointTransaction pt
+					JOIN FETCH pt.wallet wallet
+					JOIN FETCH wallet.user targetUser
+					WHERE pt.type = com.kiwobollae.api.point.entity.enums.PointTxType.ADMIN_ADJUST
+					  AND pt.refType = com.kiwobollae.api.point.entity.enums.PointRefType.ADMIN
+					  AND (:targetUserId IS NULL OR targetUser.id = :targetUserId)
+					  AND (:currencyType IS NULL OR pt.currencyType = :currencyType)
+					  AND (:amountSign IS NULL
+					       OR (:amountSign > 0 AND pt.amount > 0)
+					       OR (:amountSign < 0 AND pt.amount < 0))
+					  AND (:from IS NULL OR pt.createdAt >= :from)
+					  AND (:to IS NULL OR pt.createdAt < :to)
+					""",
+			countQuery = """
+					SELECT COUNT(pt) FROM PointTransaction pt
+					JOIN pt.wallet wallet
+					JOIN wallet.user targetUser
+					WHERE pt.type = com.kiwobollae.api.point.entity.enums.PointTxType.ADMIN_ADJUST
+					  AND pt.refType = com.kiwobollae.api.point.entity.enums.PointRefType.ADMIN
+					  AND (:targetUserId IS NULL OR targetUser.id = :targetUserId)
+					  AND (:currencyType IS NULL OR pt.currencyType = :currencyType)
+					  AND (:amountSign IS NULL
+					       OR (:amountSign > 0 AND pt.amount > 0)
+					       OR (:amountSign < 0 AND pt.amount < 0))
+					  AND (:from IS NULL OR pt.createdAt >= :from)
+					  AND (:to IS NULL OR pt.createdAt < :to)
+					"""
+	)
+	Page<PointTransaction> searchAdminAdjustments(
+			@Param("targetUserId") Long targetUserId,
+			@Param("currencyType") CurrencyType currencyType,
+			@Param("amountSign") Long amountSign,
+			@Param("from") LocalDateTime from,
+			@Param("to") LocalDateTime to,
+			Pageable pageable
+	);
 }

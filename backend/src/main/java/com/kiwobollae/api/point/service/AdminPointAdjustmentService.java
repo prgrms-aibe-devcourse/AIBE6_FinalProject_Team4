@@ -45,6 +45,7 @@ public class AdminPointAdjustmentService {
 		}
 
 		AdminPointAdjustmentResponse response = walletService.adjustByAdmin(
+				adminUserId,
 				request.userId(),
 				request.currencyType(),
 				request.amount()

@@ -12,6 +12,9 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
+import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentDirection;
+import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentHistoryResponse;
+import com.kiwobollae.api.point.dto.response.PointActivityResponse;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -28,6 +31,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -46,6 +51,12 @@ class WalletServiceMySqlIntegrationTest {
 
 	@Autowired
 	private WalletService walletService;
+
+	@Autowired
+	private AdminPointAdjustmentHistoryService adminPointAdjustmentHistoryService;
+
+	@Autowired
+	private PointTransactionService pointTransactionService;
 
 	@Autowired
 	private WalletRepository walletRepository;
@@ -236,7 +247,127 @@ class WalletServiceMySqlIntegrationTest {
 		assertThat(transactions.getFirst().getAmount()).isEqualTo(-800L);
 		assertThat(transactions.getFirst().getBalanceAfter()).isEqualTo(200L);
 		assertThat(transactions.getFirst().getRefType()).isEqualTo(PointRefType.ADMIN);
-		assertThat(transactions.getFirst().getRefId()).isNull();
+		assertThat(transactions.getFirst().getRefId()).isEqualTo(99L);
+	}
+
+	@Test
+	void adminAdjustmentHistoryReturnsTargetAndActorWithFilters() {
+		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, 100L);
+		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, -50L);
+
+		Page<AdminPointAdjustmentHistoryResponse> history =
+				adminPointAdjustmentHistoryService.getAdjustments(
+						userId,
+						CurrencyType.FREE,
+						null,
+						null,
+						null,
+						PageRequest.of(0, 20)
+				);
+
+		assertThat(history.getTotalElements()).isEqualTo(2);
+		assertThat(history.getContent())
+				.extracting(AdminPointAdjustmentHistoryResponse::amount)
+				.containsExactly(-50L, 100L);
+		assertThat(history.getContent().getFirst().targetUserId()).isEqualTo(userId);
+		assertThat(history.getContent().getFirst().targetEmail())
+				.isEqualTo("wallet-integration@example.test");
+		assertThat(history.getContent().getFirst().targetNickname())
+				.isEqualTo("wallet-integration");
+		assertThat(history.getContent().getFirst().balanceAfter()).isEqualTo(550L);
+		assertThat(history.getContent().getFirst().adminUserId()).isEqualTo(99L);
+
+		Page<AdminPointAdjustmentHistoryResponse> grants =
+				adminPointAdjustmentHistoryService.getAdjustments(
+						userId,
+						CurrencyType.FREE,
+						AdminPointAdjustmentDirection.GRANT,
+						null,
+						null,
+						PageRequest.of(0, 20)
+				);
+
+		assertThat(grants.getTotalElements()).isEqualTo(1);
+		assertThat(grants.getContent().getFirst().amount()).isEqualTo(100L);
+	}
+
+	@Test
+	void pointActivitiesGroupMixedCurrencyLedgersAndFilterBySource() {
+		walletService.deductForOrderPurchase(userId, 800L, 200L, 501L);
+
+		Page<PointActivityResponse> orderActivities = pointTransactionService.getActivities(
+				userId,
+				null,
+				PointRefType.ORDER,
+				null,
+				null,
+				PageRequest.of(0, 20)
+		);
+
+		assertThat(orderActivities.getTotalElements()).isEqualTo(1);
+		PointActivityResponse purchase = orderActivities.getContent().getFirst();
+		assertThat(purchase.type()).isEqualTo(PointTxType.PURCHASE);
+		assertThat(purchase.refType()).isEqualTo(PointRefType.ORDER);
+		assertThat(purchase.refId()).isEqualTo(501L);
+		assertThat(purchase.amount()).isEqualTo(-800L);
+		assertThat(purchase.paidAmount()).isEqualTo(-600L);
+		assertThat(purchase.freeAmount()).isEqualTo(-200L);
+		assertThat(purchase.paidBalanceAfter()).isEqualTo(400L);
+		assertThat(purchase.freeBalanceAfter()).isEqualTo(300L);
+
+		walletService.restorePurchasePoints(
+				userId,
+				200L,
+				600L,
+				PointRefType.ORDER,
+				501L
+		);
+
+		Page<PointActivityResponse> allOrderActivities = pointTransactionService.getActivities(
+				userId,
+				null,
+				PointRefType.ORDER,
+				null,
+				null,
+				PageRequest.of(0, 1)
+		);
+		assertThat(allOrderActivities.getTotalElements()).isEqualTo(2);
+		assertThat(allOrderActivities.getTotalPages()).isEqualTo(2);
+		assertThat(allOrderActivities.getContent())
+				.extracting(PointActivityResponse::type)
+				.containsExactly(PointTxType.RESTORE);
+
+		Page<PointActivityResponse> secondPage = pointTransactionService.getActivities(
+				userId,
+				null,
+				PointRefType.ORDER,
+				null,
+				null,
+				PageRequest.of(1, 1)
+		);
+		assertThat(secondPage.getContent())
+				.extracting(PointActivityResponse::type)
+				.containsExactly(PointTxType.PURCHASE);
+	}
+
+	@Test
+	void pointActivitiesKeepAdminAdjustmentsAsSeparateEvents() {
+		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, 100L);
+		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, 200L);
+
+		Page<PointActivityResponse> activities = pointTransactionService.getActivities(
+				userId,
+				PointTxType.ADMIN_ADJUST,
+				null,
+				null,
+				null,
+				PageRequest.of(0, 20)
+		);
+
+		assertThat(activities.getTotalElements()).isEqualTo(2);
+		assertThat(activities.getContent())
+				.extracting(PointActivityResponse::amount)
+				.containsExactly(200L, 100L);
 	}
 
 	private Callable<AttemptResult> orderDeductionAttempt(
@@ -328,7 +459,7 @@ class WalletServiceMySqlIntegrationTest {
 		return () -> {
 			awaitStart(ready, start);
 			try {
-				walletService.adjustByAdmin(userId, CurrencyType.PAID, -800L);
+				walletService.adjustByAdmin(99L, userId, CurrencyType.PAID, -800L);
 				return AttemptResult.SUCCESS;
 			} catch (BusinessException exception) {
 				if (exception.getErrorCode() == ErrorCode.POINT_INSUFFICIENT_BALANCE) {

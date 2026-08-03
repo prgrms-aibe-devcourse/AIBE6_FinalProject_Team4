@@ -514,7 +514,7 @@ class WalletServiceTest {
 		given(pointTransactionRepository.save(org.mockito.ArgumentMatchers.any(PointTransaction.class)))
 				.willAnswer(invocation -> invocation.getArgument(0));
 
-		var response = walletService.adjustByAdmin(7L, CurrencyType.PAID, 200L);
+		var response = walletService.adjustByAdmin(1L, 7L, CurrencyType.PAID, 200L);
 
 		assertThat(response.userId()).isEqualTo(7L);
 		assertThat(response.currencyType()).isEqualTo(CurrencyType.PAID);
@@ -530,7 +530,7 @@ class WalletServiceTest {
 		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.PAID);
 		assertThat(captor.getValue().getAmount()).isEqualTo(200L);
 		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.ADMIN);
-		assertThat(captor.getValue().getRefId()).isNull();
+		assertThat(captor.getValue().getRefId()).isEqualTo(1L);
 	}
 
 	@Test
@@ -540,7 +540,7 @@ class WalletServiceTest {
 		given(pointTransactionRepository.save(org.mockito.ArgumentMatchers.any(PointTransaction.class)))
 				.willAnswer(invocation -> invocation.getArgument(0));
 
-		var response = walletService.adjustByAdmin(7L, CurrencyType.FREE, -300L);
+		var response = walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, -300L);
 
 		assertThat(response.balanceAfter()).isZero();
 		assertThat(response.freePoint()).isZero();
@@ -556,10 +556,10 @@ class WalletServiceTest {
 				.willReturn(Optional.of(paidWallet))
 				.willReturn(Optional.of(freeWallet));
 
-		assertThatThrownBy(() -> walletService.adjustByAdmin(7L, CurrencyType.PAID, -501L))
+		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.PAID, -501L))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
-		assertThatThrownBy(() -> walletService.adjustByAdmin(7L, CurrencyType.FREE, -301L))
+		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, -301L))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
@@ -572,7 +572,7 @@ class WalletServiceTest {
 
 	@Test
 	void adminAdjustmentRejectsZeroAmountBeforeLockingWallet() {
-		assertThatThrownBy(() -> walletService.adjustByAdmin(7L, CurrencyType.FREE, 0L))
+		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, 0L))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
 

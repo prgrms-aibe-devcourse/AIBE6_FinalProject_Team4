@@ -52,11 +52,13 @@ public class WalletService {
 	/** 관리자가 특정 사용자의 유상/무상 포인트를 조정하고 불변 원장을 기록한다. */
 	@Transactional
 	public AdminPointAdjustmentResponse adjustByAdmin(
+			Long adminUserId,
 			Long userId,
 			CurrencyType currency,
 			long amount
 	) {
-		if (userId == null || userId < 1 || currency == null || amount == 0) {
+		if (adminUserId == null || adminUserId < 1
+				|| userId == null || userId < 1 || currency == null || amount == 0) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
@@ -67,7 +69,7 @@ public class WalletService {
 				currency,
 				amount,
 				PointRefType.ADMIN,
-				null
+				adminUserId
 		);
 		return AdminPointAdjustmentResponse.from(userId, transaction, wallet);
 	}
@@ -445,7 +447,7 @@ public class WalletService {
 			if (transaction.getAmount() >= 0) {
 				throw new BusinessException(
 						ErrorCode.COMMON_DATA_CONFLICT,
-						"최초 구매 차감 원장이 올바르지 않습니다."
+						"기존 포인트 결제 내역을 확인할 수 없습니다."
 				);
 			}
 
@@ -467,7 +469,7 @@ public class WalletService {
 	) {
 		return new BusinessException(
 				ErrorCode.COMMON_DATA_CONFLICT,
-				"원복 요청 포인트가 최초 구매 차감 내역과 일치하지 않습니다.",
+				"취소하려는 포인트 내역이 최초 결제 내역과 일치하지 않습니다.",
 				Map.of(
 						"recordedFreePoint", recordedUsage.freePoint(),
 						"recordedPaidPoint", recordedUsage.paidPoint(),

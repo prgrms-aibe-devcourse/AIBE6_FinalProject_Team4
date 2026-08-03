@@ -49,7 +49,7 @@ class AdminPointAdjustmentServiceTest {
 		AdminPointAdjustmentResponse response = response(91L, 7L, CurrencyType.FREE, 300L, 800L);
 		given(idempotencyService.start(eq(1L), eq("POINT_ADMIN_ADJUST"), eq("adjust-key"), anyString()))
 				.willReturn(new IdempotencyExecution(key, false));
-		given(walletService.adjustByAdmin(7L, CurrencyType.FREE, 300L)).willReturn(response);
+		given(walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, 300L)).willReturn(response);
 
 		AdminPointAdjustmentResponse result = adminPointAdjustmentService.adjust(1L, "adjust-key", request);
 

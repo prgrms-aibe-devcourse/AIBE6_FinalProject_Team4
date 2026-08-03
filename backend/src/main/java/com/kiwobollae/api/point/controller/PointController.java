@@ -2,8 +2,10 @@ package com.kiwobollae.api.point.controller;
 
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
+import com.kiwobollae.api.point.dto.response.PointActivityResponse;
 import com.kiwobollae.api.point.dto.response.PointTransactionResponse;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
+import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.service.PointTransactionService;
 import com.kiwobollae.api.point.service.WalletService;
@@ -52,5 +54,20 @@ public class PointController {
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 		return ResponseEntity.ok(ApiResponse.success(
 				pointTransactionService.getTransactions(userId, type, from, to, pageable)));
+	}
+
+	@Operation(summary = "사용자 포인트 활동 내역 조회",
+			description = "같은 거래의 유상·무상 원장을 한 건으로 묶어 조회합니다. 유형·출처·기간 필터와 페이지네이션을 지원합니다.")
+	@GetMapping("/activities")
+	public ResponseEntity<ApiResponse<Page<PointActivityResponse>>> getActivities(
+			@AuthenticationPrincipal Long userId,
+			@RequestParam(required = false) PointTxType type,
+			@RequestParam(required = false) PointRefType refType,
+			@RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE_TIME) LocalDateTime from,
+			@RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE_TIME) LocalDateTime to,
+			@ParameterObject @PageableDefault(size = 20) Pageable pageable
+	) {
+		return ResponseEntity.ok(ApiResponse.success(
+				pointTransactionService.getActivities(userId, type, refType, from, to, pageable)));
 	}
 }
