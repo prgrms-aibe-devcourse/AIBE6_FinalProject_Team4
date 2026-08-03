@@ -1,13 +1,6 @@
 import { grads } from './theme';
 
 // Shared sample data — mirrors the prototype seed data.
-export const SPECIES = [
-  { id: 1, name: '방울토마토', emoji: '🍅' }, { id: 2, name: '바질', emoji: '🌿' },
-  { id: 3, name: '상추', emoji: '🥬' }, { id: 4, name: '딸기', emoji: '🍓' },
-  { id: 5, name: '고추', emoji: '🌶️' }, { id: 6, name: '수박', emoji: '🍉' },
-  { id: 7, name: '당근', emoji: '🥕' }, { id: 8, name: '청경채', emoji: '🥬' },
-];
-
 export const PLANTS = [
   { id: 1, nickname: '토실이', species: '방울토마토', emoji: '🍅', grad: grads.tomato, startDate: '2026.06.09', dplus: 42, status: 'GROWING', archived: false, careGuide: '햇빛을 아주 좋아해요. 하루 6시간 이상 볕을 쬐어 주세요.\n흙 표면이 마르면 듬뿍 물을 주고, 열매가 맺히면 물 양을 조금 줄여 당도를 높여요.\n곁순은 부지런히 따주면 열매가 더 튼튼해져요.' },
   { id: 2, nickname: '바질이', species: '바질', emoji: '🌿', grad: grads.basil, startDate: '2026.07.06', dplus: 15, status: 'GROWING', archived: false, careGuide: '따뜻하고 볕이 잘 드는 곳을 좋아해요.\n윗잎을 자주 따주면 옆으로 풍성하게 자라요.' },
