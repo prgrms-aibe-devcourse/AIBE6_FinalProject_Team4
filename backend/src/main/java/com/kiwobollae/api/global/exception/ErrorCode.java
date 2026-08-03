@@ -69,6 +69,7 @@ public enum ErrorCode {
 	GACHA_MASTER_DATA_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "가챠 카드 데이터가 올바르지 않습니다."),
 	GACHA_PROCESSING_CONFLICT(HttpStatus.CONFLICT, "이미 처리 중인 가챠 요청입니다."),
 	GACHA_REWARD_MANUAL_REVIEW(HttpStatus.INTERNAL_SERVER_ERROR, "가챠 보상에 관리자 확인이 필요합니다."),
+	GACHA_MANUAL_RETRY_INVALID_STATE(HttpStatus.CONFLICT, "관리자 재시도가 가능한 가챠 상태가 아닙니다."),
 
 	EXCHANGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 상품을 찾을 수 없습니다."),
 	EXCHANGE_PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "교환 상품의 재고가 부족합니다."),

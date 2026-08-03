@@ -41,6 +41,22 @@ public interface GachaDrawRepository extends JpaRepository<GachaDraw, Long> {
       @Param("completed") GachaDrawStatus completed,
       @Param("viewedAt") LocalDateTime viewedAt);
 
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      """
+			update GachaDraw d
+			set d.status = :pending,
+				d.nextRetryAt = null,
+				d.updatedAt = :now
+			where d.id = :id
+			  and d.status = :manualReview
+			""")
+  int requeueManualReview(
+      @Param("id") Long id,
+      @Param("manualReview") GachaDrawStatus manualReview,
+      @Param("pending") GachaDrawStatus pending,
+      @Param("now") LocalDateTime now);
+
   @Query(
       """
 			select d
