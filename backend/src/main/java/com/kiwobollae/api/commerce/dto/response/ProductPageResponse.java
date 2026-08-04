@@ -2,6 +2,7 @@ package com.kiwobollae.api.commerce.dto.response;
 
 import com.kiwobollae.api.commerce.entity.Product;
 import java.util.List;
+import java.util.function.Function;
 import org.springframework.data.domain.Page;
 
 public record ProductPageResponse(
@@ -13,10 +14,13 @@ public record ProductPageResponse(
 		boolean first,
 		boolean last
 ) {
-	public static ProductPageResponse from(Page<Product> products) {
+	public static ProductPageResponse from(Page<Product> products, Function<String, String> imageUrlResolver) {
 		return new ProductPageResponse(
 				products.getContent().stream()
-						.map(ProductListItemResponse::from)
+						.map(product -> ProductListItemResponse.from(
+								product,
+								imageUrlResolver.apply(product.getImageUrl())
+						))
 						.toList(),
 				products.getNumber(),
 				products.getSize(),

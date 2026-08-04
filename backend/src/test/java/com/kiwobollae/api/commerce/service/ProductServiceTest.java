@@ -18,6 +18,7 @@ import com.kiwobollae.api.commerce.repository.ProductRepository;
 import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,9 @@ class ProductServiceTest {
 
 	@Mock
 	private ProductRepository productRepository;
+
+	@Mock
+	private AssetUrlResolver assetUrlResolver;
 
 	@InjectMocks
 	private ProductService productService;

@@ -14,6 +14,7 @@ import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
 import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,11 @@ class AdminProductServiceTest {
   @BeforeEach
   void setUp() {
     productRepository = mock(ProductRepository.class);
-    service = new AdminProductService(productRepository, mock(PlantSpeciesRepository.class));
+    service =
+        new AdminProductService(
+            productRepository,
+            mock(PlantSpeciesRepository.class),
+            new AssetUrlResolver("https://assets.example.com/"));
   }
 
   @Test

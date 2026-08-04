@@ -10,6 +10,7 @@ import com.kiwobollae.api.content.entity.PlantSpecies;
 import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -26,10 +27,11 @@ public class AdminProductService {
 
   private final ProductRepository productRepository;
   private final PlantSpeciesRepository plantSpeciesRepository;
+  private final AssetUrlResolver assetUrlResolver;
 
   public List<AdminProductResponse> getProducts() {
     return productRepository.findAllByCategoryInOrderByCreatedAtDesc(MANAGED_CATEGORIES).stream()
-        .map(AdminProductResponse::from)
+        .map(this::response)
         .toList();
   }
 
@@ -48,7 +50,7 @@ public class AdminProductService {
                 .imageUrl(values.imageUrl())
                 .status(ProductStatus.ACTIVE)
                 .build());
-    return AdminProductResponse.from(product);
+    return response(product);
   }
 
   @Transactional
@@ -66,7 +68,7 @@ public class AdminProductService {
         values.plant(),
         values.description(),
         values.imageUrl());
-    return AdminProductResponse.from(product);
+    return response(product);
   }
 
   @Transactional
@@ -83,14 +85,14 @@ public class AdminProductService {
       }
       throw new BusinessException(ErrorCode.PRODUCT_OUT_OF_STOCK);
     }
-    return AdminProductResponse.from(findManaged(productId));
+    return response(findManaged(productId));
   }
 
   @Transactional
   public AdminProductResponse changeStatus(Long productId, ProductStatus status) {
     Product product = findManaged(productId);
     productRepository.updateStatusIfChanged(productId, status);
-    return AdminProductResponse.from(findManaged(productId));
+    return response(findManaged(productId));
   }
 
   @Transactional
@@ -154,6 +156,10 @@ public class AdminProductService {
     return new BusinessException(
         ErrorCode.COMMON_VALIDATION_FAILED,
         Map.of("field", field, "rejectedValue", String.valueOf(value), "reason", reason));
+  }
+
+  private AdminProductResponse response(Product product) {
+    return AdminProductResponse.from(product, assetUrlResolver.resolve(product.getImageUrl()));
   }
 
   private String trimToNull(String value) {

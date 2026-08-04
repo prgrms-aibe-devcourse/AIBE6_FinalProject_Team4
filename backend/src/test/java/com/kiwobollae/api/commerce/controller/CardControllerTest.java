@@ -64,7 +64,7 @@ class CardControllerTest {
 		mockMvc.perform(get("/api/v1/card/404"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("CARD_NOT_FOUND"))
-				.andExpect(jsonPath("$.message").value("카드를 찾을 수 없습니다."));
+				.andExpect(jsonPath("$.message").value("쿠폰을 찾을 수 없습니다."));
 	}
 
 	@Test

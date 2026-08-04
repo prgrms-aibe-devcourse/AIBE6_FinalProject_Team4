@@ -12,7 +12,7 @@ public record ProductListItemResponse(
 		boolean soldOut,
 		String imageUrl
 ) {
-	public static ProductListItemResponse from(Product product) {
+	public static ProductListItemResponse from(Product product, String imageUrl) {
 		return new ProductListItemResponse(
 				product.getId(),
 				product.getName(),
@@ -20,7 +20,7 @@ public record ProductListItemResponse(
 				product.getPointPrice(),
 				product.getStock(),
 				product.getCategory() != ProductCategory.GACHA_PACK && product.getStock() <= 0,
-				product.getImageUrl()
+				imageUrl
 		);
 	}
 }

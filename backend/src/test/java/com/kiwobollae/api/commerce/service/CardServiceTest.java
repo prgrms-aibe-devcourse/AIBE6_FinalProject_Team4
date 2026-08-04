@@ -15,6 +15,7 @@ import com.kiwobollae.api.commerce.repository.CardRepository;
 import com.kiwobollae.api.commerce.repository.UserCardRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,9 @@ class CardServiceTest {
 
 	@Mock
 	private UserCardRepository userCardRepository;
+
+	@Mock
+	private AssetUrlResolver assetUrlResolver;
 
 	@InjectMocks
 	private CardService cardService;

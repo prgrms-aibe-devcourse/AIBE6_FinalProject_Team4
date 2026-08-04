@@ -20,7 +20,7 @@ public record AdminProductResponse(
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {
 
-  public static AdminProductResponse from(Product product) {
+  public static AdminProductResponse from(Product product, String imageUrl) {
     boolean unlimitedStock = product.getCategory() == ProductCategory.GACHA_PACK;
     return new AdminProductResponse(
         product.getId(),
@@ -32,7 +32,7 @@ public record AdminProductResponse(
         !unlimitedStock && product.getStock() <= 0,
         product.getPlant() == null ? null : product.getPlant().getId(),
         product.getDescription(),
-        product.getImageUrl(),
+        imageUrl,
         product.getStatus(),
         product.getCreatedAt(),
         product.getUpdatedAt());

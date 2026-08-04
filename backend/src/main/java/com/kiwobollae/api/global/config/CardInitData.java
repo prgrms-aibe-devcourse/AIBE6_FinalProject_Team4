@@ -28,8 +28,19 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CardInitData implements ApplicationRunner {
 
-	private static final String CARD_IMAGE_BASE_URL = "https://placehold.co/800x1100/E8F3D8/4B7A1E?text=";
 	private static final String PRODUCT_IMAGE_BASE_URL = "https://placehold.co/800x600/FFF3CC/8A6D00?text=";
+	private static final List<String> COUPON_IMAGE_KEYS = List.of(
+			"coupons/1/5d085536-b249-56bf-b42f-82e56bd785dd.png",
+			"coupons/2/a4d206ed-e57c-57aa-b347-6a633f1f08b4.png",
+			"coupons/3/817208ec-104b-5e78-8d90-84ebeab76ffe.png",
+			"coupons/4/81c3e0a4-e115-5cc9-a21e-5accc4504cbd.png",
+			"coupons/5/64303f95-e437-5ee9-8fb0-d9bccefe3a1b.png",
+			"coupons/6/0a0fac0b-b987-5240-8802-e13c719b6475.png",
+			"coupons/7/c14efdb8-491e-546d-b234-15ee6ef863b1.png",
+			"coupons/8/6ef1c07a-be33-5e1d-a6c2-75427e43e13e.png",
+			"coupons/9/cda323a0-8b66-5071-9730-34c3cad1ea16.png",
+			"coupons/10/a5a1f56f-5b64-5df6-b955-9df23797ca9f.png"
+	);
 
 	private final CardRepository cardRepository;
 	private final ExchangeProductRepository exchangeProductRepository;
@@ -62,7 +73,11 @@ public class CardInitData implements ApplicationRunner {
 
 		cardRepository.saveAll(
 				IntStream.range(0, seeds.size())
-						.mapToObj(index -> card(seeds.get(index), exchangeProducts.get(index)))
+						.mapToObj(index -> card(
+								seeds.get(index),
+								exchangeProducts.get(index),
+								COUPON_IMAGE_KEYS.get(index)
+						))
 						.toList()
 		);
 	}
@@ -77,14 +92,14 @@ public class CardInitData implements ApplicationRunner {
 				.build();
 	}
 
-	private Card card(CardSeed seed, ExchangeProduct exchangeProduct) {
+	private Card card(CardSeed seed, ExchangeProduct exchangeProduct, String imageKey) {
 		return Card.builder()
 				.name(seed.cardName())
 				.pointPrice(seed.pointPrice())
 				.exchangeProduct(exchangeProduct)
 				.requiredCountForExchange(seed.requiredCountForExchange())
 				.description(seed.exchangeProductName() + " 교환을 위해 모으는 쿠폰입니다.")
-				.imageUrl(CARD_IMAGE_BASE_URL + seed.imageText() + "+Coupon")
+				.imageUrl(imageKey)
 				.status(ActiveStatus.ON_SALE)
 				.build();
 	}
