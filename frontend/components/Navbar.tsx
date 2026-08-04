@@ -8,6 +8,7 @@ import { useUI } from '@/lib/ui';
 import { levelTitle } from '@/lib/levels';
 import Skeleton from './Skeleton';
 import { useGachaCosmetics } from '@/features/gacha/use-gacha-cosmetics';
+import GachaQaShardGrantButton from '@/components/gacha/GachaQaShardGrantButton';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
   DELIVERY: '📦',
@@ -226,6 +227,7 @@ export default function Navbar() {
                     <Link href="/my/inquiries" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
                       1:1 문의
                     </Link>
+                    {state.accessToken && <GachaQaShardGrantButton accessToken={state.accessToken} />}
                     <button
                       type="button"
                       onClick={doLogout}

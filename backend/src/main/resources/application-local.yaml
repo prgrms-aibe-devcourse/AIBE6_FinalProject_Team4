@@ -8,6 +8,10 @@ logging:
     com.kiwobollae.api: DEBUG
 
 app:
+  qa:
+    # 조각/코스메틱 QA가 끝나면 false로 바꾸거나 GachaQa* 클래스를 삭제한다.
+    gacha-shards:
+      enabled: true
   seed:
     gacha:
       enabled: true
