@@ -194,7 +194,7 @@ public class OpenAiClient implements AiClient {
     return new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
   }
 
-  private static RestClient.Builder createRestClientBuilder(OpenAiProperties properties) {
+  static RestClient.Builder createRestClientBuilder(OpenAiProperties properties) {
     HttpClient httpClient =
         HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();
     JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
