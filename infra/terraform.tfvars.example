@@ -29,3 +29,8 @@ ghcr_owner = "tesalriah" # GitHub 계정 소문자
 #   export TF_VAR_ghcr_token=...
 #   export TF_VAR_mail_password=...
 #   export TF_VAR_toss_payments_secret_key=...   # Toss 개발자센터 테스트 시크릿 키(test_sk_...) — 필수, 기본값 없음
+#   export TF_VAR_openai_api_key=...              # 백엔드 전용 OpenAI API Key
+
+# AI 기능을 활성화할 때 사용하는 모델 ID. 코드에 모델명을 고정하지 않는다.
+# openai_text_model   = ""
+# openai_vision_model = ""

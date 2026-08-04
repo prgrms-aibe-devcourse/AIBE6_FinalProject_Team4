@@ -53,3 +53,10 @@ variable "toss_payments_secret_key" {
   type      = string
   sensitive = true
 }
+
+variable "openai_api_key" {
+  description = "백엔드 OpenAI API Key. 실제 키는 TF_VAR_openai_api_key로 주입한다."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
