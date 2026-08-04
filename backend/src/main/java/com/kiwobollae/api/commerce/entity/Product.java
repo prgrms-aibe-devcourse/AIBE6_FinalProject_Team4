@@ -62,4 +62,22 @@ public class Product extends BaseTimeEntity {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private ProductStatus status;
+
+	public void updateInfo(
+			String name,
+			ProductCategory category,
+			Long pointPrice,
+			Integer stock,
+			PlantSpecies plant,
+			String description,
+			String imageUrl
+	) {
+		this.name = name;
+		this.category = category;
+		this.pointPrice = pointPrice;
+		this.stock = stock;
+		this.plant = plant;
+		this.description = description;
+		this.imageUrl = imageUrl;
+	}
 }
