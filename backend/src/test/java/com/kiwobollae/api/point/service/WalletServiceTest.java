@@ -570,4 +570,82 @@ class WalletServiceTest {
 		assertThat(wallet.getFreePoint()).isEqualTo(900L);
 		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
 	}
+
+	@Test
+	void adminAdjustmentGrantsPaidPointAndWritesAdminLedger() {
+		User user = mock(User.class);
+		Wallet wallet = Wallet.builder()
+				.user(user)
+				.freePoint(300L)
+				.paidPoint(500L)
+				.build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.save(org.mockito.ArgumentMatchers.any(PointTransaction.class)))
+				.willAnswer(invocation -> invocation.getArgument(0));
+
+		var response = walletService.adjustByAdmin(1L, 7L, CurrencyType.PAID, 200L);
+
+		assertThat(response.userId()).isEqualTo(7L);
+		assertThat(response.currencyType()).isEqualTo(CurrencyType.PAID);
+		assertThat(response.amount()).isEqualTo(200L);
+		assertThat(response.balanceAfter()).isEqualTo(700L);
+		assertThat(response.paidPoint()).isEqualTo(700L);
+		assertThat(response.freePoint()).isEqualTo(300L);
+		assertThat(response.balance()).isEqualTo(1_000L);
+
+		ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+		verify(pointTransactionRepository).save(captor.capture());
+		assertThat(captor.getValue().getType()).isEqualTo(PointTxType.ADMIN_ADJUST);
+		assertThat(captor.getValue().getCurrencyType()).isEqualTo(CurrencyType.PAID);
+		assertThat(captor.getValue().getAmount()).isEqualTo(200L);
+		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.ADMIN);
+		assertThat(captor.getValue().getRefId()).isEqualTo(1L);
+	}
+
+	@Test
+	void adminAdjustmentCanDeductFreePointDownToZero() {
+		Wallet wallet = Wallet.builder().freePoint(300L).paidPoint(500L).build();
+		given(walletRepository.findByUserIdForUpdate(7L)).willReturn(Optional.of(wallet));
+		given(pointTransactionRepository.save(org.mockito.ArgumentMatchers.any(PointTransaction.class)))
+				.willAnswer(invocation -> invocation.getArgument(0));
+
+		var response = walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, -300L);
+
+		assertThat(response.balanceAfter()).isZero();
+		assertThat(response.freePoint()).isZero();
+		assertThat(response.paidPoint()).isEqualTo(500L);
+		assertThat(response.balance()).isEqualTo(500L);
+	}
+
+	@Test
+	void adminAdjustmentRejectsPaidAndFreePointUnderflowWithoutMutation() {
+		Wallet paidWallet = Wallet.builder().freePoint(300L).paidPoint(500L).build();
+		Wallet freeWallet = Wallet.builder().freePoint(300L).paidPoint(500L).build();
+		given(walletRepository.findByUserIdForUpdate(7L))
+				.willReturn(Optional.of(paidWallet))
+				.willReturn(Optional.of(freeWallet));
+
+		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.PAID, -501L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
+		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, -301L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
+
+		assertThat(paidWallet.getPaidPoint()).isEqualTo(500L);
+		assertThat(paidWallet.getFreePoint()).isEqualTo(300L);
+		assertThat(freeWallet.getPaidPoint()).isEqualTo(500L);
+		assertThat(freeWallet.getFreePoint()).isEqualTo(300L);
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void adminAdjustmentRejectsZeroAmountBeforeLockingWallet() {
+		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, 0L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
 }

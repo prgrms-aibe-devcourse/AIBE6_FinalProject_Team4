@@ -1,5 +1,6 @@
 "use client";
 import { ApiError } from "@/lib/api";
+import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
 import {
   adjustAdminProductStock,
   AdminProduct,
@@ -606,6 +607,7 @@ export default function Admin() {
     ["orders", "주문 관리"],
     ["exchanges", "교환 관리"],
     ["products", "상품 관리"],
+    ["points", "포인트 관리"],
     ["reports", "신고 관리"],
     ["species", "종 관리"],
   ];
@@ -1109,6 +1111,10 @@ export default function Admin() {
             </div>
           </div>
         </div>
+      )}
+
+      {tab === "points" && (
+        <AdminPointAdjustmentPanel accessToken={state.accessToken} />
       )}
 
       {tab === "species" && (

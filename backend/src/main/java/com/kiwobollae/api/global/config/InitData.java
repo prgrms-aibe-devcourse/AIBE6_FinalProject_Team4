@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * users (e.g. PlantProfileInitData) can rely on them already existing.
  */
 @Component
-@Profile("local")
+@Profile({"local", "prod"})
 @Order(1)
 @RequiredArgsConstructor
 public class InitData implements ApplicationRunner {

@@ -55,7 +55,7 @@ public class PointTransaction extends BaseEntity {
 	@Column(name = "ref_type", length = 20)
 	private PointRefType refType;
 
-	/** Polymorphic reference — target table determined by refType (ADMIN 조정 시 null). */
+	/** Polymorphic reference — target table determined by refType (ADMIN 조정 시 실행 관리자 user ID). */
 	@Column(name = "ref_id")
 	private Long refId;
 

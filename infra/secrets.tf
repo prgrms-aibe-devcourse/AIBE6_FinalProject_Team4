@@ -39,3 +39,17 @@ variable "naver_client_secret" {
   sensitive = true
   default   = ""
 }
+
+variable "mail_password" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+# TossPaymentProvider가 기동 시점에 "test_"로 시작하는 값인지 검증한다 — 운영 결제
+# 연동 전까지는 반드시 Toss 테스트 시크릿 키(test_sk_...)를 넣을 것. default 없이
+# 강제해 배포 때 빠뜨리면 terraform plan 단계에서부터 드러나게 한다.
+variable "toss_payments_secret_key" {
+  type      = string
+  sensitive = true
+}

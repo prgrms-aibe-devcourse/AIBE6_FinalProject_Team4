@@ -17,6 +17,7 @@ import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.PaymentRefund;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundAttemptStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentRefundCommand;
@@ -75,6 +76,9 @@ class PaymentRefundServiceTest {
 
 	@BeforeEach
 	void setUp() {
+		org.mockito.Mockito.lenient()
+				.when(paymentProvider.getType())
+				.thenReturn(PaymentProviderType.TOSS);
 		paymentRefundService = new PaymentRefundService(
 				paymentRepository,
 				paymentRefundRepository,
@@ -90,7 +94,7 @@ class PaymentRefundServiceTest {
 
 	@Test
 	void fullRefundDeductsPaidPointAndCompletesPaymentAndRefund() throws Exception {
-		Payment payment = payment(PaymentStatus.PAID);
+		Payment payment = payment(PaymentStatus.COMPLETED);
 		PaymentRefund requestedRefund = org.mockito.Mockito.mock(PaymentRefund.class);
 		PaymentRefund completedRefund = completedRefund(payment);
 		IdempotencyKey key = org.mockito.Mockito.mock(IdempotencyKey.class);
@@ -122,7 +126,7 @@ class PaymentRefundServiceTest {
 				.willReturn(PaymentRefundResult.success("provider-refund-key"));
 		given(paymentRepository.updateStatusOnlyIfCurrent(
 				21L,
-				PaymentStatus.PAID,
+				PaymentStatus.COMPLETED,
 				PaymentStatus.REFUNDED
 		)).willReturn(1);
 		given(paymentRefundRepository.completeIfCurrent(
@@ -278,7 +282,7 @@ class PaymentRefundServiceTest {
 
 	@Test
 	void refundRejectsInsufficientPaidPointBeforeCallingProvider() {
-		Payment payment = payment(PaymentStatus.PAID);
+		Payment payment = payment(PaymentStatus.COMPLETED);
 		PaymentRefund requestedRefund = org.mockito.Mockito.mock(PaymentRefund.class);
 		given(idempotencyService.start(
 				org.mockito.ArgumentMatchers.eq(7L),
@@ -329,7 +333,7 @@ class PaymentRefundServiceTest {
 
 	@Test
 	void refundBlocksRetryWhileEarlierAttemptIsUnsettled() {
-		Payment payment = payment(PaymentStatus.PAID);
+		Payment payment = payment(PaymentStatus.COMPLETED);
 		given(idempotencyService.start(
 				org.mockito.ArgumentMatchers.eq(7L),
 				org.mockito.ArgumentMatchers.eq("PAYMENT_REFUND"),
@@ -368,7 +372,7 @@ class PaymentRefundServiceTest {
 
 	@Test
 	void refundRollsBackWhenProviderDeclines() {
-		Payment payment = payment(PaymentStatus.PAID);
+		Payment payment = payment(PaymentStatus.COMPLETED);
 		PaymentRefund requestedRefund = org.mockito.Mockito.mock(PaymentRefund.class);
 		given(idempotencyService.start(
 				org.mockito.ArgumentMatchers.eq(7L),
@@ -429,13 +433,15 @@ class PaymentRefundServiceTest {
 		Payment payment = org.mockito.Mockito.mock(Payment.class);
 		org.mockito.Mockito.lenient().when(payment.getId()).thenReturn(21L);
 		org.mockito.Mockito.lenient().when(payment.getStatus()).thenReturn(status);
-		if (status == PaymentStatus.PAID) {
+		if (status == PaymentStatus.COMPLETED) {
 			org.mockito.Mockito.lenient().when(payment.getCashAmount()).thenReturn(5_000L);
 			org.mockito.Mockito.lenient().when(payment.getPointAmount()).thenReturn(5_000L);
 			org.mockito.Mockito.lenient().when(payment.getProviderOrderId())
 					.thenReturn("provider-order-21");
 			org.mockito.Mockito.lenient().when(payment.getProviderPaymentKey())
 					.thenReturn("provider-payment-21");
+			org.mockito.Mockito.lenient().when(payment.getProvider())
+					.thenReturn(PaymentProviderType.TOSS);
 		}
 		return payment;
 	}

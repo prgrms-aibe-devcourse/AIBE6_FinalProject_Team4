@@ -48,18 +48,48 @@ variable "cors_allowed_origins" {
 variable "google_client_id" {
   default = ""
 }
+# www.kiwor.site가 canonical 도메인(kiwor.site는 Vercel에서 여기로 301 리다이렉트).
+# 프론트가 window.location.origin을 그대로 써서 이 값과 반드시 일치해야 하므로
+# non-www로 바꾸지 말 것 — 바꾸면 redirect_uri_mismatch로 소셜 로그인이 깨진다.
 variable "google_redirect_uri" {
-  default = "https://kiwor.site/oauth/callback/google"
+  default = "https://www.kiwor.site/oauth/callback/google"
 }
 variable "kakao_client_id" {
   default = ""
 }
 variable "kakao_redirect_uri" {
-  default = "https://kiwor.site/oauth/callback/kakao"
+  default = "https://www.kiwor.site/oauth/callback/kakao"
 }
 variable "naver_client_id" {
   default = ""
 }
 variable "naver_redirect_uri" {
-  default = "https://kiwor.site/oauth/callback/naver"
+  default = "https://www.kiwor.site/oauth/callback/naver"
+}
+
+# ---------------------------------------------------------
+# 메일 발송 (기본은 비활성 — LoggingEmailSender가 대신 로그에만 찍는다)
+# ---------------------------------------------------------
+variable "mail_enabled" {
+  default = false
+  type    = bool
+}
+variable "mail_from" {
+  default = ""
+}
+variable "mail_host" {
+  default = ""
+}
+variable "mail_port" {
+  default = 587
+}
+variable "mail_username" {
+  default = ""
+}
+
+# ---------------------------------------------------------
+# Toss Payments
+# ---------------------------------------------------------
+variable "toss_payments_base_url" {
+  default = "https://api.tosspayments.com"
 }

@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * seeds here already exist when profiles are created against them.
  */
 @Component
-@Profile("local")
+@Profile({"local", "prod"})
 @ConditionalOnProperty(prefix = "app.seed.product", name = "enabled", havingValue = "true")
 @Order(2)
 @RequiredArgsConstructor

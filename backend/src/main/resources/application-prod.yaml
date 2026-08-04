@@ -39,10 +39,29 @@ app:
       client-id: ${NAVER_CLIENT_ID}
       client-secret: ${NAVER_CLIENT_SECRET}
       redirect-uri: ${NAVER_REDIRECT_URI}
+  seed:
+    # InitData 계열(@Profile로 local과 prod 모두에서 실행)이 만드는 테스트
+    # 계정(admin/test/user@test.com)과 샘플 상품·카드·식물·일지·알림이 운영 DB에도
+    # 그대로 들어간다 — ddl-auto: update처럼 배포 편의를 위한 임시 조치. 실제 서비스
+    # 오픈 전에는 반드시 false로 되돌리거나 이 블록 자체를 지울 것.
+    gacha:
+      enabled: true
+    gacha-pack:
+      enabled: true
+    charge-product:
+      enabled: true
+    product:
+      enabled: true
+    card:
+      enabled: true
+    plant-profile:
+      enabled: true
+    journal:
+      enabled: true
+    notification:
+      enabled: true
 
 payment:
-  # 실제 Toss 연동 전까지, 배포를 막지 않으려면 EC2의 /etc/environment에
-  # PAYMENT_PROVIDER=MOCK, PAYMENT_ALLOW_MOCK_IN_PROD=true를 임시로 설정한다.
-  # Toss 연동이 끝나면 두 환경변수를 지우기만 하면 기본값(TOSS/false)으로 돌아온다.
-  provider: ${PAYMENT_PROVIDER:TOSS}
-  allow-mock-in-prod: ${PAYMENT_ALLOW_MOCK_IN_PROD:false}
+  toss:
+    base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
+    secret-key: ${TOSS_PAYMENTS_SECRET_KEY}

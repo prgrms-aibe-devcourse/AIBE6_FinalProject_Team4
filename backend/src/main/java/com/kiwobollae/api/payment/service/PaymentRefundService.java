@@ -10,6 +10,7 @@ import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.PaymentRefund;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundAttemptStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
+import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentRefundCommand;
@@ -69,8 +70,15 @@ public class PaymentRefundService {
 			return readSnapshot(idempotency.key().getResponseSnapshot());
 		}
 
-		if (payment.getStatus() != PaymentStatus.PAID) {
+		if (payment.getStatus() != PaymentStatus.COMPLETED) {
 			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
+		}
+		if (payment.getProvider() != PaymentProviderType.TOSS
+				|| paymentProvider.getType() != PaymentProviderType.TOSS) {
+			throw new BusinessException(
+					ErrorCode.PAYMENT_INVALID_STATE,
+					"Toss 결제만 환불할 수 있습니다."
+			);
 		}
 		if (payment.getProviderPaymentKey() == null || payment.getProviderPaymentKey().isBlank()) {
 			throw new BusinessException(
@@ -128,7 +136,7 @@ public class PaymentRefundService {
 
 		int paymentUpdated = paymentRepository.updateStatusOnlyIfCurrent(
 				payment.getId(),
-				PaymentStatus.PAID,
+				PaymentStatus.COMPLETED,
 				PaymentStatus.REFUNDED
 		);
 		if (paymentUpdated == 0) {
