@@ -68,6 +68,7 @@ public class ExchangeService {
 						requiredCount,
 						request.receiverName(),
 						request.receiverPhone(),
+						request.zipCode(),
 						request.address(),
 						request.addressDetail(),
 						LocalDateTime.now(KST)

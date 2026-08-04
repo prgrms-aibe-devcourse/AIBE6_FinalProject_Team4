@@ -18,6 +18,7 @@ export interface ExchangeOrderData {
   deliveredAt: string | null;
   receiverName: string;
   receiverPhone: string;
+  zipCode: string | null;
   address: string;
   addressDetail: string | null;
   requestedAt: string;
@@ -27,6 +28,7 @@ export interface ExchangeRequestPayload {
   cardId: number;
   receiverName: string;
   receiverPhone: string;
+  zipCode: string;
   address: string;
   addressDetail?: string;
 }

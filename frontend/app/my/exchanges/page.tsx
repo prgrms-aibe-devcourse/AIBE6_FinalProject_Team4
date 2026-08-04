@@ -6,6 +6,7 @@ import { CardData, getMyCards } from '@/lib/card-api';
 import { cancelExchange, ExchangeOrderData, ExchangeStatus, getMyExchanges } from '@/lib/exchange-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
+import { formatPhone } from '@/components/AddressForm';
 
 const STEPS: [ExchangeStatus, string][] = [['REQUESTED', '신청됨'], ['PREPARING', '준비중'], ['SHIPPING', '배송중'], ['DELIVERED', '배송완료']];
 
@@ -154,14 +155,32 @@ export default function MyExchanges() {
                 <div className="flex flex-wrap items-center gap-3.5">
                   <div className="flex h-14 w-14 items-center justify-center rounded-[13px] bg-brand-soft text-[28px]">🎁</div>
                   <div className="min-w-[160px] flex-1">
-                    <div className="font-extrabold">{x.exchangeProductName}</div>
-                    <div className="text-[13px] text-sub">{x.cardName} {x.usedCardCount}장 사용 · {formatDate(x.requestedAt)}</div>
+                    <div className="font-extrabold">
+                      {x.exchangeProductName} <span className="text-[12px] font-semibold text-faint">#{x.id}</span>
+                    </div>
+                    <div className="text-[13px] text-sub">
+                      {x.cardName} {x.usedCardCount}장 사용 · 신청 {formatDate(x.requestedAt)}
+                      {x.deliveredAt && ` · 배송완료 ${formatDate(x.deliveredAt)}`}
+                    </div>
                   </div>
                   {x.status === 'REQUESTED' && (
                     <button type="button" onClick={() => cancel(x.id)} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[9px] font-bold text-[#b5502f]">
                       취소하기
                     </button>
                   )}
+                </div>
+
+                <div className="mt-3.5 rounded-xl bg-[#F8FAF3] px-3.5 py-3 text-[13px]">
+                  <div className="mb-1 flex items-center gap-1.5 font-bold text-ink">
+                    <span className="material-symbols-outlined text-[16px] text-sub">local_shipping</span>
+                    배송지
+                  </div>
+                  <div className="text-sub">
+                    {x.receiverName} · {formatPhone(x.receiverPhone)}
+                  </div>
+                  <div className="text-sub">
+                    {x.zipCode && `[${x.zipCode}] `}{x.address} {x.addressDetail}
+                  </div>
                 </div>
 
                 {cancelled ? (

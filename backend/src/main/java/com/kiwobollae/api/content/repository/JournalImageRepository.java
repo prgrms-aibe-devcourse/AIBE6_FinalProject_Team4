@@ -36,4 +36,9 @@ public interface JournalImageRepository extends JpaRepository<JournalImage, Long
 
 	// 이미지 URL이 어떤 일지에 아직 쓰이고 있는지 확인한다 — S3 정리 전 안전 장치.
 	boolean existsByImageUrl(String imageUrl);
+
+	// 타임랩스 소스: 프로필의 대표이미지만, 작성일 오름차순.
+	@Query("select i from JournalImage i where i.journal.plantProfile.id = :profileId "
+			+ "and i.representative = true order by i.writtenDate asc")
+	List<JournalImage> findRepresentativeByProfileIdOrderByWrittenDateAsc(@Param("profileId") Long profileId);
 }

@@ -103,7 +103,7 @@ class AdminControllerTest {
 	private ExchangeOrderResponse sampleResponse(Long id, ExchangeStatus status) {
 		return new ExchangeOrderResponse(
 				id, 7L, 1L, "수박 카드", 10L, "텀블러", 3, status, null, null, null, null,
-				"홍길동", "010-1234-5678", "서울시 강남구", "101동", LocalDateTime.of(2026, 7, 28, 10, 0)
+				"홍길동", "010-1234-5678", "06236", "서울시 강남구", "101동", LocalDateTime.of(2026, 7, 28, 10, 0)
 		);
 	}
 

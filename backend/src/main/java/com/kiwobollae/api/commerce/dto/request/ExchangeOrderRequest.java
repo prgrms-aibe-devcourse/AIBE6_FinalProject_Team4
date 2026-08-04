@@ -8,6 +8,7 @@ public record ExchangeOrderRequest(
 		@NotNull Long cardId,
 		@NotBlank @Size(max = 50) String receiverName,
 		@NotBlank @Size(max = 20) String receiverPhone,
+		@NotBlank @Size(max = 10) String zipCode,
 		@NotBlank @Size(max = 200) String address,
 		@Size(max = 100) String addressDetail
 ) {

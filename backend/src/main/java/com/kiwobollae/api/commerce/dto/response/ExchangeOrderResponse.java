@@ -20,6 +20,7 @@ public record ExchangeOrderResponse(
 		LocalDateTime deliveredAt,
 		String receiverName,
 		String receiverPhone,
+		String zipCode,
 		String address,
 		String addressDetail,
 		LocalDateTime requestedAt
@@ -40,6 +41,7 @@ public record ExchangeOrderResponse(
 				exchangeOrder.getDeliveredAt(),
 				exchangeOrder.getReceiverName(),
 				exchangeOrder.getReceiverPhone(),
+				exchangeOrder.getZipCode(),
 				exchangeOrder.getAddress(),
 				exchangeOrder.getAddressDetail(),
 				exchangeOrder.getRequestedAt()

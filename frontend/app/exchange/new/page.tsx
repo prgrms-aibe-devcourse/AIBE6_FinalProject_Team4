@@ -7,9 +7,7 @@ import { CardData, getCard } from '@/lib/card-api';
 import { requestExchange } from '@/lib/exchange-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-
-const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
-const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
+import AddressForm, { AddressFields, EMPTY_ADDRESS_FIELDS, isValidPhone } from '@/components/AddressForm';
 
 function ExchangeNewInner() {
   const params = useSearchParams();
@@ -20,10 +18,7 @@ function ExchangeNewInner() {
   const [card, setCard] = useState<CardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [receiverName, setReceiverName] = useState('');
-  const [receiverPhone, setReceiverPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [addressDetail, setAddressDetail] = useState('');
+  const [addressFields, setAddressFields] = useState<AddressFields>(EMPTY_ADDRESS_FIELDS);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -94,19 +89,23 @@ function ExchangeNewInner() {
 
   const submit = async () => {
     if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
-    if (!receiverName.trim()) return showToast('받는 분 이름을 입력해 주세요.', 'err');
-    if (!receiverPhone.trim()) return showToast('연락처를 입력해 주세요.', 'err');
-    if (!address.trim()) return showToast('주소를 입력해 주세요.', 'err');
+    if (!addressFields.receiverName.trim()) return showToast('받는 분 이름을 입력해 주세요.', 'err');
+    if (!isValidPhone(addressFields.receiverPhone)) {
+      return showToast('연락처를 010 또는 011로 시작하는 숫자 9~11자리로 입력해 주세요.', 'err');
+    }
+    if (!addressFields.zipCode.trim()) return showToast('우편번호를 입력해 주세요.', 'err');
+    if (!addressFields.address.trim()) return showToast('주소를 입력해 주세요.', 'err');
 
     setSubmitting(true);
     try {
       await requestExchange(
         {
           cardId: card.id,
-          receiverName: receiverName.trim(),
-          receiverPhone: receiverPhone.trim(),
-          address: address.trim(),
-          addressDetail: addressDetail.trim() || undefined,
+          receiverName: addressFields.receiverName.trim(),
+          receiverPhone: addressFields.receiverPhone.trim(),
+          zipCode: addressFields.zipCode.trim(),
+          address: addressFields.address.trim(),
+          addressDetail: addressFields.addressDetail.trim() || undefined,
         },
         state.accessToken,
       );
@@ -150,14 +149,7 @@ function ExchangeNewInner() {
           {!notEnough && !outOfStock && (
             <>
               <div className="mb-3 mt-5 font-extrabold">배송지</div>
-              <label className={LABEL}>받는 분 <span className="text-[#e5533b]">*</span></label>
-              <input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} maxLength={50} placeholder="이름" className={`${FIELD} mb-3.5 mt-1.5`} />
-              <label className={LABEL}>연락처 <span className="text-[#e5533b]">*</span></label>
-              <input value={receiverPhone} onChange={(e) => setReceiverPhone(e.target.value)} maxLength={20} placeholder="010-0000-0000" className={`${FIELD} mb-3.5 mt-1.5`} />
-              <label className={LABEL}>주소 <span className="text-[#e5533b]">*</span></label>
-              <input value={address} onChange={(e) => setAddress(e.target.value)} maxLength={200} placeholder="도로명 주소" className={`${FIELD} mb-3.5 mt-1.5`} />
-              <label className={LABEL}>상세 주소</label>
-              <input value={addressDetail} onChange={(e) => setAddressDetail(e.target.value)} maxLength={100} placeholder="동/호수 등" className={`${FIELD} mb-3.5 mt-1.5`} />
+              <AddressForm accessToken={state.accessToken} value={addressFields} onChange={setAddressFields} />
             </>
           )}
         </div>
