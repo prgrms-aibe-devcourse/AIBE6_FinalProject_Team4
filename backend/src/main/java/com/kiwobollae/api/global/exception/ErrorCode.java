@@ -99,6 +99,9 @@ public enum ErrorCode {
 	JOURNAL_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요."),
 	PLANT_IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 형식의 이미지만 업로드할 수 있습니다."),
 	PLANT_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요."),
+	TIMELAPSE_NOT_HARVESTED(HttpStatus.CONFLICT, "재배가 완료된 식물만 타임랩스를 만들 수 있습니다."),
+	TIMELAPSE_INSUFFICIENT_IMAGES(HttpStatus.CONFLICT, "대표 이미지가 2장 이상 있어야 타임랩스를 만들 수 있습니다."),
+	TIMELAPSE_ALREADY_PROCESSING(HttpStatus.CONFLICT, "이미 타임랩스를 생성하는 중입니다."),
 
 	// --- 마이페이지 / 배송지 도메인 ---
 	ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "배송지를 찾을 수 없습니다."),
