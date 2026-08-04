@@ -47,7 +47,7 @@ describe('Cards', () => {
     vi.clearAllMocks();
   });
 
-  it('전체 카드와 내 카드를 분리하지 않고 한 목록으로 보여준다', async () => {
+  it('전체 쿠폰과 내 쿠폰을 분리하지 않고 한 목록으로 보여준다', async () => {
     mockedGetCards.mockResolvedValue([
       card(1, '보유하지 않은 카드', 0),
       card(2, '보유한 카드', 3),
@@ -55,8 +55,8 @@ describe('Cards', () => {
 
     render(<Cards />);
 
-    expect(await screen.findByText('보유하지 않은 카드')).toBeInTheDocument();
-    expect(screen.getByText('보유한 카드')).toBeInTheDocument();
+    expect(await screen.findByText('보유하지 않은 쿠폰')).toBeInTheDocument();
+    expect(screen.getByText('보유한 쿠폰')).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: '전체 카드' }),
     ).not.toBeInTheDocument();

@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GachaPage from "./page";
 import {
@@ -135,5 +141,18 @@ describe("GachaPage", () => {
     expect(originalImage).toBeInTheDocument();
     expect(originalImage.parentElement).toHaveClass("aspect-[1122/1402]");
     expect(originalImage.parentElement).not.toHaveClass("bg-black");
+  });
+
+  it("브라우저 뒤로가기로 복귀하면 보유 카드와 개봉 이력을 다시 조회한다", async () => {
+    mockAuth.accessToken = "access-token";
+    render(<GachaPage />);
+
+    await waitFor(() => expect(mockedCollection).toHaveBeenCalledOnce());
+    await waitFor(() => expect(mockedDraws).toHaveBeenCalledOnce());
+
+    window.dispatchEvent(new Event("pageshow"));
+
+    await waitFor(() => expect(mockedCollection).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockedDraws).toHaveBeenCalledTimes(2));
   });
 });

@@ -24,16 +24,16 @@ const NAV = [
   { key: 'plants', label: '내 식물', href: '/plants' },
   { key: 'journal', label: '일지', href: '/journals' },
   { key: 'shop', label: '상점', href: '/shop' },
-  { key: 'cards', label: '카드', href: '/cards' },
+  { key: 'cards', label: '쿠폰', href: '/cards' },
   { key: 'gacha', label: '가챠', href: '/gacha' },
   { key: 'exchange', label: '교환', href: '/my/exchanges' },
 ];
 
-// 모바일 하단 탭은 식물/일지를 "식물" 하나로 합치고 카드 수집과 가챠를 각각 바로 접근하게 한다.
+// 모바일 하단 탭은 식물/일지를 "식물" 하나로 합치고 쿠폰과 가챠를 각각 바로 접근하게 한다.
 const BOTTOM = [
   { key: 'home', label: '홈', icon: 'home', href: '/' },
   { key: 'plants', label: '식물', icon: 'potted_plant', href: '/plants' },
-  { key: 'cards', label: '카드', icon: 'style', href: '/cards' },
+  { key: 'cards', label: '쿠폰', icon: 'style', href: '/cards' },
   { key: 'gacha', label: '가챠', icon: 'casino', href: '/gacha' },
   { key: 'shop', label: '상점', icon: 'storefront', href: '/shop' },
   { key: 'account', label: 'MY', icon: 'person', href: '/my' },

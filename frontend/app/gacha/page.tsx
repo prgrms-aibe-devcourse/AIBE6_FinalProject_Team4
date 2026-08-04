@@ -105,6 +105,16 @@ export default function GachaPage() {
     setCollection(await getMyGachaCollection(state.accessToken));
   }, [state.accessToken]);
 
+  const refreshOwnedState = useCallback(async () => {
+    if (!state.accessToken) return;
+    const [nextCollection, nextHistory] = await Promise.all([
+      getMyGachaCollection(state.accessToken),
+      getGachaDraws(state.accessToken),
+    ]);
+    setCollection(nextCollection);
+    setHistory(nextHistory);
+  }, [state.accessToken]);
+
   useEffect(() => {
     if (!hydrated) return;
     const controller = new AbortController();
@@ -153,6 +163,37 @@ export default function GachaPage() {
       controller.abort();
     };
   }, [hydrated, state.accessToken]);
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshOwnedState().catch(() => undefined);
+      }
+    };
+    window.addEventListener("pageshow", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("pageshow", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [hydrated, refreshOwnedState, state.accessToken]);
+
+  const hasProcessingDraw =
+    history?.content.some((draw) =>
+      ["PENDING", "PROCESSING", "RETRYABLE_FAILED"].includes(draw.status),
+    ) ?? false;
+
+  useEffect(() => {
+    if (!hasProcessingDraw) return;
+    const timer = window.setInterval(
+      () => void refreshOwnedState().catch(() => undefined),
+      1500,
+    );
+    return () => window.clearInterval(timer);
+  }, [hasProcessingDraw, refreshOwnedState]);
 
   useEffect(() => {
     if (!selectedCard) return;

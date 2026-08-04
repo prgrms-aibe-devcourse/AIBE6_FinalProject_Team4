@@ -40,16 +40,16 @@ public class CardInitData implements ApplicationRunner {
 		}
 
 		List<CardSeed> seeds = List.of(
-				new CardSeed("수박 카드", 300L, 5, "제철 수박 한 통", 8, "시원하고 달콤한 여름 수박입니다.", "Watermelon"),
-				new CardSeed("방울토마토 카드", 200L, 4, "방울토마토 1kg", 12, "농장에서 갓 수확한 방울토마토입니다.", "Cherry+Tomato"),
-				new CardSeed("설향 딸기 카드", 350L, 6, "설향 딸기 한 팩", 5, "향긋하고 달콤한 설향 딸기입니다.", "Strawberry"),
-				new CardSeed("유기농 당근 카드", 150L, 3, "유기농 당근 1kg", 10, "아삭한 식감의 유기농 당근입니다.", "Carrot"),
-				new CardSeed("수미감자 카드", 180L, 5, "수미감자 2kg", 20, "포슬포슬한 식감의 수미감자입니다.", "Potato"),
-				new CardSeed("샤인머스캣 카드", 450L, 8, "샤인머스캣 한 송이", 4, "달콤하고 향긋한 샤인머스캣입니다.", "Shine+Muscat"),
-				new CardSeed("초당옥수수 카드", 250L, 5, "초당옥수수 4개", 9, "생으로도 달콤한 초당옥수수입니다.", "Sweet+Corn"),
-				new CardSeed("꿀고구마 카드", 220L, 4, "꿀고구마 2kg", 14, "구우면 더욱 달콤해지는 꿀고구마입니다.", "Sweet+Potato"),
-				new CardSeed("부사 사과 카드", 280L, 5, "부사 사과 2kg", 11, "아삭하고 새콤달콤한 부사 사과입니다.", "Apple"),
-				new CardSeed("제주 감귤 카드", 260L, 5, "제주 감귤 3kg", 0, "제주에서 자란 새콤달콤한 감귤입니다.", "Tangerine")
+				new CardSeed("수박 쿠폰", 300L, 5, "제철 수박 한 통", 8, "시원하고 달콤한 여름 수박입니다.", "Watermelon"),
+				new CardSeed("방울토마토 쿠폰", 200L, 4, "방울토마토 1kg", 12, "농장에서 갓 수확한 방울토마토입니다.", "Cherry+Tomato"),
+				new CardSeed("설향 딸기 쿠폰", 350L, 6, "설향 딸기 한 팩", 5, "향긋하고 달콤한 설향 딸기입니다.", "Strawberry"),
+				new CardSeed("유기농 당근 쿠폰", 150L, 3, "유기농 당근 1kg", 10, "아삭한 식감의 유기농 당근입니다.", "Carrot"),
+				new CardSeed("수미감자 쿠폰", 180L, 5, "수미감자 2kg", 20, "포슬포슬한 식감의 수미감자입니다.", "Potato"),
+				new CardSeed("샤인머스캣 쿠폰", 450L, 8, "샤인머스캣 한 송이", 4, "달콤하고 향긋한 샤인머스캣입니다.", "Shine+Muscat"),
+				new CardSeed("초당옥수수 쿠폰", 250L, 5, "초당옥수수 4개", 9, "생으로도 달콤한 초당옥수수입니다.", "Sweet+Corn"),
+				new CardSeed("꿀고구마 쿠폰", 220L, 4, "꿀고구마 2kg", 14, "구우면 더욱 달콤해지는 꿀고구마입니다.", "Sweet+Potato"),
+				new CardSeed("부사 사과 쿠폰", 280L, 5, "부사 사과 2kg", 11, "아삭하고 새콤달콤한 부사 사과입니다.", "Apple"),
+				new CardSeed("제주 감귤 쿠폰", 260L, 5, "제주 감귤 3kg", 0, "제주에서 자란 새콤달콤한 감귤입니다.", "Tangerine")
 		);
 
 		List<ExchangeProduct> exchangeProducts = exchangeProductRepository.saveAll(
@@ -81,8 +81,8 @@ public class CardInitData implements ApplicationRunner {
 				.pointPrice(seed.pointPrice())
 				.exchangeProduct(exchangeProduct)
 				.requiredCountForExchange(seed.requiredCountForExchange())
-				.description(seed.exchangeProductName() + " 교환을 위해 모으는 카드입니다.")
-				.imageUrl(CARD_IMAGE_BASE_URL + seed.imageText() + "+Card")
+				.description(seed.exchangeProductName() + " 교환을 위해 모으는 쿠폰입니다.")
+				.imageUrl(CARD_IMAGE_BASE_URL + seed.imageText() + "+Coupon")
 				.status(ActiveStatus.ON_SALE)
 				.build();
 	}

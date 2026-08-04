@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { request } from "@/lib/api";
-import { purchaseGachaPacks } from "@/lib/gacha-api";
+import { markGachaDrawViewed, purchaseGachaPacks } from "@/lib/gacha-api";
 
 vi.mock("@/lib/api", () => ({
   request: vi.fn(),
@@ -43,5 +43,20 @@ describe("gacha api", () => {
       body: JSON.stringify({ productId: 9, quantity: 1 }),
     });
     expect(response.drawIds).toEqual([701]);
+  });
+
+  it("개봉 페이지 이탈 중에도 확인 처리를 완료한다", async () => {
+    mockedRequest.mockResolvedValueOnce({ drawId: 701 });
+
+    await markGachaDrawViewed(701, "access-token");
+
+    expect(mockedRequest).toHaveBeenCalledWith(
+      "/api/v1/card/gacha/draws/701/viewed",
+      {
+        method: "PATCH",
+        accessToken: "access-token",
+        keepalive: true,
+      },
+    );
   });
 });

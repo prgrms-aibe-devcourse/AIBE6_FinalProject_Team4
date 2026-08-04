@@ -270,6 +270,7 @@ export function markGachaDrawViewed(
   return request<GachaDrawDetail>(`/api/v1/card/gacha/draws/${drawId}/viewed`, {
     method: "PATCH",
     accessToken,
+    keepalive: true,
   });
 }
 

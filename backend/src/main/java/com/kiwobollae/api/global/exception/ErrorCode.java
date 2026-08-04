@@ -62,8 +62,8 @@ public enum ErrorCode {
 	CART_QUANTITY_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_CONTENT, "장바구니에는 상품당 최대 99개까지 담을 수 있습니다."),
 	CART_QUANTITY_EXCEEDS_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "재고보다 많은 수량은 담을 수 없습니다."),
 
-	CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."),
-	CARD_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "교환에 필요한 카드를 보유하고 있지 않습니다."),
+	CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰을 찾을 수 없습니다."),
+	CARD_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "교환에 필요한 쿠폰을 보유하고 있지 않습니다."),
 	GACHA_DRAW_NOT_FOUND(HttpStatus.NOT_FOUND, "가챠 결과를 찾을 수 없습니다."),
 	GACHA_DRAW_NOT_COMPLETED(HttpStatus.CONFLICT, "아직 가챠 결과가 확정되지 않았습니다."),
 	GACHA_MASTER_DATA_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "가챠 카드 데이터가 올바르지 않습니다."),
