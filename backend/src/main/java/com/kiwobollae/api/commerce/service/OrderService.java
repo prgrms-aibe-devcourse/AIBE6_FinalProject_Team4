@@ -103,6 +103,7 @@ public class OrderService {
 				totalPoint,
 				request.receiverName(),
 				request.receiverPhone(),
+				request.zipCode(),
 				request.address(),
 				request.addressDetail(),
 				LocalDateTime.now(KST)
@@ -221,7 +222,7 @@ public class OrderService {
 					.reduce((a, b) -> a + "," + b)
 					.orElse("");
 			String value = sortedIds + ":" + request.requestedFreePoint() + ":" + request.receiverName()
-					+ ":" + request.receiverPhone() + ":" + request.address() + ":" + request.addressDetail();
+					+ ":" + request.receiverPhone() + ":" + request.zipCode() + ":" + request.address() + ":" + request.addressDetail();
 			return HexFormat.of().formatHex(
 					MessageDigest.getInstance("SHA-256")
 							.digest(value.getBytes(StandardCharsets.UTF_8))

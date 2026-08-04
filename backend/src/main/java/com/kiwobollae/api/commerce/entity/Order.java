@@ -61,6 +61,11 @@ public class Order extends BaseEntity {
 	@Column(name = "receiver_phone", nullable = false, length = 20)
 	private String receiverPhone;
 
+	// 기존 주문에는 값이 없어 nullable로 둔다(당시엔 이 필드가 존재하지 않았음). 신규 주문은
+	// OrderCreateRequest에서 @NotBlank로 강제한다.
+	@Column(name = "zip_code", length = 10)
+	private String zipCode;
+
 	@Column(nullable = false, length = 200)
 	private String address;
 
@@ -88,6 +93,7 @@ public class Order extends BaseEntity {
 			Long totalPoint,
 			String receiverName,
 			String receiverPhone,
+			String zipCode,
 			String address,
 			String addressDetail,
 			LocalDateTime orderedAt
@@ -101,6 +107,7 @@ public class Order extends BaseEntity {
 				.deliveryStatus(DeliveryStatus.PREPARING)
 				.receiverName(receiverName)
 				.receiverPhone(receiverPhone)
+				.zipCode(zipCode)
 				.address(address)
 				.addressDetail(addressDetail)
 				.orderedAt(orderedAt)

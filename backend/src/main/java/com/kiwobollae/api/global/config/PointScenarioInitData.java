@@ -127,6 +127,7 @@ public class PointScenarioInitData implements ApplicationRunner {
 							300L,
 							"김초록",
 							"01022223333",
+							"04524",
 							"서울특별시 중구 세종대로 110",
 							ORDER_MARKER
 					)

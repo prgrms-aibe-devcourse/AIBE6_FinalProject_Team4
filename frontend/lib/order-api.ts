@@ -76,6 +76,7 @@ export interface OrderData {
   deliveryStatus: DeliveryStatus;
   receiverName: string;
   receiverPhone: string;
+  zipCode: string | null;
   address: string;
   addressDetail: string | null;
   orderedAt: string;
@@ -114,6 +115,7 @@ export interface OrderCreatePayload {
   requestedFreePoint: number;
   receiverName: string;
   receiverPhone: string;
+  zipCode: string;
   address: string;
   addressDetail?: string;
 }
