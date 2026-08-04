@@ -12,5 +12,6 @@ class ErrorCodeTest {
 		assertThat(ErrorCode.TIMELAPSE_NOT_HARVESTED.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
 		assertThat(ErrorCode.TIMELAPSE_INSUFFICIENT_IMAGES.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
 		assertThat(ErrorCode.TIMELAPSE_ALREADY_PROCESSING.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
+		assertThat(ErrorCode.TIMELAPSE_VIDEO_UPLOAD_FAILED.getHttpStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
 	}
 }
