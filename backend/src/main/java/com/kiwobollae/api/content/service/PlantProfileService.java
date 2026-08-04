@@ -12,6 +12,7 @@ import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
+import com.kiwobollae.api.content.repository.PlantTimelapseRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.util.List;
@@ -32,6 +33,7 @@ public class PlantProfileService {
 	private final PlantSpeciesRepository plantSpeciesRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
+	private final PlantTimelapseRepository plantTimelapseRepository;
 	private final PlantImageUploadService plantImageUploadService;
 	private final JournalImageUploadService journalImageUploadService;
 	private final UserRepository userRepository;
@@ -78,6 +80,7 @@ public class PlantProfileService {
 
 		journalImageRepository.deleteAllByProfileId(profileId);
 		plantJournalRepository.deleteAllByProfileId(profileId);
+		plantTimelapseRepository.deleteByPlantProfileId(profileId);
 		plantProfileRepository.delete(profile);
 
 		// DB 삭제가 끝난 뒤 S3 정리 — 정리 실패가 프로필 삭제 자체를 막지 않도록 delete()는 항상 예외 없이 반환한다.
