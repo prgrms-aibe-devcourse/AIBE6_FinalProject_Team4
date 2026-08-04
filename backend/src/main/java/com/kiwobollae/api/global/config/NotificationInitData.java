@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code app.seed.notification.enabled=false}.
  */
 @Component
-@Profile("local")
+@Profile({"local", "prod"})
 @ConditionalOnProperty(prefix = "app.seed.notification", name = "enabled", havingValue = "true")
 @Order(5)
 @RequiredArgsConstructor

@@ -76,6 +76,10 @@ public class ExchangeOrder extends BaseEntity {
 	@Column(name = "receiver_phone", nullable = false, length = 20)
 	private String receiverPhone;
 
+	// 기존 교환 신청에는 값이 없어 nullable로 둔다. 신규 신청은 ExchangeOrderRequest에서 @NotBlank로 강제한다.
+	@Column(name = "zip_code", length = 10)
+	private String zipCode;
+
 	@Column(nullable = false, length = 200)
 	private String address;
 
@@ -86,7 +90,7 @@ public class ExchangeOrder extends BaseEntity {
 	private LocalDateTime requestedAt;
 
 	public static ExchangeOrder create(User user, Card card, ExchangeProduct exchangeProduct, Integer usedCardCount,
-			String receiverName, String receiverPhone, String address, String addressDetail, LocalDateTime now) {
+			String receiverName, String receiverPhone, String zipCode, String address, String addressDetail, LocalDateTime now) {
 		return ExchangeOrder.builder()
 				.user(user)
 				.card(card)
@@ -97,6 +101,7 @@ public class ExchangeOrder extends BaseEntity {
 				.status(ExchangeStatus.REQUESTED)
 				.receiverName(receiverName)
 				.receiverPhone(receiverPhone)
+				.zipCode(zipCode)
 				.address(address)
 				.addressDetail(addressDetail)
 				.requestedAt(now)

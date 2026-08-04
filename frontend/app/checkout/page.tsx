@@ -2,10 +2,11 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ApiError, getAddresses, UserAddress } from '@/lib/api';
+import { ApiError } from '@/lib/api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import AddressForm, { AddressFields, EMPTY_ADDRESS_FIELDS, isCompleteAddress } from '@/components/AddressForm';
 import { CartItemData, createOrder, getCart, OrderDetailData } from '@/lib/order-api';
 import {
   calculateOrderPointUsage,
@@ -23,8 +24,7 @@ function CheckoutInner() {
     .filter((id) => Number.isInteger(id) && id > 0);
 
   const [items, setItems] = useState<CartItemData[]>([]);
-  const [addresses, setAddresses] = useState<UserAddress[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [addressFields, setAddressFields] = useState<AddressFields>(EMPTY_ADDRESS_FIELDS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [useFreePoint, setUseFreePoint] = useState(false);
@@ -47,17 +47,14 @@ function CheckoutInner() {
 
     setLoading(true);
     setError('');
-    Promise.all([getCart(state.accessToken), getAddresses()])
-      .then(([cart, addressList]) => {
+    getCart(state.accessToken)
+      .then((cart) => {
         const selected = cart.items.filter((item) => selectedIds.includes(item.id));
         if (selected.length === 0) {
           setError('선택한 상품을 장바구니에서 찾을 수 없어요. 다시 선택해 주세요.');
           return;
         }
         setItems(selected);
-        setAddresses(addressList);
-        const defaultAddress = addressList.find((address) => address.isDefault) || addressList[0];
-        if (defaultAddress) setSelectedAddressId(defaultAddress.id);
       })
       .catch((requestError) => {
         setError(
@@ -79,10 +76,10 @@ function CheckoutInner() {
     freePoint: state.wallet.free,
     requestedFreePoint,
   });
-  const selectedAddress = addresses.find((address) => address.id === selectedAddressId) || null;
+  const addressValid = isCompleteAddress(addressFields);
 
   const place = async () => {
-    if (ordering || !pointUsage.valid || !selectedAddress) return;
+    if (ordering || !pointUsage.valid || !addressValid) return;
     if (!idempotencyKeyRef.current) idempotencyKeyRef.current = crypto.randomUUID();
     setOrdering(true);
     try {
@@ -90,10 +87,11 @@ function CheckoutInner() {
         {
           cartItemIds: items.map((item) => item.id),
           requestedFreePoint,
-          receiverName: selectedAddress.receiverName,
-          receiverPhone: selectedAddress.receiverPhone,
-          address: selectedAddress.address,
-          addressDetail: selectedAddress.addressDetail || undefined,
+          receiverName: addressFields.receiverName.trim(),
+          receiverPhone: addressFields.receiverPhone.trim(),
+          zipCode: addressFields.zipCode.trim(),
+          address: addressFields.address.trim(),
+          addressDetail: addressFields.addressDetail.trim() || undefined,
         },
         idempotencyKeyRef.current,
         state.accessToken,
@@ -181,31 +179,8 @@ function CheckoutInner() {
       <div className="grid items-start gap-[22px] [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
         <div>
           <div className="mb-3 font-extrabold">배송지</div>
-          <div className="mb-6 flex flex-col gap-2.5">
-            {addresses.length === 0 && (
-              <div className="rounded-[14px] border-[1.5px] border-dashed border-[#cfe0b6] bg-white p-3.5 text-center text-sm text-sub">
-                등록된 배송지가 없어요.{' '}
-                <Link href="/my" className="font-bold text-brand-dark underline">마이페이지에서 배송지를 등록해 주세요.</Link>
-              </div>
-            )}
-            {addresses.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setSelectedAddressId(a.id)}
-                className={`cursor-pointer rounded-[14px] border-2 bg-white px-4 py-[15px] text-left ${
-                  selectedAddressId === a.id ? 'border-brand' : 'border-[#eceee5]'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-bold">
-                  {a.receiverName}
-                  {a.isDefault && <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand-dark">기본</span>}
-                </div>
-                <div className="mt-1 text-[13.5px] text-sub">
-                  {a.receiverPhone} · {a.address} {a.addressDetail}
-                </div>
-              </button>
-            ))}
+          <div className="mb-6">
+            <AddressForm accessToken={state.accessToken} value={addressFields} onChange={setAddressFields} />
           </div>
 
           <div className="mb-3 font-extrabold">주문 상품</div>
@@ -305,9 +280,9 @@ function CheckoutInner() {
                 onOk: place,
               })
             }
-            disabled={ordering || !pointUsage.valid || !selectedAddress}
+            disabled={ordering || !pointUsage.valid || !addressValid}
             className={`w-full rounded-[13px] p-[15px] font-extrabold text-white ${
-              ordering || !pointUsage.valid || !selectedAddress ? 'cursor-not-allowed bg-[#b0c894]' : 'cursor-pointer bg-brand'
+              ordering || !pointUsage.valid || !addressValid ? 'cursor-not-allowed bg-[#b0c894]' : 'cursor-pointer bg-brand'
             }`}
           >
             {ordering ? '주문 처리 중…' : '결제하고 주문 완료'}

@@ -54,6 +54,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/journals/images/**").permitAll()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/plants/images/**").permitAll()
 						.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+						.requestMatchers("/actuator/health").permitAll()
 						.anyRequest().authenticated()
 				)
 				.exceptionHandling(ex -> ex

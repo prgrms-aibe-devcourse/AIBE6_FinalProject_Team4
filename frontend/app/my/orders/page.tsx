@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import { formatPhone } from '@/components/AddressForm';
 import {
   cancelOrder,
   confirmOrder,
@@ -65,6 +66,15 @@ export default function Orders() {
     if (!hydrated) return;
     void load();
   }, [hydrated, load]);
+
+  useEffect(() => {
+    if (loading || orders.length === 0 || !window.location.hash) return;
+    const targetId = decodeURIComponent(window.location.hash.slice(1));
+    if (!targetId.startsWith('order-')) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [loading, orders]);
 
   const setBusy = (id: number, value: boolean) => setBusyIds((prev) => ({ ...prev, [id]: value }));
 
@@ -144,7 +154,11 @@ export default function Orders() {
             const items = itemsByOrderId[order.id] || [];
             const busy = busyIds[order.id];
             return (
-              <div key={order.id} className="rounded-[18px] bg-white p-5 shadow-card">
+              <div
+                id={`order-${order.id}`}
+                key={order.id}
+                className="scroll-mt-24 rounded-[18px] bg-white p-5 shadow-card target:ring-2 target:ring-brand"
+              >
                 <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <span className="font-extrabold">주문 #{order.id}</span>
@@ -163,6 +177,19 @@ export default function Orders() {
                       <div className="flex-1 text-sm font-semibold">{item.productName} <span className="text-faint">× {item.quantity}</span></div>
                     </div>
                   ))}
+                </div>
+
+                <div className="mb-3.5 rounded-xl bg-[#F8FAF3] px-3.5 py-3 text-[13px]">
+                  <div className="mb-1 flex items-center gap-1.5 font-bold text-ink">
+                    <span className="material-symbols-outlined text-[16px] text-sub">local_shipping</span>
+                    배송지
+                  </div>
+                  <div className="text-sub">
+                    {order.receiverName} · {formatPhone(order.receiverPhone)}
+                  </div>
+                  <div className="text-sub">
+                    {order.zipCode && `[${order.zipCode}] `}{order.address} {order.addressDetail}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[#f2f3ec] pt-3.5">

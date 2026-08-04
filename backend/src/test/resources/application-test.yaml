@@ -1,0 +1,3 @@
+payment:
+  toss:
+    secret-key: test_sk_application_context

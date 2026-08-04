@@ -1,4 +1,4 @@
-import { request } from '@/lib/api';
+import { request } from "@/lib/api";
 
 export interface ChargeProduct {
   id: number;
@@ -8,13 +8,8 @@ export interface ChargeProduct {
   isActive: boolean;
 }
 
-export type PaymentScenario = 'SUCCESS' | 'FAILURE' | 'CANCEL';
 export type PaymentStatus =
-  | 'PENDING'
-  | 'PAID'
-  | 'FAILED'
-  | 'CANCELED'
-  | 'REFUNDED';
+  "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 export interface PaymentData {
   id: number;
@@ -24,7 +19,7 @@ export interface PaymentData {
   cashAmount: number;
   pointAmount: number;
   status: PaymentStatus;
-  provider: 'MOCK' | 'TOSS';
+  provider: "TOSS";
   providerOrderId: string;
   providerPaymentKey: string | null;
   approvedAt: string | null;
@@ -32,7 +27,7 @@ export interface PaymentData {
   message: string | null;
 }
 
-export type PaymentRefundStatus = 'REQUESTED' | 'COMPLETED' | 'FAILED';
+export type PaymentRefundStatus = "REQUESTED" | "COMPLETED" | "FAILED";
 
 export interface PaymentRefundData {
   id: number;
@@ -55,7 +50,7 @@ export function getChargeProducts(
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<ChargeProduct[]> {
-  return request<ChargeProduct[]>('/api/v1/payments/products', {
+  return request<ChargeProduct[]>("/api/v1/payments/products", {
     accessToken,
     signal,
   });
@@ -66,11 +61,25 @@ export function requestCharge(
   chargeProductId: number,
   idempotencyKey: string,
 ): Promise<PaymentData> {
-  return request<PaymentData>('/api/v1/payments/charge', {
-    method: 'POST',
+  return request<PaymentData>("/api/v1/payments/charge", {
+    method: "POST",
     accessToken,
-    headers: { 'Idempotency-Key': idempotencyKey },
+    headers: { "Idempotency-Key": idempotencyKey },
     body: JSON.stringify({ chargeProductId }),
+  });
+}
+
+export function reportPaymentFailure(
+  accessToken: string,
+  providerOrderId: string,
+  code: string,
+  idempotencyKey: string,
+): Promise<PaymentData> {
+  return request<PaymentData>("/api/v1/payments/fail", {
+    method: "POST",
+    accessToken,
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ providerOrderId, code }),
   });
 }
 
@@ -78,7 +87,6 @@ interface ConfirmPaymentInput {
   providerOrderId: string;
   paymentKey: string;
   amount: number;
-  scenario: PaymentScenario;
 }
 
 export function confirmPayment(
@@ -86,16 +94,19 @@ export function confirmPayment(
   payload: ConfirmPaymentInput,
   idempotencyKey: string,
 ): Promise<PaymentData> {
-  return request<PaymentData>('/api/v1/payments/confirm', {
-    method: 'POST',
+  return request<PaymentData>("/api/v1/payments/confirm", {
+    method: "POST",
     accessToken,
-    headers: { 'Idempotency-Key': idempotencyKey },
+    headers: { "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(payload),
   });
 }
 
-export function getPaymentHistory(accessToken: string, signal?: AbortSignal): Promise<PaymentHistory[]> {
-  return request<PaymentHistory[]>('/api/v1/payments', {
+export function getPaymentHistory(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<PaymentHistory[]> {
+  return request<PaymentHistory[]>("/api/v1/payments", {
     accessToken,
     signal,
   });
@@ -108,9 +119,9 @@ export function refundPayment(
   idempotencyKey: string,
 ): Promise<PaymentRefundData> {
   return request<PaymentRefundData>(`/api/v1/payments/${paymentId}/refund`, {
-    method: 'POST',
+    method: "POST",
     accessToken,
-    headers: { 'Idempotency-Key': idempotencyKey },
+    headers: { "Idempotency-Key": idempotencyKey },
     body: JSON.stringify({ reason }),
   });
 }

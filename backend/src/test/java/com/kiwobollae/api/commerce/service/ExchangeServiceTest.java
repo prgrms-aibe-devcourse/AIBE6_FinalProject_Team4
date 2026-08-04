@@ -50,7 +50,7 @@ class ExchangeServiceTest {
 	@InjectMocks private ExchangeService exchangeService;
 
 	private static final ExchangeOrderRequest REQUEST =
-			new ExchangeOrderRequest(1L, "홍길동", "010-1234-5678", "서울시 강남구", "101동");
+			new ExchangeOrderRequest(1L, "홍길동", "010-1234-5678", "06236", "서울시 강남구", "101동");
 
 	private ExchangeOrder mockOrder(Long id, ExchangeStatus status, Long userId, Long cardId,
 			Long productId, Integer usedCardCount) {

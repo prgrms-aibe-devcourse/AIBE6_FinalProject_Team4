@@ -33,3 +33,8 @@ app:
       # Seeds one sample alert per NotificationType for each InitData test user,
       # so the notification bell/목록/설정 화면 isn't empty on a fresh local DB.
       enabled: true
+    point-scenario:
+      # Seeds test@test.com's point history with admin adjustments, a mixed-point
+      # order and cancellation, a mixed-point card purchase, and a journal reward.
+      # Charge/refund history is created through Toss Payments test transactions.
+      enabled: true

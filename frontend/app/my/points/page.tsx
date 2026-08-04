@@ -4,11 +4,17 @@ import Link from 'next/link';
 import { ApiError } from '@/lib/api';
 import { useStore, fmt } from '@/lib/store';
 import {
-  getPointTransactions,
-  PointCurrencyType,
-  PointTransaction,
+  getPointActivities,
+  PointActivity,
   PointTransactionType,
 } from '@/features/point/api';
+import {
+  getPointActivityDescription,
+  getPointActivityLink,
+  getPointActivityTitle,
+  POINT_HISTORY_FILTERS,
+  PointHistoryFilterKey,
+} from '@/features/point/activity-presentation';
 
 const ICON: Record<PointTransactionType, [string, string]> = {
   CHARGE: ['light_mode', 'bg-gold-soft'],
@@ -18,30 +24,6 @@ const ICON: Record<PointTransactionType, [string, string]> = {
   REFUND: ['currency_exchange', 'bg-[#fff1eb]'],
   ADMIN_ADJUST: ['tune', 'bg-[#f4f0eb]'],
 };
-
-const TX_LABEL: Record<PointTransactionType, string> = {
-  CHARGE: '포인트 충전',
-  JOURNAL_REWARD: '일지 보상',
-  PURCHASE: '포인트 사용',
-  RESTORE: '구매 취소 원복',
-  REFUND: '충전 취소 회수',
-  ADMIN_ADJUST: '관리자 조정',
-};
-
-const CURRENCY_LABEL: Record<PointCurrencyType, string> = {
-  FREE: '무상',
-  PAID: '유상',
-};
-
-const FILTERS: { key: 'all' | PointTransactionType; label: string }[] = [
-  { key: 'all', label: '전체' },
-  { key: 'CHARGE', label: '충전' },
-  { key: 'JOURNAL_REWARD', label: '일지 보상' },
-  { key: 'PURCHASE', label: '사용' },
-  { key: 'RESTORE', label: '구매 취소' },
-  { key: 'REFUND', label: '충전 취소' },
-  { key: 'ADMIN_ADJUST', label: '관리자 조정' },
-];
 
 function toExclusiveEndDate(date: string): string | undefined {
   if (!date) return undefined;
@@ -75,11 +57,11 @@ export default function PointsHome() {
     walletError,
     refreshWallet,
   } = useStore();
-  const [filter, setFilter] = useState<'all' | PointTransactionType>('all');
+  const [filter, setFilter] = useState<PointHistoryFilterKey>('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(0);
-  const [transactions, setTransactions] = useState<PointTransaction[]>([]);
+  const [activities, setActivities] = useState<PointActivity[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [transactionLoading, setTransactionLoading] = useState(true);
   const [transactionError, setTransactionError] = useState('');
@@ -92,21 +74,23 @@ export default function PointsHome() {
     setTransactionLoading(true);
     setTransactionError('');
 
-    getPointTransactions({
+    const selectedFilter = POINT_HISTORY_FILTERS.find(({ key }) => key === filter);
+    getPointActivities({
       accessToken: state.accessToken,
-      type: filter === 'all' ? undefined : filter,
+      type: selectedFilter?.type,
+      refType: selectedFilter?.refType,
       from: fromDate ? `${fromDate}T00:00:00` : undefined,
       to: toExclusiveEndDate(toDate),
       page,
       signal: controller.signal,
     })
       .then((response) => {
-        setTransactions(response.content);
+        setActivities(response.content);
         setTotalPages(response.totalPages);
       })
       .catch((error) => {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        setTransactions([]);
+        setActivities([]);
         setTotalPages(0);
         setTransactionError(
           error instanceof ApiError
@@ -121,7 +105,7 @@ export default function PointsHome() {
     return () => controller.abort();
   }, [filter, fromDate, page, reloadKey, state.accessToken, toDate]);
 
-  const changeFilter = (nextFilter: 'all' | PointTransactionType) => {
+  const changeFilter = (nextFilter: PointHistoryFilterKey) => {
     setFilter(nextFilter);
     setPage(0);
   };
@@ -172,7 +156,8 @@ export default function PointsHome() {
           {fmt(balance)}<span className="text-xl">P</span>
         </div>
         <div className="text-[13.5px] text-gold-text opacity-85">
-          유상 포인트 {fmt(state.wallet.paid)}P · 무상 포인트 {fmt(state.wallet.free)}P
+          충전 포인트(유상) {fmt(state.wallet.paid)}P · 보너스 포인트(무상){' '}
+          {fmt(state.wallet.free)}P
         </div>
         <Link href="/my/points/charge" className="mt-4 inline-block rounded-xl bg-ink px-[22px] py-[11px] font-bold text-white hover:text-white">충전하기</Link>
       </div>
@@ -183,7 +168,7 @@ export default function PointsHome() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-[7px]">
-        {FILTERS.map(({ key, label }) => (
+        {POINT_HISTORY_FILTERS.map(({ key, label }) => (
           <button
             key={key}
             type="button"
@@ -248,52 +233,92 @@ export default function PointsHome() {
             다시 시도
           </button>
         </div>
-      ) : transactions.length === 0 ? (
+      ) : activities.length === 0 ? (
         <div className="rounded-[18px] bg-white py-12 text-center text-sm text-sub shadow-card">
           조건에 맞는 포인트 내역이 없어요.
         </div>
       ) : (
         <>
           <div className="overflow-hidden rounded-[18px] bg-white shadow-card">
-            {transactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex items-center gap-3.5 border-b border-[#f4f5ee] px-[18px] py-[15px] last:border-b-0"
-              >
+            {activities.map((activity) => {
+              const relatedLink = getPointActivityLink(activity);
+              const hasPaidPoint = activity.paidAmount !== 0;
+              const hasFreePoint = activity.freeAmount !== 0;
+              const mixedCurrency = hasPaidPoint && hasFreePoint;
+              return (
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-[11px] ${ICON[transaction.type][1]}`}
+                  key={activity.id}
+                  className="flex items-start gap-3.5 border-b border-[#f4f5ee] px-[18px] py-[15px] last:border-b-0"
                 >
-                  <span className="material-symbols-outlined text-xl">
-                    {ICON[transaction.type][0]}
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[14.5px] font-bold">{TX_LABEL[transaction.type]}</span>
-                    <span className="rounded-md bg-[#f4f5ee] px-1.5 py-0.5 text-[10px] font-bold text-sub">
-                      {CURRENCY_LABEL[transaction.currencyType]}
+                  <div
+                    className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] ${ICON[activity.type][1]}`}
+                  >
+                    <span className="material-symbols-outlined text-xl">
+                      {ICON[activity.type][0]}
                     </span>
                   </div>
-                  <div className="text-[12.5px] text-faint">
-                    {formatTransactionDate(transaction.createdAt)}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[14.5px] font-bold">
+                        {getPointActivityTitle(activity)}
+                      </span>
+                      {hasPaidPoint && (
+                        <span
+                          title="직접 충전한 유상 포인트"
+                          className="rounded-md bg-[#fff3cc] px-1.5 py-0.5 text-[10px] font-bold text-gold-text"
+                        >
+                          충전 포인트
+                        </span>
+                      )}
+                      {hasFreePoint && (
+                        <span
+                          title="보상이나 이벤트로 받은 무상 포인트"
+                          className="rounded-md bg-brand-soft px-1.5 py-0.5 text-[10px] font-bold text-brand-dark"
+                        >
+                          보너스 포인트
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-[12.5px] text-sub">
+                      {getPointActivityDescription(activity)}
+                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-faint">
+                      <span>{formatTransactionDate(activity.createdAt)}</span>
+                      {relatedLink && (
+                        <Link href={relatedLink.href} className="font-bold text-brand-dark">
+                          {relatedLink.label} →
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div
+                      className={`font-extrabold ${
+                        activity.amount > 0 ? 'text-brand-text' : 'text-[#767676]'
+                      }`}
+                    >
+                      {activity.amount > 0 ? '+' : ''}
+                      {fmt(activity.amount)}P
+                    </div>
+                    {mixedCurrency && (
+                      <div className="mt-0.5 text-[11px] text-sub">
+                        충전 {activity.paidAmount > 0 ? '+' : ''}{fmt(activity.paidAmount)}P · 보너스{' '}
+                        {activity.freeAmount > 0 ? '+' : ''}{fmt(activity.freeAmount)}P
+                      </div>
+                    )}
+                    <div className="mt-0.5 text-[11px] text-faint">
+                      {activity.paidBalanceAfter !== null && (
+                        <span>충전 잔액 {fmt(activity.paidBalanceAfter)}P</span>
+                      )}
+                      {activity.paidBalanceAfter !== null && activity.freeBalanceAfter !== null && ' · '}
+                      {activity.freeBalanceAfter !== null && (
+                        <span>보너스 잔액 {fmt(activity.freeBalanceAfter)}P</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div
-                    className={`font-extrabold ${
-                      transaction.amount > 0 ? 'text-brand-text' : 'text-[#8a8a8a]'
-                    }`}
-                  >
-                    {transaction.amount > 0 ? '+' : ''}
-                    {fmt(transaction.amount)}P
-                  </div>
-                  <div className="text-xs text-faint">
-                    {CURRENCY_LABEL[transaction.currencyType]} 잔액{' '}
-                    {fmt(transaction.balanceAfter)}P
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {totalPages > 1 && (

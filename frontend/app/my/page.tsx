@@ -15,6 +15,7 @@ import {
   type UserAddress,
   type UserResponse,
 } from "@/lib/api";
+import { formatPhone } from "@/components/AddressForm";
 import { embedAddressSearch } from "@/lib/daumPostcode";
 import { levelTitle } from "@/lib/levels";
 import { useStore } from "@/lib/store";
@@ -745,7 +746,7 @@ export default function MyPage() {
                 )}
               </div>
               <div className="mt-1 text-[13.5px] text-sub">
-                {a.receiverPhone} · {a.address}
+                {formatPhone(a.receiverPhone)} · {a.address}
                 {a.addressDetail ? ` ${a.addressDetail}` : ""}
               </div>
             </div>

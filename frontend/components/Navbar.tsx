@@ -24,7 +24,6 @@ const NAV = [
   { key: 'shop', label: '상점', href: '/shop' },
   { key: 'cards', label: '카드', href: '/cards' },
   { key: 'gacha', label: '가챠', href: '/gacha' },
-  { key: 'exchange', label: '교환', href: '/my/exchanges' },
 ];
 
 // 모바일 하단 탭은 식물/일지를 "식물" 하나로 합치고 카드 수집과 가챠를 각각 바로 접근하게 한다.
@@ -44,7 +43,6 @@ function activeKey(pathname: string) {
   if (pathname.startsWith('/cards')) return 'cards';
   if (pathname.startsWith('/gacha')) return 'gacha';
   if (pathname.startsWith('/shop')) return 'shop';
-  if (pathname.startsWith('/my/exchanges') || pathname.startsWith('/exchange')) return 'exchange';
   if (pathname.startsWith('/my')) return 'account';
   return '';
 }
@@ -212,6 +210,9 @@ export default function Navbar() {
                     </Link>
                     <Link href="/my/orders" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
                       주문 내역
+                    </Link>
+                    <Link href="/my/exchanges" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
+                      교환 내역
                     </Link>
                     <Link href="/my/points" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
                       포인트 내역

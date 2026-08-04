@@ -35,12 +35,23 @@ spring:
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 jwt:
   secret: ${JWT_SECRET:CHANGE_ME_dev_only_placeholder_secret}
   access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
 
 app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
   asset:
     # 카드 일러스트 등 정적 자산의 base URL. cards/ 프리픽스만 퍼블릭 read를 허용한 S3 버킷을 직접 가리킨다.
     # CloudFront로 옮기게 되면 이 값만 그 도메인으로 바꾸면 된다(imageKey는 그대로 재사용).
@@ -77,7 +88,9 @@ app:
       redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:3000/oauth/callback/naver}
 
 payment:
-  provider: ${PAYMENT_PROVIDER:MOCK}
+  toss:
+    base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
+    secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
 
 aws:
   s3:

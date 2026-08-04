@@ -3,6 +3,7 @@ package com.kiwobollae.api.point.service;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentResponse;
 import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
@@ -46,6 +47,31 @@ public class WalletService {
 		Wallet wallet = walletRepository.findByUserId(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 		return WalletResponse.from(wallet);
+	}
+
+	/** 관리자가 특정 사용자의 유상/무상 포인트를 조정하고 불변 원장을 기록한다. */
+	@Transactional
+	public AdminPointAdjustmentResponse adjustByAdmin(
+			Long adminUserId,
+			Long userId,
+			CurrencyType currency,
+			long amount
+	) {
+		if (adminUserId == null || adminUserId < 1
+				|| userId == null || userId < 1 || currency == null || amount == 0) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		PointTransaction transaction = applyDeltaToWallet(
+				wallet,
+				PointTxType.ADMIN_ADJUST,
+				currency,
+				amount,
+				PointRefType.ADMIN,
+				adminUserId
+		);
+		return AdminPointAdjustmentResponse.from(userId, transaction, wallet);
 	}
 
 	/** 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다. */
@@ -291,29 +317,45 @@ public class WalletService {
 	 * 부호 있는 delta를 적용하고, 불변 원장(balance_after 스냅샷)을 같은 트랜잭션에 기록한다.
 	 * deduct/credit/reward 등 상위 흐름이 이 메서드를 조합해 사용한다.
 	 *
-	 * <p>정책: paid_point는 항상 음수 불가. free_point는 ADMIN_ADJUST만 음수(부채)
-	 * 허용하고, 그 외 거래의 무상 차감은 하한 0을 지킨다. 하한 위반 시
-	 * {@code POINT_INSUFFICIENT_BALANCE}.
+	 * <p>정책: paid_point와 free_point 모두 음수가 될 수 없다. 하한 위반 시
+	 * {@code POINT_INSUFFICIENT_BALANCE}를 반환한다.
 	 */
 	@Transactional
 	public PointTransaction applyDelta(Long userId, PointTxType type, CurrencyType currency,
 			long amount, PointRefType refType, Long refId) {
+		if (userId == null || userId < 1 || type == null || currency == null || amount == 0) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		return applyDeltaToWallet(wallet, type, currency, amount, refType, refId);
+	}
 
+	private PointTransaction applyDeltaToWallet(
+			Wallet wallet,
+			PointTxType type,
+			CurrencyType currency,
+			long amount,
+			PointRefType refType,
+			Long refId
+	) {
+		long currentBalance = currency == CurrencyType.PAID
+				? wallet.getPaidPoint()
+				: wallet.getFreePoint();
 		long balanceAfter;
+		try {
+			balanceAfter = Math.addExact(currentBalance, amount);
+		} catch (ArithmeticException exception) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "포인트 조정 금액이 허용 범위를 벗어났습니다.");
+		}
+		if (balanceAfter < 0) {
+			throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
+		}
+
 		if (currency == CurrencyType.PAID) {
-			balanceAfter = wallet.increasePaidPoint(amount);
-			if (balanceAfter < 0) {
-				throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
-			}
+			wallet.increasePaidPoint(amount);
 		} else {
-			balanceAfter = wallet.increaseFreePoint(amount);
-			// ADMIN_ADJUST만 free_point 음수(부채) 허용. 그 외 거래의 무상 차감은
-			// 잔액 하한(0)을 지켜야 하므로 부족하면 거절한다.
-			if (balanceAfter < 0 && !type.allowsNegativeFree()) {
-				throw new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE);
-			}
+			wallet.increaseFreePoint(amount);
 		}
 
 		PointTransaction tx = PointTransaction.builder()
@@ -468,7 +510,7 @@ public class WalletService {
 			if (transaction.getAmount() >= 0) {
 				throw new BusinessException(
 						ErrorCode.COMMON_DATA_CONFLICT,
-						"최초 구매 차감 원장이 올바르지 않습니다."
+						"기존 포인트 결제 내역을 확인할 수 없습니다."
 				);
 			}
 
@@ -490,7 +532,7 @@ public class WalletService {
 	) {
 		return new BusinessException(
 				ErrorCode.COMMON_DATA_CONFLICT,
-				"원복 요청 포인트가 최초 구매 차감 내역과 일치하지 않습니다.",
+				"취소하려는 포인트 내역이 최초 결제 내역과 일치하지 않습니다.",
 				Map.of(
 						"recordedFreePoint", recordedUsage.freePoint(),
 						"recordedPaidPoint", recordedUsage.paidPoint(),

@@ -9,6 +9,7 @@ import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
@@ -29,17 +30,20 @@ import org.springframework.transaction.annotation.Transactional;
  * profiles, @Order(3)) having already run; skips silently if either is missing.
  * Attaches journals to whichever profiles actually exist rather than hardcoding
  * nicknames, since profiles can be deleted independently of this seed running.
+ * Seed dates start from yesterday so local data never consumes today's
+ * once-per-day journal reward opportunity.
  *
  * <p>Disable without changing code by setting {@code app.seed.journal.enabled=false}.
  */
 @Component
-@Profile("local")
+@Profile({"local", "prod"})
 @ConditionalOnProperty(prefix = "app.seed.journal", name = "enabled", havingValue = "true")
 @Order(4)
 @RequiredArgsConstructor
 public class PlantJournalInitData implements ApplicationRunner {
 
 	private static final String IMAGE_BASE_URL = "https://placehold.co/800x800/E8F3D8/4B7A1E?text=";
+	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
 	private static final List<String> SAMPLE_CONTENTS = List.of(
 			"오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.",
@@ -69,10 +73,11 @@ public class PlantJournalInitData implements ApplicationRunner {
 			return;
 		}
 
+		LocalDate yesterday = LocalDate.now(KST).minusDays(1);
 		int seedIndex = 0;
 		for (PlantProfile profile : profiles) {
 			for (int entry = 0; entry < 2; entry++) {
-				LocalDate writtenDate = LocalDate.now().minusDays(entry);
+				LocalDate writtenDate = yesterday.minusDays(entry);
 				String content = SAMPLE_CONTENTS.get(seedIndex % SAMPLE_CONTENTS.size());
 
 				PlantJournal journal = plantJournalRepository.save(
