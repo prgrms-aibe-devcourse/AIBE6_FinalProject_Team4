@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Disable without changing code by setting {@code app.seed.plant-profile.enabled=false}.
  */
 @Component
-@Profile("local")
+@Profile({"local", "prod"})
 @ConditionalOnProperty(prefix = "app.seed.plant-profile", name = "enabled", havingValue = "true")
 @Order(3)
 @RequiredArgsConstructor

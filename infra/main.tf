@@ -234,24 +234,35 @@ locals {
     #!/bin/bash
     timedatectl set-timezone Asia/Seoul
 
-    # 필수 환경변수를 /etc/environment 에 심어서 배포 스크립트(SSM)에서 재사용
+    # 필수 환경변수를 /etc/environment 에 심어서 배포 스크립트(SSM)에서 재사용.
+    # 전부 따옴표로 감싼다 — DB_URL의 "&"처럼 셸 특수문자가 섞인 값을 이 파일이
+    # "source"될 때(아래, 그리고 배포 스크립트에서) 그대로 실행돼버리는 걸 막기 위함.
+    # 따옴표 없이 쓰면 "&" 뒤가 백그라운드 실행으로 잘려나가 값이 통째로 안 먹힌다.
     cat >> /etc/environment <<EOF
-    DB_URL=jdbc:mysql://${aws_db_instance.this.address}:3306/${var.db_name}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    DB_USERNAME=${var.db_username}
-    DB_PASSWORD=${var.db_password}
-    APP_DOMAIN=${var.app_domain}
-    DB_NAME=${var.db_name}
-    JWT_SECRET=${var.jwt_secret}
-    CORS_ALLOWED_ORIGINS=${var.cors_allowed_origins}
-    GOOGLE_CLIENT_ID=${var.google_client_id}
-    GOOGLE_CLIENT_SECRET=${var.google_client_secret}
-    GOOGLE_REDIRECT_URI=${var.google_redirect_uri}
-    KAKAO_CLIENT_ID=${var.kakao_client_id}
-    KAKAO_CLIENT_SECRET=${var.kakao_client_secret}
-    KAKAO_REDIRECT_URI=${var.kakao_redirect_uri}
-    NAVER_CLIENT_ID=${var.naver_client_id}
-    NAVER_CLIENT_SECRET=${var.naver_client_secret}
-    NAVER_REDIRECT_URI=${var.naver_redirect_uri}
+    DB_URL="jdbc:mysql://${aws_db_instance.this.address}:3306/${var.db_name}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
+    DB_USERNAME="${var.db_username}"
+    DB_PASSWORD="${var.db_password}"
+    APP_DOMAIN="${var.app_domain}"
+    DB_NAME="${var.db_name}"
+    JWT_SECRET="${var.jwt_secret}"
+    CORS_ALLOWED_ORIGINS="${var.cors_allowed_origins}"
+    GOOGLE_CLIENT_ID="${var.google_client_id}"
+    GOOGLE_CLIENT_SECRET="${var.google_client_secret}"
+    GOOGLE_REDIRECT_URI="${var.google_redirect_uri}"
+    KAKAO_CLIENT_ID="${var.kakao_client_id}"
+    KAKAO_CLIENT_SECRET="${var.kakao_client_secret}"
+    KAKAO_REDIRECT_URI="${var.kakao_redirect_uri}"
+    NAVER_CLIENT_ID="${var.naver_client_id}"
+    NAVER_CLIENT_SECRET="${var.naver_client_secret}"
+    NAVER_REDIRECT_URI="${var.naver_redirect_uri}"
+    MAIL_ENABLED="${var.mail_enabled}"
+    MAIL_FROM="${var.mail_from}"
+    MAIL_HOST="${var.mail_host}"
+    MAIL_PORT="${var.mail_port}"
+    MAIL_USERNAME="${var.mail_username}"
+    MAIL_PASSWORD="${var.mail_password}"
+    TOSS_PAYMENTS_BASE_URL="${var.toss_payments_base_url}"
+    TOSS_PAYMENTS_SECRET_KEY="${var.toss_payments_secret_key}"
     EOF
     source /etc/environment
 
