@@ -2,11 +2,25 @@ package com.kiwobollae.api.content.service;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DefaultFfmpegProcessRunner implements FfmpegProcessRunner {
+
+	private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(5);
+
+	private final Duration timeout;
+
+	public DefaultFfmpegProcessRunner() {
+		this(DEFAULT_TIMEOUT);
+	}
+
+	DefaultFfmpegProcessRunner(Duration timeout) {
+		this.timeout = timeout;
+	}
 
 	@Override
 	public int run(List<String> command) throws IOException, InterruptedException {
@@ -22,8 +36,19 @@ public class DefaultFfmpegProcessRunner implements FfmpegProcessRunner {
 		});
 		drain.setDaemon(true);
 		drain.start();
-		int exitCode = process.waitFor();
+
+		// ffmpeg가 멈춰버리면 waitFor()를 무한정 기다리게 되고, 워커 스레드풀(corePoolSize=1)이
+		// 그 한 스레드에서 영원히 막혀버린다 — 그러면 해당 프로필의 PlantTimelapse는 PROCESSING에
+		// 갇혀 TIMELAPSE_ALREADY_PROCESSING 때문에 재요청도 불가능해진다. 타임아웃으로 이를 방지한다.
+		boolean finishedInTime = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
+		if (!finishedInTime) {
+			process.destroyForcibly();
+			drain.join();
+			throw new TimelapseEncodingException(
+					"ffmpeg process timed out after " + timeout.toMinutes() + " minutes");
+		}
+
 		drain.join();
-		return exitCode;
+		return process.exitValue();
 	}
 }
