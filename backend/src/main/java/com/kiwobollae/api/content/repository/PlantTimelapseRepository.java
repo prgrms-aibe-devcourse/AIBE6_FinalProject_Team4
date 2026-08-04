@@ -17,4 +17,8 @@ public interface PlantTimelapseRepository extends JpaRepository<PlantTimelapse, 
 			+ "where t.plantProfile.id = :profileId "
 			+ "and t.status = com.kiwobollae.api.content.entity.enums.PlantTimelapseStatus.PENDING")
 	int claimForProcessing(@Param("profileId") Long profileId);
+
+	@Modifying
+	@Query("delete from PlantTimelapse t where t.plantProfile.id = :profileId")
+	int deleteByPlantProfileId(@Param("profileId") Long profileId);
 }

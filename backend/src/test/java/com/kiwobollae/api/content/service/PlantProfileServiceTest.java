@@ -15,6 +15,7 @@ import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
+import com.kiwobollae.api.content.repository.PlantTimelapseRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +33,7 @@ class PlantProfileServiceTest {
 	@Mock private PlantSpeciesRepository plantSpeciesRepository;
 	@Mock private PlantJournalRepository plantJournalRepository;
 	@Mock private JournalImageRepository journalImageRepository;
+	@Mock private PlantTimelapseRepository plantTimelapseRepository;
 	@Mock private PlantImageUploadService plantImageUploadService;
 	@Mock private JournalImageUploadService journalImageUploadService;
 	@Mock private com.kiwobollae.api.auth.repository.UserRepository userRepository;
