@@ -81,7 +81,7 @@ public class PointScenarioInitData implements ApplicationRunner {
 
 		seedSafely("운영팀 포인트 지급·차감", () -> seedAdminAdjustments(admin.getId(), testUser.getId()));
 		seedSafely("상품 주문 혼합 결제·취소", () -> seedOrderAndCancellation(testUser.getId()));
-		seedSafely("카드 혼합 결제", () -> seedCardPurchase(testUser.getId()));
+		seedSafely("쿠폰 혼합 결제", () -> seedCardPurchase(testUser.getId()));
 		seedSafely("성장일지 작성 보상", () -> seedJournalReward(testUser.getId()));
 	}
 
@@ -152,11 +152,11 @@ public class PointScenarioInitData implements ApplicationRunner {
 
 	private void seedCardPurchase(Long userId) {
 		Card card = cardRepository.findAllByStatusOrderByCreatedAtDesc(ActiveStatus.ON_SALE).stream()
-				.filter(candidate -> "수박 카드".equals(candidate.getName()))
+				.filter(candidate -> "수박 쿠폰".equals(candidate.getName()))
 				.findFirst()
 				.orElse(null);
 		if (card == null) {
-			log.warn("카드 구매 시나리오를 건너뜁니다: 수박 카드가 없습니다.");
+			log.warn("쿠폰 구매 시나리오를 건너뜁니다: 수박 쿠폰이 없습니다.");
 			return;
 		}
 		cardPurchaseService.purchase(
