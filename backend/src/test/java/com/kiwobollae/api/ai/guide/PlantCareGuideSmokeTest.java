@@ -110,6 +110,7 @@ class PlantCareGuideSmokeTest {
     return new PlantCareGuideService(
         plantSpeciesService,
         mock(PlantCareGuideCacheRepository.class),
+        mock(PlantCareGuideCacheWriter.class),
         client,
         mock(AiRequestGuard.class),
         new ObjectMapper(),

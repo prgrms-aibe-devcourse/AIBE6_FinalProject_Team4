@@ -19,8 +19,9 @@ import lombok.NoArgsConstructor;
  * <p>가이드는 사용자별 콘텐츠가 아니다 — "방울토마토 재배 가이드"는 누가 요청해도 같은 내용이다. 그래서 종당 한 번만 생성해 저장하고 이후 요청은 저장본을 그대로
  * 돌려준다. 종이 열여섯 개면 AI 호출은 사용자 수와 무관하게 최대 열여섯 번이다.
  *
- * <p><b>캐시 키는 species_id가 아니라 정규화된 종 이름이다.</b> 앞으로 사용자가 DB에 없는 종을 직접 입력하는 경우까지 같은 저장소로 덮기 위한 선택이다.
- * 등록된 종은 source_species_id에 출처를 남기지만 물리 FK는 두지 않는다(임의 입력 종은 가리킬 행이 없고, 종이 삭제돼도 가이드는 남는 편이 낫다).
+ * <p><b>캐시 키는 species_id가 아니라 정규화된 종 이름·응답 버전·원본 컨텍스트 fingerprint다.</b> 앞으로 사용자가 DB에 없는 종을 직접 입력하는
+ * 경우까지 같은 저장소로 덮기 위한 선택이다. 등록된 종은 source_species_id에 출처를 남기지만 물리 FK는 두지 않는다(임의 입력 종은 가리킬 행이 없고, 종이
+ * 삭제돼도 가이드는 남는 편이 낫다).
  */
 @Getter
 @Entity
@@ -29,7 +30,7 @@ import lombok.NoArgsConstructor;
     uniqueConstraints = {
       @UniqueConstraint(
           name = "uq_ai_plant_care_guide_species_name_version",
-          columnNames = {"species_name", "guide_version"})
+          columnNames = {"species_name", "guide_version", "source_context_hash"})
     })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -44,6 +45,10 @@ public class PlantCareGuideCache extends BaseEntity {
   @Column(name = "source_species_id")
   private Long sourceSpeciesId;
 
+  /** 생성 시점에 사용한 종 분류·공식 가이드 fingerprint. 원본 변경 시 기존 캐시를 무효화한다. */
+  @Column(name = "source_context_hash", length = 64)
+  private String sourceContextHash;
+
   /** 응답 스키마 버전. 스키마를 바꾸면 이 값을 올려 옛 저장본을 자연히 무효화한다 — 지우거나 마이그레이션 하지 않고 새 버전으로만 조회하면 된다. */
   @Column(name = "guide_version", nullable = false)
   private int guideVersion;
@@ -56,7 +61,7 @@ public class PlantCareGuideCache extends BaseEntity {
    * AI가 반환한 가이드 JSON 원본.
    *
    * <p>가이드는 읽기 전용 문서라 컬럼으로 쪼갤 이유가 없다. 통째로 저장하면 응답 스키마가 바뀌어도 테이블 구조는 그대로 두고 guide_version만 올리면
-   * 된다(idempotency_keys.response_snapshot과 같은 방식).
+   * 되고, 원본 종 정보가 바뀌면 source_context_hash가 기존 저장본을 무효화한다.
    */
   @Lob
   @Column(name = "guide_json", nullable = false)

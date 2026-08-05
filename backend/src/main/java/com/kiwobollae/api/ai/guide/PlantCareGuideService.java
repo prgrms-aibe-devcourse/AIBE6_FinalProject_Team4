@@ -13,14 +13,17 @@ import com.kiwobollae.api.content.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.content.service.PlantSpeciesService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,8 +35,6 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class PlantCareGuideService {
 
   private static final String SYSTEM_PROMPT =
@@ -52,13 +53,30 @@ public class PlantCareGuideService {
 
   private final PlantSpeciesService plantSpeciesService;
   private final PlantCareGuideCacheRepository cacheRepository;
+  private final PlantCareGuideCacheWriter cacheWriter;
   private final AiClient aiClient;
   private final AiRequestGuard requestGuard;
   private final ObjectMapper objectMapper;
   private final Clock seoulClock;
 
+  public PlantCareGuideService(
+      PlantSpeciesService plantSpeciesService,
+      PlantCareGuideCacheRepository cacheRepository,
+      PlantCareGuideCacheWriter cacheWriter,
+      AiClient aiClient,
+      AiRequestGuard requestGuard,
+      ObjectMapper objectMapper,
+      Clock seoulClock) {
+    this.plantSpeciesService = plantSpeciesService;
+    this.cacheRepository = cacheRepository;
+    this.cacheWriter = cacheWriter;
+    this.aiClient = aiClient;
+    this.requestGuard = requestGuard;
+    this.objectMapper = objectMapper;
+    this.seoulClock = seoulClock;
+  }
+
   /** 등록된 종 id로 가이드를 조회한다. 저장본이 없으면 AI를 호출해 생성하고 저장한다. */
-  @Transactional
   public PlantCareGuide getGuideBySpeciesId(Long userId, Long speciesId) {
     if (speciesId == null || speciesId < 1) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "식물 종 ID가 필요합니다.");
@@ -70,48 +88,39 @@ public class PlantCareGuideService {
   private PlantCareGuide resolveGuide(
       Long userId, String rawName, Long sourceSpeciesId, String category, String officialGuide) {
     String speciesName = normalizeSpeciesName(rawName);
+    String sourceContextHash = sourceContextHash(category, officialGuide);
 
     Optional<PlantCareGuideCache> cached =
-        cacheRepository.findBySpeciesNameAndGuideVersion(speciesName, PlantCareGuideSchema.VERSION);
+        cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+            speciesName, PlantCareGuideSchema.VERSION, sourceContextHash);
     if (cached.isPresent()) {
-      return PlantCareGuide.of(speciesName, readGuide(cached.get()), true);
+      return PlantCareGuide.of(speciesName, validateGuide(readGuide(cached.get())), true);
     }
 
     // 캐시 미스에서만 외부 호출이 일어나므로 이 지점에서만 제한을 센다.
     requestGuard.checkRateLimit(userId, AiFeature.PLANT_CARE_GUIDE);
 
     AiResponse response = aiClient.generate(buildRequest(speciesName, category, officialGuide));
-    PlantCareGuideContent generated = deserialize(response.result().toString());
-
-    return PlantCareGuide.of(
-        speciesName, store(speciesName, sourceSpeciesId, response, generated), false);
-  }
-
-  private PlantCareGuideContent store(
-      String speciesName,
-      Long sourceSpeciesId,
-      AiResponse response,
-      PlantCareGuideContent generated) {
+    PlantCareGuideContent generated = validateGuide(deserialize(response.result().toString()));
     try {
-      cacheRepository.save(
+      cacheWriter.save(
           PlantCareGuideCache.builder()
               .speciesName(speciesName)
               .sourceSpeciesId(sourceSpeciesId)
+              .sourceContextHash(sourceContextHash)
               .guideVersion(PlantCareGuideSchema.VERSION)
               .model(response.model())
               .guideJson(response.result().toString())
               .createdAt(LocalDateTime.now(seoulClock))
               .build());
-      return generated;
+      return PlantCareGuide.of(speciesName, generated, false);
     } catch (DataIntegrityViolationException exception) {
-      // 같은 종을 동시에 요청해 다른 트랜잭션이 먼저 저장했다. 두 번 호출한 비용은 이미 났지만
-      // 저장본을 하나로 유지하는 게 중요하므로 먼저 저장된 쪽을 정본으로 삼는다.
-      // 외부 호출 구간에 락을 걸지 않기 위해 감수하는 트레이드오프다(드물게 발생).
       log.info("가이드 캐시 중복 저장 감지, 기존 저장본을 사용합니다: {}", speciesName);
       return cacheRepository
-          .findBySpeciesNameAndGuideVersion(speciesName, PlantCareGuideSchema.VERSION)
-          .map(this::readGuide)
-          .orElse(generated);
+          .findBySpeciesNameAndGuideVersionAndSourceContextHash(
+              speciesName, PlantCareGuideSchema.VERSION, sourceContextHash)
+          .map(cache -> PlantCareGuide.of(speciesName, validateGuide(readGuide(cache)), true))
+          .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_DATA_CONFLICT));
     }
   }
 
@@ -156,6 +165,58 @@ public class PlantCareGuideService {
 
   private PlantCareGuideContent readGuide(PlantCareGuideCache cache) {
     return deserialize(cache.getGuideJson());
+  }
+
+  private PlantCareGuideContent validateGuide(PlantCareGuideContent guide) {
+    if (guide == null
+        || !contains(PlantCareGuideSchema.DIFFICULTY_VALUES, guide.difficulty())
+        || blank(guide.difficultyReason())
+        || guide.environment() == null
+        || blank(guide.environment().sunlight())
+        || blank(guide.environment().watering())
+        || blank(guide.environment().temperature())
+        || guide.stages() == null
+        || guide.stages().size() != PlantCareGuideSchema.STAGE_NAMES.size()
+        || guide.stages().stream().anyMatch(stage -> stage == null || blank(stage.guide()))
+        || !stageNamesMatch(guide.stages())
+        || guide.pitfalls() == null
+        || guide.pitfalls().size() < 2
+        || guide.pitfalls().size() > 3
+        || guide.pitfalls().stream()
+            .anyMatch(p -> p == null || blank(p.problem()) || blank(p.action()))
+        || blank(guide.harvestTarget())) {
+      throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
+    }
+    return guide;
+  }
+
+  private boolean stageNamesMatch(List<PlantCareGuideContent.Stage> stages) {
+    for (int i = 0; i < stages.size(); i++) {
+      if (!PlantCareGuideSchema.STAGE_NAMES.get(i).equals(stages.get(i).name())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean contains(List<String> values, String value) {
+    return value != null && values.contains(value);
+  }
+
+  private boolean blank(String value) {
+    return value == null || value.isBlank();
+  }
+
+  private String sourceContextHash(String category, String officialGuide) {
+    String source =
+        (category == null ? "" : category) + "\n" + (officialGuide == null ? "" : officialGuide);
+    try {
+      return HexFormat.of()
+          .formatHex(
+              MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256을 사용할 수 없습니다.", exception);
+    }
   }
 
   private PlantCareGuideContent deserialize(String json) {

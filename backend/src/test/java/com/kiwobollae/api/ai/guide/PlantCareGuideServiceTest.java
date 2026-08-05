@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -69,6 +70,7 @@ class PlantCareGuideServiceTest {
 
   @Mock private PlantSpeciesService plantSpeciesService;
   @Mock private PlantCareGuideCacheRepository cacheRepository;
+  @Mock private PlantCareGuideCacheWriter cacheWriter;
   @Mock private AiClient aiClient;
   @Mock private AiRequestGuard requestGuard;
 
@@ -78,6 +80,7 @@ class PlantCareGuideServiceTest {
     return new PlantCareGuideService(
         plantSpeciesService,
         cacheRepository,
+        cacheWriter,
         aiClient,
         requestGuard,
         objectMapper,
@@ -88,7 +91,9 @@ class PlantCareGuideServiceTest {
   @Test
   void servesStoredGuideWithoutCallingAiOrConsumingRateLimit() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheRepository.findBySpeciesNameAndGuideVersion("청상추", PlantCareGuideSchema.VERSION))
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.of(cache("청상추")));
 
     PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
@@ -106,7 +111,9 @@ class PlantCareGuideServiceTest {
   @Test
   void generatesAndStoresGuideOnCacheMiss() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheRepository.findBySpeciesNameAndGuideVersion("청상추", PlantCareGuideSchema.VERSION))
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.empty());
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
 
@@ -118,7 +125,7 @@ class PlantCareGuideServiceTest {
 
     ArgumentCaptor<PlantCareGuideCache> cacheCaptor =
         ArgumentCaptor.forClass(PlantCareGuideCache.class);
-    verify(cacheRepository).save(cacheCaptor.capture());
+    verify(cacheWriter).save(cacheCaptor.capture());
     assertThat(cacheCaptor.getValue().getSpeciesName()).isEqualTo("청상추");
     assertThat(cacheCaptor.getValue().getSourceSpeciesId()).isEqualTo(21L);
     assertThat(cacheCaptor.getValue().getGuideVersion()).isEqualTo(PlantCareGuideSchema.VERSION);
@@ -131,7 +138,9 @@ class PlantCareGuideServiceTest {
   @Test
   void groundsPromptOnRegisteredOfficialGuide() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheRepository.findBySpeciesNameAndGuideVersion(anyString(), anyInt()))
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                anyString(), anyInt(), anyString()))
         .willReturn(Optional.empty());
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
 
@@ -150,7 +159,9 @@ class PlantCareGuideServiceTest {
   @Test
   void normalizesSpeciesNameForCacheKey() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("  스위트   바질  "));
-    given(cacheRepository.findBySpeciesNameAndGuideVersion("스위트 바질", PlantCareGuideSchema.VERSION))
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("스위트 바질"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.of(cache("스위트 바질")));
 
     PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
@@ -163,17 +174,20 @@ class PlantCareGuideServiceTest {
   @Test
   void fallsBackToExistingRowWhenConcurrentRequestStoredFirst() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheRepository.findBySpeciesNameAndGuideVersion("청상추", PlantCareGuideSchema.VERSION))
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.empty())
         .willReturn(Optional.of(cache("청상추")));
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
-    given(cacheRepository.save(any(PlantCareGuideCache.class)))
-        .willThrow(new DataIntegrityViolationException("duplicate species_name"));
+    doThrow(new DataIntegrityViolationException("duplicate species_name"))
+        .when(cacheWriter)
+        .save(any(PlantCareGuideCache.class));
 
     PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
 
     assertThat(guide.difficulty()).isEqualTo("초급");
-    assertThat(guide.cached()).isFalse();
+    assertThat(guide.cached()).isTrue();
   }
 
   @Test
@@ -191,7 +205,9 @@ class PlantCareGuideServiceTest {
   @Test
   void rejectsStoredGuideThatNoLongerMatchesSchema() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheRepository.findBySpeciesNameAndGuideVersion(eq("청상추"), anyInt()))
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), anyInt(), anyString()))
         .willReturn(
             Optional.of(
                 PlantCareGuideCache.builder()
@@ -199,6 +215,33 @@ class PlantCareGuideServiceTest {
                     .guideVersion(PlantCareGuideSchema.VERSION)
                     .model("text-model")
                     .guideJson("not-json")
+                    .createdAt(LocalDateTime.of(2026, 8, 5, 10, 0))
+                    .build()));
+
+    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+  }
+
+  @Test
+  void rejectsStoredGuideThatViolatesContentRules() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), anyInt(), anyString()))
+        .willReturn(
+            Optional.of(
+                PlantCareGuideCache.builder()
+                    .speciesName("청상추")
+                    .sourceSpeciesId(21L)
+                    .sourceContextHash("test-hash")
+                    .guideVersion(PlantCareGuideSchema.VERSION)
+                    .model("text-model")
+                    .guideJson(
+                        GUIDE_JSON.replace(
+                            "\"harvestTarget\": \"파종 후 약 5주\"", "\"harvestTarget\": \"\""))
                     .createdAt(LocalDateTime.of(2026, 8, 5, 10, 0))
                     .build()));
 
@@ -224,6 +267,7 @@ class PlantCareGuideServiceTest {
         .speciesName(speciesName)
         .sourceSpeciesId(21L)
         .guideVersion(PlantCareGuideSchema.VERSION)
+        .sourceContextHash("test-hash")
         .model("text-model")
         .guideJson(GUIDE_JSON)
         .createdAt(LocalDateTime.of(2026, 8, 5, 10, 0))
