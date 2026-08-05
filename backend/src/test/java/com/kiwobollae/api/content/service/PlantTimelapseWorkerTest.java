@@ -62,4 +62,13 @@ class PlantTimelapseWorkerTest {
 
 		verify(transactionService).fail(eq(21L), eq("boom"));
 	}
+
+	@Test
+	void processDoesNotPropagateWhenFailItselfThrows() {
+		given(transactionService.claim(21L)).willReturn(true);
+		willThrow(new TimelapseEncodingException("boom")).given(transactionService).encodeAndUpload(eq(21L), isNull());
+		willThrow(new java.util.NoSuchElementException()).given(transactionService).fail(21L, "boom");
+
+		org.assertj.core.api.Assertions.assertThatCode(() -> worker.process(21L, null)).doesNotThrowAnyException();
+	}
 }
