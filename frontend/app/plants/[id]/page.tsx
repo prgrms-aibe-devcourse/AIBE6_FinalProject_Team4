@@ -9,7 +9,7 @@ import { ApiError, resolveImageUrl } from '@/lib/api';
 import { deletePlant, deletePlantImage, getPlant, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
-import { getTimelapse, PlantTimelapseData } from '@/lib/timelapse-api';
+import { getTimelapse, requestTimelapse, PlantTimelapseData } from '@/lib/timelapse-api';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -40,6 +40,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   const [saving, setSaving] = useState(false);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
   const [timelapse, setTimelapse] = useState<PlantTimelapseData | null>(null);
+  const [timelapseRequesting, setTimelapseRequesting] = useState(false);
   const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -101,6 +102,22 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
 
     return () => controller.abort();
   }, [hydrated, state.accessToken, id, plant?.status]);
+
+  // PENDING/PROCESSING인 동안에만 짧은 간격으로 재조회한다. COMPLETED/FAILED가 되는 순간
+  // 이 effect의 조건이 더 이상 맞지 않아 스스로 멈추는 바운디드 폴링 — 완료/실패 결과를
+  // 페이지 재진입 없이도 반영하기 위함(무한 폴링 아님).
+  useEffect(() => {
+    if (!hydrated || !state.accessToken || !timelapse) return;
+    if (timelapse.status !== 'PENDING' && timelapse.status !== 'PROCESSING') return;
+    const accessToken = state.accessToken;
+    const timer = setTimeout(() => {
+      getTimelapse(id, accessToken)
+        .then((data) => setTimelapse(data))
+        .catch(() => {});
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [hydrated, state.accessToken, id, timelapse]);
 
   const remove = () => {
     if (!plant || !state.accessToken) return;
@@ -185,6 +202,22 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     revokeIfBlobUrl(photoPreview);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleRequestTimelapse = async () => {
+    if (!plant || !state.accessToken) return;
+    setTimelapseRequesting(true);
+    try {
+      const data = await requestTimelapse(plant.id, state.accessToken);
+      setTimelapse(data);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '타임랩스 생성 요청에 실패했어요. 잠시 후 다시 시도해 주세요.',
+        'err',
+      );
+    } finally {
+      setTimelapseRequesting(false);
+    }
   };
 
   const saveStatus = async () => {
@@ -293,6 +326,47 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      {plant.status !== 'GROWING' && timelapse && (
+        <div className="mt-7 rounded-2xl bg-white p-5 shadow-card">
+          <h2 className="mb-3 text-[19px] font-extrabold">타임랩스</h2>
+          {timelapse.status === 'NONE' && (
+            <button
+              type="button"
+              onClick={handleRequestTimelapse}
+              disabled={timelapseRequesting}
+              className="cursor-pointer rounded-[11px] bg-brand px-[18px] py-[11px] font-bold text-white disabled:opacity-60"
+            >
+              {timelapseRequesting ? '요청 중...' : '타임랩스 만들기'}
+            </button>
+          )}
+          {(timelapse.status === 'PENDING' || timelapse.status === 'PROCESSING') && (
+            <div className="text-[15px] text-sub">타임랩스를 만들고 있어요. 완료되면 알림으로 알려드릴게요 🎬</div>
+          )}
+          {timelapse.status === 'COMPLETED' && timelapse.videoUrl && (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              key={timelapse.videoUrl}
+              src={resolveImageUrl(timelapse.videoUrl)}
+              controls
+              className="w-full max-w-[400px] rounded-[14px]"
+            />
+          )}
+          {timelapse.status === 'FAILED' && (
+            <div>
+              <div className="mb-3 text-[15px] text-sub">{timelapse.failReason || '타임랩스 생성에 실패했어요.'}</div>
+              <button
+                type="button"
+                onClick={handleRequestTimelapse}
+                disabled={timelapseRequesting}
+                className="cursor-pointer rounded-[11px] bg-brand px-[18px] py-[11px] font-bold text-white disabled:opacity-60"
+              >
+                {timelapseRequesting ? '요청 중...' : '다시 만들기'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-7 flex items-center justify-between">
         <h2 className="text-[19px] font-extrabold">이 식물의 일지</h2>
