@@ -165,15 +165,6 @@ export function getMyGachaShards(
   });
 }
 
-export function grantGachaQaShards(
-  accessToken: string,
-): Promise<GachaShardWallet> {
-  return request<GachaShardWallet>("/api/v1/card/gacha/me/qa/shards", {
-    method: "POST",
-    accessToken,
-  });
-}
-
 export function dismantleGachaCards(
   items: { cardId: number; quantity: number }[],
   accessToken: string,
