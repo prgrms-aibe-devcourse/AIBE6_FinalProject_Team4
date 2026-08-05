@@ -8,6 +8,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -64,17 +66,30 @@ public class PlantTimelapseVideoStorageService {
 		}
 	}
 
-	public ResponseEntity<byte[]> download(Long userId, String filename) {
+	// rangeHeader가 있으면(브라우저 <video> 탐색 등) S3에도 그대로 Range를 전달해 필요한 구간만
+	// 받아온다 — 매 요청마다 영상 전체를 메모리에 올리지 않기 위함. S3가 Range를 받아들이면
+	// Content-Range가 채워진 응답을 주므로 그걸 기준으로 200/206을 결정한다(요청했다고 항상
+	// 206이 오는 건 아니라서 rangeHeader 유무가 아니라 실제 응답을 본다).
+	public ResponseEntity<byte[]> download(Long userId, String filename, String rangeHeader) {
 		String key = objectKey(userId, filename);
-		try (ResponseInputStream<GetObjectResponse> object = s3Client.getObject(
-				GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+		GetObjectRequest.Builder request = GetObjectRequest.builder().bucket(bucket).key(key);
+		if (rangeHeader != null) {
+			request.range(rangeHeader);
+		}
+		try (ResponseInputStream<GetObjectResponse> object = s3Client.getObject(request.build())) {
 			byte[] bytes = object.readAllBytes();
-			return ResponseEntity.ok()
+			GetObjectResponse metadata = object.response();
+			boolean partial = metadata.contentRange() != null;
+			ResponseEntity.BodyBuilder response = ResponseEntity.status(partial ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
 					.contentType(MediaType.parseMediaType("video/mp4"))
 					.header("X-Content-Type-Options", "nosniff")
 					.header("Content-Disposition", "inline")
 					.header("Cache-Control", "private, max-age=31536000, immutable")
-					.body(bytes);
+					.header(HttpHeaders.ACCEPT_RANGES, "bytes");
+			if (partial) {
+				response.header(HttpHeaders.CONTENT_RANGE, metadata.contentRange());
+			}
+			return response.body(bytes);
 		} catch (NoSuchKeyException e) {
 			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
 		} catch (SdkException | IOException e) {

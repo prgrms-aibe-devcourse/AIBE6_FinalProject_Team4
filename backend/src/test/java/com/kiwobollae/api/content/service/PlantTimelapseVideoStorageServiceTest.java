@@ -62,9 +62,25 @@ class PlantTimelapseVideoStorageServiceTest {
 		given(s3Client.getObject(any(GetObjectRequest.class)))
 				.willReturn(new ResponseInputStream<>(response, AbortableInputStream.create(new java.io.ByteArrayInputStream(content))));
 
-		var result = videoStorageService.download(7L, "abc.mp4");
+		var result = videoStorageService.download(7L, "abc.mp4", null);
 
+		assertThat(result.getStatusCode().value()).isEqualTo(200);
 		assertThat(result.getBody()).isEqualTo(content);
 		assertThat(result.getHeaders().getContentType().toString()).isEqualTo("video/mp4");
+		assertThat(result.getHeaders().getFirst("Accept-Ranges")).isEqualTo("bytes");
+	}
+
+	@Test
+	void downloadWithRangeHeaderForwardsRangeToS3AndReturnsPartialContent() {
+		byte[] chunk = "chunk".getBytes();
+		GetObjectResponse response = GetObjectResponse.builder().contentRange("bytes 0-4/11").build();
+		given(s3Client.getObject(argThat((GetObjectRequest req) -> "bytes=0-4".equals(req.range()))))
+				.willReturn(new ResponseInputStream<>(response, AbortableInputStream.create(new java.io.ByteArrayInputStream(chunk))));
+
+		var result = videoStorageService.download(7L, "abc.mp4", "bytes=0-4");
+
+		assertThat(result.getStatusCode().value()).isEqualTo(206);
+		assertThat(result.getBody()).isEqualTo(chunk);
+		assertThat(result.getHeaders().getFirst("Content-Range")).isEqualTo("bytes 0-4/11");
 	}
 }
