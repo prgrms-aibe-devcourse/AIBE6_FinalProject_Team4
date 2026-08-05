@@ -84,12 +84,13 @@ public class PlantTimelapseTransactionService {
 	}
 
 	// 복구 스케줄러(PlantTimelapseRecoveryScheduler) 전용 — 정상 워커가 죽거나 fail() 자체가
-	// 실패해서 PROCESSING에 갇힌 행을 강제로 FAILED 처리한다. failIfStillProcessing이 여전히
-	// PROCESSING일 때만 조건부로 전이시키므로, 그 사이 정상 워커가 이미 완료/실패 처리했다면
-	// 0을 반환하고 여기서는 아무것도(중복 알림 포함) 하지 않는다.
+	// 실패해서 PROCESSING에 갇히거나, 실행 큐가 가득 차 제출 자체가 거부돼 PENDING에 갇힌 행을
+	// 강제로 FAILED 처리한다. failIfStillPendingOrProcessing이 여전히 그 상태일 때만 조건부로
+	// 전이시키므로, 그 사이 정상 워커가 이미 완료/실패 처리했다면 0을 반환하고 여기서는
+	// 아무것도(중복 알림 포함) 하지 않는다.
 	@Transactional
 	public void recoverStale(Long profileId) {
-		int updated = plantTimelapseRepository.failIfStillProcessing(profileId, "PROCESSING_TIMEOUT", LocalDateTime.now(KST));
+		int updated = plantTimelapseRepository.failIfStillPendingOrProcessing(profileId, "REQUEST_TIMEOUT", LocalDateTime.now(KST));
 		if (updated == 0) {
 			return;
 		}

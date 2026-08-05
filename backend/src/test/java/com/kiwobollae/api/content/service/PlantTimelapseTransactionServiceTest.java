@@ -127,8 +127,8 @@ class PlantTimelapseTransactionServiceTest {
 	}
 
 	@Test
-	void recoverStaleMarksFailedAndNotifiesWhenStillProcessing() {
-		given(plantTimelapseRepository.failIfStillProcessing(eq(21L), anyString(), any())).willReturn(1);
+	void recoverStaleMarksFailedAndNotifiesWhenStillPendingOrProcessing() {
+		given(plantTimelapseRepository.failIfStillPendingOrProcessing(eq(21L), anyString(), any())).willReturn(1);
 		PlantTimelapse timelapse = PlantTimelapse.create(profile(21L, 7L), java.time.LocalDateTime.now());
 		given(plantTimelapseRepository.findByPlantProfileId(21L)).willReturn(Optional.of(timelapse));
 
@@ -139,7 +139,7 @@ class PlantTimelapseTransactionServiceTest {
 
 	@Test
 	void recoverStaleDoesNothingWhenAlreadyResolvedByNormalWorker() {
-		given(plantTimelapseRepository.failIfStillProcessing(eq(21L), anyString(), any())).willReturn(0);
+		given(plantTimelapseRepository.failIfStillPendingOrProcessing(eq(21L), anyString(), any())).willReturn(0);
 
 		transactionService.recoverStale(21L);
 

@@ -11,7 +11,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 정상 워커가 죽거나(서버 재시작 등) fail() 자체가 실패해서 PROCESSING에 영구히 갇힌 행을 주기적으로
+ * 정상 워커가 죽거나(서버 재시작 등) fail() 자체가 실패해서 PROCESSING에 갇히거나, 실행 큐가
+ * 가득 차 작업 제출 자체가 거부돼(RejectedExecutionException) PENDING에 갇힌 행을 주기적으로
  * 정리한다. commerce/gacha의 GachaRecoveryScheduler와 같은 목적이지만, 재시도/환불 같은 도메인
  * 로직이 없어 훨씬 단순하다 — 그냥 FAILED로 전환해서 사용자가 직접 재요청할 수 있게 할 뿐이다.
  */
@@ -28,9 +29,9 @@ public class PlantTimelapseRecoveryScheduler {
 	private final PlantTimelapseTransactionService transactionService;
 
 	@Scheduled(fixedDelay = 30_000)
-	public void recoverStaleProcessing() {
+	public void recoverStaleRequests() {
 		LocalDateTime staleBefore = LocalDateTime.now(KST).minusMinutes(STALE_MINUTES);
-		List<Long> profileIds = plantTimelapseRepository.findStaleProcessingProfileIds(staleBefore, PageRequest.of(0, BATCH_SIZE));
+		List<Long> profileIds = plantTimelapseRepository.findStalePendingOrProcessingProfileIds(staleBefore, PageRequest.of(0, BATCH_SIZE));
 		for (Long profileId : profileIds) {
 			try {
 				transactionService.recoverStale(profileId);

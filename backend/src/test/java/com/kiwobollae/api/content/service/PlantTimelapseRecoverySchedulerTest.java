@@ -24,23 +24,23 @@ class PlantTimelapseRecoverySchedulerTest {
 	private PlantTimelapseRecoveryScheduler scheduler;
 
 	@Test
-	void recoverStaleProcessingDelegatesToTransactionServiceForEachStaleProfile() {
-		given(plantTimelapseRepository.findStaleProcessingProfileIds(any(), any()))
+	void recoverStaleRequestsDelegatesToTransactionServiceForEachStaleProfile() {
+		given(plantTimelapseRepository.findStalePendingOrProcessingProfileIds(any(), any()))
 				.willReturn(List.of(11L, 12L));
 
-		scheduler.recoverStaleProcessing();
+		scheduler.recoverStaleRequests();
 
 		verify(transactionService).recoverStale(11L);
 		verify(transactionService).recoverStale(12L);
 	}
 
 	@Test
-	void recoverStaleProcessingContinuesWhenOneProfileThrows() {
-		given(plantTimelapseRepository.findStaleProcessingProfileIds(any(), any()))
+	void recoverStaleRequestsContinuesWhenOneProfileThrows() {
+		given(plantTimelapseRepository.findStalePendingOrProcessingProfileIds(any(), any()))
 				.willReturn(List.of(11L, 12L));
 		willThrow(new RuntimeException("boom")).given(transactionService).recoverStale(11L);
 
-		assertThatCode(() -> scheduler.recoverStaleProcessing()).doesNotThrowAnyException();
+		assertThatCode(() -> scheduler.recoverStaleRequests()).doesNotThrowAnyException();
 
 		verify(transactionService).recoverStale(12L);
 	}
