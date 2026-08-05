@@ -1,6 +1,6 @@
 import { request, SpringPage } from '@/lib/api';
 
-export type NotificationType = 'DELIVERY' | 'COMMUNITY' | 'POINT' | 'NOTICE' | 'INQUIRY' | 'JOURNAL_REMINDER';
+export type NotificationType = 'DELIVERY' | 'COMMUNITY' | 'POINT' | 'NOTICE' | 'INQUIRY' | 'JOURNAL_REMINDER' | 'TIMELAPSE';
 
 export interface NotificationData {
   id: number;

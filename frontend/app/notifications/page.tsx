@@ -19,6 +19,7 @@ const NIC: Record<NotificationType, [string, string]> = {
   JOURNAL_REMINDER: ['eco', 'bg-brand-soft'],
   INQUIRY: ['chat_bubble', 'bg-[#F0ECF9]'],
   NOTICE: ['campaign', 'bg-[#FBEDE3]'],
+  TIMELAPSE: ['movie', 'bg-[#E6F4EA]'],
 };
 
 const TYPE_TABS: { label: string; type?: NotificationType }[] = [
