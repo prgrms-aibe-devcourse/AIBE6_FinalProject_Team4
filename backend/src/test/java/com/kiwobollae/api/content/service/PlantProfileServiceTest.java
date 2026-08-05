@@ -10,7 +10,6 @@ import com.kiwobollae.api.content.dto.request.PlantProfileUpdateRequest;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
-import com.kiwobollae.api.content.entity.PlantTimelapse;
 import com.kiwobollae.api.content.entity.enums.PlantStatus;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
@@ -83,9 +82,8 @@ class PlantProfileServiceTest {
 		PlantProfile profile = profile(21L, user, "emoji:🌱");
 		given(plantProfileRepository.findByIdAndUserId(21L, 7L)).willReturn(Optional.of(profile));
 		given(journalImageRepository.findByProfileId(21L)).willReturn(List.of());
-		PlantTimelapse timelapse = PlantTimelapse.create(profile, java.time.LocalDateTime.now());
-		timelapse.complete("/api/v1/plants/timelapse-videos/7/abc.mp4", java.time.LocalDateTime.now());
-		given(plantTimelapseRepository.findByPlantProfileId(21L)).willReturn(Optional.of(timelapse));
+		given(plantTimelapseRepository.findVideoUrlByPlantProfileId(21L))
+				.willReturn(Optional.of("/api/v1/plants/timelapse-videos/7/abc.mp4"));
 
 		plantProfileService.deleteProfile(7L, 21L);
 
@@ -98,7 +96,7 @@ class PlantProfileServiceTest {
 		PlantProfile profile = profile(21L, user, "emoji:🌱");
 		given(plantProfileRepository.findByIdAndUserId(21L, 7L)).willReturn(Optional.of(profile));
 		given(journalImageRepository.findByProfileId(21L)).willReturn(List.of());
-		given(plantTimelapseRepository.findByPlantProfileId(21L)).willReturn(Optional.empty());
+		given(plantTimelapseRepository.findVideoUrlByPlantProfileId(21L)).willReturn(Optional.empty());
 
 		plantProfileService.deleteProfile(7L, 21L);
 

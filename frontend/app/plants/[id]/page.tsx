@@ -110,8 +110,9 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     if (!hydrated || !state.accessToken || !timelapse) return;
     if (timelapse.status !== 'PENDING' && timelapse.status !== 'PROCESSING') return;
     const accessToken = state.accessToken;
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      getTimelapse(id, accessToken)
+      getTimelapse(id, accessToken, controller.signal)
         .then((data) => {
           setTimelapse(data);
           // 완료/실패 알림은 백엔드가 이 시점에 만들어 두므로, 벨 배지도 같이 최신화한다 —
@@ -123,7 +124,10 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
         .catch(() => {});
     }, 3000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [hydrated, state.accessToken, id, timelapse, refreshNotifications]);
 
   const remove = () => {

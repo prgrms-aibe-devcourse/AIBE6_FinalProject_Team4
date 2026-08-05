@@ -17,10 +17,11 @@ const LABELS: Record<NotificationType, { icon: string; label: string }> = {
   NOTICE: { icon: 'campaign', label: '공지 알림' },
   INQUIRY: { icon: 'chat_bubble', label: '문의 답변 알림' },
   JOURNAL_REMINDER: { icon: 'eco', label: '케어 리마인더' },
+  TIMELAPSE: { icon: 'movie', label: '타임랩스 알림' },
 };
 
 // 화면에 보여줄 순서 — enum 선언 순서와 무관하게 사용자에게 익숙한 순서로 고정한다.
-const ORDER: NotificationType[] = ['DELIVERY', 'COMMUNITY', 'POINT', 'NOTICE', 'INQUIRY', 'JOURNAL_REMINDER'];
+const ORDER: NotificationType[] = ['DELIVERY', 'COMMUNITY', 'POINT', 'NOTICE', 'INQUIRY', 'JOURNAL_REMINDER', 'TIMELAPSE'];
 
 export default function NotiSettings() {
   const { showToast } = useUI();
