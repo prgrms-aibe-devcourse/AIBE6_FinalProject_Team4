@@ -75,6 +75,7 @@ export interface StoreContextValue {
   refreshWallet: () => Promise<void>;
   refreshCartCount: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
+  refreshUnreadCount: () => Promise<void>;
 }
 
 const EMPTY_WALLET: Wallet = { free: 0, paid: 0 };
@@ -269,6 +270,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [state.accessToken, state.authed]);
 
+  // 벨 드롭다운 목록까지는 필요 없고 배지 숫자만 즉시 갱신하고 싶을 때 쓴다(예: 다른 페이지에서
+  // 어떤 작업 완료로 새 알림이 생겼을 때) — refreshNotifications()는 목록 조회까지 같이 하므로
+  // 배지만 필요한 호출부에서 쓰면 불필요한 API 호출이 생긴다.
+  const refreshUnreadCount = useCallback(async () => {
+    const requestId = ++notificationsRequestId.current;
+    if (!state.authed || !state.accessToken) {
+      setState((s) => ({ ...s, unreadNotificationCount: 0 }));
+      return;
+    }
+    try {
+      const unread = await getUnreadNotificationCount(undefined);
+      if (requestId !== notificationsRequestId.current) return;
+      setState((s) => ({ ...s, unreadNotificationCount: unread.unreadCount }));
+    } catch {
+      // 배지 갱신 실패는 조용히 무시한다 — 다음 갱신 시점에 다시 시도된다.
+    }
+  }, [state.accessToken, state.authed]);
+
   useEffect(() => {
     if (!hydrated) return;
     void refreshNotifications();
@@ -367,6 +386,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         refreshWallet,
         refreshCartCount,
         refreshNotifications,
+        refreshUnreadCount,
       }}
     >
       {children}

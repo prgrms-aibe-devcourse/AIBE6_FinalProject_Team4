@@ -25,7 +25,7 @@ function revokeIfBlobUrl(url: string | null) {
 }
 
 export default function PlantDetail({ params }: { params: { id: string } }) {
-  const { state, hydrated, set, refreshNotifications } = useStore();
+  const { state, hydrated, set, refreshUnreadCount } = useStore();
   const { showToast, askConfirm } = useUI();
   const router = useRouter();
   const id = Number(params.id);
@@ -118,7 +118,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           // 완료/실패 알림은 백엔드가 이 시점에 만들어 두므로, 벨 배지도 같이 최신화한다 —
           // 안 그러면 전역 30초 폴링(store.tsx)이 돌 때까지 뱃지 숫자가 안 늘어난 것처럼 보인다.
           if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-            void refreshNotifications();
+            void refreshUnreadCount();
           }
         })
         .catch(() => {});
@@ -128,7 +128,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [hydrated, state.accessToken, id, timelapse, refreshNotifications]);
+  }, [hydrated, state.accessToken, id, timelapse, refreshUnreadCount]);
 
   const remove = () => {
     if (!plant || !state.accessToken) return;
