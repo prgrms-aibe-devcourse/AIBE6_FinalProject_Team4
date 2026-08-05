@@ -96,7 +96,7 @@ class PlantTimelapseServiceTest {
 		PlantTimelapseResponse response = plantTimelapseService.requestTimelapse(7L, 21L);
 
 		assertThat(response.status()).isEqualTo("PENDING");
-		verify(eventPublisher).publishEvent(new PlantTimelapseRequestedEvent(21L));
+		verify(eventPublisher).publishEvent(new PlantTimelapseRequestedEvent(21L, null));
 	}
 
 	@Test
@@ -113,7 +113,7 @@ class PlantTimelapseServiceTest {
 
 		assertThat(response.status()).isEqualTo("PENDING");
 		verify(plantTimelapseRepository, never()).save(any());
-		verify(eventPublisher).publishEvent(new PlantTimelapseRequestedEvent(21L));
+		verify(eventPublisher).publishEvent(new PlantTimelapseRequestedEvent(21L, "/api/v1/plants/timelapse-videos/7/old.mp4"));
 	}
 
 	@Test
