@@ -23,9 +23,49 @@ export interface GachaCard {
 
 export interface GachaCollectionCard extends GachaCard {
   ownedCount: number;
+  dismantleableCount: number;
+  shardPerCard: number;
   owned: boolean;
   unlocked: boolean;
   goldenGachaAcquired: boolean;
+}
+
+export type GachaCosmeticType = "TITLE" | "BORDER";
+
+export interface GachaShardWallet {
+  balance: number;
+  lifetimeEarned: number;
+  lifetimeSpent: number;
+}
+
+export interface GachaCosmetic {
+  code: string;
+  name: string;
+  type: GachaCosmeticType;
+  price: number;
+  styleKey: string;
+  owned: boolean;
+  equipped: boolean;
+  unlockedAt: string | null;
+}
+
+export interface GachaMyCosmetics {
+  shards: GachaShardWallet;
+  cosmetics: GachaCosmetic[];
+}
+
+export interface GachaDismantleData {
+  earnedShards: number;
+  balance: number;
+  lifetimeEarned: number;
+  items: {
+    cardId: number;
+    cardName: string;
+    quantity: number;
+    shardPerCard: number;
+    earnedShards: number;
+    ownedCountAfter: number;
+  }[];
 }
 
 export interface GachaRateData {
@@ -115,6 +155,80 @@ export function getMyGachaCollection(
   });
 }
 
+export function getMyGachaShards(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<GachaShardWallet> {
+  return request<GachaShardWallet>("/api/v1/card/gacha/me/shards", {
+    accessToken,
+    signal,
+  });
+}
+
+export function dismantleGachaCards(
+  items: { cardId: number; quantity: number }[],
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<GachaDismantleData> {
+  return request<GachaDismantleData>("/api/v1/card/gacha/me/dismantles", {
+    method: "POST",
+    accessToken,
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function getGachaCosmetics(
+  signal?: AbortSignal,
+): Promise<GachaCosmetic[]> {
+  return request<GachaCosmetic[]>("/api/v1/card/gacha/cosmetics", { signal });
+}
+
+export function getMyGachaCosmetics(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<GachaMyCosmetics> {
+  return request<GachaMyCosmetics>("/api/v1/card/gacha/me/cosmetics", {
+    accessToken,
+    signal,
+  });
+}
+
+export function purchaseGachaCosmetic(
+  code: string,
+  accessToken: string,
+  idempotencyKey: string,
+): Promise<GachaMyCosmetics> {
+  return request<GachaMyCosmetics>(
+    `/api/v1/card/gacha/me/cosmetics/${encodeURIComponent(code)}/purchases`,
+    {
+      method: "POST",
+      accessToken,
+      headers: { "Idempotency-Key": idempotencyKey },
+    },
+  );
+}
+
+export function equipGachaCosmetic(
+  code: string,
+  accessToken: string,
+): Promise<GachaMyCosmetics> {
+  return request<GachaMyCosmetics>(
+    `/api/v1/card/gacha/me/cosmetics/${encodeURIComponent(code)}/equipped`,
+    { method: "PATCH", accessToken },
+  );
+}
+
+export function unequipGachaCosmetic(
+  type: GachaCosmeticType,
+  accessToken: string,
+): Promise<GachaMyCosmetics> {
+  return request<GachaMyCosmetics>(
+    `/api/v1/card/gacha/me/cosmetics/${type}/equipped`,
+    { method: "DELETE", accessToken },
+  );
+}
+
 export function getGachaDraws(
   accessToken: string,
   viewed?: boolean,
@@ -147,6 +261,7 @@ export function markGachaDrawViewed(
   return request<GachaDrawDetail>(`/api/v1/card/gacha/draws/${drawId}/viewed`, {
     method: "PATCH",
     accessToken,
+    keepalive: true,
   });
 }
 

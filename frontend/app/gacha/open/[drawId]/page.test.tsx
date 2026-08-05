@@ -96,6 +96,14 @@ describe("GachaOpenPage", () => {
     expect(
       screen.getByRole("button", { name: "다음 카드 보기" }),
     ).toBeInTheDocument();
+
+    for (let index = 0; index < 4; index += 1) {
+      fireEvent.click(screen.getByRole("button", { name: "다음 카드 보기" }));
+    }
+    fireEvent.click(screen.getByRole("button", { name: "전체 결과 보기" }));
+    expect(
+      await screen.findByRole("link", { name: "상점으로 가기" }),
+    ).toHaveAttribute("href", "/shop");
   });
 
   it("환불된 팩은 포인트 반환 안내 후 대기를 종료한다", async () => {

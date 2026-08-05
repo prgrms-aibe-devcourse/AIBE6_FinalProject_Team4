@@ -81,4 +81,22 @@ public interface UserCardCollectionRepository extends JpaRepository<UserCardColl
 			""",
       nativeQuery = true)
   Optional<Integer> findOwnedCount(@Param("userId") Long userId, @Param("cardId") Long cardId);
+
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+			UPDATE user_card_collections
+			SET owned_count = owned_count - :quantity,
+				updated_at = :now
+			WHERE user_id = :userId
+			  AND card_id = :cardId
+			  AND owned_count >= :quantity + 1
+			""",
+      nativeQuery = true)
+  int decrementKeepingOne(
+      @Param("userId") Long userId,
+      @Param("cardId") Long cardId,
+      @Param("quantity") int quantity,
+      @Param("now") LocalDateTime now);
 }

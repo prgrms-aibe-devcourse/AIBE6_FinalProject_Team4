@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "교환", description = "카드를 실물 상품으로 교환하는 관련 API")
+@Tag(name = "교환", description = "쿠폰을 실물 상품으로 교환하는 관련 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiVersion.V1 + "/exchanges")
@@ -33,7 +33,7 @@ public class ExchangeController {
 
 	private final ExchangeService exchangeService;
 
-	@Operation(summary = "교환 신청", description = "보유한 카드를 실물 상품으로 교환 신청합니다.")
+	@Operation(summary = "교환 신청", description = "보유한 쿠폰을 실물 상품으로 교환 신청합니다.")
 	@PostMapping
 	public ResponseEntity<ApiResponse<ExchangeOrderResponse>> requestExchange(
 			@AuthenticationPrincipal Long userId,
@@ -58,7 +58,7 @@ public class ExchangeController {
 		return ResponseEntity.ok(ApiResponse.success(exchangeService.getMyExchange(userId, id)));
 	}
 
-	@Operation(summary = "교환 신청 취소", description = "접수 대기 중인 내 교환 신청을 취소합니다. 카드·재고가 환급됩니다.")
+	@Operation(summary = "교환 신청 취소", description = "접수 대기 중인 내 교환 신청을 취소합니다. 쿠폰·재고가 환급됩니다.")
 	@PatchMapping("/{id}/cancel")
 	public ResponseEntity<Void> cancelExchange(
 			@AuthenticationPrincipal Long userId,

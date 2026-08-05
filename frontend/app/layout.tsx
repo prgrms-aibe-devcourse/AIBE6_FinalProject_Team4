@@ -4,6 +4,7 @@ import { StoreProvider } from '@/lib/store';
 import { UIProvider } from '@/lib/ui';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { GachaCosmeticsProvider } from '@/features/gacha/use-gacha-cosmetics';
 
 export const metadata = {
   title: '키워볼래 🌱',
@@ -20,12 +21,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       {/* pb-[66px] leaves room for the mobile bottom tab bar */}
       <body className="flex min-h-screen flex-col pb-[66px] md:pb-0">
         <StoreProvider>
-          <UIProvider>
-            <Navbar />
-            {/* min-height keeps the footer's top half in view even on short pages, instead of it sitting flush under a tiny amount of content */}
-            <main className="min-h-[calc(100vh-62px-120px)] flex-1">{children}</main>
-            <Footer />
-          </UIProvider>
+          <GachaCosmeticsProvider>
+            <UIProvider>
+              <Navbar />
+              {/* min-height keeps the footer's top half in view even on short pages, instead of it sitting flush under a tiny amount of content */}
+              <main className="min-h-[calc(100vh-62px-120px)] flex-1">{children}</main>
+              <Footer />
+            </UIProvider>
+          </GachaCosmeticsProvider>
         </StoreProvider>
       </body>
     </html>

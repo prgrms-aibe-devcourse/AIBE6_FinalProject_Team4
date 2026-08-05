@@ -315,7 +315,13 @@ export default function GachaBatchOpenPage({
 
               <GachaBatchResultGrid results={groupedResults} />
 
-              <div className="mt-10 flex justify-center">
+              <div className="mt-10 flex flex-wrap justify-center gap-3">
+                <Link
+                  href="/shop"
+                  className="rounded-full border border-[#d7c266]/60 px-8 py-3.5 font-black text-[#f2dc83] transition hover:-translate-y-0.5 hover:bg-[#d7c266]/10"
+                >
+                  상점으로 가기
+                </Link>
                 <button
                   type="button"
                   onClick={confirm}

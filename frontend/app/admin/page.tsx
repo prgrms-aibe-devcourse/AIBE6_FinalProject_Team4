@@ -1,6 +1,19 @@
 "use client";
 import { ApiError } from "@/lib/api";
+import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
+import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
+import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
+import {
+  adjustAdminProductStock,
+  AdminProduct,
+  AdminProductInput,
+  changeAdminProductStatus,
+  createAdminProduct,
+  getAdminProducts,
+  hideAdminProduct,
+  updateAdminProduct,
+} from "@/lib/admin-product-api";
 import {
   adminCancelExchange,
   deliverExchange,
@@ -9,9 +22,17 @@ import {
   prepareExchange,
   shipExchange,
 } from "@/lib/exchange-api";
-import { createSpecies, getSpecies, PlantSpeciesData, updateSpecies } from "@/lib/species-api";
+import {
+  createSpecies,
+  getSpecies,
+  PlantSpeciesData,
+  updateSpecies,
+} from "@/lib/species-api";
 import { fmt, useStore } from "@/lib/store";
+import { couponName } from "@/lib/coupon-label";
+import { ProductCategory } from "@/lib/product-api";
 import { useUI } from "@/lib/ui";
+import { validateCommerceAssetKey } from "@/lib/commerce-asset";
 import { useEffect, useState } from "react";
 
 const DELSEQ = ["PREPARING", "SHIPPING", "DELIVERED"];
@@ -57,9 +78,14 @@ const ROW = "items-center border-t border-[#f2f3ec] px-[18px] py-3.5 text-sm";
 const CHIP = "rounded-full px-2.5 py-1 text-xs font-extrabold";
 const BTN_SOFT =
   "cursor-pointer rounded-[9px] bg-brand-soft px-[13px] py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white";
+const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
+  KIT: "재배 키트",
+  SEEDLING: "모종",
+  GACHA_PACK: "가챠 팩",
+};
 
 export default function Admin() {
-  const { showToast } = useUI();
+  const { showToast, askConfirm } = useUI();
   const [tab, setTab] = useState("orders");
   const [orders, setOrders] = useState([
     {
@@ -129,10 +155,20 @@ export default function Admin() {
   const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
   const [speciesLoading, setSpeciesLoading] = useState(true);
   const [speciesError, setSpeciesError] = useState("");
-  const [speciesForm, setSpeciesForm] = useState({ name: "", category: "", careGuide: "" });
+  const [speciesForm, setSpeciesForm] = useState({
+    name: "",
+    category: "",
+    careGuide: "",
+  });
   const [speciesSubmitting, setSpeciesSubmitting] = useState(false);
-  const [editingSpecies, setEditingSpecies] = useState<PlantSpeciesData | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", category: "", careGuide: "" });
+  const [editingSpecies, setEditingSpecies] = useState<PlantSpeciesData | null>(
+    null,
+  );
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "",
+    careGuide: "",
+  });
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => {
@@ -145,7 +181,11 @@ export default function Admin() {
     getSpecies(accessToken, controller.signal)
       .then((data) => setSpeciesList(data))
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+        )
+          return;
         setSpeciesList([]);
         setSpeciesError(
           requestError instanceof ApiError
@@ -160,40 +200,48 @@ export default function Admin() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      name: "새싹 재배 키트",
-      emoji: "🌱",
-      price: 800,
-      stock: 24,
-      hidden: false,
-    },
-    {
-      id: 2,
-      name: "방울토마토 모종",
-      emoji: "🍅",
-      price: 1200,
-      stock: 12,
-      hidden: false,
-    },
-    {
-      id: 3,
-      name: "상추 모종",
-      emoji: "🥬",
-      price: 700,
-      stock: 0,
-      hidden: false,
-    },
-    {
-      id: 4,
-      name: "딸기 모종",
-      emoji: "🍓",
-      price: 1800,
-      stock: 5,
-      hidden: true,
-    },
-  ]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState("");
+  const [productSubmitting, setProductSubmitting] = useState(false);
+  const [productBusyId, setProductBusyId] = useState<number | null>(null);
+  const [stockDeltas, setStockDeltas] = useState<Record<number, string>>({});
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    category: "KIT" as ProductCategory,
+    pointPrice: "",
+    stock: "0",
+    plantId: "",
+    description: "",
+    imageUrl: "",
+  });
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const controller = new AbortController();
+    setProductsLoading(true);
+    setProductsError("");
+    getAdminProducts(state.accessToken, controller.signal)
+      .then(setProducts)
+      .catch((requestError) => {
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+        )
+          return;
+        setProducts([]);
+        setProductsError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : "상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setProductsLoading(false);
+      });
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
   const [reports, setReports] = useState([
     {
       id: 1,
@@ -274,7 +322,7 @@ export default function Admin() {
         state.accessToken,
       );
       setExchanges((prev) => prev.map((e) => (e.id === id ? updated : e)));
-      showToast("교환을 취소하고 카드를 복원했어요.");
+      showToast("교환을 취소하고 쿠폰을 복원했어요.");
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError
@@ -286,15 +334,20 @@ export default function Admin() {
   };
   const addSpecies = async () => {
     if (!state.accessToken) return;
-    if (!speciesForm.name.trim()) return showToast("종 이름을 입력해 주세요.", "err");
+    if (!speciesForm.name.trim())
+      return showToast("종 이름을 입력해 주세요.", "err");
 
     setSpeciesSubmitting(true);
     try {
       const created = await createSpecies(
         {
           name: speciesForm.name.trim(),
-          ...(speciesForm.category.trim() ? { category: speciesForm.category.trim() } : {}),
-          ...(speciesForm.careGuide.trim() ? { careGuide: speciesForm.careGuide.trim() } : {}),
+          ...(speciesForm.category.trim()
+            ? { category: speciesForm.category.trim() }
+            : {}),
+          ...(speciesForm.careGuide.trim()
+            ? { careGuide: speciesForm.careGuide.trim() }
+            : {}),
         },
         state.accessToken,
       );
@@ -303,7 +356,9 @@ export default function Admin() {
       showToast(`'${created.name}' 종을 추가했어요 🌱`);
     } catch (requestError) {
       showToast(
-        requestError instanceof ApiError ? requestError.message : "종 추가에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        requestError instanceof ApiError
+          ? requestError.message
+          : "종 추가에 실패했어요. 잠시 후 다시 시도해 주세요.",
         "err",
       );
     } finally {
@@ -312,7 +367,11 @@ export default function Admin() {
   };
   const openEditSpecies = (sp: PlantSpeciesData) => {
     setEditingSpecies(sp);
-    setEditForm({ name: sp.name, category: sp.category ?? "", careGuide: sp.careGuide ?? "" });
+    setEditForm({
+      name: sp.name,
+      category: sp.category ?? "",
+      careGuide: sp.careGuide ?? "",
+    });
   };
   const closeEditSpecies = () => {
     if (editSubmitting) return;
@@ -320,7 +379,8 @@ export default function Admin() {
   };
   const saveEditSpecies = async () => {
     if (!state.accessToken || !editingSpecies) return;
-    if (!editForm.name.trim()) return showToast("종 이름을 입력해 주세요.", "err");
+    if (!editForm.name.trim())
+      return showToast("종 이름을 입력해 주세요.", "err");
 
     setEditSubmitting(true);
     try {
@@ -328,28 +388,226 @@ export default function Admin() {
         editingSpecies.id,
         {
           name: editForm.name.trim(),
-          ...(editForm.category.trim() ? { category: editForm.category.trim() } : {}),
-          ...(editForm.careGuide.trim() ? { careGuide: editForm.careGuide.trim() } : {}),
+          ...(editForm.category.trim()
+            ? { category: editForm.category.trim() }
+            : {}),
+          ...(editForm.careGuide.trim()
+            ? { careGuide: editForm.careGuide.trim() }
+            : {}),
         },
         state.accessToken,
       );
-      setSpeciesList(speciesList.map((sp) => (sp.id === updated.id ? updated : sp)));
+      setSpeciesList(
+        speciesList.map((sp) => (sp.id === updated.id ? updated : sp)),
+      );
       showToast(`'${updated.name}' 정보를 수정했어요 🌱`);
       setEditingSpecies(null);
     } catch (requestError) {
       showToast(
-        requestError instanceof ApiError ? requestError.message : "종 수정에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        requestError instanceof ApiError
+          ? requestError.message
+          : "종 수정에 실패했어요. 잠시 후 다시 시도해 주세요.",
         "err",
       );
     } finally {
       setEditSubmitting(false);
     }
   };
-  const toggleProd = (id: number) => {
-    setProducts(
-      products.map((p) => (p.id === id ? { ...p, hidden: !p.hidden } : p)),
+  const resetProductForm = () => {
+    setEditingProductId(null);
+    setProductForm({
+      name: "",
+      category: "KIT",
+      pointPrice: "",
+      stock: "0",
+      plantId: "",
+      description: "",
+      imageUrl: "",
+    });
+  };
+
+  const replaceProduct = (next: AdminProduct) => {
+    setProducts((current) =>
+      current.some((product) => product.id === next.id)
+        ? current.map((product) => (product.id === next.id ? next : product))
+        : [next, ...current],
     );
-    showToast("상품 노출 상태를 변경했어요.");
+  };
+
+  const productInput = (): AdminProductInput | null => {
+    const pointPrice = Number(productForm.pointPrice);
+    const stock = Number(productForm.stock);
+    if (!productForm.name.trim()) {
+      showToast("상품명을 입력해 주세요.", "err");
+      return null;
+    }
+    if (!Number.isInteger(pointPrice) || pointPrice < 0) {
+      showToast("가격은 0 이상의 정수로 입력해 주세요.", "err");
+      return null;
+    }
+    if (productForm.category === "GACHA_PACK" && pointPrice < 1) {
+      showToast("가챠 팩 가격은 1P 이상이어야 해요.", "err");
+      return null;
+    }
+    if (!Number.isInteger(stock) || stock < 0) {
+      showToast("재고는 0 이상의 정수로 입력해 주세요.", "err");
+      return null;
+    }
+    const imageError = validateCommerceAssetKey(
+      productForm.imageUrl,
+      "products",
+      editingProductId,
+    );
+    if (imageError) {
+      showToast(imageError, "err");
+      return null;
+    }
+    const plantId = productForm.plantId ? Number(productForm.plantId) : null;
+    return {
+      name: productForm.name.trim(),
+      category: productForm.category,
+      pointPrice,
+      stock: productForm.category === "GACHA_PACK" ? 0 : stock,
+      plantId:
+        productForm.category === "SEEDLING" && Number.isInteger(plantId)
+          ? plantId
+          : null,
+      description: productForm.description.trim() || null,
+      imageUrl: productForm.imageUrl.trim() || null,
+    };
+  };
+
+  const saveProduct = async () => {
+    if (!state.accessToken || productSubmitting) return;
+    const input = productInput();
+    if (!input) return;
+    setProductSubmitting(true);
+    try {
+      const saved = editingProductId
+        ? await updateAdminProduct(editingProductId, input, state.accessToken)
+        : await createAdminProduct(input, state.accessToken);
+      replaceProduct(saved);
+      showToast(
+        editingProductId ? "상품 정보를 수정했어요." : "새 상품을 등록했어요.",
+      );
+      resetProductForm();
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "상품을 저장하지 못했어요.",
+        "err",
+      );
+    } finally {
+      setProductSubmitting(false);
+    }
+  };
+
+  const editProduct = (product: AdminProduct) => {
+    setEditingProductId(product.id);
+    setProductForm({
+      name: product.name,
+      category: product.category,
+      pointPrice: String(product.pointPrice),
+      stock: String(product.stock),
+      plantId: product.plantId ? String(product.plantId) : "",
+      description: product.description ?? "",
+      imageUrl: product.imageKey ?? "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const toggleProduct = async (product: AdminProduct) => {
+    if (!state.accessToken || productBusyId !== null) return;
+    setProductBusyId(product.id);
+    try {
+      const next = await changeAdminProductStatus(
+        product.id,
+        product.status === "ACTIVE" ? "HIDDEN" : "ACTIVE",
+        state.accessToken,
+      );
+      replaceProduct(next);
+      showToast(
+        next.status === "ACTIVE" ? "상품을 노출했어요." : "상품을 숨겼어요.",
+      );
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "노출 상태를 변경하지 못했어요.",
+        "err",
+      );
+    } finally {
+      setProductBusyId(null);
+    }
+  };
+
+  const adjustProductStock = async (product: AdminProduct, delta: number) => {
+    if (!state.accessToken || productBusyId !== null || product.unlimitedStock)
+      return;
+    setProductBusyId(product.id);
+    try {
+      const next = await adjustAdminProductStock(
+        product.id,
+        delta,
+        state.accessToken,
+      );
+      replaceProduct(next);
+      if (editingProductId === product.id) {
+        setProductForm((current) => ({
+          ...current,
+          stock: String(next.stock),
+        }));
+      }
+      showToast(`재고를 ${next.stock}개로 조정했어요.`);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "재고를 조정하지 못했어요.",
+        "err",
+      );
+    } finally {
+      setProductBusyId(null);
+    }
+  };
+
+  const applyStockDelta = (product: AdminProduct) => {
+    const delta = Number(stockDeltas[product.id]);
+    if (!Number.isInteger(delta) || delta === 0) {
+      showToast("재고 증감량을 0이 아닌 정수로 입력해 주세요.", "err");
+      return;
+    }
+    void adjustProductStock(product, delta).then(() =>
+      setStockDeltas((current) => ({ ...current, [product.id]: "" })),
+    );
+  };
+
+  const confirmHideProduct = (product: AdminProduct) => {
+    if (!state.accessToken || productBusyId !== null) return;
+    askConfirm({
+      icon: "visibility_off",
+      title: "상품을 삭제할까요?",
+      body: "실제 데이터는 삭제하지 않고 상점에서 숨깁니다. 언제든 다시 노출할 수 있어요.",
+      ok: "숨김 처리",
+      onOk: async () => {
+        setProductBusyId(product.id);
+        try {
+          const next = await hideAdminProduct(product.id, state.accessToken!);
+          replaceProduct(next);
+          showToast("상품을 숨김 처리했어요.");
+        } catch (requestError) {
+          showToast(
+            requestError instanceof ApiError
+              ? requestError.message
+              : "상품을 숨기지 못했어요.",
+            "err",
+          );
+        } finally {
+          setProductBusyId(null);
+        }
+      },
+    });
   };
   const resolveReport = (id: number, msg: string) => {
     setReports(
@@ -362,6 +620,8 @@ export default function Admin() {
     ["orders", "주문 관리"],
     ["exchanges", "교환 관리"],
     ["products", "상품 관리"],
+    ["coupons", "쿠폰 관리"],
+    ["gacha-operations", "가챠 장애 관리"],
     ["points", "포인트 관리"],
     ["reports", "신고 관리"],
     ["species", "종 관리"],
@@ -447,7 +707,7 @@ export default function Admin() {
         <div className={PANEL}>
           <div className={`grid grid-cols-[1.3fr_1fr_1fr_1.4fr] ${HEAD}`}>
             <div>실물상품</div>
-            <div>카드</div>
+            <div>쿠폰</div>
             <div>상태</div>
             <div className="text-right">처리</div>
           </div>
@@ -477,7 +737,7 @@ export default function Admin() {
                 >
                   <div className="font-bold">{x.exchangeProductName}</div>
                   <div className="text-[#6d7a68]">
-                    {x.cardName} {x.usedCardCount}장
+                    {couponName(x.cardName)} {x.usedCardCount}장
                   </div>
                   <div>
                     <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
@@ -510,47 +770,367 @@ export default function Admin() {
       )}
 
       {tab === "products" && (
-        <div className={PANEL}>
-          <div className={`grid grid-cols-[1.6fr_1fr_1fr_1.2fr] ${HEAD}`}>
-            <div>상품명</div>
-            <div>가격</div>
-            <div>재고</div>
-            <div className="text-right">노출</div>
-          </div>
-          {products.map((p) => (
-            <div
-              key={p.id}
-              className={`grid grid-cols-[1.6fr_1fr_1fr_1.2fr] ${ROW}`}
-            >
-              <div className="flex items-center gap-[9px] font-bold">
-                <span className="text-xl">{p.emoji}</span>
-                {p.name}
+        <div className="flex flex-col gap-5">
+          <div className={`${PANEL} p-5`}>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-extrabold">
+                  {editingProductId ? "상품 수정" : "새 상품 추가"}
+                </h2>
+                <p className="mt-1 text-xs text-sub">
+                  상점 상품과 무제한 재고 가챠 팩을 관리합니다.
+                </p>
               </div>
-              <div className="font-bold text-gold-text">{fmt(p.price)}P</div>
-              <div
-                className={`font-bold ${p.stock === 0 ? "text-[#b5502f]" : "text-brand-text"}`}
-              >
-                {p.stock === 0 ? "품절" : p.stock + "개"}
-              </div>
-              <div className="text-right">
+              {editingProductId && (
                 <button
                   type="button"
-                  onClick={() => toggleProd(p.id)}
-                  aria-pressed={!p.hidden}
-                  className={`relative inline-block h-[26px] w-[46px] cursor-pointer rounded-full transition-colors duration-150 ${p.hidden ? "bg-[#d7dccd] hover:bg-[#c5cbb9]" : "bg-brand hover:bg-brand-dark"}`}
+                  onClick={resetProductForm}
+                  className={BTN_SOFT}
                 >
-                  <span
-                    className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-[left] ${p.hidden ? "left-[3px]" : "left-[23px]"}`}
-                  />
+                  신규 등록으로 전환
                 </button>
-              </div>
+              )}
             </div>
-          ))}
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <label className="text-xs font-bold text-sub">
+                상품명
+                <input
+                  value={productForm.name}
+                  onChange={(event) =>
+                    setProductForm({
+                      ...productForm,
+                      name: event.target.value,
+                    })
+                  }
+                  maxLength={100}
+                  placeholder="상품명"
+                  className="mt-1.5 w-full rounded-xl border-[1.5px] border-line px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"
+                />
+              </label>
+
+              <label className="text-xs font-bold text-sub">
+                카테고리
+                <select
+                  value={productForm.category}
+                  disabled={editingProductId !== null}
+                  onChange={(event) =>
+                    setProductForm({
+                      ...productForm,
+                      category: event.target.value as ProductCategory,
+                      stock:
+                        event.target.value === "GACHA_PACK"
+                          ? "0"
+                          : productForm.stock,
+                      plantId:
+                        event.target.value === "SEEDLING"
+                          ? productForm.plantId
+                          : "",
+                    })
+                  }
+                  className="mt-1.5 w-full rounded-xl border-[1.5px] border-line bg-white px-3 py-2.5 text-sm text-ink outline-none disabled:bg-[#f3f4ef]"
+                >
+                  <option value="KIT">재배 키트</option>
+                  <option value="SEEDLING">모종</option>
+                  <option value="GACHA_PACK">가챠 팩</option>
+                </select>
+              </label>
+
+              <label className="text-xs font-bold text-sub">
+                가격(P)
+                <input
+                  type="number"
+                  min={productForm.category === "GACHA_PACK" ? 1 : 0}
+                  step={1}
+                  value={productForm.pointPrice}
+                  onChange={(event) =>
+                    setProductForm({
+                      ...productForm,
+                      pointPrice: event.target.value,
+                    })
+                  }
+                  className="mt-1.5 w-full rounded-xl border-[1.5px] border-line px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"
+                />
+              </label>
+
+              <label className="text-xs font-bold text-sub">
+                {productForm.category === "GACHA_PACK"
+                  ? "재고"
+                  : editingProductId
+                    ? "현재 재고"
+                    : "초기 재고"}
+                <input
+                  type={
+                    productForm.category === "GACHA_PACK" ? "text" : "number"
+                  }
+                  min={0}
+                  step={1}
+                  value={
+                    productForm.category === "GACHA_PACK"
+                      ? "무제한"
+                      : productForm.stock
+                  }
+                  disabled={
+                    productForm.category === "GACHA_PACK" ||
+                    editingProductId !== null
+                  }
+                  onChange={(event) =>
+                    setProductForm({
+                      ...productForm,
+                      stock: event.target.value,
+                    })
+                  }
+                  className="mt-1.5 w-full rounded-xl border-[1.5px] border-line px-3 py-2.5 text-sm text-ink outline-none disabled:bg-[#f3f4ef]"
+                />
+              </label>
+            </div>
+
+            {productForm.category === "SEEDLING" && (
+              <label className="mt-3 block text-xs font-bold text-sub">
+                연결 식물 종
+                <select
+                  value={productForm.plantId}
+                  onChange={(event) =>
+                    setProductForm({
+                      ...productForm,
+                      plantId: event.target.value,
+                    })
+                  }
+                  className="mt-1.5 w-full rounded-xl border-[1.5px] border-line bg-white px-3 py-2.5 text-sm text-ink outline-none md:max-w-sm"
+                >
+                  <option value="">연결하지 않음</option>
+                  {speciesList.map((species) => (
+                    <option key={species.id} value={species.id}>
+                      {species.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <AdminAssetKeyField
+                value={productForm.imageUrl}
+                onChange={(imageUrl) =>
+                  setProductForm({ ...productForm, imageUrl })
+                }
+                prefix="products"
+                resourceId={editingProductId}
+              />
+              <label className="text-xs font-bold text-sub">
+                설명
+                <textarea
+                  value={productForm.description}
+                  onChange={(event) =>
+                    setProductForm({
+                      ...productForm,
+                      description: event.target.value,
+                    })
+                  }
+                  maxLength={2000}
+                  rows={2}
+                  className="mt-1.5 w-full resize-none rounded-xl border-[1.5px] border-line px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"
+                />
+              </label>
+            </div>
+
+            <button
+              type="button"
+              disabled={productSubmitting}
+              onClick={() => void saveProduct()}
+              className="mt-4 cursor-pointer rounded-xl bg-brand px-5 py-2.5 text-sm font-extrabold text-white disabled:opacity-50"
+            >
+              {productSubmitting
+                ? "저장 중..."
+                : editingProductId
+                  ? "수정 저장"
+                  : "+ 상품 등록"}
+            </button>
+          </div>
+
+          <div className={`${PANEL} overflow-x-auto`}>
+            <div className="min-w-[920px]">
+              <div
+                className={`grid grid-cols-[1.7fr_.8fr_.8fr_2.3fr_.7fr_1.4fr] ${HEAD}`}
+              >
+                <div>상품</div>
+                <div>카테고리</div>
+                <div>가격</div>
+                <div>재고 관리</div>
+                <div>노출</div>
+                <div className="text-right">관리</div>
+              </div>
+              {productsLoading ? (
+                <div className="px-5 py-12 text-center text-sm text-sub">
+                  상품을 불러오고 있어요.
+                </div>
+              ) : productsError ? (
+                <div className="px-5 py-12 text-center text-sm text-danger">
+                  {productsError}
+                </div>
+              ) : products.length === 0 ? (
+                <div className="px-5 py-12 text-center text-sm text-sub">
+                  등록된 상점 상품이 없어요.
+                </div>
+              ) : (
+                products.map((product) => {
+                  const busy = productBusyId === product.id;
+                  return (
+                    <div
+                      key={product.id}
+                      className={`grid grid-cols-[1.7fr_.8fr_.8fr_2.3fr_.7fr_1.4fr] ${ROW}`}
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        {product.imageUrl ? (
+                          <div
+                            className="h-10 w-10 flex-none rounded-lg bg-brand-soft bg-cover bg-center"
+                            style={{
+                              backgroundImage: `url("${product.imageUrl}")`,
+                            }}
+                          />
+                        ) : (
+                          <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-brand-soft text-xl">
+                            {product.category === "GACHA_PACK" ? "🎴" : "🌱"}
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <div className="truncate font-bold">
+                            {product.name}
+                          </div>
+                          <div className="truncate text-xs text-sub">
+                            {product.description || "설명 없음"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs font-bold text-sub">
+                        {PRODUCT_CATEGORY_LABEL[product.category]}
+                      </div>
+                      <div className="font-bold text-gold-text">
+                        {fmt(product.pointPrice)}P
+                      </div>
+                      <div>
+                        {product.unlimitedStock ? (
+                          <span className="font-extrabold text-brand-text">
+                            무제한 재고 · 1회 1팩 구매
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={busy || product.stock < 1}
+                              onClick={() =>
+                                void adjustProductStock(product, -1)
+                              }
+                              className="h-7 w-7 rounded-lg bg-[#f0f1ea] font-black disabled:opacity-35"
+                            >
+                              −
+                            </button>
+                            <span
+                              className={`min-w-12 text-center font-extrabold ${product.soldOut ? "text-danger" : "text-brand-text"}`}
+                            >
+                              {product.soldOut ? "품절" : `${product.stock}개`}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void adjustProductStock(product, 1)
+                              }
+                              className="h-7 w-7 rounded-lg bg-brand-soft font-black text-brand-dark disabled:opacity-35"
+                            >
+                              +
+                            </button>
+                            <input
+                              type="number"
+                              step={1}
+                              value={stockDeltas[product.id] ?? ""}
+                              onChange={(event) =>
+                                setStockDeltas((current) => ({
+                                  ...current,
+                                  [product.id]: event.target.value,
+                                }))
+                              }
+                              aria-label={`${product.name} 재고 증감량`}
+                              placeholder="±수량"
+                              className="ml-1 w-16 rounded-lg border border-line px-2 py-1 text-xs outline-none"
+                            />
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => applyStockDelta(product)}
+                              className="rounded-lg bg-[#f0f1ea] px-2 py-1 text-[11px] font-bold disabled:opacity-35"
+                            >
+                              적용
+                            </button>
+                            {product.stock > 0 && (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void adjustProductStock(
+                                    product,
+                                    -product.stock,
+                                  )
+                                }
+                                className="ml-1 rounded-lg border border-danger/30 px-2 py-1 text-[11px] font-bold text-danger disabled:opacity-35"
+                              >
+                                품절 처리
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void toggleProduct(product)}
+                          aria-pressed={product.status === "ACTIVE"}
+                          aria-label={`${product.name} ${product.status === "ACTIVE" ? "숨기기" : "노출하기"}`}
+                          className={`relative inline-block h-[26px] w-[46px] cursor-pointer rounded-full transition-colors disabled:opacity-40 ${product.status === "ACTIVE" ? "bg-brand" : "bg-[#d7dccd]"}`}
+                        >
+                          <span
+                            className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-[left] ${product.status === "ACTIVE" ? "left-[23px]" : "left-[3px]"}`}
+                          />
+                        </button>
+                      </div>
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => editProduct(product)}
+                          className={BTN_SOFT}
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy || product.status === "HIDDEN"}
+                          onClick={() => confirmHideProduct(product)}
+                          className="cursor-pointer rounded-[9px] bg-danger-soft px-3 py-[7px] text-[12px] font-bold text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {tab === "points" && (
         <AdminPointAdjustmentPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "coupons" && state.accessToken && (
+        <AdminCouponPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "gacha-operations" && state.accessToken && (
+        <AdminGachaOperationsPanel accessToken={state.accessToken} />
       )}
 
       {tab === "species" && (
@@ -560,21 +1140,27 @@ export default function Admin() {
             <div className="grid gap-2.5 sm:grid-cols-3">
               <input
                 value={speciesForm.name}
-                onChange={(e) => setSpeciesForm({ ...speciesForm, name: e.target.value })}
+                onChange={(e) =>
+                  setSpeciesForm({ ...speciesForm, name: e.target.value })
+                }
                 placeholder="이름 (예: 몬스테라)"
                 maxLength={100}
                 className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
               />
               <input
                 value={speciesForm.category}
-                onChange={(e) => setSpeciesForm({ ...speciesForm, category: e.target.value })}
+                onChange={(e) =>
+                  setSpeciesForm({ ...speciesForm, category: e.target.value })
+                }
                 placeholder="카테고리 (선택)"
                 maxLength={50}
                 className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
               />
               <input
                 value={speciesForm.careGuide}
-                onChange={(e) => setSpeciesForm({ ...speciesForm, careGuide: e.target.value })}
+                onChange={(e) =>
+                  setSpeciesForm({ ...speciesForm, careGuide: e.target.value })
+                }
                 placeholder="관리 가이드 (선택)"
                 maxLength={500}
                 className="rounded-xl border-[1.5px] border-line px-[13px] py-2.5 text-sm outline-none"
@@ -597,11 +1183,17 @@ export default function Admin() {
               <div>관리 가이드</div>
             </div>
             {speciesLoading ? (
-              <div className="px-[18px] py-10 text-center text-sm text-sub">종 목록을 불러오고 있어요 🌱</div>
+              <div className="px-[18px] py-10 text-center text-sm text-sub">
+                종 목록을 불러오고 있어요 🌱
+              </div>
             ) : speciesError ? (
-              <div className="px-[18px] py-10 text-center text-sm text-sub">{speciesError}</div>
+              <div className="px-[18px] py-10 text-center text-sm text-sub">
+                {speciesError}
+              </div>
             ) : speciesList.length === 0 ? (
-              <div className="px-[18px] py-10 text-center text-sm text-sub">등록된 종이 없어요.</div>
+              <div className="px-[18px] py-10 text-center text-sm text-sub">
+                등록된 종이 없어요.
+              </div>
             ) : (
               speciesList.map((sp) => (
                 <button
@@ -612,7 +1204,9 @@ export default function Admin() {
                 >
                   <div className="font-bold">{sp.name}</div>
                   <div className="text-[#6d7a68]">{sp.category ?? "-"}</div>
-                  <div className="truncate text-[#6d7a68]">{sp.careGuide ?? "-"}</div>
+                  <div className="truncate text-[#6d7a68]">
+                    {sp.careGuide ?? "-"}
+                  </div>
                 </button>
               ))
             )}
@@ -625,29 +1219,42 @@ export default function Admin() {
           onClick={closeEditSpecies}
           className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10"
         >
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]"
+          >
             <h3 className="mb-5 text-xl font-extrabold">종 정보 수정 🌿</h3>
 
             <label className="text-[13px] font-bold text-[#6d7a68]">이름</label>
             <input
               value={editForm.name}
-              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, name: e.target.value })
+              }
               maxLength={100}
               className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
             />
 
-            <label className="text-[13px] font-bold text-[#6d7a68]">카테고리</label>
+            <label className="text-[13px] font-bold text-[#6d7a68]">
+              카테고리
+            </label>
             <input
               value={editForm.category}
-              onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, category: e.target.value })
+              }
               maxLength={50}
               className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
             />
 
-            <label className="text-[13px] font-bold text-[#6d7a68]">관리 가이드</label>
+            <label className="text-[13px] font-bold text-[#6d7a68]">
+              관리 가이드
+            </label>
             <textarea
               value={editForm.careGuide}
-              onChange={(e) => setEditForm({ ...editForm, careGuide: e.target.value })}
+              onChange={(e) =>
+                setEditForm({ ...editForm, careGuide: e.target.value })
+              }
               maxLength={500}
               rows={5}
               className="mb-5 mt-1.5 w-full resize-none rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"

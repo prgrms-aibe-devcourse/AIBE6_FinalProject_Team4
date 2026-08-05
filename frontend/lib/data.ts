@@ -28,11 +28,11 @@ export const PRODUCTS = [
 ];
 
 export const CARDS = [
-  { id: 1, name: '수박 카드', price: 300, emoji: '🍉', grad: grads.basil, owned: 5, required: 5, realName: '진짜 수박', realEmoji: '🍉', realGrad: 'linear-gradient(135deg,#C8E6C9,#81C784)', realDesc: '제철 수박 한 통', stock: 8 },
-  { id: 2, name: '토마토 카드', price: 200, emoji: '🍅', grad: grads.tomato, owned: 2, required: 4, realName: '방울토마토 1kg', realEmoji: '🍅', realGrad: 'linear-gradient(135deg,#FFE0B2,#FFAB91)', realDesc: '농장 직송 1kg', stock: 12 },
-  { id: 3, name: '딸기 카드', price: 350, emoji: '🍓', grad: grads.strawberry, owned: 1, required: 6, realName: '딸기 한 팩', realEmoji: '🍓', realGrad: 'linear-gradient(135deg,#FCE4EC,#F48FB1)', realDesc: '설향 500g', stock: 5 },
-  { id: 4, name: '당근 카드', price: 150, emoji: '🥕', grad: grads.carrot, owned: 3, required: 3, realName: '당근 1kg', realEmoji: '🥕', realGrad: 'linear-gradient(135deg,#FFE0B2,#FFB74D)', realDesc: '유기농 1kg', stock: 0 },
-  { id: 5, name: '감자 카드', price: 180, emoji: '🥔', grad: grads.potato, owned: 0, required: 5, realName: '감자 2kg', realEmoji: '🥔', realGrad: 'linear-gradient(135deg,#EFEBE9,#BCAAA4)', realDesc: '수미감자 2kg', stock: 20 },
+  { id: 1, name: '수박 쿠폰', price: 300, emoji: '🍉', grad: grads.basil, owned: 5, required: 5, realName: '진짜 수박', realEmoji: '🍉', realGrad: 'linear-gradient(135deg,#C8E6C9,#81C784)', realDesc: '제철 수박 한 통', stock: 8 },
+  { id: 2, name: '토마토 쿠폰', price: 200, emoji: '🍅', grad: grads.tomato, owned: 2, required: 4, realName: '방울토마토 1kg', realEmoji: '🍅', realGrad: 'linear-gradient(135deg,#FFE0B2,#FFAB91)', realDesc: '농장 직송 1kg', stock: 12 },
+  { id: 3, name: '딸기 쿠폰', price: 350, emoji: '🍓', grad: grads.strawberry, owned: 1, required: 6, realName: '딸기 한 팩', realEmoji: '🍓', realGrad: 'linear-gradient(135deg,#FCE4EC,#F48FB1)', realDesc: '설향 500g', stock: 5 },
+  { id: 4, name: '당근 쿠폰', price: 150, emoji: '🥕', grad: grads.carrot, owned: 3, required: 3, realName: '당근 1kg', realEmoji: '🥕', realGrad: 'linear-gradient(135deg,#FFE0B2,#FFB74D)', realDesc: '유기농 1kg', stock: 0 },
+  { id: 5, name: '감자 쿠폰', price: 180, emoji: '🥔', grad: grads.potato, owned: 0, required: 5, realName: '감자 2kg', realEmoji: '🥔', realGrad: 'linear-gradient(135deg,#EFEBE9,#BCAAA4)', realDesc: '수미감자 2kg', stock: 20 },
 ];
 
 export const ADDRESSES = [

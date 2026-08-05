@@ -90,6 +90,9 @@ describe("shop gacha pack detail", () => {
       name: "100P로 1팩 구매하고 개봉하기",
     });
     expect(screen.getByText("팩은 한 번에 1개씩 구매할 수 있어요")).toBeInTheDocument();
+    expect(screen.queryByText("수량")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "−" })).not.toBeInTheDocument();
 
     fireEvent.click(purchaseButton);
 

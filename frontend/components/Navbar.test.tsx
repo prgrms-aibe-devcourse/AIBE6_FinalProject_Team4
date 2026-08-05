@@ -33,6 +33,10 @@ vi.mock("@/lib/ui", () => ({
   useUI: () => ({ showToast: vi.fn(), askConfirm: vi.fn() }),
 }));
 
+vi.mock("@/features/gacha/use-gacha-cosmetics", () => ({
+  useGachaCosmetics: () => ({ title: null, border: null }),
+}));
+
 describe("Navbar", () => {
   afterEach(cleanup);
 
