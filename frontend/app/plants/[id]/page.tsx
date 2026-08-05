@@ -9,6 +9,7 @@ import { ApiError, resolveImageUrl } from '@/lib/api';
 import { deletePlant, deletePlantImage, getPlant, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
+import { getTimelapse, PlantTimelapseData } from '@/lib/timelapse-api';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -38,6 +39,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   const [editStatus, setEditStatus] = useState<PlantStatus>('GROWING');
   const [saving, setSaving] = useState(false);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
+  const [timelapse, setTimelapse] = useState<PlantTimelapseData | null>(null);
   const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -83,6 +85,22 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
 
     return () => controller.abort();
   }, [hydrated, state.accessToken, id]);
+
+  useEffect(() => {
+    // GROWING인 동안엔 타임랩스를 만들 수 없으므로(TIMELAPSE_NOT_HARVESTED) 조회 자체를 스킵한다.
+    if (!hydrated || !state.accessToken || !plant || plant.status === 'GROWING') return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+
+    getTimelapse(id, accessToken, controller.signal)
+      .then((data) => setTimelapse(data))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setTimelapse(null);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken, id, plant?.status]);
 
   const remove = () => {
     if (!plant || !state.accessToken) return;
