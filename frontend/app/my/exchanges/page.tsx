@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ApiError } from '@/lib/api';
+import { couponName } from '@/lib/coupon-label';
 import { CardData, getMyCards } from '@/lib/card-api';
 import { cancelExchange, ExchangeOrderData, ExchangeStatus, getMyExchanges } from '@/lib/exchange-api';
 import { useStore } from '@/lib/store';
@@ -73,13 +74,13 @@ export default function MyExchanges() {
 
   const cancel = (id: number) => askConfirm({
     icon: 'undo', title: '교환을 취소할까요?', ok: '취소하기', danger: true,
-    body: '카드와 수량이 다시 돌아와요. 취소할까요?',
+    body: '쿠폰과 수량이 다시 돌아와요. 취소할까요?',
     onOk: async () => {
       if (!state.accessToken) return;
       try {
         await cancelExchange(id, '단순 변심', state.accessToken);
         setExchanges((prev) => prev.map((x) => (x.id === id ? { ...x, status: 'CANCELLED', cancelledBy: 'USER' } : x)));
-        showToast('교환을 취소했어요. 카드와 수량이 다시 돌아왔어요.');
+        showToast('교환을 취소했어요. 쿠폰과 수량이 다시 돌아왔어요.');
       } catch (requestError) {
         showToast(
           requestError instanceof ApiError ? requestError.message : '취소에 실패했어요. 잠시 후 다시 시도해 주세요.',
@@ -95,13 +96,13 @@ export default function MyExchanges() {
 
       <div className="mb-7">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-extrabold">내 카드</h2>
-          <Link href="/cards" className="text-sm font-bold text-brand-dark">카드 구매하기 →</Link>
+          <h2 className="text-lg font-extrabold">내 쿠폰</h2>
+          <Link href="/cards" className="text-sm font-bold text-brand-dark">쿠폰 구매하기 →</Link>
         </div>
         {cardsLoading ? (
-          <div className="rounded-[18px] bg-white py-8 text-center text-sm text-sub">카드를 불러오고 있어요 🃏</div>
+          <div className="rounded-[18px] bg-white py-8 text-center text-sm text-sub">쿠폰을 불러오고 있어요 🎟️</div>
         ) : myCards.length === 0 ? (
-          <div className="rounded-[18px] bg-white py-8 text-center text-sm text-sub">아직 보유한 카드가 없어요.</div>
+          <div className="rounded-[18px] bg-white py-8 text-center text-sm text-sub">아직 보유한 쿠폰이 없어요.</div>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-1">
             {myCards.map((card) => {
@@ -116,7 +117,7 @@ export default function MyExchanges() {
                   >
                     {!card.imageUrl && '🃏'}
                   </div>
-                  <div className="mb-1 truncate text-[13px] font-extrabold">{card.name}</div>
+                  <div className="mb-1 truncate text-[13px] font-extrabold">{couponName(card.name)}</div>
                   <div className="mb-2 text-[11px] font-bold text-sub">보유 {owned} / {card.requiredCountForExchange}</div>
                   {ready ? (
                     <Link
@@ -159,7 +160,7 @@ export default function MyExchanges() {
                       {x.exchangeProductName} <span className="text-[12px] font-semibold text-faint">#{x.id}</span>
                     </div>
                     <div className="text-[13px] text-sub">
-                      {x.cardName} {x.usedCardCount}장 사용 · 신청 {formatDate(x.requestedAt)}
+                      {couponName(x.cardName)} {x.usedCardCount}장 사용 · 신청 {formatDate(x.requestedAt)}
                       {x.deliveredAt && ` · 배송완료 ${formatDate(x.deliveredAt)}`}
                     </div>
                   </div>

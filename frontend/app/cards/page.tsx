@@ -5,6 +5,7 @@ import FilterBar from '@/components/FilterBar';
 import PointPrice from '@/components/PointPrice';
 import { ApiError } from '@/lib/api';
 import { CardData, getCards } from '@/lib/card-api';
+import { couponName } from '@/lib/coupon-label';
 import { useStore } from '@/lib/store';
 
 const TABS = [
@@ -49,7 +50,7 @@ export default function Cards() {
         setError(
           requestError instanceof ApiError
             ? requestError.message
-            : '카드를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+            : '쿠폰을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
         );
       })
       .finally(() => {
@@ -71,7 +72,8 @@ export default function Cards() {
       return (card.ownedCount ?? 0) >= card.requiredCountForExchange;
     }
     if (filter === 'collecting') {
-      return (card.ownedCount ?? 0) < card.requiredCountForExchange;
+      const ownedCount = card.ownedCount ?? 0;
+      return ownedCount > 0 && ownedCount < card.requiredCountForExchange;
     }
     return true;
   });
@@ -87,7 +89,7 @@ export default function Cards() {
 
   return (
     <div className="container animate-upIn">
-      <h1 className="mb-4 text-2xl font-extrabold">카드</h1>
+      <h1 className="mb-4 text-2xl font-extrabold">쿠폰</h1>
 
       <FilterBar
         tabs={personalized ? TABS : TABS.slice(0, 1)}
@@ -100,7 +102,7 @@ export default function Cards() {
 
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
-          카드를 불러오고 있어요 🃏
+          쿠폰을 불러오고 있어요 🎟️
         </div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">
@@ -108,7 +110,7 @@ export default function Cards() {
         </div>
       ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
-          해당하는 카드가 없어요. 일지를 기록하고 포인트를 모아보세요!
+          해당하는 쿠폰이 없어요. 일지를 기록하고 포인트를 모아보세요!
         </div>
       ) : (
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
@@ -142,7 +144,7 @@ export default function Cards() {
                 </div>
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-base font-extrabold">{card.name}</div>
+                    <div className="text-base font-extrabold">{couponName(card.name)}</div>
                     <span className="shrink-0 rounded-full bg-brand-soft px-2 py-1 text-[10.5px] font-extrabold text-brand-dark">
                       무상 포인트 우선
                     </span>

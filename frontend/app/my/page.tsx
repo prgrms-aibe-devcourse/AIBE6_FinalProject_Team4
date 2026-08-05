@@ -23,12 +23,21 @@ import { useUI } from "@/lib/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
+import GachaTitleBadge from "@/components/gacha/GachaTitleBadge";
+import ProfileCosmeticFrame from "@/components/gacha/ProfileCosmeticFrame";
 
 const LINKS = [
   { icon: "receipt_long", label: "주문 내역", href: "/my/orders" },
   { icon: "redeem", label: "교환 내역", href: "/my/exchanges" },
   { icon: "paid", label: "포인트 내역", href: "/my/points" },
-  { icon: "style", label: "카드 목록", href: "/cards" },
+  { icon: "style", label: "쿠폰 목록", href: "/cards" },
+  { icon: "gallery_thumbnail", label: "내 카드", href: "/gacha?tab=mine" },
+  {
+    icon: "award_star",
+    label: "내 칭호·테두리",
+    href: "/gacha?tab=workshop&section=cosmetics",
+  },
   { icon: "menu_book", label: "내 일지", href: "/journals" },
   { icon: "mail", label: "1:1 문의", href: "/my/inquiries" },
 ];
@@ -46,6 +55,8 @@ const MAX_ADDRESSES = 5;
 export default function MyPage() {
   const { showToast } = useUI();
   const { state, set, logout } = useStore();
+  const { title: equippedTitle, border: equippedBorder } =
+    useGachaCosmetics();
   const router = useRouter();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -468,9 +479,14 @@ export default function MyPage() {
   return (
     <div className="container max-w-[960px]">
       <div className="mb-6 flex flex-wrap items-center gap-[18px] rounded-[20px] bg-white p-6 shadow-card">
-        <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] text-3xl font-extrabold text-white">
-          {displayNickname.charAt(0)}
-        </div>
+        <ProfileCosmeticFrame
+          borderCode={equippedBorder?.code}
+          className="h-[78px] w-[78px]"
+        >
+          <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] text-3xl font-extrabold text-white">
+            {displayNickname.charAt(0)}
+          </div>
+        </ProfileCosmeticFrame>
         <div className="min-w-[180px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xl font-extrabold">{displayNickname}</span>
@@ -479,6 +495,13 @@ export default function MyPage() {
             </span>
           </div>
           <div className="mt-1 text-sm text-sub">{displayEmail}</div>
+          {equippedTitle ? (
+            <GachaTitleBadge
+              code={equippedTitle.code}
+              name={equippedTitle.name}
+              className="mt-2"
+            />
+          ) : null}
         </div>
         <div className="flex gap-2">
           <button

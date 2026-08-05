@@ -49,4 +49,24 @@ public class Card extends BaseTimeEntity {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private ActiveStatus status;
+
+	public void updateInfo(
+			String name,
+			Long pointPrice,
+			ExchangeProduct exchangeProduct,
+			Integer requiredCountForExchange,
+			String description,
+			String imageUrl
+	) {
+		this.name = name;
+		this.pointPrice = pointPrice;
+		this.exchangeProduct = exchangeProduct;
+		this.requiredCountForExchange = requiredCountForExchange;
+		this.description = description;
+		this.imageUrl = imageUrl;
+	}
+
+	public void changeStatus(ActiveStatus status) {
+		this.status = status;
+	}
 }

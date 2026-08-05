@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api';
-import { saveGachaBatch } from '@/features/gacha/batch-session';
 import { withTopicParticle } from '@/lib/korean';
 import { purchaseGachaPacks } from '@/lib/gacha-api';
 import { getProduct, ProductDetail as ProductDetailData } from '@/lib/product-api';
@@ -141,8 +140,9 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
   };
 
   const isGachaPack = product.category === 'GACHA_PACK';
-  const maxQuantity = isGachaPack ? 1 : product.stock;
-  const totalPoint = product.pointPrice * qty;
+  const maxQuantity = product.stock;
+  const gachaPackQuantity = 1;
+  const gachaTotalPoint = product.pointPrice;
 
   const purchaseGachaPack = () => {
     if (!hydrated || !state.accessToken) {
@@ -158,20 +158,20 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
       );
       return;
     }
-    if (state.wallet.free + state.wallet.paid < totalPoint) {
+    if (state.wallet.free + state.wallet.paid < gachaTotalPoint) {
       showToast('사용 가능한 포인트가 부족해요.', 'err');
       return;
     }
 
     askConfirm({
       icon: 'casino',
-      title: `가챠 팩 ${qty}개를 구매할까요?`,
-      body: `총 ${totalPoint.toLocaleString()}P를 사용하고 구매 즉시 개봉합니다.`,
+      title: '가챠 팩 1개를 구매할까요?',
+      body: `총 ${gachaTotalPoint.toLocaleString()}P를 사용하고 구매 즉시 개봉합니다.`,
       ok: '구매하고 개봉하기',
       onOk: async () => {
         setPurchasing(true);
         try {
-          const signature = `${product.id}:${qty}`;
+          const signature = `${product.id}:${gachaPackQuantity}`;
           const idempotencyKey =
             purchaseAttempt.current?.signature === signature
               ? purchaseAttempt.current.key
@@ -179,18 +179,14 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           purchaseAttempt.current = { signature, key: idempotencyKey };
           const response = await purchaseGachaPacks(
             product.id,
-            qty,
+            gachaPackQuantity,
             state.accessToken!,
             idempotencyKey,
           );
           purchaseAttempt.current = null;
           await refreshWallet().catch(() => undefined);
           showToast(`${response.quantity}팩 구매가 완료됐어요!`);
-          if (response.drawIds.length === 1) {
-            router.push(`/gacha/open/${response.drawIds[0]}`);
-          } else {
-            router.push(`/gacha/open/batch/${saveGachaBatch(response.drawIds)}`);
-          }
+          router.push(`/gacha/open/${response.drawIds[0]}`);
         } catch (purchaseError) {
           showToast(
             purchaseError instanceof ApiError
@@ -267,26 +263,28 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
             </button>
           ) : (
             <>
-              <div className="mb-[18px] flex items-center gap-3.5">
-                <span className="font-bold text-[#6d7a68]">수량</span>
-                <div className="flex items-center overflow-hidden rounded-[11px] border-[1.5px] border-line">
-                  <button
-                    type="button"
-                    onClick={() => setQty(Math.max(1, qty - 1))}
-                    className="flex h-10 w-10 cursor-pointer items-center justify-center text-xl text-[#6d7a68]"
-                  >
-                    −
-                  </button>
-                  <div className="w-[46px] text-center text-base font-extrabold">{qty}</div>
-                  <button
-                    type="button"
-                    onClick={() => setQty(Math.min(maxQuantity, qty + 1))}
-                    className="flex h-10 w-10 cursor-pointer items-center justify-center text-xl text-[#6d7a68]"
-                  >
-                    +
-                  </button>
+              {!isGachaPack && (
+                <div className="mb-[18px] flex items-center gap-3.5">
+                  <span className="font-bold text-[#6d7a68]">수량</span>
+                  <div className="flex items-center overflow-hidden rounded-[11px] border-[1.5px] border-line">
+                    <button
+                      type="button"
+                      onClick={() => setQty(Math.max(1, qty - 1))}
+                      className="flex h-10 w-10 cursor-pointer items-center justify-center text-xl text-[#6d7a68]"
+                    >
+                      −
+                    </button>
+                    <div className="w-[46px] text-center text-base font-extrabold">{qty}</div>
+                    <button
+                      type="button"
+                      onClick={() => setQty(Math.min(maxQuantity, qty + 1))}
+                      className="flex h-10 w-10 cursor-pointer items-center justify-center text-xl text-[#6d7a68]"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
               {isGachaPack ? (
                 <button
                   type="button"
@@ -296,7 +294,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
                 >
                   {purchasing
                     ? '팩을 준비하고 있어요...'
-                    : `${totalPoint.toLocaleString()}P로 ${qty}팩 구매하고 개봉하기`}
+                    : `${gachaTotalPoint.toLocaleString()}P로 1팩 구매하고 개봉하기`}
                 </button>
               ) : (
                 <>

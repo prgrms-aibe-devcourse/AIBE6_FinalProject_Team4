@@ -23,7 +23,7 @@ public class GachaPackProductInitData implements ApplicationRunner {
 	// GACHA_PACK은 재고를 차감하지 않는다. NOT NULL인 공용 stock 컬럼에는 미사용 값만 둔다.
 	private static final int UNLIMITED_STOCK_PLACEHOLDER = 0;
 	private static final String PACK_IMAGE =
-			"/cards/900001/0005fbe2-236e-5543-a4d4-69f8b57bd3f7.svg";
+			"products/11/f7573887-a33e-5690-b058-f32f7aa2a326.png";
 
 	private final ProductRepository productRepository;
 

@@ -18,7 +18,7 @@ public record ProductDetailResponse(
 		LocalDateTime createdAt,
 		LocalDateTime updatedAt
 ) {
-	public static ProductDetailResponse from(Product product) {
+	public static ProductDetailResponse from(Product product, String imageUrl) {
 		PlantGuideResponse plantGuide = product.getCategory() == ProductCategory.SEEDLING
 				? PlantGuideResponse.from(product.getPlant())
 				: null;
@@ -31,7 +31,7 @@ public record ProductDetailResponse(
 				product.getStock(),
 				product.getCategory() != ProductCategory.GACHA_PACK && product.getStock() <= 0,
 				product.getDescription(),
-				product.getImageUrl(),
+				imageUrl,
 				plantGuide,
 				product.getCreatedAt(),
 				product.getUpdatedAt()

@@ -22,10 +22,14 @@ public record CardResponse(
 		Integer ownedCount
 ) {
 	public static CardResponse from(Card card) {
-		return from(card, null);
+		return from(card, null, card.getImageUrl());
 	}
 
 	public static CardResponse from(Card card, Integer ownedCount) {
+		return from(card, ownedCount, card.getImageUrl());
+	}
+
+	public static CardResponse from(Card card, Integer ownedCount, String imageUrl) {
 		return new CardResponse(
 				card.getId(),
 				card.getName(),
@@ -37,7 +41,7 @@ public record CardResponse(
 				card.getExchangeProduct().getStock(),
 				card.getRequiredCountForExchange(),
 				card.getDescription(),
-				card.getImageUrl(),
+				imageUrl,
 				card.getStatus(),
 				card.getCreatedAt(),
 				card.getUpdatedAt(),

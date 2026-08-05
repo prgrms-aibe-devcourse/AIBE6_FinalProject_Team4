@@ -10,6 +10,7 @@ import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,6 +33,7 @@ public class ProductService {
 	);
 
 	private final ProductRepository productRepository;
+	private final AssetUrlResolver assetUrlResolver;
 
 	public ProductPageResponse getProducts(String categoryValue, String sortValue, int page, int size) {
 		validatePage(page, size);
@@ -43,13 +45,17 @@ public class ProductService {
 		Pageable pageable = PageRequest.of(page, size, sort.toSort());
 
 		return ProductPageResponse.from(
-				productRepository.findAllByStatusAndCategoryIn(ProductStatus.ACTIVE, categories, pageable)
+				productRepository.findAllByStatusAndCategoryIn(ProductStatus.ACTIVE, categories, pageable),
+				assetUrlResolver::resolve
 		);
 	}
 
 	public ProductDetailResponse getProduct(Long productId) {
 		return productRepository.findByIdAndStatus(productId, ProductStatus.ACTIVE)
-				.map(ProductDetailResponse::from)
+				.map(product -> ProductDetailResponse.from(
+						product,
+						assetUrlResolver.resolve(product.getImageUrl())
+				))
 				.orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 	}
 

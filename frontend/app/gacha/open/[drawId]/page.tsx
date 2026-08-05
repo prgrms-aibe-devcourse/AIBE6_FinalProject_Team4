@@ -327,6 +327,12 @@ export default function GachaOpenPage({
                 ))}
               </div>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <Link
+                  href="/shop"
+                  className="rounded-xl border border-[#dfca72]/60 px-5 py-3 text-sm font-bold text-[#f3dc82] transition hover:bg-[#dfca72]/10"
+                >
+                  상점으로 가기
+                </Link>
                 <button
                   type="button"
                   onClick={replay}

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '@/lib/api';
+import { couponName } from '@/lib/coupon-label';
 import { CardData, getCard, purchaseCard } from '@/lib/card-api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
@@ -36,7 +37,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     if (!Number.isInteger(cardId) || cardId < 1) {
-      setError('잘못된 카드 주소예요.');
+      setError('잘못된 쿠폰 주소예요.');
       setLoading(false);
       return;
     }
@@ -57,7 +58,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
         setError(
           requestError instanceof ApiError
             ? requestError.message
-            : '카드를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+            : '쿠폰을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
         );
       })
       .finally(() => {
@@ -71,7 +72,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
     return (
       <div className="container">
         <div className="rounded-[22px] bg-white py-14 text-center text-sub">
-          카드를 불러오고 있어요 🃏
+          쿠폰을 불러오고 있어요 🎟️
         </div>
       </div>
     );
@@ -81,12 +82,12 @@ export default function CardDetail({ params }: { params: { id: string } }) {
     return (
       <div className="container">
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
-          <p>{error || '카드를 찾을 수 없어요.'}</p>
+          <p>{error || '쿠폰을 찾을 수 없어요.'}</p>
           <Link
             href="/cards"
             className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white"
           >
-            카드 목록으로 돌아가기
+            쿠폰 목록으로 돌아가기
           </Link>
         </div>
       </div>
@@ -106,7 +107,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
 
   const buy = () => {
     if (!hydrated || !state.accessToken || owned === null) {
-      showToast('카드 구매는 로그인 후 이용할 수 있어요.', 'err');
+      showToast('쿠폰 구매는 로그인 후 이용할 수 있어요.', 'err');
       return;
     }
     if (!walletLoaded) {
@@ -125,8 +126,8 @@ export default function CardDetail({ params }: { params: { id: string } }) {
       );
       return;
     }
-    askConfirm({ icon: 'eco', title: '카드를 구매할까요?', ok: '구매하기',
-      body: `${card.name} ${qty}장 · 무상 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 유상 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
+    askConfirm({ icon: 'eco', title: '쿠폰을 구매할까요?', ok: '구매하기',
+      body: `${couponName(card.name)} ${qty}장 · 무상 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 유상 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
       onOk: async () => {
         const currentOwned = owned ?? 0;
         setPurchasing(true);
@@ -147,13 +148,13 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             set((s) => ({ readyCards: s.readyCards + 1 }));
             setCelebrate(true);
           } else {
-            showToast('카드를 구매했어요! 🃏');
+            showToast('쿠폰을 구매했어요! 🎟️');
           }
         } catch (purchaseError) {
           showToast(
             purchaseError instanceof ApiError
               ? purchaseError.message
-              : '카드를 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
+              : '쿠폰을 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
             'err',
           );
         } finally {
@@ -164,7 +165,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
 
   return (
     <div className="container">
-      <Link href="/cards" className="text-sm font-semibold text-sub">← 카드</Link>
+      <Link href="/cards" className="text-sm font-semibold text-sub">← 쿠폰</Link>
       <div className="mt-4 grid items-start gap-7 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <div
           className="flex aspect-[3/4] max-h-[420px] items-center justify-center overflow-hidden rounded-[22px] bg-brand-soft bg-cover bg-center text-[150px] shadow-[0_12px_36px_rgba(0,0,0,.1)]"
@@ -177,7 +178,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
           {!card.imageUrl && '🃏'}
         </div>
         <div>
-          <h1 className="mb-1.5 text-[28px] font-extrabold">{card.name}</h1>
+          <h1 className="mb-1.5 text-[28px] font-extrabold">{couponName(card.name)}</h1>
           <div className="mb-3 flex items-center gap-2">
             <span className="text-sm font-bold text-sub">1장당</span>
             <PointPrice value={card.pointPrice} size="lg" />
@@ -186,7 +187,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             </span>
           </div>
           <p className="mb-5 text-[14.5px] leading-[1.7] text-[#6d7a68]">
-            {card.description || '카드 설명을 준비하고 있어요.'}
+            {card.description?.replace(/카드/g, '쿠폰') || '쿠폰 설명을 준비하고 있어요.'}
           </p>
 
           {owned === null ? (
@@ -304,7 +305,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             ))}
             <div className="text-[66px]">🎉</div>
             <h3 className="mb-2 mt-3.5 text-xl font-extrabold">축하해요!</h3>
-            <p className="mb-6 leading-[1.6] text-[#6d7a68]">{card.name}가 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
+            <p className="mb-6 leading-[1.6] text-[#6d7a68]">{couponName(card.name)}이 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
             <div className="flex gap-2.5">
               <button type="button" onClick={() => router.push(`/exchange/new?cardId=${card.id}`)} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
                 교환 신청하기

@@ -123,5 +123,8 @@ describe("GachaBatchOpenPage", () => {
       resultImages.map((image) => image.getAttribute("aria-label")),
     ).toEqual(["골든 카드", "커먼 카드"]);
     expect(screen.getAllByText("+5")).toHaveLength(2);
+    expect(
+      screen.getByRole("link", { name: "상점으로 가기" }),
+    ).toHaveAttribute("href", "/shop");
   });
 });

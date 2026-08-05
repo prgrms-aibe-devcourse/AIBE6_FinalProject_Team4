@@ -42,7 +42,7 @@ public class NotificationInitData implements ApplicationRunner {
 			new Sample(NotificationType.JOURNAL_REMINDER, "오늘 쌈싸리의 모습을 남겨볼까요? 🌱", "아직 오늘의 일지를 쓰지 않으셨어요", "/journals", true, 0),
 			new Sample(NotificationType.COMMUNITY, "내 게시글에 댓글이 달렸어요 💬", "\"저도 이 방법으로 키우고 있어요!\"", null, false, 1),
 			new Sample(NotificationType.INQUIRY, "문의하신 내용에 답변이 도착했어요 💬", "배송 관련 문의", "/my/inquiries", true, 1),
-			new Sample(NotificationType.NOTICE, "새로운 카드가 상점에 입고됐어요 📢", "감자 카드를 만나보세요", "/cards", true, 1)
+			new Sample(NotificationType.NOTICE, "새로운 쿠폰이 상점에 입고됐어요 📢", "감자 쿠폰을 만나보세요", "/cards", true, 1)
 	);
 
 	private static final List<String> SEED_EMAILS = List.of("admin@test.com", "test@test.com", "user@test.com");

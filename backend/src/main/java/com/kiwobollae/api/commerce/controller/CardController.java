@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "카드", description = "카드 조회/보유 관련 API")
+@Tag(name = "쿠폰", description = "쿠폰 조회/보유 관련 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiVersion.V1 + "/card")
@@ -35,8 +35,8 @@ public class CardController {
 	private final CardPurchaseService cardPurchaseService;
 
 	@Operation(
-			summary = "카드 목록 조회",
-			description = "판매 중인 카드를 조회합니다. 로그인한 경우 내 보유 수량을 함께 반환합니다."
+			summary = "쿠폰 목록 조회",
+			description = "판매 중인 쿠폰을 조회합니다. 로그인한 경우 내 보유 수량을 함께 반환합니다."
 	)
 	@GetMapping
 	public ResponseEntity<ApiResponse<List<CardResponse>>> getCards(
@@ -46,8 +46,8 @@ public class CardController {
 	}
 
 	@Operation(
-			summary = "내 카드 목록 조회",
-			description = "로그인한 사용자가 1장 이상 보유한 카드를 조회합니다. 숨김 카드도 기존 보유자에게는 반환합니다."
+			summary = "내 쿠폰 목록 조회",
+			description = "로그인한 사용자가 1장 이상 보유한 쿠폰을 조회합니다. 숨김 쿠폰도 기존 보유자에게는 반환합니다."
 	)
 	@GetMapping("/me")
 	public ResponseEntity<ApiResponse<List<CardResponse>>> getMyCards(
@@ -57,8 +57,8 @@ public class CardController {
 	}
 
 	@Operation(
-			summary = "카드 구매",
-			description = "포인트로 카드를 구매하고 보유 수량 및 구매 이력을 갱신합니다."
+			summary = "쿠폰 구매",
+			description = "포인트로 쿠폰을 구매하고 보유 수량 및 구매 이력을 갱신합니다."
 	)
 	@PostMapping("/purchase")
 	public ResponseEntity<ApiResponse<CardPurchaseResponse>> purchase(
@@ -72,8 +72,8 @@ public class CardController {
 	}
 
 	@Operation(
-			summary = "카드 상세 조회",
-			description = "판매 중인 카드 상세를 조회합니다. 로그인한 경우 내 보유 수량을 함께 반환합니다."
+			summary = "쿠폰 상세 조회",
+			description = "판매 중인 쿠폰 상세를 조회합니다. 로그인한 경우 내 보유 수량을 함께 반환합니다."
 	)
 	@GetMapping("/{cardId}")
 	public ResponseEntity<ApiResponse<CardResponse>> getCard(

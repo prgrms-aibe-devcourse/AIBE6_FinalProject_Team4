@@ -19,12 +19,12 @@ const FEATURES = [
   {
     image: {
       src: 'https://4team-storage-495264909330-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com/cards/8/399f7998-3e24-5d1d-b69c-68da63b839ef.png',
-      alt: '상추 카드',
+      alt: '상추 쿠폰',
     },
-    title: '카드 모으기',
-    desc: '쌓인 포인트로 특별한 카드를 모아보세요',
+    title: '가챠 카드 뽑기',
+    desc: <><span>쌓인 포인트로 카드팩을 열고</span><br /><span>특별한 카드를 모아보세요</span></>,
   },
-  { emoji: '🍉', title: '진짜 열매 받기', desc: '모은 카드를 진짜 과일·채소로 교환해요' },
+  { emoji: '🍉', title: '진짜 열매 받기', desc: '모은 쿠폰을 진짜 과일·채소로 교환해요' },
 ];
 
 function kstToday(): string {
@@ -80,7 +80,7 @@ export default function Home() {
               식물을 키우고,<br />기록하고,<br /><span className="text-brand">진짜 열매</span>를 받아보세요
             </h1>
             <p className="mb-7 text-base leading-[1.6] text-sub md:text-[17px]">
-              매일의 성장을 기록하면 포인트가 쌓이고,<br />카드를 모으면 진짜 과일·채소로 바꿔드려요.
+              매일의 성장을 기록하면 포인트가 쌓이고,<br />쿠폰을 모으면 진짜 과일·채소로 바꿔드려요.
             </p>
             <div className="flex flex-wrap justify-center gap-3 md:justify-start">
               <Link href="/auth?view=signup" className="rounded-[14px] bg-brand px-7 py-[15px] text-base font-bold text-white shadow-[0_6px_18px_rgba(124,179,66,.35)] transition-colors duration-150 hover:bg-brand-dark hover:text-white">
@@ -134,7 +134,7 @@ export default function Home() {
         <div className="relative mb-6 flex flex-wrap items-center gap-4 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#FFE9A6] to-[#FFD54F] px-6 py-[22px] shadow-[0_8px_24px_rgba(255,213,79,.3)]">
           <div className="text-[46px]">🍉</div>
           <div className="min-w-[200px] flex-1">
-            <div className="text-lg font-extrabold text-[#6b5500]">교환 가능한 카드가 {state.readyCards}종 있어요!</div>
+            <div className="text-lg font-extrabold text-[#6b5500]">교환 가능한 쿠폰이 {state.readyCards}종 있어요!</div>
             <div className="text-[14.5px] text-gold-text">진짜 열매로 바꿔볼까요?</div>
           </div>
           <Link href="/cards" className="rounded-xl bg-ink px-5 py-3 font-bold text-white transition-colors duration-150 hover:bg-[#2a332a] hover:text-white">교환하러 가기 🎉</Link>

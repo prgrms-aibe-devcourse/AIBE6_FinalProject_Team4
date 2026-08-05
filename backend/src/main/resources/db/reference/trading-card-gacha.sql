@@ -1,28 +1,32 @@
 -- =============================================================================
--- 트레이딩 카드 · 가챠 물리 스키마 (minimal / 가챠 테이블 5개)
+-- 트레이딩 카드 · 가챠 물리 스키마 (가챠·조각·코스메틱 테이블 8개)
 --
 -- [정본 분리]
---   이 파일 / Flyway migration : UNIQUE · INDEX · CHECK · DEFAULT 등 물리 스키마 정본
+--   이 파일 / 수동 migration SQL : UNIQUE · INDEX · CHECK · DEFAULT 등 물리 스키마 정본
 --   ERDCloud                   : 테이블 · 컬럼 · PK · FK 관계 시각화 전용
 --   ERDCloud MCP import 시 UNIQUE / INDEX / CHECK 메타데이터는 저장되지 않는다.
 --   ERDCloud export 를 운영 DDL 생성 원본으로 사용하지 않는다.
 --
 -- [테이블 구성]
---   가챠 테이블 5개 : trading_cards / user_card_collections / golden_card_instances
---                     gacha_draws / gacha_draw_items
+--   카드·가챠 테이블 8개 : trading_cards / user_card_collections / golden_card_instances
+--                          gacha_draws / gacha_draw_items / user_card_shard_wallets
+--                          card_shard_transactions / user_card_cosmetics
 --   users 는 팀 공용 기존 테이블이며 가챠 테이블 수에 포함하지 않는다.
 --   분리 ERD 에서만 id BIGINT PK 단일 컬럼 스텁으로 유지한다.
 --
 -- [팀 ERD 병합 안내]
---   users 스텁은 복사하지 않는다. 가챠 테이블 5개만 병합하고
---   기존 users.id 에 아래 4개 FK 를 재연결한다.
+--   users 스텁은 복사하지 않는다. 카드·가챠 테이블 8개만 병합하고
+--   기존 users.id 에 아래 7개 FK 를 재연결한다.
 --     user_card_collections.user_id
 --     golden_card_instances.owner_user_id
 --     golden_card_instances.origin_user_id
 --     gacha_draws.user_id
+--     user_card_shard_wallets.user_id
+--     card_shard_transactions.user_id
+--     user_card_cosmetics.user_id
 --
 -- [MVP 제외 범위]
---   카드 분해 / 조각 지갑 / 코스메틱 / 다중 팩 / 팩별 확률 이력
+--   배지 / 카드별 개별 테두리 / 해금 환불 / 다중 팩 / 팩별 확률 이력
 --   미개봉 팩 보관 / 거래 주문 및 체결 이력
 --
 -- [골든 가챠 재획득 제한]
@@ -79,9 +83,10 @@
 --   같은 등급의 카드는 모두 동일한 draw_weight 를 가진다.
 --   활성 카드 전체 draw_weight 합계는 2,100,000 이어야 한다 (애플리케이션 검증).
 --
--- [CHECK 제약 14개]
+-- [CHECK 제약 21개]
 --   trading_cards 3 / user_card_collections 1 / golden_card_instances 1
---   gacha_draws 4 / gacha_draw_items 5
+--   gacha_draws 4 / gacha_draw_items 5 / user_card_shard_wallets 3
+--   card_shard_transactions 3 / user_card_cosmetics 1
 -- =============================================================================
 
 CREATE TABLE trading_cards (
@@ -343,5 +348,97 @@ CREATE TABLE gacha_draw_items (
             'HYPER_RARE',
             'GOLDEN_RARE'
         )
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE user_card_shard_wallets (
+    user_id BIGINT NOT NULL,
+    balance BIGINT NOT NULL DEFAULT 0,
+    lifetime_earned BIGINT NOT NULL DEFAULT 0,
+    lifetime_spent BIGINT NOT NULL DEFAULT 0,
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+
+    PRIMARY KEY (user_id),
+
+    CONSTRAINT fk_user_card_shard_wallets_user
+        FOREIGN KEY (user_id)
+        REFERENCES users (id),
+
+    CONSTRAINT ck_user_card_shard_wallets_balance CHECK (balance >= 0),
+    CONSTRAINT ck_user_card_shard_wallets_earned CHECK (lifetime_earned >= 0),
+    CONSTRAINT ck_user_card_shard_wallets_spent CHECK (lifetime_spent >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE card_shard_transactions (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    transaction_type VARCHAR(30) NOT NULL,
+    card_id BIGINT NULL,
+    cosmetic_code VARCHAR(100) NULL,
+    card_quantity INT NULL,
+    shard_per_card_snapshot BIGINT NULL,
+    amount BIGINT NOT NULL,
+    balance_after BIGINT NOT NULL,
+    request_id BIGINT NOT NULL,
+    line_no INT NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_card_shard_transactions_request_line (user_id, request_id, line_no),
+    KEY idx_card_shard_transactions_user_created (user_id, created_at),
+    KEY idx_card_shard_transactions_card (card_id),
+
+    CONSTRAINT fk_card_shard_transactions_user
+        FOREIGN KEY (user_id)
+        REFERENCES users (id),
+    CONSTRAINT fk_card_shard_transactions_card
+        FOREIGN KEY (card_id)
+        REFERENCES trading_cards (id),
+
+    CONSTRAINT ck_card_shard_transactions_type CHECK (
+        transaction_type IN ('DISMANTLE_EARN', 'COSMETIC_SPEND')
+    ),
+    CONSTRAINT ck_card_shard_transactions_balance CHECK (balance_after >= 0),
+    CONSTRAINT ck_card_shard_transactions_payload CHECK (
+        (transaction_type = 'DISMANTLE_EARN'
+            AND card_id IS NOT NULL
+            AND cosmetic_code IS NULL
+            AND card_quantity > 0
+            AND shard_per_card_snapshot > 0
+            AND amount > 0)
+        OR
+        (transaction_type = 'COSMETIC_SPEND'
+            AND card_id IS NULL
+            AND cosmetic_code IS NOT NULL
+            AND card_quantity IS NULL
+            AND shard_per_card_snapshot IS NULL
+            AND amount < 0)
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE user_card_cosmetics (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    cosmetic_code VARCHAR(100) NOT NULL,
+    cosmetic_type VARCHAR(20) NOT NULL,
+    shard_price_snapshot BIGINT NOT NULL,
+    unlocked_at DATETIME(6) NOT NULL,
+    equipped_at DATETIME(6) NULL,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_card_cosmetics_user_code (user_id, cosmetic_code),
+    KEY idx_user_card_cosmetics_user_type (user_id, cosmetic_type),
+
+    CONSTRAINT fk_user_card_cosmetics_user
+        FOREIGN KEY (user_id)
+        REFERENCES users (id),
+
+    CONSTRAINT ck_user_card_cosmetics_type CHECK (
+        cosmetic_type IN ('TITLE', 'BORDER')
     )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

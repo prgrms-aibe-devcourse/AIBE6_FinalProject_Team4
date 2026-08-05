@@ -2,10 +2,14 @@ package com.kiwobollae.api.infra.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.infra.entity.IdempotencyKey;
+import com.kiwobollae.api.infra.entity.enums.IdempotencyStatus;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -97,5 +101,26 @@ class IdempotencyServiceTest {
 
 		assertThat(Duration.between(key.getCreatedAt(), key.getExpiresAt()))
 				.isEqualTo(Duration.ofHours(24));
+	}
+
+	@Test
+	void returnsCompletedReplayWithoutTakingWriteLock() {
+		IdempotencyKey key = mock(IdempotencyKey.class);
+		given(key.getRequestHash()).willReturn("request-hash");
+		given(key.getStatus()).willReturn(IdempotencyStatus.SUCCEEDED);
+		given(idempotencyKeyRepository.findByUser_IdAndApiTypeAndClientKey(
+				7L, "GACHA_COSMETIC_PURCHASE", "replay-key"))
+				.willReturn(Optional.of(key));
+
+		Optional<IdempotencyExecution> replay = idempotencyService.replayIfPresent(
+				7L,
+				"GACHA_COSMETIC_PURCHASE",
+				"replay-key",
+				"request-hash"
+		);
+
+		assertThat(replay).hasValueSatisfying(execution -> assertThat(execution.replay()).isTrue());
+		verify(idempotencyKeyRepository, never())
+				.findForUpdate(7L, "GACHA_COSMETIC_PURCHASE", "replay-key");
 	}
 }
