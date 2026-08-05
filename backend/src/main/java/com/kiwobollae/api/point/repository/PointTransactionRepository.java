@@ -11,29 +11,12 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface PointTransactionRepository extends JpaRepository<PointTransaction, Long> {
 
 	boolean existsByTypeAndRefTypeAndRefId(PointTxType type, PointRefType refType, Long refId);
-
-	/** 로컬 시나리오 시드의 일지 보상 표시 시각을 해당 과거 일지 날짜로 맞춘다. */
-	@Transactional
-	@Modifying(clearAutomatically = true, flushAutomatically = true)
-	@Query(value = """
-			UPDATE point_transactions
-			SET created_at = :createdAt
-			WHERE type = 'JOURNAL_REWARD'
-			  AND ref_type = 'JOURNAL_COMPLETION'
-			  AND ref_id = :journalId
-			""", nativeQuery = true)
-	int backdateLocalSeedJournalReward(
-			@Param("journalId") Long journalId,
-			@Param("createdAt") LocalDateTime createdAt
-	);
 
 	List<PointTransaction> findAllByWalletAndTypeAndRefTypeAndRefId(
 			Wallet wallet,

@@ -88,7 +88,6 @@ class PointScenarioInitDataMySqlIntegrationTest {
 				PointTxType.JOURNAL_REWARD,
 				PointRefType.JOURNAL_COMPLETION
 		);
-		assertThat(journalReward.createdAt()).isEqualTo(today.minusDays(1).atTime(9, 0));
 
 		PointActivityResponse orderPurchase = find(
 				activities,
@@ -107,6 +106,7 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(cardPurchase.amount()).isEqualTo(-2_100L);
 		assertThat(cardPurchase.freeAmount()).isEqualTo(-1_940L);
 		assertThat(cardPurchase.paidAmount()).isEqualTo(-160L);
+		assertThat(journalReward.createdAt()).isAfter(cardPurchase.createdAt());
 
 		OrderResponse cancelledOrder = orderService.getOrders(user.getId(), PageRequest.of(0, 20)).stream()
 				.filter(order -> order.status() == OrderStatus.CANCELLED)
@@ -118,6 +118,7 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		WalletResponse wallet = walletService.getWallet(user.getId());
 		assertThat(wallet.freePoint()).isEqualTo(100L);
 		assertThat(wallet.paidPoint()).isEqualTo(7_840L);
+		assertThat(activities.getFirst().freeBalanceAfter()).isEqualTo(wallet.freePoint());
 
 		pointScenarioInitData.run(new DefaultApplicationArguments(new String[0]));
 

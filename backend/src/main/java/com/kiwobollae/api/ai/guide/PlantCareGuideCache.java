@@ -60,8 +60,8 @@ public class PlantCareGuideCache extends BaseEntity {
   /**
    * AI가 반환한 가이드 JSON 원본.
    *
-   * <p>가이드는 읽기 전용 문서라 컬럼으로 쪼갤 이유가 없다. 통째로 저장하면 응답 스키마가 바뀌어도 테이블 구조는 그대로 두고 guide_version만 올리면
-   * 되고, 원본 종 정보가 바뀌면 source_context_hash가 기존 저장본을 무효화한다.
+   * <p>가이드는 읽기 전용 문서라 컬럼으로 쪼갤 이유가 없다. 통째로 저장하면 응답 스키마가 바뀌어도 테이블 구조는 그대로 두고 guide_version만 올리면 되고,
+   * 원본 종 정보가 바뀌면 source_context_hash가 기존 저장본을 무효화한다.
    */
   @Lob
   @Column(name = "guide_json", nullable = false)
