@@ -2,6 +2,7 @@ package com.kiwobollae.api.content.controller;
 
 import com.kiwobollae.api.content.dto.response.PlantTimelapseResponse;
 import com.kiwobollae.api.content.service.PlantTimelapseService;
+import com.kiwobollae.api.content.service.PlantTimelapseVideoStorageService;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlantTimelapseController {
 
 	private final PlantTimelapseService plantTimelapseService;
+	private final PlantTimelapseVideoStorageService videoStorageService;
 
 	@Operation(summary = "타임랩스 생성 요청", description = "재배가 완료된 식물의 대표이미지를 모아 타임랩스 영상 생성을 요청합니다.")
 	@PostMapping("/{profileId}/timelapse")
@@ -37,5 +39,11 @@ public class PlantTimelapseController {
 	public ResponseEntity<ApiResponse<PlantTimelapseResponse>> getTimelapse(
 			@AuthenticationPrincipal Long userId, @PathVariable Long profileId) {
 		return ResponseEntity.ok(ApiResponse.success(plantTimelapseService.getTimelapse(userId, profileId)));
+	}
+
+	@Operation(summary = "타임랩스 영상 서빙", description = "private S3에 저장된 타임랩스 영상을 프록시로 서빙합니다.")
+	@GetMapping("/timelapse-videos/{userId}/{filename}")
+	public ResponseEntity<byte[]> serveVideo(@PathVariable Long userId, @PathVariable String filename) {
+		return videoStorageService.download(userId, filename);
 	}
 }
