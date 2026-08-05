@@ -361,7 +361,10 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           )}
           {timelapse.status === 'FAILED' && (
             <div>
-              <div className="mb-3 text-[15px] text-sub">{timelapse.failReason || '타임랩스 생성에 실패했어요.'}</div>
+              <div className="mb-3 flex items-start gap-2 rounded-[11px] bg-danger-soft px-[13px] py-[11px] text-[13px] font-semibold text-danger">
+                <span className="material-symbols-outlined text-[18px]">error</span>
+                <span>{timelapse.failReason || '타임랩스 생성에 실패했어요.'}</span>
+              </div>
               <button
                 type="button"
                 onClick={handleRequestTimelapse}
