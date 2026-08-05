@@ -21,8 +21,8 @@ const FEATURES = [
       src: 'https://4team-storage-495264909330-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com/cards/8/399f7998-3e24-5d1d-b69c-68da63b839ef.png',
       alt: '상추 쿠폰',
     },
-    title: '쿠폰 모으기',
-    desc: '쌓인 포인트로 특별한 쿠폰을 모아보세요',
+    title: '가챠 카드 뽑기',
+    desc: <><span>쌓인 포인트로 카드팩을 열고</span><br /><span>특별한 카드를 모아보세요</span></>,
   },
   { emoji: '🍉', title: '진짜 열매 받기', desc: '모은 쿠폰을 진짜 과일·채소로 교환해요' },
 ];
