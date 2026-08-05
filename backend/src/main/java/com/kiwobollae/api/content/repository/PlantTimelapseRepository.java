@@ -14,6 +14,13 @@ public interface PlantTimelapseRepository extends JpaRepository<PlantTimelapse, 
 
 	Optional<PlantTimelapse> findByPlantProfileId(Long plantProfileId);
 
+	// 프로필 삭제 시 S3 정리용으로 videoUrl 값만 필요할 때 쓴다 — 엔티티를 통째로 로드하면 이후
+	// bulk delete로 DB 행이 지워져도 영속성 컨텍스트엔 그대로 남아, 다른 쿼리가 유발하는
+	// auto-flush 시점에 Hibernate가 이 엔티티의 plantProfile 연관관계를 검증하다 같은 트랜잭션에서
+	// remove()된 PlantProfile을 transient로 오인해 TransientPropertyValueException을 던진다.
+	@Query("select t.videoUrl from PlantTimelapse t where t.plantProfile.id = :profileId")
+	Optional<String> findVideoUrlByPlantProfileId(@Param("profileId") Long profileId);
+
 	// PENDING -> PROCESSING 조건부 전이. 0을 반환하면 이미 처리 중이거나 대상이 아니라는 뜻이라 워커가 조용히 종료한다.
 	@Modifying
 	@Query("update PlantTimelapse t set t.status = com.kiwobollae.api.content.entity.enums.PlantTimelapseStatus.PROCESSING "

@@ -8,7 +8,6 @@ import com.kiwobollae.api.content.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
-import com.kiwobollae.api.content.entity.PlantTimelapse;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
@@ -79,9 +78,7 @@ public class PlantProfileService {
 		List<JournalImage> journalImages = journalImageRepository.findByProfileId(profileId);
 		// 삭제 순서와 무관하게 안전하도록, DB 삭제 전에 정리에 필요한 값을 미리 뽑아둔다.
 		String thumbnailUrl = profile.getPlantImage();
-		String timelapseVideoUrl = plantTimelapseRepository.findByPlantProfileId(profileId)
-				.map(PlantTimelapse::getVideoUrl)
-				.orElse(null);
+		String timelapseVideoUrl = plantTimelapseRepository.findVideoUrlByPlantProfileId(profileId).orElse(null);
 
 		journalImageRepository.deleteAllByProfileId(profileId);
 		plantJournalRepository.deleteAllByProfileId(profileId);
