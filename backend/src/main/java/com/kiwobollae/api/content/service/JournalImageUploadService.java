@@ -29,18 +29,15 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
- * Bucket is private — images aren't served via a raw S3 URL. Upload writes the
- * object to S3 and returns a URL pointing back at {@link
- * com.kiwobollae.api.content.controller.JournalImageUploadController#serveImage},
- * which fetches the bytes from S3 (using our S3Client credentials) and streams
- * them to the client. So the browser never talks to S3 directly.
+ * 버킷은 private이라 이미지를 raw S3 URL로 직접 서빙하지 않는다. 업로드 시 객체를 S3에
+ * 쓰고 {@link com.kiwobollae.api.content.controller.JournalImageUploadController#serveImage}로
+ * 되돌아오는 URL을 반환하며, 그 엔드포인트가 (우리 S3Client 자격증명으로) S3에서 바이트를
+ * 가져와 클라이언트로 스트리밍한다. 즉 브라우저는 S3와 직접 통신하지 않는다.
  *
- * <p>The URL returned/stored is host-relative (e.g. "/api/v1/journals/images/...").
- * Baking the request's scheme/host/port in at upload time would get persisted into
- * JournalImage rows forever — fine on one environment, but breaks (and requires a
- * data migration) the moment the app moves to a different host, e.g. from local dev
- * to a real deployment. Callers (frontend) prefix it with whatever base URL is
- * correct for their current environment when rendering.
+ * <p>반환/저장되는 URL은 host-relative다(예: "/api/v1/journals/images/..."). 업로드 시점의
+ * 요청 scheme/host/port를 그대로 박아넣으면 JournalImage row에 영구히 저장돼버려서, 한 환경에서는
+ * 문제없지만 앱이 다른 호스트로 옮겨가는 순간(로컬 개발 → 실제 배포 등) 깨지고 데이터 마이그레이션이
+ * 필요해진다. 호출부(프론트엔드)가 렌더링 시점에 자신의 환경에 맞는 base URL을 앞에 붙인다.
  */
 @Slf4j
 @Service
@@ -91,18 +88,15 @@ public class JournalImageUploadService {
 	}
 
 	/**
-	 * Best-effort S3 cleanup for an image that's no longer referenced by any
-	 * journal (replaced on update, or the journal itself was deleted). Never
-	 * throws — a failed cleanup shouldn't fail the journal write/delete that
-	 * triggered it; it just leaves an orphaned object to be dealt with later.
+	 * 더 이상 어떤 일지에서도 참조되지 않는 이미지에 대한 best-effort S3 정리(수정 시 교체됐거나,
+	 * 일지 자체가 삭제된 경우). 절대 예외를 던지지 않는다 — 정리 실패가 이를 유발한 일지
+	 * 작성/삭제 자체를 실패시키면 안 되고, 그냥 고아 객체를 남겨두고 나중에 처리한다.
 	 *
-	 * <p>{@code ownerUserId} must be the userId of whoever's journal operation
-	 * triggered this — the userId embedded in the key (parsed back out of the
-	 * stored URL) has to match it, or the delete is refused. This method is only
-	 * ever called by already-ownership-checked call sites today (see
-	 * PlantJournalService), but the check is enforced here too rather than trusted
-	 * to every future caller — nothing about this URL/key pair is itself proof of
-	 * ownership.
+	 * <p>{@code ownerUserId}는 이 호출을 유발한 일지 작업의 userId여야 한다 — key에 박혀 있는
+	 * (저장된 URL에서 다시 파싱해낸) userId와 일치하지 않으면 삭제가 거부된다. 현재는 이미
+	 * 소유권 검증을 마친 호출부(PlantJournalService 참고)에서만 이 메서드를 부르지만, 앞으로의
+	 * 모든 호출부를 신뢰하기보다 여기서도 검증을 강제한다 — 이 URL/key 쌍 자체는 소유권을
+	 * 증명하지 않는다.
 	 */
 	public void delete(String imageUrl, Long ownerUserId) {
 		String key = keyFromUrl(imageUrl);
@@ -155,6 +149,23 @@ public class JournalImageUploadService {
 					.header("Content-Disposition", "inline")
 					.header("Cache-Control", "private, max-age=31536000, immutable")
 					.body(bytes);
+		} catch (NoSuchKeyException e) {
+			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
+		} catch (SdkException | IOException e) {
+			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
+		}
+	}
+
+	// 타임랩스 워커가 대표이미지를 인코딩용으로 내려받을 때 쓰는 내부 전용 메서드.
+	// download(userId, filename)과 달리 HTTP 응답 형태가 아니라 순수 바이트만 반환한다.
+	public byte[] downloadBytes(String imageUrl) {
+		String key = keyFromUrl(imageUrl);
+		if (key == null) {
+			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
+		}
+		try (ResponseInputStream<GetObjectResponse> object = s3Client.getObject(
+				GetObjectRequest.builder().bucket(bucket).key(key).build())) {
+			return object.readAllBytes();
 		} catch (NoSuchKeyException e) {
 			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
 		} catch (SdkException | IOException e) {
