@@ -31,6 +31,14 @@ vi.mock("@/lib/ui", () => ({
   useUI: () => ({ showToast: vi.fn(), askConfirm: vi.fn() }),
 }));
 
+vi.mock("@/features/gacha/use-gacha-cosmetics", () => ({
+  useGachaCosmetics: () => ({
+    data: null,
+    title: null,
+    border: null,
+  }),
+}));
+
 vi.mock("@/lib/gacha-api", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/gacha-api")>();
   return {

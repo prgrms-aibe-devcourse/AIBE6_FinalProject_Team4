@@ -8,7 +8,6 @@ vi.mock("@/lib/ui", () => ({
 }));
 
 vi.mock("@/features/gacha/use-gacha-cosmetics", () => ({
-  notifyGachaCosmeticsChanged: vi.fn(),
   useGachaCosmetics: () => ({
     data: {
       shards: { balance: 40, lifetimeEarned: 50, lifetimeSpent: 10 },

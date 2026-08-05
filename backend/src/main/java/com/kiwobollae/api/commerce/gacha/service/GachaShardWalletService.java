@@ -1,12 +1,16 @@
 package com.kiwobollae.api.commerce.gacha.service;
 
+import static com.kiwobollae.api.commerce.gacha.GachaTimeZone.KST;
+
 import com.kiwobollae.api.commerce.gacha.dto.GachaShardWalletResponse;
 import com.kiwobollae.api.commerce.gacha.entity.UserCardShardWallet;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardShardWalletRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -14,16 +18,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class GachaShardWalletService {
 
   private final UserCardShardWalletRepository walletRepository;
-  private final GachaShardWalletInitializer walletInitializer;
 
-  @Transactional
+  @Transactional(readOnly = true)
   public GachaShardWalletResponse getWallet(Long userId) {
     requireUser(userId);
-    return GachaShardWalletResponse.from(getOrCreateForUpdate(userId));
+    return walletRepository
+        .findById(userId)
+        .map(GachaShardWalletResponse::from)
+        .orElseGet(GachaShardWalletResponse::empty);
   }
 
+  @Transactional(propagation = Propagation.MANDATORY)
   UserCardShardWallet getOrCreateForUpdate(Long userId) {
-    walletInitializer.ensure(userId);
+    walletRepository.ensureWallet(userId, LocalDateTime.now(KST));
     return walletRepository
         .findForUpdate(userId)
         .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR));

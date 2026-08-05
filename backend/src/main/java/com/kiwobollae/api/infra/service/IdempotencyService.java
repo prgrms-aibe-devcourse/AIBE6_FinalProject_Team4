@@ -8,6 +8,7 @@ import com.kiwobollae.api.infra.entity.enums.IdempotencyStatus;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,17 @@ public class IdempotencyService {
 	private final IdempotencyKeyRepository idempotencyKeyRepository;
 	private final UserRepository userRepository;
 	private final Clock seoulClock;
+
+	public Optional<IdempotencyExecution> replayIfPresent(
+			Long userId,
+			String apiType,
+			String clientKey,
+			String requestHash
+	) {
+		return idempotencyKeyRepository
+				.findByUser_IdAndApiTypeAndClientKey(userId, apiType, clientKey)
+				.map(existing -> validateExisting(existing, requestHash));
+	}
 
 	public IdempotencyExecution start(
 			Long userId,

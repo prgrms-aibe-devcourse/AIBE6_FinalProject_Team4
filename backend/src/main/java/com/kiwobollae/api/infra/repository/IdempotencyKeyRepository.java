@@ -10,6 +10,12 @@ import org.springframework.data.repository.query.Param;
 
 public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, Long> {
 
+	Optional<IdempotencyKey> findByUser_IdAndApiTypeAndClientKey(
+			Long userId,
+			String apiType,
+			String clientKey
+	);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("""
 			SELECT k

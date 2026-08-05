@@ -209,8 +209,7 @@ class GachaDismantleMySqlIntegrationTest {
 
     assertThat(collectionRepository.findOwnedCount(user.getId(), common.getId())).contains(2);
     assertThat(collectionRepository.findOwnedCount(user.getId(), hyper.getId())).contains(2);
-    assertThat(walletRepository.findById(user.getId()))
-        .hasValueSatisfying(wallet -> assertThat(wallet.getBalance()).isZero());
+    assertThat(walletRepository.findById(user.getId())).isEmpty();
   }
 
   private String dismantleAfterBarrier(

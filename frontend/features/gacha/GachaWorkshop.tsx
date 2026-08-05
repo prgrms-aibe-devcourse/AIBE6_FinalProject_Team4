@@ -14,10 +14,7 @@ import {
   unequipGachaCosmetic,
 } from "@/lib/gacha-api";
 import { useUI } from "@/lib/ui";
-import {
-  notifyGachaCosmeticsChanged,
-  useGachaCosmetics,
-} from "@/features/gacha/use-gacha-cosmetics";
+import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
 
 const COSMETIC_DESCRIPTION: Record<string, string> = {
   TITLE_SPROUT_COLLECTOR: "새싹빛과 잎사귀가 피어나는 생동감 효과 칭호",
@@ -49,7 +46,7 @@ export default function GachaWorkshop({
   initialSection?: "menu" | "dismantle" | "cosmetics";
 }) {
   const { showToast, askConfirm } = useUI();
-  const { data, setData, refresh } = useGachaCosmetics(accessToken);
+  const { data, setData, refresh } = useGachaCosmetics();
   const [section, setSection] = useState<"menu" | "dismantle" | "cosmetics">(
     initialSection,
   );
@@ -117,7 +114,6 @@ export default function GachaWorkshop({
       setQuantities({});
       await onCollectionRefresh();
       await refresh();
-      notifyGachaCosmeticsChanged();
       showToast(`${result.earnedShards}조각을 획득했어요.`);
     } catch (error) {
       showToast(message(error, "카드를 분해하지 못했어요."), "err");
@@ -136,7 +132,6 @@ export default function GachaWorkshop({
         crypto.randomUUID(),
       );
       setData(next);
-      notifyGachaCosmeticsChanged();
       showToast(`${cosmetic.name}을(를) 해금했어요.`);
     } catch (error) {
       showToast(message(error, "해금하지 못했어요."), "err");
@@ -153,7 +148,6 @@ export default function GachaWorkshop({
         ? await unequipGachaCosmetic(cosmetic.type, accessToken)
         : await equipGachaCosmetic(cosmetic.code, accessToken);
       setData(next);
-      notifyGachaCosmeticsChanged();
       showToast(cosmetic.equipped ? "장착을 해제했어요." : "장착했어요.");
     } catch (error) {
       showToast(message(error, "장착 상태를 바꾸지 못했어요."), "err");

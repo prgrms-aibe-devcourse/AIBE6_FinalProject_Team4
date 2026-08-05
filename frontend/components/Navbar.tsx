@@ -58,7 +58,7 @@ export default function Navbar() {
   const active = activeKey(pathname);
   const cartCount = state.cartCount;
   const isAdmin = state.user?.role === 'ADMIN';
-  const { title: equippedTitle, border: equippedBorder } = useGachaCosmetics(state.accessToken);
+  const { title: equippedTitle, border: equippedBorder } = useGachaCosmetics();
 
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);

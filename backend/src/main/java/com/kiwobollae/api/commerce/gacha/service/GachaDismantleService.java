@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,13 +47,18 @@ public class GachaDismantleService {
   private final UserRepository userRepository;
   private final ObjectMapper objectMapper;
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public GachaDismantleResponse dismantle(
       Long userId, String idempotencyKey, GachaDismantleRequest request) {
     List<GachaDismantleRequest.Item> items = validateAndSort(userId, idempotencyKey, request);
+    String hash = requestHash(items);
+    var replay = idempotencyService.replayIfPresent(userId, API_TYPE, idempotencyKey, hash);
+    if (replay.isPresent()) {
+      return deserialize(replay.get().key().getResponseSnapshot());
+    }
     UserCardShardWallet wallet = walletService.getOrCreateForUpdate(userId);
     IdempotencyExecution execution =
-        idempotencyService.start(userId, API_TYPE, idempotencyKey, requestHash(items));
+        idempotencyService.start(userId, API_TYPE, idempotencyKey, hash);
     if (execution.replay()) {
       return deserialize(execution.key().getResponseSnapshot());
     }
@@ -63,7 +69,7 @@ public class GachaDismantleService {
         .findAllByUser_IdAndCard_IdIn(userId, cardIds)
         .forEach(collection -> collections.put(collection.getCard().getId(), collection));
     if (collections.size() != cardIds.size()) {
-      throw new BusinessException(ErrorCode.GACHA_CARD_KEEP_ONE_REQUIRED);
+      throw new BusinessException(ErrorCode.GACHA_CARD_NOT_OWNED);
     }
 
     User user = userRepository.getReferenceById(userId);

@@ -30,6 +30,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -54,21 +55,25 @@ public class GachaCosmeticService {
         .toList();
   }
 
-  @Transactional
+  @Transactional(readOnly = true)
   public GachaMyCosmeticsResponse getMine(Long userId) {
     requireUser(userId);
-    UserCardShardWallet wallet = walletService.getOrCreateForUpdate(userId);
-    return mine(userId, wallet);
+    return mine(userId, walletService.getWallet(userId));
   }
 
-  @Transactional
+  @Transactional(isolation = Isolation.READ_COMMITTED)
   public GachaMyCosmeticsResponse purchase(Long userId, String idempotencyKey, String code) {
     requireUser(userId);
     validateKey(idempotencyKey);
     CosmeticDefinition definition = catalog.get(code);
+    String hash = sha256(definition.code());
+    var replay = idempotencyService.replayIfPresent(userId, API_TYPE, idempotencyKey, hash);
+    if (replay.isPresent()) {
+      return deserialize(replay.get().key().getResponseSnapshot());
+    }
     UserCardShardWallet wallet = walletService.getOrCreateForUpdate(userId);
     IdempotencyExecution execution =
-        idempotencyService.start(userId, API_TYPE, idempotencyKey, sha256(definition.code()));
+        idempotencyService.start(userId, API_TYPE, idempotencyKey, hash);
     if (execution.replay()) {
       return deserialize(execution.key().getResponseSnapshot());
     }
@@ -101,7 +106,7 @@ public class GachaCosmeticService {
             .lineNo(1)
             .createdAt(now)
             .build());
-    GachaMyCosmeticsResponse response = mine(userId, wallet);
+    GachaMyCosmeticsResponse response = mine(userId, GachaShardWalletResponse.from(wallet));
     idempotencyService.succeed(
         execution.key(), 200, serialize(response), "CARD_COSMETIC", execution.key().getId());
     return response;
@@ -111,7 +116,6 @@ public class GachaCosmeticService {
   public GachaMyCosmeticsResponse equip(Long userId, String code) {
     requireUser(userId);
     CosmeticDefinition definition = catalog.get(code);
-    UserCardShardWallet wallet = walletService.getOrCreateForUpdate(userId);
     UserCardCosmetic target =
         cosmeticRepository.findAllByUser_Id(userId).stream()
             .filter(cosmetic -> cosmetic.getCosmeticCode().equals(code))
@@ -123,7 +127,7 @@ public class GachaCosmeticService {
           .forEach(UserCardCosmetic::unequip);
       target.equip(LocalDateTime.now(KST));
     }
-    return mine(userId, wallet);
+    return mine(userId, walletService.getWallet(userId));
   }
 
   @Transactional
@@ -132,14 +136,13 @@ public class GachaCosmeticService {
     if (type == null) {
       throw new BusinessException(ErrorCode.GACHA_COSMETIC_NOT_FOUND);
     }
-    UserCardShardWallet wallet = walletService.getOrCreateForUpdate(userId);
     cosmeticRepository.findAllByUser_IdAndCosmeticType(userId, type).stream()
         .filter(cosmetic -> cosmetic.getEquippedAt() != null)
         .forEach(UserCardCosmetic::unequip);
-    return mine(userId, wallet);
+    return mine(userId, walletService.getWallet(userId));
   }
 
-  private GachaMyCosmeticsResponse mine(Long userId, UserCardShardWallet wallet) {
+  private GachaMyCosmeticsResponse mine(Long userId, GachaShardWalletResponse shards) {
     Map<String, UserCardCosmetic> owned =
         cosmeticRepository.findAllByUser_Id(userId).stream()
             .collect(Collectors.toMap(UserCardCosmetic::getCosmeticCode, Function.identity()));
@@ -147,7 +150,7 @@ public class GachaCosmeticService {
         catalog.all().stream()
             .map(definition -> GachaCosmeticResponse.from(definition, owned.get(definition.code())))
             .toList();
-    return new GachaMyCosmeticsResponse(GachaShardWalletResponse.from(wallet), cosmetics);
+    return new GachaMyCosmeticsResponse(shards, cosmetics);
   }
 
   private void requireUser(Long userId) {

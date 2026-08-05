@@ -16,9 +16,10 @@ public interface UserCardShardWalletRepository extends JpaRepository<UserCardSha
   @Query(
       value =
           """
-          INSERT IGNORE INTO user_card_shard_wallets
+          INSERT INTO user_card_shard_wallets
             (user_id, balance, lifetime_earned, lifetime_spent, version, created_at, updated_at)
           VALUES (:userId, 0, 0, 0, 0, :now, :now)
+          ON DUPLICATE KEY UPDATE user_id = user_id
           """,
       nativeQuery = true)
   int ensureWallet(@Param("userId") Long userId, @Param("now") LocalDateTime now);

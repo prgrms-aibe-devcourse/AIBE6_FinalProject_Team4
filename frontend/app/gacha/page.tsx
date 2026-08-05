@@ -126,7 +126,7 @@ export default function GachaPage({
     data: cosmeticData,
     title: equippedTitle,
     border: equippedBorder,
-  } = useGachaCosmetics(state.accessToken);
+  } = useGachaCosmetics();
 
   const refreshCollection = useCallback(async () => {
     if (!state.accessToken) return;

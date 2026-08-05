@@ -56,7 +56,7 @@ export default function MyPage() {
   const { showToast } = useUI();
   const { state, set, logout } = useStore();
   const { title: equippedTitle, border: equippedBorder } =
-    useGachaCosmetics(state.accessToken);
+    useGachaCosmetics();
   const router = useRouter();
   const [addresses, setAddresses] = useState<UserAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);

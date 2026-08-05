@@ -28,6 +28,7 @@ import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -73,6 +74,9 @@ class GachaDismantleServiceTest {
     UserCardShardWallet wallet = new UserCardShardWallet(7L, user, 5L, 5L, 0L, 0L, null, null);
 
     when(key.getId()).thenReturn(100L);
+    when(idempotencyService.replayIfPresent(
+            eq(7L), eq("GACHA_CARD_DISMANTLE"), eq("key"), anyString()))
+        .thenReturn(Optional.empty());
     when(idempotencyService.start(eq(7L), eq("GACHA_CARD_DISMANTLE"), eq("key"), anyString()))
         .thenReturn(new IdempotencyExecution(key, false));
     when(collectionRepository.findAllByUser_IdAndCard_IdIn(eq(7L), any()))
@@ -123,6 +127,41 @@ class GachaDismantleServiceTest {
   }
 
   @Test
+  void rejectsCardThatUserDoesNotOwnWithDedicatedError() {
+    IdempotencyService idempotencyService = mock(IdempotencyService.class);
+    GachaShardWalletService walletService = mock(GachaShardWalletService.class);
+    UserCardCollectionRepository collectionRepository = mock(UserCardCollectionRepository.class);
+    GachaDismantleService service =
+        new GachaDismantleService(
+            idempotencyService,
+            walletService,
+            collectionRepository,
+            mock(CardShardTransactionRepository.class),
+            mock(UserRepository.class),
+            new ObjectMapper());
+    IdempotencyKey key = mock(IdempotencyKey.class);
+    when(idempotencyService.replayIfPresent(
+            eq(7L), eq("GACHA_CARD_DISMANTLE"), eq("key"), anyString()))
+        .thenReturn(Optional.empty());
+    when(idempotencyService.start(eq(7L), eq("GACHA_CARD_DISMANTLE"), eq("key"), anyString()))
+        .thenReturn(new IdempotencyExecution(key, false));
+    when(walletService.getOrCreateForUpdate(7L))
+        .thenReturn(new UserCardShardWallet(7L, null, 0L, 0L, 0L, 0L, null, null));
+    when(collectionRepository.findAllByUser_IdAndCard_IdIn(7L, List.of(99L))).thenReturn(List.of());
+
+    assertThatThrownBy(
+            () ->
+                service.dismantle(
+                    7L,
+                    "key",
+                    new GachaDismantleRequest(List.of(new GachaDismantleRequest.Item(99L, 1)))))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.GACHA_CARD_NOT_OWNED));
+  }
+
+  @Test
   void replaysStoredResponseWithoutDecrementingCardsAgain() throws Exception {
     IdempotencyService idempotencyService = mock(IdempotencyService.class);
     GachaShardWalletService walletService = mock(GachaShardWalletService.class);
@@ -139,14 +178,17 @@ class GachaDismantleServiceTest {
     IdempotencyKey key = mock(IdempotencyKey.class);
     GachaDismantleResponse stored = new GachaDismantleResponse(3, 13, 13, List.of());
     when(key.getResponseSnapshot()).thenReturn(objectMapper.writeValueAsString(stored));
-    when(idempotencyService.start(eq(7L), eq("GACHA_CARD_DISMANTLE"), eq("key"), anyString()))
-        .thenReturn(new IdempotencyExecution(key, true));
+    when(idempotencyService.replayIfPresent(
+            eq(7L), eq("GACHA_CARD_DISMANTLE"), eq("key"), anyString()))
+        .thenReturn(Optional.of(new IdempotencyExecution(key, true)));
 
     GachaDismantleResponse response =
         service.dismantle(
             7L, "key", new GachaDismantleRequest(List.of(new GachaDismantleRequest.Item(1L, 1))));
 
     assertThat(response).isEqualTo(stored);
+    verify(walletService, never()).getOrCreateForUpdate(7L);
+    verify(idempotencyService, never()).start(any(), anyString(), anyString(), anyString());
     verify(collectionRepository, never())
         .decrementKeepingOne(any(), any(), any(Integer.class), any());
   }
