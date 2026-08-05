@@ -13,7 +13,6 @@ import {
 } from "@/features/gacha/batch-session";
 import { groupGachaDrawResults } from "@/features/gacha/result";
 import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
-import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
 import { ApiError } from "@/lib/api";
 import {
   GachaDrawDetail,
@@ -53,7 +52,6 @@ export default function GachaBatchOpenPage({
 }) {
   const router = useRouter();
   const { state, hydrated } = useStore();
-  const { border } = useGachaCosmetics(state.accessToken);
   const [drawIds, setDrawIds] = useState<number[] | null>(null);
   const [details, setDetails] = useState<GachaDrawDetail[]>([]);
   const [stage, setStage] = useState<Stage>("loading");
@@ -315,10 +313,7 @@ export default function GachaBatchOpenPage({
                 </p>
               </div>
 
-              <GachaBatchResultGrid
-                results={groupedResults}
-                borderCode={border?.code}
-              />
+              <GachaBatchResultGrid results={groupedResults} />
 
               <div className="mt-10 flex flex-wrap justify-center gap-3">
                 <Link

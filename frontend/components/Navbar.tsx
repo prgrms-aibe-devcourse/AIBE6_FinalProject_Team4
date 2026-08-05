@@ -8,6 +8,8 @@ import { useUI } from '@/lib/ui';
 import { levelTitle } from '@/lib/levels';
 import Skeleton from './Skeleton';
 import { useGachaCosmetics } from '@/features/gacha/use-gacha-cosmetics';
+import GachaTitleBadge from '@/components/gacha/GachaTitleBadge';
+import ProfileCosmeticFrame from '@/components/gacha/ProfileCosmeticFrame';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
   DELIVERY: '📦',
@@ -56,7 +58,7 @@ export default function Navbar() {
   const active = activeKey(pathname);
   const cartCount = state.cartCount;
   const isAdmin = state.user?.role === 'ADMIN';
-  const { title: equippedTitle } = useGachaCosmetics(state.accessToken);
+  const { title: equippedTitle, border: equippedBorder } = useGachaCosmetics(state.accessToken);
 
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
@@ -188,14 +190,26 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
-              <div className="relative" ref={profileRef}>
-                <button
-                  type="button"
-                  onClick={() => setProfileOpen((v) => !v)}
-                  className="flex h-[34px] w-[34px] cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] font-extrabold text-white ring-0 ring-brand-dark/40 transition-shadow duration-150 hover:ring-4"
+              <div className="relative flex items-center gap-2" ref={profileRef}>
+                {equippedTitle && (
+                  <GachaTitleBadge
+                    code={equippedTitle.code}
+                    name={equippedTitle.name}
+                    className="hidden max-w-[150px] xl:inline-flex"
+                  />
+                )}
+                <ProfileCosmeticFrame
+                  borderCode={equippedBorder?.code}
+                  className="h-10 w-10"
                 >
-                  {state.user?.nickname?.charAt(0) ?? '?'}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen((v) => !v)}
+                    className="flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] font-extrabold text-white ring-0 ring-brand-dark/40 transition-shadow duration-150 hover:ring-4"
+                  >
+                    {state.user?.nickname?.charAt(0) ?? '?'}
+                  </button>
+                </ProfileCosmeticFrame>
                 {profileOpen && (
                   <div className="absolute right-0 top-[44px] w-56 overflow-hidden rounded-2xl border border-line bg-white shadow-[0_14px_40px_-12px_rgba(85,139,47,.35)]">
                     <div className="border-b border-[#F2ECDD] px-4 py-3.5">
@@ -207,9 +221,11 @@ export default function Navbar() {
                       </div>
                       <div className="mt-1 truncate text-[12.5px] text-faint">{state.user?.email}</div>
                       {equippedTitle && (
-                        <div className="mt-2 inline-flex rounded-full bg-[#edf3e9] px-2.5 py-1 text-[11px] font-extrabold text-brand-dark">
-                          ✦ {equippedTitle.name}
-                        </div>
+                        <GachaTitleBadge
+                          code={equippedTitle.code}
+                          name={equippedTitle.name}
+                          className="mt-2"
+                        />
                       )}
                     </div>
                     <Link href="/my" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
@@ -261,7 +277,31 @@ export default function Navbar() {
                   mobileActive === b.key ? 'text-brand hover:text-brand' : 'text-[#9aa691] hover:text-[#9aa691]'
                 }`}
               >
-                <span className="material-symbols-outlined text-2xl">{b.icon}</span>
+                {b.key === 'account' ? (
+                  !hydrated ? (
+                    <span
+                      aria-hidden="true"
+                      className="h-7 w-7 animate-pulse rounded-full bg-[#dfe6d8]"
+                    />
+                  ) : state.authed ? (
+                    <ProfileCosmeticFrame
+                      borderCode={equippedBorder?.code}
+                      className="h-8 w-8"
+                    >
+                      <span className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] text-xs font-black text-white">
+                        {state.user?.nickname?.charAt(0) ?? '?'}
+                      </span>
+                    </ProfileCosmeticFrame>
+                  ) : (
+                    <span className="material-symbols-outlined text-2xl">
+                      person
+                    </span>
+                  )
+                ) : (
+                  <span className="material-symbols-outlined text-2xl">
+                    {b.icon}
+                  </span>
+                )}
                 <span className="text-[11px] font-bold">{b.label}</span>
               </Link>
             );

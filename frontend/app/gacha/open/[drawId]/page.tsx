@@ -5,12 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import GoldenCelebrationEffects from "@/components/gacha/GoldenCelebrationEffects";
-import CardCosmeticFrame from "@/components/gacha/CardCosmeticFrame";
 import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
 import { playRarityRevealSound } from "@/features/gacha/audio";
 import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
-import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
 import { ApiError } from "@/lib/api";
 import {
   GachaDrawDetail,
@@ -83,7 +81,6 @@ export default function GachaOpenPage({
   const drawId = Number(params.drawId);
   const router = useRouter();
   const { state, hydrated } = useStore();
-  const { border } = useGachaCosmetics(state.accessToken);
   const [detail, setDetail] = useState<GachaDrawDetail | null>(null);
   const [stage, setStage] = useState<Stage>("loading");
   const [revealedIndex, setRevealedIndex] = useState(0);
@@ -284,7 +281,6 @@ export default function GachaOpenPage({
               index={revealedIndex}
               total={detail.items.length}
               muted={muted}
-              borderCode={border?.code}
               onNext={revealNext}
             />
           )}
@@ -301,10 +297,7 @@ export default function GachaOpenPage({
                     key={item.sequence}
                     className="rounded-2xl border border-white/10 bg-white/[.07] p-2.5 backdrop-blur"
                   >
-                    <CardCosmeticFrame
-                      borderCode={border?.code}
-                      className="aspect-[1122/1402] rounded-xl bg-black/20"
-                    >
+                    <div className="relative aspect-[1122/1402] overflow-hidden rounded-xl bg-black/20">
                       {item.imageUrl && (
                         <Image
                           src={item.imageUrl}
@@ -318,7 +311,7 @@ export default function GachaOpenPage({
                           NEW
                         </span>
                       )}
-                    </CardCosmeticFrame>
+                    </div>
                     <p className="mt-2 truncate text-sm font-extrabold">
                       {item.name}
                     </p>
@@ -368,14 +361,12 @@ function RevealCard({
   index,
   total,
   muted,
-  borderCode,
   onNext,
 }: {
   item: GachaDrawItem;
   index: number;
   total: number;
   muted: boolean;
-  borderCode?: string | null;
   onNext: () => void;
 }) {
   const golden = item.finalRarity === "GOLDEN_RARE";
@@ -468,9 +459,8 @@ function RevealCard({
                   : "motion-safe:animate-cardReveal3d"
             }`}
           >
-            <CardCosmeticFrame
-              borderCode={borderCode}
-              className={`absolute inset-0 aspect-[1122/1402] rounded-[24px] bg-black/20 shadow-[0_30px_70px_rgba(0,0,0,.5)] [backface-visibility:hidden] ${revealStyle.frame}`}
+            <div
+              className={`absolute inset-0 aspect-[1122/1402] overflow-hidden rounded-[24px] bg-black/20 shadow-[0_30px_70px_rgba(0,0,0,.5)] [backface-visibility:hidden] ${revealStyle.frame}`}
             >
               {item.imageUrl && (
                 <Image
@@ -494,7 +484,7 @@ function RevealCard({
                   NEW
                 </span>
               )}
-            </CardCosmeticFrame>
+            </div>
             <div
               className="absolute inset-0 overflow-hidden rounded-[24px] bg-[#102519] shadow-[0_30px_70px_rgba(0,0,0,.55)] [backface-visibility:hidden]"
               style={{ transform: "rotateY(180deg)" }}

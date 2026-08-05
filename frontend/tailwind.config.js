@@ -3,6 +3,7 @@ module.exports = {
   content: [
     './app/**/*.{js,jsx,ts,tsx}',
     './components/**/*.{js,jsx,ts,tsx}',
+    './features/**/*.{js,jsx,ts,tsx}',
     './lib/**/*.{js,jsx,ts,tsx}',
   ],
   theme: {
@@ -48,6 +49,38 @@ module.exports = {
         floaty: {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-8px)' },
+        },
+        profileLeafSway: {
+          '0%, 100%': { rotate: '-4deg' },
+          '50%': { rotate: '5deg' },
+        },
+        profileBlossomBloom: {
+          '0%, 100%': { rotate: '-3deg', scale: '1' },
+          '50%': { rotate: '4deg', scale: '1.08' },
+        },
+        profilePetalDrift: {
+          '0%': { opacity: '0', translate: '0 -35%', rotate: '0deg' },
+          '20%': { opacity: '1' },
+          '100%': {
+            opacity: '0',
+            translate: '-45% 145%',
+            rotate: '170deg',
+          },
+        },
+        profileAppleFloat: {
+          '0%, 100%': { translate: '0 0', rotate: '-2deg' },
+          '50%': { translate: '0 -9%', rotate: '2deg' },
+        },
+        profileRingTurn: {
+          to: { rotate: '360deg' },
+        },
+        profileTwinkle: {
+          '0%, 100%': { opacity: '.35', scale: '.55' },
+          '50%': { opacity: '1', scale: '1.15' },
+        },
+        profileShine: {
+          '0%': { backgroundPosition: '180% 0' },
+          '55%, 100%': { backgroundPosition: '-130% 0' },
         },
         glowPulse: {
           '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,213,79,.6)' },
@@ -611,6 +644,14 @@ module.exports = {
         upIn: 'upIn .3s ease',
         pop: 'pop .35s ease',
         floaty: 'floaty 3s ease-in-out infinite',
+        profileLeafSway: 'profileLeafSway 2.8s ease-in-out infinite',
+        profileBlossomBloom:
+          'profileBlossomBloom 3.2s ease-in-out infinite',
+        profilePetalDrift: 'profilePetalDrift 3.1s ease-in-out infinite',
+        profileAppleFloat: 'profileAppleFloat 2.4s ease-in-out infinite',
+        profileRingTurn: 'profileRingTurn 10s linear infinite',
+        profileTwinkle: 'profileTwinkle 1.5s ease-in-out infinite',
+        profileShine: 'profileShine 2.7s ease-in-out infinite',
         glowPulse: 'glowPulse 2s infinite',
         confettiFall: 'confettiFall 1.4s ease-in forwards',
         shimmer: 'shimmer 1.6s ease-in-out infinite',

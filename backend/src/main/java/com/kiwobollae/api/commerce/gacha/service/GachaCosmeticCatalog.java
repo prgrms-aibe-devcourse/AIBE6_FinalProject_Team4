@@ -22,16 +22,16 @@ public class GachaCosmeticCatalog {
           new CosmeticDefinition(
               "TITLE_CARD_MASTER", "카드 마스터", GachaCosmeticType.TITLE, 80, "title-card-master"),
           new CosmeticDefinition(
-              "BORDER_SPROUT_VINE", "새싹 덩굴", GachaCosmeticType.BORDER, 150, "border-sprout-vine"),
+              "BORDER_SPROUT_VINE", "풀잎의 숨결", GachaCosmeticType.BORDER, 150, "border-sprout-vine"),
           new CosmeticDefinition(
               "BORDER_BLOOM_GARDEN",
-              "만개한 정원",
+              "벚꽃의 축복",
               GachaCosmeticType.BORDER,
               220,
               "border-bloom-garden"),
           new CosmeticDefinition(
               "BORDER_GOLDEN_HARVEST",
-              "황금 수확",
+              "황금 사과",
               GachaCosmeticType.BORDER,
               300,
               "border-golden-harvest"));

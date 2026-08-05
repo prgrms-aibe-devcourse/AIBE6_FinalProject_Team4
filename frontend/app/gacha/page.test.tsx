@@ -27,6 +27,10 @@ vi.mock("@/lib/store", () => ({
   }),
 }));
 
+vi.mock("@/lib/ui", () => ({
+  useUI: () => ({ showToast: vi.fn(), askConfirm: vi.fn() }),
+}));
+
 vi.mock("@/lib/gacha-api", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/gacha-api")>();
   return {
@@ -125,6 +129,12 @@ describe("GachaPage", () => {
       await screen.findByRole("heading", { name: "나의 카드 갤러리" }),
     ).toBeInTheDocument();
     expect(screen.getByText("×3")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /조각 공방 열기/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^조각 공방$/ }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", {
@@ -141,6 +151,30 @@ describe("GachaPage", () => {
     expect(originalImage).toBeInTheDocument();
     expect(originalImage.parentElement).toHaveClass("aspect-[1122/1402]");
     expect(originalImage.parentElement).not.toHaveClass("bg-black");
+  });
+
+  it("마이페이지 내 카드 링크는 내 카드 갤러리를 바로 연다", async () => {
+    mockAuth.accessToken = "access-token";
+
+    render(<GachaPage searchParams={{ tab: "mine" }} />);
+
+    expect(
+      await screen.findByRole("heading", { name: "나의 카드 갤러리" }),
+    ).toBeInTheDocument();
+  });
+
+  it("마이페이지 칭호·테두리 링크는 이펙트 상점을 바로 연다", async () => {
+    mockAuth.accessToken = "access-token";
+
+    render(
+      <GachaPage searchParams={{ tab: "workshop", section: "cosmetics" }} />,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "이펙트 칭호·프로필 테두리",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("브라우저 뒤로가기로 복귀하면 보유 카드와 개봉 이력을 다시 조회한다", async () => {
