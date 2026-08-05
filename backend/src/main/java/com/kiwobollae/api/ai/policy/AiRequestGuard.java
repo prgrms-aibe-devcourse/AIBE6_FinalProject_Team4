@@ -3,31 +3,31 @@ package com.kiwobollae.api.ai.policy;
 import com.kiwobollae.api.ai.config.AiPolicyProperties;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.LongSupplier;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Optional;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AiRequestGuard {
 
-  private static final long CLEANUP_INTERVAL_MASK = 0xffL;
+  // 같은 (user, feature)의 첫 호출이 동시에 몰리면 창 행을 만드는 INSERT가 서로 경합해 드물게
+  // 데드락이 난다. 창이 한 번 만들어진 뒤에는 조건부 UPDATE만 남아 발생하지 않으므로, 짧은
+  // 재시도로 흡수한다. 모두 실패하면 예외를 그대로 올려 AI 호출을 하지 않는다 — 소비량을 셀 수
+  // 없는 상태에서 외부 호출을 통과시키면 한도가 무의미해진다.
+  private static final int MAX_CONSUME_ATTEMPTS = 3;
 
   private final AiPolicyProperties properties;
-  private final LongSupplier currentTimeMillis;
-  private final ConcurrentHashMap<RequestKey, Window> windows = new ConcurrentHashMap<>();
-  private final AtomicLong requestCount = new AtomicLong();
+  private final AiRateLimitStore rateLimitStore;
+  private final Clock seoulClock;
 
-  @Autowired
-  public AiRequestGuard(AiPolicyProperties properties) {
-    this(properties, System::currentTimeMillis);
-  }
-
-  AiRequestGuard(AiPolicyProperties properties, LongSupplier currentTimeMillis) {
+  public AiRequestGuard(
+      AiPolicyProperties properties, AiRateLimitStore rateLimitStore, Clock seoulClock) {
     this.properties = properties;
-    this.currentTimeMillis = currentTimeMillis;
+    this.rateLimitStore = rateLimitStore;
+    this.seoulClock = seoulClock;
   }
 
   public void checkRateLimit(Long userId, AiFeature feature) {
@@ -38,18 +38,29 @@ public class AiRequestGuard {
       throw new IllegalArgumentException("AI 기능 구분이 필요합니다.");
     }
 
-    long now = currentTimeMillis.getAsLong();
-    long windowMillis = properties.rateLimit().window().toMillis();
-    RequestKey key = new RequestKey(userId, feature);
-    Window window = windows.computeIfAbsent(key, ignored -> new Window(now));
-    long retryAfterSeconds =
-        window.tryConsume(now, windowMillis, properties.rateLimit().maxRequests());
-    cleanupExpiredWindowsPeriodically(now, windowMillis);
+    consumeWithRetry(userId, feature)
+        .ifPresent(
+            seconds -> {
+              throw new BusinessException(
+                  ErrorCode.COMMON_RATE_LIMITED, Map.of("retryAfterSeconds", seconds));
+            });
+  }
 
-    if (retryAfterSeconds > 0) {
-      throw new BusinessException(
-          ErrorCode.COMMON_RATE_LIMITED, Map.of("retryAfterSeconds", retryAfterSeconds));
+  private Optional<Long> consumeWithRetry(Long userId, AiFeature feature) {
+    CannotAcquireLockException lastFailure = null;
+    for (int attempt = 1; attempt <= MAX_CONSUME_ATTEMPTS; attempt++) {
+      try {
+        return rateLimitStore.consume(
+            userId,
+            feature,
+            LocalDateTime.now(seoulClock),
+            properties.rateLimit().window(),
+            properties.rateLimit().maxRequests());
+      } catch (CannotAcquireLockException exception) {
+        lastFailure = exception;
+      }
     }
+    throw lastFailure;
   }
 
   public void validateUserInput(String input) {
@@ -60,42 +71,6 @@ public class AiRequestGuard {
       throw new BusinessException(
           ErrorCode.COMMON_VALIDATION_FAILED,
           "AI 요청 내용은 " + properties.maxInputLength() + "자 이하로 입력해 주세요.");
-    }
-  }
-
-  private void cleanupExpiredWindowsPeriodically(long now, long windowMillis) {
-    if ((requestCount.incrementAndGet() & CLEANUP_INTERVAL_MASK) != 0) {
-      return;
-    }
-    windows.entrySet().removeIf(entry -> entry.getValue().isExpired(now, windowMillis));
-  }
-
-  private record RequestKey(Long userId, AiFeature feature) {}
-
-  private static final class Window {
-
-    private volatile long startedAtMillis;
-    private int consumed;
-
-    private Window(long startedAtMillis) {
-      this.startedAtMillis = startedAtMillis;
-    }
-
-    private synchronized long tryConsume(long now, long windowMillis, int limit) {
-      if (now - startedAtMillis >= windowMillis) {
-        startedAtMillis = now;
-        consumed = 0;
-      }
-      if (consumed < limit) {
-        consumed++;
-        return 0;
-      }
-      long remainingMillis = Math.max(1L, startedAtMillis + windowMillis - now);
-      return Math.max(1L, (remainingMillis + 999L) / 1_000L);
-    }
-
-    private boolean isExpired(long now, long windowMillis) {
-      return now - startedAtMillis >= windowMillis * 2;
     }
   }
 }
