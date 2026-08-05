@@ -10,7 +10,6 @@ import java.net.http.HttpTimeoutException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,16 +36,19 @@ public class OpenAiClient implements AiClient {
   private final RestClient restClient;
   private final ObjectMapper objectMapper;
   private final OpenAiProperties properties;
+  private final AiImageUrlResolver imageUrlResolver;
 
   @Autowired
-  public OpenAiClient(OpenAiProperties properties, ObjectMapper objectMapper) {
-    this(createRestClientBuilder(properties), objectMapper, properties);
+  public OpenAiClient(
+      OpenAiProperties properties, ObjectMapper objectMapper, AiImageUrlResolver imageUrlResolver) {
+    this(createRestClientBuilder(properties), objectMapper, properties, imageUrlResolver);
   }
 
   OpenAiClient(
       RestClient.Builder restClientBuilder,
       ObjectMapper objectMapper,
-      OpenAiProperties properties) {
+      OpenAiProperties properties,
+      AiImageUrlResolver imageUrlResolver) {
     this.restClient =
         restClientBuilder
             .baseUrl(properties.baseUrl())
@@ -54,6 +56,7 @@ public class OpenAiClient implements AiClient {
             .build();
     this.objectMapper = objectMapper;
     this.properties = properties;
+    this.imageUrlResolver = imageUrlResolver;
   }
 
   @Override
@@ -107,8 +110,8 @@ public class OpenAiClient implements AiClient {
       userContent.add(
           Map.of(
               "type", "input_image",
-              "image_url", image.imageUrl(),
-              "detail", image.detail().name().toLowerCase(Locale.ROOT)));
+              "image_url", imageUrlResolver.resolveJournalImageUrl(image.imageUrl()),
+              "detail", image.detail().wireValue()));
     }
     input.add(Map.of("role", "user", "content", userContent));
     return input;

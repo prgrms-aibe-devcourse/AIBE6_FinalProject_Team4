@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.kiwobollae.api.ai.config.AiImageProperties;
 import com.kiwobollae.api.ai.config.OpenAiProperties;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
@@ -28,6 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 class OpenAiClientTest {
 
   private static final String BASE_URL = "https://api.openai.test";
+  private static final String IMAGE_PUBLIC_BASE_URL = "https://api.kiwor.site";
   private static final String API_KEY = "test-openai-key";
 
   private MockRestServiceServer server;
@@ -37,7 +39,7 @@ class OpenAiClientTest {
   void setUp() {
     RestClient.Builder builder = RestClient.builder();
     server = MockRestServiceServer.bindTo(builder).build();
-    client = new OpenAiClient(builder, new ObjectMapper(), properties(API_KEY));
+    client = new OpenAiClient(builder, new ObjectMapper(), properties(API_KEY), imageUrlResolver());
   }
 
   @Test
@@ -117,7 +119,7 @@ class OpenAiClientTest {
 						      {"type": "input_text", "text": "user prompt"},
 						      {
 						        "type": "input_image",
-						        "image_url": "https://images.test/journal.jpg",
+						        "image_url": "https://api.kiwor.site/api/v1/journals/images/1/journal.jpg",
 						        "detail": "high"
 						      }
 						    ]}
@@ -132,7 +134,9 @@ class OpenAiClientTest {
             AiModelRole.VISION,
             "system prompt",
             "user prompt",
-            List.of(new AiImageInput("https://images.test/journal.jpg", AiImageInput.Detail.HIGH)),
+            List.of(
+                new AiImageInput(
+                    "/api/v1/journals/images/1/journal.jpg", AiImageInput.Detail.HIGH)),
             schema());
 
     client.generate(request);
@@ -200,7 +204,8 @@ class OpenAiClientTest {
   @Test
   void rejectsCallWhenApiKeyIsNotConfigured() {
     OpenAiClient unconfigured =
-        new OpenAiClient(RestClient.builder(), new ObjectMapper(), properties(""));
+        new OpenAiClient(
+            RestClient.builder(), new ObjectMapper(), properties(""), imageUrlResolver());
 
     assertThatThrownBy(() -> unconfigured.generate(textRequest()))
         .isInstanceOfSatisfying(
@@ -237,6 +242,19 @@ class OpenAiClientTest {
         Duration.ofSeconds(1),
         Duration.ofSeconds(2),
         1200);
+  }
+
+  private AiImageUrlResolver imageUrlResolver() {
+    return new AiImageUrlResolver(new AiImageProperties(IMAGE_PUBLIC_BASE_URL));
+  }
+
+  // OpenAI Responses API의 input_image.detail은 auto/low/high만 허용한다. 상수가 늘어날 때
+  // 허용되지 않는 값이 전송되면(→ 400) 여기서 먼저 깨지도록 와이어 값을 고정한다.
+  @Test
+  void everyDetailMapsToAValueOpenAiAccepts() {
+    assertThat(AiImageInput.Detail.values())
+        .extracting(AiImageInput.Detail::wireValue)
+        .containsExactly("auto", "low", "high");
   }
 
   private String completedResponse() {

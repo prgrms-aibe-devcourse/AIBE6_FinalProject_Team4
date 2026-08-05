@@ -3,6 +3,7 @@ package com.kiwobollae.api.ai.client;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kiwobollae.api.ai.config.AiConfig;
+import com.kiwobollae.api.ai.config.AiImageProperties;
 import com.kiwobollae.api.ai.config.OpenAiProperties;
 import com.kiwobollae.api.global.exception.BusinessException;
 import java.util.List;
@@ -33,7 +34,12 @@ class OpenAiClientSmokeTest {
                   providerStatus.set(response.getStatusCode().value());
                   return response;
                 });
-    OpenAiClient client = new OpenAiClient(restClientBuilder, new ObjectMapper(), properties);
+    OpenAiClient client =
+        new OpenAiClient(
+            restClientBuilder,
+            new ObjectMapper(),
+            properties,
+            new AiImageUrlResolver(new AiImageProperties("")));
 
     AiResponse response;
     try {
