@@ -88,6 +88,20 @@ class PlantTimelapseTransactionServiceTest {
 		verify(videoStorageService, org.mockito.Mockito.never()).deleteVideo(any());
 	}
 
+	// 요청 검증(대표이미지 2장 이상) 시점과 워커 실행(비동기) 시점 사이에 사용자가 일지를 지우면
+	// 실제로 빈 리스트가 될 수 있다 — 그 경우 ffmpeg 호출로 흘려보내지 않고 여기서 바로 막는다.
+	@Test
+	void encodeAndUploadThrowsWhenNoRepresentativeImagesLeft() {
+		given(journalImageRepository.findRepresentativeByProfileIdOrderByWrittenDateAsc(21L))
+				.willReturn(List.of());
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> transactionService.encodeAndUpload(21L, null))
+				.isInstanceOf(TimelapseEncodingException.class);
+
+		verify(encoder, org.mockito.Mockito.never()).encode(any());
+		verify(videoStorageService, org.mockito.Mockito.never()).uploadVideo(any(), any());
+	}
+
 	@Test
 	void completeMarksRowCompletedAndNotifiesOwner() {
 		PlantTimelapse existing = PlantTimelapse.create(profile(21L, 7L), java.time.LocalDateTime.now());
@@ -110,6 +124,27 @@ class PlantTimelapseTransactionServiceTest {
 		assertThat(timelapse.getStatus()).isEqualTo(com.kiwobollae.api.content.entity.enums.PlantTimelapseStatus.FAILED);
 		assertThat(timelapse.getFailReason()).isEqualTo("ffmpeg exited with code 1");
 		verify(notificationService).notify(eq(7L), eq(NotificationType.TIMELAPSE), anyString(), anyString(), anyString(), eq("PLANT_TIMELAPSE"), eq(21L));
+	}
+
+	@Test
+	void recoverStaleMarksFailedAndNotifiesWhenStillProcessing() {
+		given(plantTimelapseRepository.failIfStillProcessing(eq(21L), anyString(), any())).willReturn(1);
+		PlantTimelapse timelapse = PlantTimelapse.create(profile(21L, 7L), java.time.LocalDateTime.now());
+		given(plantTimelapseRepository.findByPlantProfileId(21L)).willReturn(Optional.of(timelapse));
+
+		transactionService.recoverStale(21L);
+
+		verify(notificationService).notify(eq(7L), eq(NotificationType.TIMELAPSE), anyString(), anyString(), anyString(), eq("PLANT_TIMELAPSE"), eq(21L));
+	}
+
+	@Test
+	void recoverStaleDoesNothingWhenAlreadyResolvedByNormalWorker() {
+		given(plantTimelapseRepository.failIfStillProcessing(eq(21L), anyString(), any())).willReturn(0);
+
+		transactionService.recoverStale(21L);
+
+		verify(plantTimelapseRepository, org.mockito.Mockito.never()).findByPlantProfileId(any());
+		verify(notificationService, org.mockito.Mockito.never()).notify(any(), any(), any(), any(), any(), any(), any());
 	}
 
 	private JournalImage journalImage(Long userId, String imageUrl) {

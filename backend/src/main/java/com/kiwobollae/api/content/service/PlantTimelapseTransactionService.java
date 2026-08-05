@@ -46,6 +46,12 @@ public class PlantTimelapseTransactionService {
 	// 재생성해도 이전 영상이 S3에서 안 지워지는 버그로 발견됨).
 	public String encodeAndUpload(Long profileId, String previousVideoUrl) {
 		List<JournalImage> images = journalImageRepository.findRepresentativeByProfileIdOrderByWrittenDateAsc(profileId);
+		// 요청 검증(대표이미지 2장 이상) 시점과 이 워커가 실제로 도는 시점(비동기) 사이에 사용자가
+		// 일지를 지울 수 있어, 여기서 다시 비어있을 수 있다 — images.get(0)에서 그냥 터지게
+		// 두지 않고 명확한 실패로 처리한다.
+		if (images.isEmpty()) {
+			throw new TimelapseEncodingException("No representative images available for profileId=" + profileId);
+		}
 		List<TimelapseSourceImage> sources = images.stream()
 				.map(image -> new TimelapseSourceImage(
 						journalImageUploadService.downloadBytes(image.getImageUrl()),
@@ -74,6 +80,20 @@ public class PlantTimelapseTransactionService {
 	public void fail(Long profileId, String reason) {
 		PlantTimelapse timelapse = plantTimelapseRepository.findByPlantProfileId(profileId).orElseThrow();
 		timelapse.fail(reason, LocalDateTime.now(KST));
+		notify(timelapse, "타임랩스 생성에 실패했어요", "타임랩스 영상 생성 중 문제가 발생했어요. 다시 시도해 주세요.");
+	}
+
+	// 복구 스케줄러(PlantTimelapseRecoveryScheduler) 전용 — 정상 워커가 죽거나 fail() 자체가
+	// 실패해서 PROCESSING에 갇힌 행을 강제로 FAILED 처리한다. failIfStillProcessing이 여전히
+	// PROCESSING일 때만 조건부로 전이시키므로, 그 사이 정상 워커가 이미 완료/실패 처리했다면
+	// 0을 반환하고 여기서는 아무것도(중복 알림 포함) 하지 않는다.
+	@Transactional
+	public void recoverStale(Long profileId) {
+		int updated = plantTimelapseRepository.failIfStillProcessing(profileId, "PROCESSING_TIMEOUT", LocalDateTime.now(KST));
+		if (updated == 0) {
+			return;
+		}
+		PlantTimelapse timelapse = plantTimelapseRepository.findByPlantProfileId(profileId).orElseThrow();
 		notify(timelapse, "타임랩스 생성에 실패했어요", "타임랩스 영상 생성 중 문제가 발생했어요. 다시 시도해 주세요.");
 	}
 
