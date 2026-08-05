@@ -72,7 +72,8 @@ export default function Cards() {
       return (card.ownedCount ?? 0) >= card.requiredCountForExchange;
     }
     if (filter === 'collecting') {
-      return (card.ownedCount ?? 0) < card.requiredCountForExchange;
+      const ownedCount = card.ownedCount ?? 0;
+      return ownedCount > 0 && ownedCount < card.requiredCountForExchange;
     }
     return true;
   });
