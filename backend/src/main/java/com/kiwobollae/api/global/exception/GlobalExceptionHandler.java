@@ -35,6 +35,11 @@ public class GlobalExceptionHandler {
 					.header("Retry-After", "2")
 					.body(errorResponse(e.getErrorCode(), e.getMessage(), e.getDetails(), null, request));
 		}
+		if (e.getErrorCode() == ErrorCode.COMMON_RATE_LIMITED) {
+			return ResponseEntity.status(e.getErrorCode().getHttpStatus())
+					.header("Retry-After", resolveRetryAfter(e.getDetails()))
+					.body(errorResponse(e.getErrorCode(), e.getMessage(), e.getDetails(), null, request));
+		}
 		return respond(e.getErrorCode(), e.getMessage(), e.getDetails(), null, request);
 	}
 
@@ -110,5 +115,15 @@ public class GlobalExceptionHandler {
 		return ErrorResponse.of(
 				errorCode, message != null ? message : errorCode.getDefaultMessage(),
 				details, fieldErrors, ErrorResponse.newTraceId(), request.getRequestURI());
+	}
+
+	private String resolveRetryAfter(Map<String, Object> details) {
+		if (details == null) {
+			return "1";
+		}
+		Object retryAfterSeconds = details.get("retryAfterSeconds");
+		return retryAfterSeconds instanceof Number number
+				? Long.toString(Math.max(1L, number.longValue()))
+				: "1";
 	}
 }

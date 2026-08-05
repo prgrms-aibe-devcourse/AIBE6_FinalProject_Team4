@@ -156,6 +156,11 @@ jobs:
               -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI:-}" \
               -e TOSS_PAYMENTS_BASE_URL="${TOSS_PAYMENTS_BASE_URL:-https://api.tosspayments.com}" \
               -e TOSS_PAYMENTS_SECRET_KEY="${TOSS_PAYMENTS_SECRET_KEY:-}" \
+              -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com}" \
+              -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+              -e OPENAI_TEXT_MODEL="${OPENAI_TEXT_MODEL:-}" \
+              -e OPENAI_VISION_MODEL="${OPENAI_VISION_MODEL:-}" \
+              -e AI_IMAGE_PUBLIC_BASE_URL="https://${APP_DOMAIN}" \
               "${IMAGE}"
 
             echo "health-check: ${GREEN}"

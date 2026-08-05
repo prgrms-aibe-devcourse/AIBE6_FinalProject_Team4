@@ -263,6 +263,10 @@ locals {
     MAIL_PASSWORD="${var.mail_password}"
     TOSS_PAYMENTS_BASE_URL="${var.toss_payments_base_url}"
     TOSS_PAYMENTS_SECRET_KEY="${var.toss_payments_secret_key}"
+    OPENAI_BASE_URL="${var.openai_base_url}"
+    OPENAI_API_KEY="${var.openai_api_key}"
+    OPENAI_TEXT_MODEL="${var.openai_text_model}"
+    OPENAI_VISION_MODEL="${var.openai_vision_model}"
     EOF
     source /etc/environment
 

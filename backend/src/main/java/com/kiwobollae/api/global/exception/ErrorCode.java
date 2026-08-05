@@ -89,6 +89,12 @@ public enum ErrorCode {
 	PAYMENT_PROVIDER_INVALID_RESPONSE(HttpStatus.BAD_GATEWAY, "결제 대행사로부터 올바르지 않은 응답을 받았습니다."),
 	PAYMENT_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "결제 대행사를 일시적으로 사용할 수 없습니다."),
 
+	// --- AI domain ---
+	AI_CONFIGURATION_INVALID(HttpStatus.SERVICE_UNAVAILABLE, "AI 기능 설정이 완료되지 않았습니다."),
+	AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스를 일시적으로 사용할 수 없습니다."),
+	AI_REQUEST_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."),
+	AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI 서비스로부터 올바르지 않은 응답을 받았습니다."),
+
 	// --- Content 도메인: 식물 프로필 / 성장 일지 (팀 컨벤션에 따라 메시지 구분 대신 전용 코드 사용) ---
 	PLANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 프로필을 찾을 수 없습니다."),
 	PLANT_SPECIES_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 종을 찾을 수 없습니다."),

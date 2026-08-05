@@ -92,6 +92,28 @@ payment:
     base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
     secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
 
+ai:
+  image:
+    # DB에는 host-relative 경로를 저장하고, OpenAI 호출 직전에 이 공개 주소를 붙인다.
+    # 텍스트 기능은 값 없이 사용할 수 있지만 이미지 기능 호출 시에는 필수다.
+    public-base-url: ${AI_IMAGE_PUBLIC_BASE_URL:}
+  openai:
+    # API Key와 모델은 코드에 기본값을 두지 않는다. 값이 없으면 기존 기능은 정상 기동하고,
+    # 실제 AI 호출만 AI_CONFIGURATION_INVALID로 거부한다.
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    api-key: ${OPENAI_API_KEY:}
+    text-model: ${OPENAI_TEXT_MODEL:}
+    vision-model: ${OPENAI_VISION_MODEL:}
+    connect-timeout: ${OPENAI_CONNECT_TIMEOUT:3s}
+    read-timeout: ${OPENAI_READ_TIMEOUT:30s}
+    max-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:2000}
+  policy:
+    # MVP 기본값이며 운영 사용량을 확인한 뒤 환경변수로 조정한다.
+    max-input-length: ${AI_MAX_INPUT_LENGTH:2000}
+    rate-limit:
+      max-requests: ${AI_RATE_LIMIT_MAX_REQUESTS:10}
+      window: ${AI_RATE_LIMIT_WINDOW:1m}
+
 aws:
   s3:
     region: ${AWS_S3_REGION:ap-northeast-2}
