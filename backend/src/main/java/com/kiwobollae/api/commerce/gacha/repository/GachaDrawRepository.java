@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -24,6 +25,18 @@ public interface GachaDrawRepository extends JpaRepository<GachaDraw, Long> {
   Optional<GachaDraw> findByIdForUpdate(@Param("id") Long id);
 
   Optional<GachaDraw> findByIdAndUser_Id(Long id, Long userId);
+
+  @EntityGraph(attributePaths = "user")
+  @Query(
+      """
+			select d
+			from GachaDraw d
+			where (:status is null or d.status = :status)
+			  and (:userId is null or d.user.id = :userId)
+			order by d.createdAt desc
+			""")
+  Page<GachaDraw> findAdminHistory(
+      @Param("status") GachaDrawStatus status, @Param("userId") Long userId, Pageable pageable);
 
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
