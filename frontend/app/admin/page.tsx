@@ -1,5 +1,8 @@
 "use client";
 import { ApiError } from "@/lib/api";
+import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
+import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
+import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
 import {
   adjustAdminProductStock,
@@ -29,6 +32,7 @@ import { fmt, useStore } from "@/lib/store";
 import { couponName } from "@/lib/coupon-label";
 import { ProductCategory } from "@/lib/product-api";
 import { useUI } from "@/lib/ui";
+import { validateCommerceAssetKey } from "@/lib/commerce-asset";
 import { useEffect, useState } from "react";
 
 const DELSEQ = ["PREPARING", "SHIPPING", "DELIVERED"];
@@ -449,6 +453,15 @@ export default function Admin() {
       showToast("재고는 0 이상의 정수로 입력해 주세요.", "err");
       return null;
     }
+    const imageError = validateCommerceAssetKey(
+      productForm.imageUrl,
+      "products",
+      editingProductId,
+    );
+    if (imageError) {
+      showToast(imageError, "err");
+      return null;
+    }
     const plantId = productForm.plantId ? Number(productForm.plantId) : null;
     return {
       name: productForm.name.trim(),
@@ -499,7 +512,7 @@ export default function Admin() {
       stock: String(product.stock),
       plantId: product.plantId ? String(product.plantId) : "",
       description: product.description ?? "",
-      imageUrl: product.imageUrl ?? "",
+      imageUrl: product.imageKey ?? "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -607,6 +620,8 @@ export default function Admin() {
     ["orders", "주문 관리"],
     ["exchanges", "교환 관리"],
     ["products", "상품 관리"],
+    ["coupons", "쿠폰 관리"],
+    ["gacha-operations", "가챠 장애 관리"],
     ["points", "포인트 관리"],
     ["reports", "신고 관리"],
     ["species", "종 관리"],
@@ -894,21 +909,14 @@ export default function Admin() {
             )}
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <label className="text-xs font-bold text-sub">
-                이미지 URL
-                <input
-                  value={productForm.imageUrl}
-                  onChange={(event) =>
-                    setProductForm({
-                      ...productForm,
-                      imageUrl: event.target.value,
-                    })
-                  }
-                  maxLength={500}
-                  placeholder="https://..."
-                  className="mt-1.5 w-full rounded-xl border-[1.5px] border-line px-3 py-2.5 text-sm text-ink outline-none focus:border-brand"
-                />
-              </label>
+              <AdminAssetKeyField
+                value={productForm.imageUrl}
+                onChange={(imageUrl) =>
+                  setProductForm({ ...productForm, imageUrl })
+                }
+                prefix="products"
+                resourceId={editingProductId}
+              />
               <label className="text-xs font-bold text-sub">
                 설명
                 <textarea
@@ -1003,7 +1011,7 @@ export default function Admin() {
                       <div>
                         {product.unlimitedStock ? (
                           <span className="font-extrabold text-brand-text">
-                            무제한
+                            무제한 재고 · 1회 1팩 구매
                           </span>
                         ) : (
                           <div className="flex items-center gap-1.5">
@@ -1115,6 +1123,14 @@ export default function Admin() {
 
       {tab === "points" && (
         <AdminPointAdjustmentPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "coupons" && state.accessToken && (
+        <AdminCouponPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "gacha-operations" && state.accessToken && (
+        <AdminGachaOperationsPanel accessToken={state.accessToken} />
       )}
 
       {tab === "species" && (

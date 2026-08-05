@@ -13,6 +13,7 @@ export interface AdminProduct {
   soldOut: boolean;
   plantId: number | null;
   description: string | null;
+  imageKey: string | null;
   imageUrl: string | null;
   status: AdminProductStatus;
   createdAt: string;

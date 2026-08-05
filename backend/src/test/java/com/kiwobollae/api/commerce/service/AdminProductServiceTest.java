@@ -31,12 +31,13 @@ class AdminProductServiceTest {
         new AdminProductService(
             productRepository,
             mock(PlantSpeciesRepository.class),
+            new CommerceAssetKeyValidator(),
             new AssetUrlResolver("https://assets.example.com/"));
   }
 
   @Test
   void createsGachaPackWithUnlimitedStockRepresentation() {
-    given(productRepository.save(any(Product.class)))
+    given(productRepository.saveAndFlush(any(Product.class)))
         .willAnswer(invocation -> invocation.getArgument(0));
 
     AdminProductResponse response =

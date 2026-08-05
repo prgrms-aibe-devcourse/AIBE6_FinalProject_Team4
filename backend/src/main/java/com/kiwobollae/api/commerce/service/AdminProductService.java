@@ -27,6 +27,7 @@ public class AdminProductService {
 
   private final ProductRepository productRepository;
   private final PlantSpeciesRepository plantSpeciesRepository;
+  private final CommerceAssetKeyValidator assetKeyValidator;
   private final AssetUrlResolver assetUrlResolver;
 
   public List<AdminProductResponse> getProducts() {
@@ -39,7 +40,7 @@ public class AdminProductService {
   public AdminProductResponse create(AdminProductRequest request) {
     ValidatedProduct values = validate(request);
     Product product =
-        productRepository.save(
+        productRepository.saveAndFlush(
             Product.builder()
                 .name(values.name())
                 .category(values.category())
@@ -47,9 +48,17 @@ public class AdminProductService {
                 .stock(values.stock())
                 .plant(values.plant())
                 .description(values.description())
-                .imageUrl(values.imageUrl())
                 .status(ProductStatus.ACTIVE)
                 .build());
+    String imageKey = assetKeyValidator.validate(values.imageUrl(), "products", product.getId());
+    product.updateInfo(
+        product.getName(),
+        product.getCategory(),
+        product.getPointPrice(),
+        product.getStock(),
+        product.getPlant(),
+        product.getDescription(),
+        imageKey);
     return response(product);
   }
 
@@ -67,7 +76,7 @@ public class AdminProductService {
         product.getStock(),
         values.plant(),
         values.description(),
-        values.imageUrl());
+        assetKeyValidator.validate(values.imageUrl(), "products", productId));
     return response(product);
   }
 

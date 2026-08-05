@@ -92,7 +92,7 @@ describe("Admin product management", () => {
 
     expect(await screen.findByText("새싹 키트")).toBeInTheDocument();
     expect(screen.getByText("시즌 1 가챠 팩")).toBeInTheDocument();
-    expect(screen.getByText("무제한")).toBeInTheDocument();
+    expect(screen.getByText("무제한 재고 · 1회 1팩 구매")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "새싹 키트 숨기기" }));
     await waitFor(() =>
