@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.auth.entity.User;
@@ -39,17 +38,25 @@ class PlantTimelapseTransactionServiceTest {
 	private PlantTimelapseTransactionService transactionService;
 
 	@Test
-	void processDoesNothingWhenClaimFails() {
+	void claimReturnsFalseWhenNoRowClaimed() {
 		given(plantTimelapseRepository.claimForProcessing(21L)).willReturn(0);
 
-		transactionService.process(21L);
+		boolean claimed = transactionService.claim(21L);
 
-		verify(journalImageRepository, never()).findRepresentativeByProfileIdOrderByWrittenDateAsc(any());
+		assertThat(claimed).isFalse();
 	}
 
 	@Test
-	void processEncodesUploadsAndCompletesWhenClaimSucceeds() {
+	void claimReturnsTrueWhenRowClaimed() {
 		given(plantTimelapseRepository.claimForProcessing(21L)).willReturn(1);
+
+		boolean claimed = transactionService.claim(21L);
+
+		assertThat(claimed).isTrue();
+	}
+
+	@Test
+	void encodeAndUploadEncodesUploadsAndCleansUpPreviousVideo() {
 		JournalImage image1 = journalImage(7L, "/api/v1/journals/images/7/a.jpg");
 		JournalImage image2 = journalImage(7L, "/api/v1/journals/images/7/b.png");
 		given(journalImageRepository.findRepresentativeByProfileIdOrderByWrittenDateAsc(21L))
@@ -58,16 +65,39 @@ class PlantTimelapseTransactionServiceTest {
 		given(journalImageUploadService.downloadBytes("/api/v1/journals/images/7/b.png")).willReturn("b".getBytes());
 		given(encoder.encode(any())).willReturn("video-bytes".getBytes());
 		given(videoStorageService.uploadVideo(eq(7L), any())).willReturn("/api/v1/plants/timelapse-videos/7/new.mp4");
+
+		String videoUrl = transactionService.encodeAndUpload(21L, "/api/v1/plants/timelapse-videos/7/old.mp4");
+
+		assertThat(videoUrl).isEqualTo("/api/v1/plants/timelapse-videos/7/new.mp4");
+		verify(videoStorageService).deleteVideo("/api/v1/plants/timelapse-videos/7/old.mp4");
+	}
+
+	@Test
+	void encodeAndUploadSkipsCleanupWhenNoPreviousVideo() {
+		JournalImage image1 = journalImage(7L, "/api/v1/journals/images/7/a.jpg");
+		JournalImage image2 = journalImage(7L, "/api/v1/journals/images/7/b.png");
+		given(journalImageRepository.findRepresentativeByProfileIdOrderByWrittenDateAsc(21L))
+				.willReturn(List.of(image1, image2));
+		given(journalImageUploadService.downloadBytes("/api/v1/journals/images/7/a.jpg")).willReturn("a".getBytes());
+		given(journalImageUploadService.downloadBytes("/api/v1/journals/images/7/b.png")).willReturn("b".getBytes());
+		given(encoder.encode(any())).willReturn("video-bytes".getBytes());
+		given(videoStorageService.uploadVideo(eq(7L), any())).willReturn("/api/v1/plants/timelapse-videos/7/new.mp4");
+
+		transactionService.encodeAndUpload(21L, null);
+
+		verify(videoStorageService, org.mockito.Mockito.never()).deleteVideo(any());
+	}
+
+	@Test
+	void completeMarksRowCompletedAndNotifiesOwner() {
 		PlantTimelapse existing = PlantTimelapse.create(profile(21L, 7L), java.time.LocalDateTime.now());
-		existing.complete("/api/v1/plants/timelapse-videos/7/old.mp4", java.time.LocalDateTime.now());
 		given(plantTimelapseRepository.findByPlantProfileId(21L)).willReturn(Optional.of(existing));
 
-		transactionService.process(21L);
+		transactionService.complete(21L, "/api/v1/plants/timelapse-videos/7/new.mp4");
 
-		verify(videoStorageService).deleteVideo("/api/v1/plants/timelapse-videos/7/old.mp4");
-		verify(notificationService).notify(eq(7L), eq(NotificationType.TIMELAPSE), anyString(), anyString(), anyString(), eq("PLANT_TIMELAPSE"), eq(21L));
 		assertThat(existing.getStatus()).isEqualTo(com.kiwobollae.api.content.entity.enums.PlantTimelapseStatus.COMPLETED);
 		assertThat(existing.getVideoUrl()).isEqualTo("/api/v1/plants/timelapse-videos/7/new.mp4");
+		verify(notificationService).notify(eq(7L), eq(NotificationType.TIMELAPSE), anyString(), anyString(), anyString(), eq("PLANT_TIMELAPSE"), eq(21L));
 	}
 
 	@Test
