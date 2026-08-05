@@ -9,6 +9,8 @@ import com.kiwobollae.api.notification.service.NotificationService;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,11 +54,15 @@ public class PlantTimelapseTransactionService {
 		if (images.isEmpty()) {
 			throw new TimelapseEncodingException("No representative images available for profileId=" + profileId);
 		}
-		List<TimelapseSourceImage> sources = images.stream()
-				.map(image -> new TimelapseSourceImage(
+		// S3 다운로드는 이미지별로 독립적인 네트워크 I/O라 순차로 하나씩 기다릴 필요가 없다 —
+		// 모두 동시에 요청을 걸어두고(ForkJoinPool 공용 풀) 순서대로 join()해 결과를 모은다.
+		// 순서는 join()을 images 순서 그대로 호출하므로 그대로 유지된다.
+		List<CompletableFuture<TimelapseSourceImage>> downloads = images.stream()
+				.map(image -> CompletableFuture.supplyAsync(() -> new TimelapseSourceImage(
 						journalImageUploadService.downloadBytes(image.getImageUrl()),
-						extensionOf(image.getImageUrl())))
+						extensionOf(image.getImageUrl()))))
 				.toList();
+		List<TimelapseSourceImage> sources = downloads.stream().map(this::joinUnwrapped).toList();
 		byte[] videoBytes = encoder.encode(sources);
 
 		Long ownerId = images.get(0).getUser().getId();
@@ -102,6 +108,21 @@ public class PlantTimelapseTransactionService {
 		Long ownerId = timelapse.getPlantProfile().getUser().getId();
 		notificationService.notify(ownerId, NotificationType.TIMELAPSE, title, content,
 				"/plants/" + timelapse.getPlantProfile().getId(), "PLANT_TIMELAPSE", timelapse.getPlantProfile().getId());
+	}
+
+	// CompletableFuture.join()은 원본 예외를 CompletionException으로 감싸서 던지는데, 그대로 두면
+	// PlantTimelapseWorker.failReasonOf()가 사용자에게 보여줄 실패 사유가
+	// "java.lang.RuntimeException: ..." 식으로 지저분해진다 — 원본 예외를 그대로 다시 던져 기존
+	// 실패 메시지 형식을 유지한다.
+	private TimelapseSourceImage joinUnwrapped(CompletableFuture<TimelapseSourceImage> future) {
+		try {
+			return future.join();
+		} catch (CompletionException exception) {
+			if (exception.getCause() instanceof RuntimeException runtimeException) {
+				throw runtimeException;
+			}
+			throw exception;
+		}
 	}
 
 	private String extensionOf(String imageUrl) {
