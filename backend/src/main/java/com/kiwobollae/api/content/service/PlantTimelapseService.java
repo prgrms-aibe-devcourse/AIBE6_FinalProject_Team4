@@ -44,15 +44,17 @@ public class PlantTimelapseService {
 
 		LocalDateTime now = LocalDateTime.now(KST);
 		PlantTimelapse timelapse = plantTimelapseRepository.findByPlantProfileId(profileId).orElse(null);
+		String previousVideoUrl = null;
 		if (timelapse == null) {
 			timelapse = plantTimelapseRepository.save(PlantTimelapse.create(profile, now));
 		} else if (timelapse.getStatus() == PlantTimelapseStatus.PROCESSING) {
 			throw new BusinessException(ErrorCode.TIMELAPSE_ALREADY_PROCESSING);
 		} else {
+			previousVideoUrl = timelapse.getVideoUrl();
 			timelapse.restart(now);
 		}
 
-		eventPublisher.publishEvent(new PlantTimelapseRequestedEvent(profileId));
+		eventPublisher.publishEvent(new PlantTimelapseRequestedEvent(profileId, previousVideoUrl));
 		return PlantTimelapseResponse.from(timelapse);
 	}
 
