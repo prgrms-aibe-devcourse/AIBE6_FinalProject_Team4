@@ -15,6 +15,6 @@ public class PlantTimelapseEventListener {
 	@Async("timelapseTaskExecutor")
 	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 	public void onTimelapseRequested(PlantTimelapseRequestedEvent event) {
-		worker.process(event.profileId());
+		worker.process(event.profileId(), event.previousVideoUrl());
 	}
 }

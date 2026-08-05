@@ -1,7 +1,11 @@
 package com.kiwobollae.api.content.service;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.Test;
@@ -19,17 +23,42 @@ class PlantTimelapseWorkerTest {
 	private PlantTimelapseWorker worker;
 
 	@Test
-	void processDelegatesToTransactionService() {
-		worker.process(21L);
+	void processDoesNothingElseWhenClaimFails() {
+		given(transactionService.claim(21L)).willReturn(false);
 
-		verify(transactionService).process(21L);
+		worker.process(21L, null);
+
+		verify(transactionService, never()).encodeAndUpload(any(), any());
+		verify(transactionService, never()).complete(any(), any());
+	}
+
+	@Test
+	void processEncodesAndCompletesWhenClaimSucceeds() {
+		given(transactionService.claim(21L)).willReturn(true);
+		given(transactionService.encodeAndUpload(eq(21L), isNull())).willReturn("/api/v1/plants/timelapse-videos/7/new.mp4");
+
+		worker.process(21L, null);
+
+		verify(transactionService).complete(21L, "/api/v1/plants/timelapse-videos/7/new.mp4");
+	}
+
+	@Test
+	void processPassesPreviousVideoUrlThroughToEncodeAndUpload() {
+		given(transactionService.claim(21L)).willReturn(true);
+		given(transactionService.encodeAndUpload(21L, "/api/v1/plants/timelapse-videos/7/old.mp4"))
+				.willReturn("/api/v1/plants/timelapse-videos/7/new.mp4");
+
+		worker.process(21L, "/api/v1/plants/timelapse-videos/7/old.mp4");
+
+		verify(transactionService).encodeAndUpload(21L, "/api/v1/plants/timelapse-videos/7/old.mp4");
 	}
 
 	@Test
 	void processCatchesExceptionAndMarksFailed() {
-		willThrow(new TimelapseEncodingException("boom")).given(transactionService).process(21L);
+		given(transactionService.claim(21L)).willReturn(true);
+		willThrow(new TimelapseEncodingException("boom")).given(transactionService).encodeAndUpload(eq(21L), isNull());
 
-		worker.process(21L);
+		worker.process(21L, null);
 
 		verify(transactionService).fail(eq(21L), eq("boom"));
 	}

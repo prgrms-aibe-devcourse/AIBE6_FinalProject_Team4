@@ -11,9 +11,13 @@ public class PlantTimelapseWorker {
 
 	private final PlantTimelapseTransactionService transactionService;
 
-	public void process(Long profileId) {
+	public void process(Long profileId, String previousVideoUrl) {
 		try {
-			transactionService.process(profileId);
+			if (!transactionService.claim(profileId)) {
+				return;
+			}
+			String videoUrl = transactionService.encodeAndUpload(profileId, previousVideoUrl);
+			transactionService.complete(profileId, videoUrl);
 		} catch (RuntimeException exception) {
 			log.warn("Plant timelapse processing failed. profileId={}", profileId, exception);
 			transactionService.fail(profileId, failReasonOf(exception));
