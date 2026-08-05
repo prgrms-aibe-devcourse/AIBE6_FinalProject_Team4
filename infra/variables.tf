@@ -93,3 +93,18 @@ variable "mail_username" {
 variable "toss_payments_base_url" {
   default = "https://api.tosspayments.com"
 }
+
+# ---------------------------------------------------------
+# OpenAI
+# ---------------------------------------------------------
+variable "openai_base_url" {
+  default = "https://api.openai.com"
+}
+variable "openai_text_model" {
+  description = "추천·가이드·챗봇에 사용할 텍스트 모델 ID"
+  default     = ""
+}
+variable "openai_vision_model" {
+  description = "일지 사진 분석에 사용할 이미지 입력 지원 모델 ID"
+  default     = ""
+}
