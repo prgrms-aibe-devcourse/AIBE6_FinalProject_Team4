@@ -43,6 +43,7 @@ export default function PlantsPage() {
     nick: '', speciesId: null, photoIdx: 0, startDate: today(),
   });
   const [todayWrittenIds, setTodayWrittenIds] = useState<Set<number>>(new Set());
+  const [writtenTodayOnly, setWrittenTodayOnly] = useState(false);
   const [query, setQuery] = useState('');
   const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -118,7 +119,9 @@ export default function PlantsPage() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  const list = plants.filter((p) => filter === 'all' || p.status === filter);
+  const list = writtenTodayOnly
+    ? plants.filter((p) => p.status === 'GROWING' && !todayWrittenIds.has(p.id))
+    : plants.filter((p) => filter === 'all' || p.status === filter);
   const regV = nickValid(reg.nick);
   const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
 
@@ -228,7 +231,7 @@ export default function PlantsPage() {
       <h1 className="mb-1 text-[27px] font-extrabold">내 식물</h1>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
 
-      <div className="mb-[22px] flex flex-wrap gap-[9px]">
+      <div className="mb-3 flex flex-wrap items-center gap-[9px]">
         {FILTERS.map(([k, label]) => (
           <button
             key={k}
@@ -243,10 +246,25 @@ export default function PlantsPage() {
         ))}
       </div>
 
+      <label className="mb-[22px] flex w-fit cursor-pointer items-center gap-2 text-[13.5px] font-bold text-[#6d7a68]">
+        <input
+          type="checkbox"
+          checked={writtenTodayOnly}
+          onChange={(e) => setWrittenTodayOnly(e.target.checked)}
+          className="h-4 w-4 accent-brand"
+        />
+        오늘 일지 안 쓴 것만 보기
+      </label>
+
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
+      ) : list.length === 0 && writtenTodayOnly ? (
+        <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
+          <div className="animate-floaty text-[70px]">🌿</div>
+          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">오늘 일지 안 쓴 식물이 없어요 🌿</p>
+        </div>
       ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌱</div>
