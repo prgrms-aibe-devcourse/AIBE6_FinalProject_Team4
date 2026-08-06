@@ -2,7 +2,6 @@ package com.kiwobollae.api.ai.policy;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,38 +17,76 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class AiRateLimitStore {
 
-  private final AiRateLimitWindowRepository repository;
+  private final AiRateLimitWindowRepository userWindowRepository;
+  private final AiGlobalRateLimitWindowRepository globalWindowRepository;
 
-  public AiRateLimitStore(AiRateLimitWindowRepository repository) {
-    this.repository = repository;
+  public AiRateLimitStore(
+      AiRateLimitWindowRepository userWindowRepository,
+      AiGlobalRateLimitWindowRepository globalWindowRepository) {
+    this.userWindowRepository = userWindowRepository;
+    this.globalWindowRepository = globalWindowRepository;
   }
 
   /**
-   * 호출 1건을 소비하고, 한도를 넘었으면 남은 대기 시간을 반환한다.
+   * 사용자별·전역 예산에서 호출 1건을 함께 예약한다.
    *
-   * @return 소비 성공이면 빈 값, 한도 초과면 재시도까지 남은 초(1 이상)
+   * <p>두 카운터를 하나의 새 트랜잭션에서 처리한다. 전역 예산을 먼저 별도 트랜잭션에서 소비한 뒤 사용자별 제한이 거부되면 실제 외부 호출 없이 전역 예산이 새기
+   * 때문이다. 반대로 사용자별 카운터를 먼저 갱신한 뒤 전역 예산이 거부되면 이 메서드가 예외로 트랜잭션을 롤백해 두 카운터 모두 소비되지 않는다.
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public Optional<Long> consume(
-      Long userId, AiFeature feature, LocalDateTime now, Duration window, int maxRequests) {
+  public void consume(
+      Long userId,
+      AiFeature feature,
+      LocalDateTime now,
+      Duration userWindow,
+      int userMaxRequests,
+      Duration globalWindow,
+      int globalMaxRequests) {
     // 행이 없을 때만 만든다. 이 존재 확인은 잠금 없는 조회이므로 정상 경로에는 락이
     // 조건부 UPDATE 하나만 남는다. INSERT를 매번 시도하면 이미 있는 행에도 중복 검사용 공유 락을
     // 잡고, 뒤이은 UPDATE가 배타 락을 요구해 동시 요청끼리 락 승격 데드락이 난다.
-    if (repository.findByUserIdAndFeature(userId, feature).isEmpty()) {
-      repository.insertWindowIfAbsent(userId, feature.name(), now);
+    if (userWindowRepository.findByUserIdAndFeature(userId, feature).isEmpty()) {
+      userWindowRepository.insertWindowIfAbsent(userId, feature.name(), now);
+    }
+    if (globalWindowRepository.findById(AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID).isEmpty()) {
+      globalWindowRepository.insertWindowIfAbsent(AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID, now);
     }
 
-    if (repository.consumeIfAllowed(userId, feature, now, now.minus(window), maxRequests) == 1) {
-      return Optional.empty();
+    // 모든 경로가 사용자 행 → 전역 행 순서로 잠가 순서가 반대인 교착을 만들지 않는다. 전역 행은
+    // 짧은 호출 예산 예약에만 쓰이므로 이 직렬화가 AI 요청 자체를 직렬화하지는 않는다.
+    if (userWindowRepository.consumeIfAllowed(
+            userId, feature, now, now.minus(userWindow), userMaxRequests)
+        == 0) {
+      throw new AiQuotaExceededException(retryAfterSeconds(userId, feature, now, userWindow));
     }
 
-    // 행은 방금 보장했으므로 0건이면 현재 창의 한도를 다 쓴 것이다.
+    if (globalWindowRepository.consumeIfAllowed(
+            AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID,
+            now,
+            now.minus(globalWindow),
+            globalMaxRequests)
+        == 0) {
+      throw new AiQuotaExceededException(retryAfterSeconds(now, globalWindow));
+    }
+  }
+
+  private long retryAfterSeconds(
+      Long userId, AiFeature feature, LocalDateTime now, Duration window) {
     LocalDateTime windowStartedAt =
-        repository
+        userWindowRepository
             .findByUserIdAndFeature(userId, feature)
             .map(AiRateLimitWindow::getWindowStartedAt)
             .orElse(now);
-    return Optional.of(retryAfterSeconds(windowStartedAt, now, window));
+    return retryAfterSeconds(windowStartedAt, now, window);
+  }
+
+  private long retryAfterSeconds(LocalDateTime now, Duration window) {
+    LocalDateTime windowStartedAt =
+        globalWindowRepository
+            .findById(AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID)
+            .map(AiGlobalRateLimitWindow::getWindowStartedAt)
+            .orElse(now);
+    return retryAfterSeconds(windowStartedAt, now, window);
   }
 
   private long retryAfterSeconds(

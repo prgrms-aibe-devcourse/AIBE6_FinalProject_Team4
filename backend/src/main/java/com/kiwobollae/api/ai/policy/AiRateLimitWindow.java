@@ -42,8 +42,12 @@ public class AiRateLimitWindow extends BaseEntity {
   @Column(name = "user_id", nullable = false)
   private Long userId;
 
+  // columnDefinition으로 varchar를 못박는다. 지정하지 않으면 Hibernate가 Java enum을 MySQL ENUM
+  // 컬럼으로 만들고, 그러면 AiFeature에 값을 추가할 때마다 ALTER TABLE이 필요하다. 운영은
+  // ddl-auto: update라 ENUM 정의를 갱신해 주지 않아, ALTER를 잊으면 새 값 저장이 런타임에 실패한다.
+  // 값 검증은 Java enum 파싱이 하므로 DB 제약이 없어도 잘못된 값이 들어갈 경로는 없다.
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, length = 30)
+  @Column(nullable = false, length = 30, columnDefinition = "varchar(30)")
   private AiFeature feature;
 
   /** 현재 창이 시작된 시각. 이 시각 + 창 길이가 지나면 다음 소비에서 창이 새로 열린다. */

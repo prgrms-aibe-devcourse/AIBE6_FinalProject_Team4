@@ -6,7 +6,6 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.Optional;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.stereotype.Component;
 
@@ -38,24 +37,28 @@ public class AiRequestGuard {
       throw new IllegalArgumentException("AI 기능 구분이 필요합니다.");
     }
 
-    consumeWithRetry(userId, feature)
-        .ifPresent(
-            seconds -> {
-              throw new BusinessException(
-                  ErrorCode.COMMON_RATE_LIMITED, Map.of("retryAfterSeconds", seconds));
-            });
+    try {
+      consumeWithRetry(userId, feature);
+    } catch (AiQuotaExceededException exception) {
+      throw new BusinessException(
+          ErrorCode.COMMON_RATE_LIMITED,
+          Map.of("retryAfterSeconds", exception.retryAfterSeconds()));
+    }
   }
 
-  private Optional<Long> consumeWithRetry(Long userId, AiFeature feature) {
+  private void consumeWithRetry(Long userId, AiFeature feature) {
     CannotAcquireLockException lastFailure = null;
     for (int attempt = 1; attempt <= MAX_CONSUME_ATTEMPTS; attempt++) {
       try {
-        return rateLimitStore.consume(
+        rateLimitStore.consume(
             userId,
             feature,
             LocalDateTime.now(seoulClock),
             properties.rateLimit().window(),
-            properties.rateLimit().maxRequests());
+            properties.rateLimit().maxRequests(),
+            properties.globalRateLimit().window(),
+            properties.globalRateLimit().maxRequests());
+        return;
       } catch (CannotAcquireLockException exception) {
         lastFailure = exception;
       }

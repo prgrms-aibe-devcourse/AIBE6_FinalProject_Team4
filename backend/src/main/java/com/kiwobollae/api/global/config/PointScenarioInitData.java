@@ -194,13 +194,8 @@ public class PointScenarioInitData implements ApplicationRunner {
 			walletService.rewardJournal(userId, journal.getId());
 		}
 
-		int updated = pointTransactionRepository.backdateLocalSeedJournalReward(
-				journal.getId(),
-				journal.getWrittenDate().atTime(9, 0)
-		);
-		if (updated != 1) {
-			log.warn("성장일지 보상 시각을 과거 일자로 조정하지 못했습니다: journalId={}", journal.getId());
-		}
+		// 보상 거래의 created_at은 실제 지급 시각을 유지한다. 과거 일지 작성일로
+		// 되돌리면 화면 정렬 순서와 잔액 스냅샷 순서가 어긋난다.
 	}
 
 	private void seedSafely(String scenario, Runnable seed) {

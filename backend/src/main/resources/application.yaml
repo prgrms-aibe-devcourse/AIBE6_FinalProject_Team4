@@ -113,6 +113,14 @@ ai:
     rate-limit:
       max-requests: ${AI_RATE_LIMIT_MAX_REQUESTS:10}
       window: ${AI_RATE_LIMIT_WINDOW:1m}
+    # 모든 사용자·기능이 공유하는 실제 외부 AI 호출 상한이다. 캐시 히트는 소모하지 않는다.
+    # 운영 비용 한도에 맞게 두 환경변수를 반드시 조정한다.
+    global-rate-limit:
+      max-requests: ${AI_GLOBAL_RATE_LIMIT_MAX_REQUESTS:100}
+      window: ${AI_GLOBAL_RATE_LIMIT_WINDOW:1d}
+  plant-care-guide:
+    # OpenAI read timeout보다 길게 둬야 정상 생성 중 lease가 만료되어 중복 호출되는 일을 막는다.
+    generation-lock-lease: ${AI_PLANT_CARE_GUIDE_GENERATION_LOCK_LEASE:1m}
 
 aws:
   s3:
