@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,7 +18,6 @@ import com.kiwobollae.api.ai.client.AiModelRole;
 import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
-import com.kiwobollae.api.ai.guide.dto.PlantCareGuideInvalidation;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
@@ -36,7 +34,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -248,76 +245,6 @@ class PlantCareGuideServiceTest {
     verifyNoInteractions(aiClient);
     verifyNoInteractions(requestGuard);
     verify(generationLockStore).release(any(PlantCareGuideGenerationLockStore.Lease.class));
-  }
-
-  // 무효화는 저장본만 지운다. 여기서 AI를 부르면 아무도 보지 않는 종까지 비용을 태우게 된다.
-  @Test
-  void invalidateDeletesStoredGuidesWithoutCallingAi() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheWriter.deleteAllBySpeciesName("청상추")).willReturn(2L);
-
-    PlantCareGuideInvalidation result = service().invalidateBySpeciesId(21L);
-
-    assertThat(result.speciesName()).isEqualTo("청상추");
-    assertThat(result.deletedCount()).isEqualTo(2L);
-    verifyNoInteractions(aiClient);
-    verifyNoInteractions(requestGuard);
-  }
-
-  // 지울 게 없어도 오류가 아니다 — 관리자가 이미 비어 있는 종을 지시했을 뿐이다.
-  @Test
-  void invalidateReportsZeroWhenNothingStored() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(cacheWriter.deleteAllBySpeciesName("청상추")).willReturn(0L);
-
-    assertThat(service().invalidateBySpeciesId(21L).deletedCount()).isZero();
-  }
-
-  // 재생성은 반드시 저장본을 먼저 지운다. 안 지우면 유니크 충돌로 옛 가이드가 그대로 돌아온다.
-  @Test
-  void regenerateDeletesStoredGuideThenGeneratesFreshOne() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
-
-    PlantCareGuide guide = service().regenerateBySpeciesId(9L, 21L);
-
-    assertThat(guide.cached()).isFalse();
-    assertThat(guide.speciesName()).isEqualTo("청상추");
-
-    InOrder inOrder = inOrder(cacheWriter, aiClient);
-    inOrder.verify(cacheWriter).deleteAllBySpeciesName("청상추");
-    inOrder.verify(aiClient).generate(any(AiRequest.class));
-    inOrder.verify(cacheWriter).save(any(PlantCareGuideCache.class));
-    // 선점 뒤의 재조회로, 관리자와 일반 사용자가 경쟁해도 중복 외부 호출을 막는다.
-    verify(cacheRepository)
-        .findBySpeciesNameAndGuideVersionAndSourceContextHash(anyString(), anyInt(), anyString());
-  }
-
-  // 관리자를 한도 밖에 두면 전역 호출 상한이 실제 비용 상한 역할을 못 한다.
-  @Test
-  void regenerateConsumesRateLimitLikeAnyOtherCall() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
-    given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
-
-    service().regenerateBySpeciesId(9L, 21L);
-
-    verify(requestGuard).checkRateLimit(9L, AiFeature.PLANT_CARE_GUIDE);
-  }
-
-  @Test
-  void rejectsInvalidSpeciesIdForAdminOperations() {
-    assertThatThrownBy(() -> service().invalidateBySpeciesId(0L))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
-    assertThatThrownBy(() -> service().regenerateBySpeciesId(9L, null))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            exception ->
-                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
-    verifyNoInteractions(cacheWriter);
-    verifyNoInteractions(aiClient);
   }
 
   @Test

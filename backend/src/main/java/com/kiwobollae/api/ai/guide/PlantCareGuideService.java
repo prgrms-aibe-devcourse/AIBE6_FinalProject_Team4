@@ -6,7 +6,6 @@ import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideContent;
-import com.kiwobollae.api.ai.guide.dto.PlantCareGuideInvalidation;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
@@ -84,41 +83,6 @@ public class PlantCareGuideService {
   public PlantCareGuide getGuideBySpeciesId(Long userId, Long speciesId) {
     PlantSpeciesResponse species = requireSpecies(speciesId);
     return resolveGuide(userId, species.name(), speciesId, species.category(), species.careGuide());
-  }
-
-  /**
-   * [관리자] 해당 종의 저장본을 지운다. AI는 호출하지 않는다.
-   *
-   * <p>생성된 가이드 내용이 부정확할 때 쓴다. 다음 사용자 요청에서 자연히 다시 생성되므로, 지금 당장 새 가이드가 필요한 게 아니라면 재생성보다 이쪽이 싸다 — 아무도
-   * 그 종을 보지 않으면 AI 호출도 일어나지 않는다.
-   */
-  public PlantCareGuideInvalidation invalidateBySpeciesId(Long speciesId) {
-    String speciesName = normalizeSpeciesName(requireSpecies(speciesId).name());
-    long deleted = cacheWriter.deleteAllBySpeciesName(speciesName);
-    log.info("재배 가이드 캐시를 무효화했습니다: species={}, deleted={}", speciesName, deleted);
-    return new PlantCareGuideInvalidation(speciesName, deleted);
-  }
-
-  /**
-   * [관리자] 해당 종의 저장본을 지우고 즉시 새로 생성한다.
-   *
-   * <p>다음 사용자가 낡은 가이드를 보는 일 없이 바로 교체해야 할 때 쓴다. <b>실제 외부 호출이므로 일반 요청과 똑같이 호출 제한을 소모한다</b> — 관리자를 예외로
-   * 두면 비용 상한(전역 한도)이 의미를 잃는다.
-   *
-   * <p>새 응답도 AI가 만든 것이라 이전 것과 마찬가지로 부정확할 수 있다. 이 API는 "고쳐 준다"가 아니라 "다시 뽑는다"까지만 보장한다.
-   */
-  public PlantCareGuide regenerateBySpeciesId(Long adminUserId, Long speciesId) {
-    PlantSpeciesResponse species = requireSpecies(speciesId);
-    String speciesName = normalizeSpeciesName(species.name());
-    long deleted = cacheWriter.deleteAllBySpeciesName(speciesName);
-    log.info("재배 가이드를 강제 재생성합니다: species={}, deleted={}", speciesName, deleted);
-    return generateAndCache(
-        adminUserId,
-        speciesName,
-        speciesId,
-        species.category(),
-        species.careGuide(),
-        sourceContextHash(species.category(), species.careGuide()));
   }
 
   private PlantSpeciesResponse requireSpecies(Long speciesId) {
