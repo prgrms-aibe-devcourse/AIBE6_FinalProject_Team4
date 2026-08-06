@@ -1,11 +1,11 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useStore } from '@/lib/store';
 import { ApiError, resolveImageUrl } from '@/lib/api';
-import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
-import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { formatDate } from '@/lib/format';
+import { getJournals, PlantJournalData } from '@/lib/journal-api';
+import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
+import { useStore } from '@/lib/store';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 
 function representativeImage(journal: PlantJournalData): string | null {
   const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
@@ -68,13 +68,31 @@ export default function JournalsPage() {
     ? journals
     : journals.filter((j) => selectedProfileIds.includes(j.plantProfileId));
 
+  // 실패한 식물은 더 이상 새 일지를 못 쓰므로(journals/new의 selectPlant 참고) 오늘 포인트 요약 대상에서 뺀다.
+  const eligiblePlants = plants.filter((p) => p.status !== 'FAILED');
+  const rewardedTodayCount = eligiblePlants.filter((p) => p.journalRewardGrantedToday).length;
+  const todayRewardSummary =
+    eligiblePlants.length === 0
+      ? null
+      : rewardedTodayCount === eligiblePlants.length
+        ? '오늘 모든 식물의 포인트를 다 받았어요! 🎉'
+        : rewardedTodayCount > 0
+          ? `오늘 ${eligiblePlants.length}개 중 ${rewardedTodayCount}개 식물에서 포인트를 받았어요 ☀️`
+          : '아직 오늘 포인트를 받은 식물이 없어요. 일지를 남겨보세요 🌱';
+
   return (
     <div className="container">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[27px] font-extrabold">성장 일지</h1>
         <Link href="/journals/new" className="rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white hover:text-white">+ 오늘의 일지 쓰기</Link>
       </div>
-      <p className="mb-5 text-sub">한 장 한 장이 모여 이 아이의 이야기가 돼요.</p>
+      <p className="mb-5 text-sub">매일 한 장씩 모여서 하나의 이야기가 돼요.</p>
+
+      {todayRewardSummary && (
+        <div className="mb-5 rounded-[14px] bg-brand-soft px-4 py-3 text-[13.5px] font-bold text-brand-dark">
+          {todayRewardSummary}
+        </div>
+      )}
 
       <div className="mb-6 flex flex-wrap items-center gap-2.5">
         <button

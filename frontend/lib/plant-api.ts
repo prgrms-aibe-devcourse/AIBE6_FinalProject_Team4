@@ -12,6 +12,7 @@ export interface PlantProfileData {
   thumbnailUrl: string | null;
   status: PlantStatus;
   createdAt: string;
+  journalRewardGrantedToday: boolean;
 }
 
 export interface PlantProfileRequest {
