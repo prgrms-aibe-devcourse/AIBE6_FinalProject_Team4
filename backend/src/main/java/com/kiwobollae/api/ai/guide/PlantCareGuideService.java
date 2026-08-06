@@ -207,12 +207,17 @@ public class PlantCareGuideService {
               .build());
       return PlantCareGuide.of(speciesName, generated, false);
     } catch (DataIntegrityViolationException exception) {
-      log.info("가이드 캐시 중복 저장 감지, 기존 저장본을 사용합니다: {}", speciesName);
-      return cacheRepository
-          .findBySpeciesNameAndGuideVersionAndSourceContextHash(
-              speciesName, PlantCareGuideSchema.VERSION, sourceContextHash)
-          .map(cache -> PlantCareGuide.of(speciesName, validateGuide(readGuide(cache)), true))
-          .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_DATA_CONFLICT));
+      // 무결성 위반을 곧바로 "중복"이라 단정하지 않는다. 저장본이 실제로 있는지 먼저 확인해야
+      // 동시 저장 경쟁(정상)과 스키마·데이터 결함(비정상)을 구분할 수 있다.
+      Optional<PlantCareGuide> stored = findCachedGuide(speciesName, sourceContextHash);
+      if (stored.isPresent()) {
+        log.info("가이드 캐시 중복 저장 감지, 기존 저장본을 사용합니다: {}", speciesName);
+        return stored.get();
+      }
+      // 저장도 실패했고 저장본도 없다 = 중복이 아니다. 컬럼 타입·길이 같은 결함이므로 원인을
+      // 반드시 남긴다. 예외를 삼키면 매 요청이 AI를 부르고 409로 끝나는 상태를 알아채지 못한다.
+      log.error("재배 가이드 캐시 저장에 실패했고 저장본도 없습니다: species={}", speciesName, exception);
+      throw new BusinessException(ErrorCode.COMMON_DATA_CONFLICT);
     }
   }
 
