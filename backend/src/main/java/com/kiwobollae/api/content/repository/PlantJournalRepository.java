@@ -2,6 +2,7 @@ package com.kiwobollae.api.content.repository;
 
 import com.kiwobollae.api.content.entity.PlantJournal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,4 +39,12 @@ public interface PlantJournalRepository extends JpaRepository<PlantJournal, Long
 	boolean existsByIdAndDeletedAtIsNull(Long id);
 
 	boolean existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(Long plantProfileId, LocalDate writtenDate);
+
+	// "오늘 일지 안 쓴 것만 보기" 필터용 — 월별 페이지 조회로 이걸 흉내 내면(size 상한 있는 페이지를
+	// 넘겨받아 클라이언트에서 오늘 날짜만 걸러내는 방식) 그 달 일지가 페이지 크기를 넘는 사용자에게서
+	// 최신 작성분이 페이지 밖으로 밀려날 수 있어 부정확해진다. 날짜 하나로 바로 걸러서 이 문제 자체를
+	// 없앤다.
+	@Query("select distinct j.plantProfile.id from PlantJournal j "
+			+ "where j.user.id = :userId and j.writtenDate = :writtenDate and j.deletedAt is null")
+	List<Long> findDistinctProfileIdsByUserIdAndWrittenDate(@Param("userId") Long userId, @Param("writtenDate") LocalDate writtenDate);
 }

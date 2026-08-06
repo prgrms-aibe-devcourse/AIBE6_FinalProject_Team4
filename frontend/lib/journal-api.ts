@@ -62,6 +62,17 @@ export function getJournals(
   );
 }
 
+// "오늘 일지 안 쓴 것만 보기" 필터용 — 오늘(KST) 일지를 쓴 식물 프로필 id 목록만 가볍게 가져온다.
+export function getProfileIdsWrittenToday(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<number[]> {
+  return request<number[]>("/api/v1/journals/written-today", {
+    accessToken,
+    signal,
+  });
+}
+
 export function getJournal(
   journalId: number,
   accessToken: string,
