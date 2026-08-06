@@ -297,7 +297,13 @@ export default function PlantsPage() {
             <button
               key={k}
               type="button"
-              onClick={() => setFilter(k)}
+              onClick={() => {
+                // 반대 방향도 마찬가지: 상태 pill을 직접 고르면 "오늘 일지 안 쓴 것만 보기"가
+                // 켜져 있어도 그 상태를 그대로 보고 싶다는 뜻이므로, 항상 GROWING만 강제하던
+                // 필터는 해제한다.
+                setFilter(k);
+                setWrittenTodayOnly(false);
+              }}
               className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2 text-sm font-bold ${
                 filter === k ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
               }`}
@@ -330,7 +336,13 @@ export default function PlantsPage() {
             type="checkbox"
             checked={writtenTodayOnly}
             disabled={todayWrittenError}
-            onChange={(e) => setWrittenTodayOnly(e.target.checked)}
+            onChange={(e) => {
+              // 이 필터가 켜지면 상태 필터(재배중/수확완료/실패)와 무관하게 항상 GROWING만
+              // 대상이 되므로, 상태 pill이 다른 걸 가리키고 있으면(예: '실패' 선택 중) 화면에
+              // 실제로 뭘 보고 있는지 헷갈린다 — 필터를 켜는 순간 상태 pill도 '전체'로 맞춘다.
+              setWrittenTodayOnly(e.target.checked);
+              if (e.target.checked) setFilter('all');
+            }}
             className="h-4 w-4 accent-brand"
           />
           오늘 일지 안 쓴 것만 보기
