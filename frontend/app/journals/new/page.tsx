@@ -11,6 +11,13 @@ import { createJournal, PlantJournalCreateData, deleteJournalImage, uploadJourna
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+// 오늘 하루 가이드 모달을 다시 안 보기로 선택했는지 기억하는 키 — 날짜 문자열(YYYY-MM-DD)을
+// 저장해두고, 저장된 날짜가 오늘과 다르면(자정이 지나면) 다시 보여준다.
+const PHOTO_GUIDE_DISMISS_KEY = 'kwb_photo_guide_dismissed_date';
+
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 interface Draft {
   plantId: number | null;
@@ -34,6 +41,8 @@ function NewJournalInner() {
   const [saved, setSaved] = useState(false);
   const [createResult, setCreateResult] = useState<PlantJournalCreateData | null>(null);
   const [plantModalOpen, setPlantModalOpen] = useState(false);
+  const [guideModalOpen, setGuideModalOpen] = useState(false);
+  const [guideDontShowToday, setGuideDontShowToday] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -53,6 +62,25 @@ function NewJournalInner() {
 
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
+
+  // 사진 선택/교체 버튼을 누르면 여기로 온다 — 오늘 이미 "다시 안 보기"를 선택했으면 가이드
+  // 모달 없이 바로 파일 선택창을 띄우고, 아니면 매번 가이드 모달부터 보여준다.
+  const openPhotoPicker = () => {
+    if (typeof window !== 'undefined' && window.localStorage.getItem(PHOTO_GUIDE_DISMISS_KEY) === todayString()) {
+      fileInputRef.current?.click();
+      return;
+    }
+    setGuideDontShowToday(false);
+    setGuideModalOpen(true);
+  };
+
+  const confirmPhotoGuide = () => {
+    if (guideDontShowToday && typeof window !== 'undefined') {
+      window.localStorage.setItem(PHOTO_GUIDE_DISMISS_KEY, todayString());
+    }
+    setGuideModalOpen(false);
+    fileInputRef.current?.click();
+  };
 
   const pickPhoto = (file: File | null) => {
     if (!file) return;
@@ -196,7 +224,7 @@ function NewJournalInner() {
           <div className="mb-[26px] flex items-center gap-4">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={openPhotoPicker}
               className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
                 photoPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
               }`}
@@ -214,7 +242,7 @@ function NewJournalInner() {
             {photoPreview && (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openPhotoPicker}
                 className="cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
               >
                 <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
@@ -277,6 +305,59 @@ function NewJournalInner() {
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {guideModalOpen && (
+        <div onClick={() => setGuideModalOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[380px] animate-pop rounded-[20px] bg-white p-6">
+            <h3 className="mb-1 text-[19px] font-extrabold">이렇게 찍어보세요 📸</h3>
+            <p className="mb-4 text-[13.5px] text-sub">식물이 정중앙에 오도록 찍어주시면, 나중에 모아서 타임랩스 영상을 만들어드릴 때 훨씬 예쁘게 이어져요.</p>
+            <div className="relative mx-auto mb-4 grid aspect-square w-full max-w-[220px] grid-cols-3 grid-rows-3 overflow-hidden rounded-2xl border-2 border-dashed border-brand bg-brand-soft">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="border border-white/50" />
+              ))}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* 이모지 렌더링이 OS/브라우저마다 다르게 보여서, 다육식물 사진 느낌으로 직접 그린 아이콘 */}
+                <svg viewBox="0 0 100 100" className="h-[65%] w-[65%]" aria-hidden="true">
+                  {/* 화분: 위쪽 밝은 테두리 + 아래쪽 본체 이중톤 */}
+                  <path d="M32 96 L68 96 L64 74 L36 74 Z" fill="#DCC6AC" />
+                  <rect x="33" y="66" width="34" height="9" rx="3" fill="#EAD9C6" />
+                  {/* 가는 줄기 */}
+                  <path d="M50 66 C 46 52, 42 44, 40 30" stroke="#B08968" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d="M50 66 C 55 50, 60 38, 62 24" stroke="#B08968" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d="M56 40 C 58 32, 58 26, 54 18" stroke="#B08968" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+                  {/* 줄기마다 마주나는 잎 */}
+                  <g>
+                    <ellipse cx="34" cy="30" rx="6" ry="10" transform="rotate(-35 34 30)" fill="#9BAE8D" />
+                    <ellipse cx="46" cy="28" rx="6" ry="10" transform="rotate(35 46 28)" fill="#8CA07D" />
+                    <ellipse cx="40" cy="46" rx="5.5" ry="9" transform="rotate(-30 40 46)" fill="#9BAE8D" />
+                    <ellipse cx="50" cy="44" rx="5.5" ry="9" transform="rotate(30 50 44)" fill="#8CA07D" />
+                    <ellipse cx="56" cy="22" rx="5.5" ry="9" transform="rotate(-25 56 22)" fill="#9BAE8D" />
+                    <ellipse cx="66" cy="20" rx="5.5" ry="9" transform="rotate(25 66 20)" fill="#8CA07D" />
+                    <ellipse cx="49" cy="14" rx="4.5" ry="7.5" transform="rotate(-15 49 14)" fill="#9BAE8D" />
+                    <ellipse cx="58" cy="14" rx="4.5" ry="7.5" transform="rotate(15 58 14)" fill="#8CA07D" />
+                  </g>
+                </svg>
+              </div>
+            </div>
+            <label className="mb-4 flex cursor-pointer items-center gap-2 text-[13px] font-bold text-[#6d7a68]">
+              <input
+                type="checkbox"
+                checked={guideDontShowToday}
+                onChange={(e) => setGuideDontShowToday(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              오늘 하루 다시 보지 않기
+            </label>
+            <button
+              type="button"
+              onClick={confirmPhotoGuide}
+              className="w-full cursor-pointer rounded-[13px] bg-brand p-3.5 text-base font-extrabold text-white"
+            >
+              사진 고르러 가기
+            </button>
           </div>
         </div>
       )}
