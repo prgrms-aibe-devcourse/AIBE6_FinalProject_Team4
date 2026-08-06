@@ -4,6 +4,7 @@ import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
 import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
 import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
+import { formatPhone } from "@/components/AddressForm";
 import {
   adjustAdminProductStock,
   AdminProduct,
@@ -23,6 +24,14 @@ import {
   shipExchange,
 } from "@/lib/exchange-api";
 import {
+  cancelOrderForAdmin,
+  deliverOrderForAdmin,
+  getOrdersForAdmin,
+  OrderData,
+  OrderItemData,
+  shipOrderForAdmin,
+} from "@/lib/order-api";
+import {
   createSpecies,
   getSpecies,
   PlantSpeciesData,
@@ -35,7 +44,14 @@ import { useUI } from "@/lib/ui";
 import { validateCommerceAssetKey } from "@/lib/commerce-asset";
 import { useEffect, useState } from "react";
 
-const DELSEQ = ["PREPARING", "SHIPPING", "DELIVERED"];
+const CANCEL_REASON_OPTIONS = [
+  "품절",
+  "고객 요청",
+  "배송 불가",
+  "결제 오류",
+  "기타",
+];
+
 const delMeta: Record<string, [string, string, string]> = {
   PREPARING: ["준비중", "bg-[#FFF3CC] text-gold-text", "배송 시작"],
   SHIPPING: ["배송중", "bg-[#E3F0FA] text-[#3a76a8]", "배송 완료"],
@@ -87,37 +103,50 @@ const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
 export default function Admin() {
   const { showToast, askConfirm } = useUI();
   const [tab, setTab] = useState("orders");
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      no: "ORD-...0043",
-      user: "초록",
-      amount: 2100,
-      delivery: "PREPARING",
-    },
-    {
-      id: 2,
-      no: "ORD-...0031",
-      user: "민트",
-      amount: 1500,
-      delivery: "SHIPPING",
-    },
-    {
-      id: 3,
-      no: "ORD-...0022",
-      user: "단풍",
-      amount: 1200,
-      delivery: "DELIVERED",
-    },
-    {
-      id: 4,
-      no: "ORD-...0018",
-      user: "노을",
-      amount: 800,
-      delivery: "PREPARING",
-    },
-  ]);
   const { state, hydrated } = useStore();
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  const [orderItemsById, setOrderItemsById] = useState<
+    Record<number, OrderItemData[]>
+  >({});
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState("");
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+
+    const controller = new AbortController();
+    setOrdersLoading(true);
+    setOrdersError("");
+
+    getOrdersForAdmin(accessToken, undefined, 0, 50, controller.signal)
+      .then((page) => {
+        setOrders(page.content.map((detail) => detail.order));
+        const map: Record<number, OrderItemData[]> = {};
+        page.content.forEach((detail) => {
+          map[detail.order.id] = detail.items;
+        });
+        setOrderItemsById(map);
+      })
+      .catch((requestError) => {
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+        )
+          return;
+        setOrders([]);
+        setOrdersError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : "주문을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setOrdersLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
   const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(true);
   const [exchangesError, setExchangesError] = useState("");
@@ -275,21 +304,74 @@ export default function Admin() {
     },
   ]);
 
-  const advOrder = (id: number) => {
-    setOrders(
-      orders.map((o) =>
-        o.id === id
-          ? {
-              ...o,
-              delivery:
-                DELSEQ[
-                  Math.min(DELSEQ.length - 1, DELSEQ.indexOf(o.delivery) + 1)
-                ],
-            }
-          : o,
-      ),
-    );
-    showToast("배송 상태를 업데이트했어요. 고객에게 알림이 발송돼요 📦");
+  const advOrder = async (o: OrderData) => {
+    if (!state.accessToken) return;
+    try {
+      let updated: OrderData;
+      if (o.deliveryStatus === "PREPARING")
+        updated = await shipOrderForAdmin(o.id, state.accessToken);
+      else if (o.deliveryStatus === "SHIPPING")
+        updated = await deliverOrderForAdmin(o.id, state.accessToken);
+      else return;
+      setOrders((prev) => prev.map((p) => (p.id === o.id ? updated : p)));
+      showToast("배송 상태를 업데이트했어요. 고객에게 알림이 발송돼요 📦");
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "상태 변경에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    }
+  };
+  const [cancelOrderTargetId, setCancelOrderTargetId] = useState<number | null>(
+    null,
+  );
+  const [cancelReasonOption, setCancelReasonOption] = useState(
+    CANCEL_REASON_OPTIONS[0],
+  );
+  const [cancelReasonCustom, setCancelReasonCustom] = useState("");
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const openCancelOrder = (id: number) => {
+    setCancelOrderTargetId(id);
+    setCancelReasonOption(CANCEL_REASON_OPTIONS[0]);
+    setCancelReasonCustom("");
+  };
+  const closeCancelOrder = () => {
+    if (cancelSubmitting) return;
+    setCancelOrderTargetId(null);
+  };
+  const submitCancelOrder = async () => {
+    if (!state.accessToken || cancelOrderTargetId == null) return;
+    const reason =
+      cancelReasonOption === "기타"
+        ? cancelReasonCustom.trim()
+        : cancelReasonOption;
+    setCancelSubmitting(true);
+    try {
+      const updated = await cancelOrderForAdmin(
+        cancelOrderTargetId,
+        reason || undefined,
+        state.accessToken,
+      );
+      setOrders((prev) =>
+        prev.map((o) => (o.id === cancelOrderTargetId ? updated : o)),
+      );
+      showToast(
+        "주문을 취소하고 재고·포인트를 복원했어요. 취소 사유가 고객에게 알림으로 전달돼요.",
+      );
+      setCancelOrderTargetId(null);
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "취소에 실패했어요. 잠시 후 다시 시도해 주세요.",
+        "err",
+      );
+    } finally {
+      setCancelSubmitting(false);
+    }
   };
   const advEx = async (x: ExchangeOrderData) => {
     if (!state.accessToken) return;
@@ -668,38 +750,100 @@ export default function Admin() {
 
       {tab === "orders" && (
         <div className={PANEL}>
-          <div className={`grid grid-cols-[1.4fr_1fr_1fr_1fr_1.2fr] ${HEAD}`}>
+          <div className={`grid grid-cols-[1fr_1fr_1fr_1fr_1.4fr] ${HEAD}`}>
             <div>주문번호</div>
             <div>고객</div>
             <div>금액</div>
             <div>배송상태</div>
             <div className="text-right">처리</div>
           </div>
-          {orders.map((o) => {
-            const m = delMeta[o.delivery];
-            return (
-              <div
-                key={o.id}
-                className={`grid grid-cols-[1.4fr_1fr_1fr_1fr_1.2fr] ${ROW}`}
-              >
-                <div className="font-bold">{o.no}</div>
-                <div className="text-[#6d7a68]">{o.user}</div>
-                <div className="font-bold text-gold-text">{fmt(o.amount)}P</div>
-                <div>
-                  <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
-                </div>
-                <div className="text-right">
-                  <button
-                    type="button"
-                    onClick={() => advOrder(o.id)}
-                    className={BTN_SOFT}
+          {ordersLoading ? (
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              주문을 불러오고 있어요 🌱
+            </div>
+          ) : ordersError ? (
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              {ordersError}
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="px-[18px] py-10 text-center text-sm text-sub">
+              주문이 없어요.
+            </div>
+          ) : (
+            orders.map((o) => {
+              const m = delMeta[o.deliveryStatus];
+              const cancelled = o.status === "CANCELLED";
+              const advanceable =
+                o.status === "PAID" &&
+                (o.deliveryStatus === "PREPARING" ||
+                  o.deliveryStatus === "SHIPPING");
+              return (
+                <div key={o.id} className="border-t border-[#f2f3ec]">
+                  <div
+                    className={`grid grid-cols-[1fr_1fr_1fr_1fr_1.4fr] ${ROW} border-t-0 pb-2`}
                   >
-                    {m[2]}
-                  </button>
+                    <div className="font-bold">주문 #{o.id}</div>
+                    <div className="text-[#6d7a68]">{o.receiverName}</div>
+                    <div className="font-bold text-gold-text">
+                      {fmt(o.totalPoint)}P
+                    </div>
+                    <div>
+                      {cancelled ? (
+                        <span className={`${CHIP} bg-[#f0f1ea] text-[#8a8a8a]`}>
+                          취소됨
+                        </span>
+                      ) : (
+                        <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
+                      )}
+                    </div>
+                    <div className="flex justify-end gap-1.5">
+                      {advanceable && (
+                        <button
+                          type="button"
+                          onClick={() => advOrder(o)}
+                          className={BTN_SOFT}
+                        >
+                          {m[2]}
+                        </button>
+                      )}
+                      {o.status === "PAID" &&
+                        o.deliveryStatus === "PREPARING" && (
+                          <button
+                            type="button"
+                            onClick={() => openCancelOrder(o.id)}
+                            className="cursor-pointer rounded-[9px] border-[1.5px] border-[#e8bdad] bg-white px-3 py-[7px] text-[13px] font-bold text-[#b5502f] transition-colors duration-150 hover:bg-danger-soft hover:border-[#e0a488]"
+                          >
+                            취소
+                          </button>
+                        )}
+                    </div>
+                  </div>
+                  <div className="px-[18px] pb-1.5 text-[12.5px] text-sub">
+                    {formatPhone(o.receiverPhone)} ·{" "}
+                    {o.zipCode && `[${o.zipCode}] `}
+                    {o.address} {o.addressDetail}
+                    {cancelled && (o.cancelReason || o.cancelledBy) && (
+                      <span className="ml-2 font-semibold text-[#b5502f]">
+                        {o.cancelledBy === "ADMIN" ? "관리자 취소" : "본인 취소"}
+                        {o.cancelReason && ` · 사유: ${o.cancelReason}`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="px-[18px] pb-3.5 text-[12.5px] text-sub">
+                    {!(o.id in orderItemsById)
+                      ? "상품 정보를 불러오는 중…"
+                      : orderItemsById[o.id].length === 0
+                        ? "표시할 상품 정보가 없어요."
+                        : orderItemsById[o.id]
+                            .map(
+                              (item) => `${item.productName} × ${item.quantity}`,
+                            )
+                            .join(", ")}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       )}
 
@@ -1276,6 +1420,70 @@ export default function Admin() {
                 className="flex-1 cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white p-3.5 text-base font-bold text-[#6d7a68] disabled:opacity-60"
               >
                 취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelOrderTargetId != null && (
+        <div
+          onClick={closeCancelOrder}
+          className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[420px] animate-pop rounded-[22px] bg-white p-[26px]"
+          >
+            <h3 className="mb-1.5 text-xl font-extrabold">주문 취소</h3>
+            <p className="mb-5 text-[13px] text-sub">
+              선택한 사유가 고객 알림에 그대로 표시돼요.
+            </p>
+
+            <label className="text-[13px] font-bold text-[#6d7a68]">
+              취소 사유
+            </label>
+            <select
+              value={cancelReasonOption}
+              onChange={(e) => setCancelReasonOption(e.target.value)}
+              className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+            >
+              {CANCEL_REASON_OPTIONS.map((reason) => (
+                <option key={reason} value={reason}>
+                  {reason}
+                </option>
+              ))}
+            </select>
+
+            {cancelReasonOption === "기타" && (
+              <input
+                value={cancelReasonCustom}
+                onChange={(e) => setCancelReasonCustom(e.target.value)}
+                maxLength={200}
+                placeholder="사유를 입력해 주세요"
+                className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+              />
+            )}
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={submitCancelOrder}
+                disabled={
+                  cancelSubmitting ||
+                  (cancelReasonOption === "기타" && !cancelReasonCustom.trim())
+                }
+                className="flex-1 cursor-pointer rounded-[13px] bg-[#b5502f] p-3.5 text-base font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cancelSubmitting ? "취소 처리 중..." : "주문 취소"}
+              </button>
+              <button
+                type="button"
+                onClick={closeCancelOrder}
+                disabled={cancelSubmitting}
+                className="flex-1 cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white p-3.5 text-base font-bold text-[#6d7a68] disabled:opacity-60"
+              >
+                닫기
               </button>
             </div>
           </div>

@@ -9,6 +9,7 @@ import com.kiwobollae.api.commerce.entity.CartItem;
 import com.kiwobollae.api.commerce.entity.Order;
 import com.kiwobollae.api.commerce.entity.OrderItem;
 import com.kiwobollae.api.commerce.entity.Product;
+import com.kiwobollae.api.commerce.entity.enums.CancelledBy;
 import com.kiwobollae.api.commerce.entity.enums.ConfirmedBy;
 import com.kiwobollae.api.commerce.entity.enums.DeliveryStatus;
 import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
@@ -165,7 +166,9 @@ public class OrderService {
 				OrderStatus.CANCELLED,
 				OrderStatus.PAID,
 				DeliveryStatus.PREPARING,
-				LocalDateTime.now(KST)
+				LocalDateTime.now(KST),
+				null,
+				CancelledBy.USER
 		);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.ORDER_INVALID_STATE);
