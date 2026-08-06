@@ -99,6 +99,11 @@ public class PlantJournalService {
 				PlantJournalResponse.from(journal, imagesByJournal.getOrDefault(journal.getId(), List.of())));
 	}
 
+	// "오늘 일지 안 쓴 것만 보기" 프론트 필터용 — 오늘(KST) 일지를 쓴 식물 프로필 id 목록만 가볍게 반환한다.
+	public List<Long> getProfileIdsWrittenToday(Long userId) {
+		return plantJournalRepository.findDistinctProfileIdsByUserIdAndWrittenDate(userId, LocalDate.now(KST));
+	}
+
 	public boolean existsActive(Long journalId) {
 		return plantJournalRepository.existsByIdAndDeletedAtIsNull(journalId);
 	}

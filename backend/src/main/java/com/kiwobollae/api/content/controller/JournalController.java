@@ -10,6 +10,7 @@ import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -69,6 +70,12 @@ public class JournalController {
 			return pageable;
 		}
 		return PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort());
+	}
+
+	@Operation(summary = "오늘 일지 작성한 프로필 목록", description = "오늘(KST) 일지를 작성한 식물 프로필 id 목록을 반환합니다.")
+	@GetMapping("/written-today")
+	public ResponseEntity<ApiResponse<List<Long>>> getProfileIdsWrittenToday(@AuthenticationPrincipal Long userId) {
+		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getProfileIdsWrittenToday(userId)));
 	}
 
 	@Operation(summary = "성장 일지 상세 조회", description = "본인 소유의 성장 일지 단건을 조회합니다.")

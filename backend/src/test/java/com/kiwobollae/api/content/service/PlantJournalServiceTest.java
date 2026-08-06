@@ -197,6 +197,16 @@ class PlantJournalServiceTest {
 				.build();
 	}
 
+	@Test
+	void getProfileIdsWrittenTodayReturnsDistinctProfileIdsForToday() {
+		given(plantJournalRepository.findDistinctProfileIdsByUserIdAndWrittenDate(7L, LocalDate.now(KST)))
+				.willReturn(List.of(21L, 22L));
+
+		List<Long> result = plantJournalService.getProfileIdsWrittenToday(7L);
+
+		assertThat(result).containsExactly(21L, 22L);
+	}
+
 	private User user(Long id) {
 		User user = User.builder().build();
 		ReflectionTestUtils.setField(user, "id", id);

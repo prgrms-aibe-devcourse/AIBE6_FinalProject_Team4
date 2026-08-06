@@ -6,10 +6,9 @@ import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
-import { getJournals } from '@/lib/journal-api';
+import { getProfileIdsWrittenToday } from '@/lib/journal-api';
 import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
-import { localToday } from '@/lib/format';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const BULK_STATUS_OPTIONS: [PlantStatus, string][] = [['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
@@ -44,6 +43,7 @@ export default function PlantsPage() {
     nick: '', speciesId: null, photoIdx: 0, startDate: today(),
   });
   const [todayWrittenIds, setTodayWrittenIds] = useState<Set<number>>(new Set());
+  const [todayWrittenError, setTodayWrittenError] = useState(false);
   const [writtenTodayOnly, setWrittenTodayOnly] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -107,24 +107,38 @@ export default function PlantsPage() {
     if (!hydrated || !state.accessToken) return;
     const accessToken = state.accessToken;
     const controller = new AbortController();
-    const now = new Date();
+    setTodayWrittenError(false);
 
-    getJournals({ year: now.getFullYear(), month: now.getMonth() + 1, size: 200 }, accessToken, controller.signal)
-      .then((data) => {
-        const today = localToday();
-        setTodayWrittenIds(new Set(data.content.filter((j) => j.writtenDate === today).map((j) => j.plantProfileId)));
-      })
+    getProfileIdsWrittenToday(accessToken, controller.signal)
+      .then((ids) => setTodayWrittenIds(new Set(ids)))
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
-        setTodayWrittenIds(new Set());
+        // 조회 실패를 빈 Set으로 처리하면 "아무도 안 씀"이 돼서 필터를 켰을 때 재배중 전체가
+        // 미작성으로 잘못 표시된다 — 대신 에러 상태를 따로 두고 필터 자체를 못 쓰게 막는다.
+        setTodayWrittenError(true);
       });
 
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  const list = writtenTodayOnly
+  const writtenTodayFilterActive = writtenTodayOnly && !todayWrittenError;
+  const list = writtenTodayFilterActive
     ? plants.filter((p) => p.status === 'GROWING' && !todayWrittenIds.has(p.id))
     : plants.filter((p) => filter === 'all' || p.status === filter);
+
+  // 필터로 화면에서 사라진 식물이 선택 상태로 계속 남아, 안 보이는 항목까지 일괄 변경 대상이
+  // 되는 걸 막는다 — 보이는 목록(list)이 바뀌면 선택도 그 목록 기준으로 다시 걸러준다.
+  useEffect(() => {
+    const visibleIds = new Set(
+      plants
+        .filter((p) => (writtenTodayFilterActive ? p.status === 'GROWING' && !todayWrittenIds.has(p.id) : filter === 'all' || p.status === filter))
+        .map((p) => p.id),
+    );
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [filter, writtenTodayFilterActive, plants, todayWrittenIds]);
   const regV = nickValid(reg.nick);
   const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
 
@@ -306,21 +320,33 @@ export default function PlantsPage() {
         </button>
       </div>
 
-      <label className="mb-[22px] flex w-fit cursor-pointer items-center gap-2 text-[13.5px] font-bold text-[#6d7a68]">
-        <input
-          type="checkbox"
-          checked={writtenTodayOnly}
-          onChange={(e) => setWrittenTodayOnly(e.target.checked)}
-          className="h-4 w-4 accent-brand"
-        />
-        오늘 일지 안 쓴 것만 보기
-      </label>
+      <div className="mb-[22px] flex flex-wrap items-center gap-2">
+        <label
+          className={`flex w-fit items-center gap-2 text-[13.5px] font-bold text-[#6d7a68] ${
+            todayWrittenError ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={writtenTodayOnly}
+            disabled={todayWrittenError}
+            onChange={(e) => setWrittenTodayOnly(e.target.checked)}
+            className="h-4 w-4 accent-brand"
+          />
+          오늘 일지 안 쓴 것만 보기
+        </label>
+        {todayWrittenError && (
+          <span className="text-[12.5px] font-semibold text-danger">
+            일지 작성 여부를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.
+          </span>
+        )}
+      </div>
 
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
-      ) : list.length === 0 && writtenTodayOnly ? (
+      ) : list.length === 0 && writtenTodayFilterActive ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌿</div>
           <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">오늘 일지 안 쓴 식물이 없어요 🌿</p>
