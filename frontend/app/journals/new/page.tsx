@@ -221,11 +221,11 @@ function NewJournalInner() {
             onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
             className="hidden"
           />
-          <div className="mb-[26px] flex items-center gap-4">
+          <div className="mb-[26px]">
             <button
               type="button"
               onClick={openPhotoPicker}
-              className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
+              className={`flex aspect-square w-full max-w-[360px] cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[16px] border-[1.5px] ${
                 photoPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
               }`}
             >
@@ -234,8 +234,8 @@ function NewJournalInner() {
                 <img src={photoPreview} alt="" className="h-full w-full object-cover" />
               ) : (
                 <>
-                  <span className="material-symbols-outlined text-2xl">photo_camera</span>
-                  <span className="text-[11px] font-bold">사진 선택</span>
+                  <span className="material-symbols-outlined text-4xl">photo_camera</span>
+                  <span className="text-[13px] font-bold">사진 선택</span>
                 </>
               )}
             </button>
@@ -243,7 +243,7 @@ function NewJournalInner() {
               <button
                 type="button"
                 onClick={openPhotoPicker}
-                className="cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
+                className="mt-3 cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
               >
                 <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
               </button>
