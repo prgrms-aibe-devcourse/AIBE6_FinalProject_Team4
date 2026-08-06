@@ -16,7 +16,6 @@ import com.kiwobollae.api.content.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.content.service.PlantSpeciesService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -112,16 +111,12 @@ class PlantCareGuideSmokeTest {
     // 저장소는 stub 없이 두면 Mockito가 Optional.empty()를 돌려주므로 항상 캐시 미스가 된다.
     PlantCareGuideGenerationLockStore generationLockStore =
         mock(PlantCareGuideGenerationLockStore.class);
-    given(generationLockStore.tryAcquire(any(), any(), any()))
+    given(generationLockStore.tryAcquire(any()))
         .willAnswer(
-            invocation -> {
-              PlantCareGuideGenerationKey key = invocation.getArgument(0);
-              LocalDateTime now = invocation.getArgument(1);
-              Duration duration = invocation.getArgument(2);
-              return Optional.of(
-                  new PlantCareGuideGenerationLockStore.Lease(
-                      key, now.plus(duration), "smoke-test-generation-owner"));
-            });
+            invocation ->
+                Optional.of(
+                    new PlantCareGuideGenerationLockStore.Lease(
+                        invocation.getArgument(0), new Object())));
     return new PlantCareGuideService(
         plantSpeciesService,
         mock(PlantCareGuideCacheRepository.class),
@@ -129,7 +124,6 @@ class PlantCareGuideSmokeTest {
         client,
         mock(AiRequestGuard.class),
         generationLockStore,
-        new PlantCareGuideProperties(Duration.ofMinutes(1)),
         new ObjectMapper(),
         Clock.fixed(Instant.parse("2026-08-05T01:00:00Z"), KST));
   }

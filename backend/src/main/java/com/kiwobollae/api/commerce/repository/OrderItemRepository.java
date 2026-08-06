@@ -9,4 +9,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
 	@EntityGraph(attributePaths = "product")
 	List<OrderItem> findAllByOrderId(Long orderId);
+
+	@EntityGraph(attributePaths = "product")
+	List<OrderItem> findAllByOrderIdIn(List<Long> orderIds);
 }

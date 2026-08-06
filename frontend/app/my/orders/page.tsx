@@ -192,6 +192,16 @@ export default function Orders() {
                   </div>
                 </div>
 
+                {order.status === 'CANCELLED' && (order.cancelReason || order.cancelledBy) && (
+                  <div className="mb-3.5 rounded-xl bg-[#FBF3EF] px-3.5 py-3 text-[13px]">
+                    <div className="mb-1 flex items-center gap-1.5 font-bold text-[#b5502f]">
+                      <span className="material-symbols-outlined text-[16px]">info</span>
+                      {order.cancelledBy === 'ADMIN' ? '관리자에 의해 취소되었어요' : '주문을 취소했어요'}
+                    </div>
+                    {order.cancelReason && <div className="text-[#b5502f]">사유: {order.cancelReason}</div>}
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-[#f2f3ec] pt-3.5">
                   <div className="flex items-center gap-1.5 font-extrabold text-gold-text">
                     총 <PointPrice value={order.totalPoint} size="sm" />

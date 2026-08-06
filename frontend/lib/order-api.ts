@@ -65,6 +65,7 @@ export function deleteCartItems(cartItemIds: number[], accessToken?: string | nu
 export type OrderStatus = 'PAID' | 'CANCELLED' | 'PURCHASE_CONFIRMED';
 export type DeliveryStatus = 'PREPARING' | 'SHIPPING' | 'DELIVERED';
 export type ConfirmedBy = 'USER' | 'SYSTEM';
+export type CancelledBy = 'USER' | 'ADMIN';
 
 export interface OrderData {
   id: number;
@@ -82,6 +83,8 @@ export interface OrderData {
   orderedAt: string;
   deliveredAt: string | null;
   cancelledAt: string | null;
+  cancelReason: string | null;
+  cancelledBy: CancelledBy | null;
   confirmedAt: string | null;
   confirmedBy: ConfirmedBy | null;
   cancellable: boolean;
@@ -104,6 +107,14 @@ export interface OrderDetailData {
 
 export interface OrderPage {
   content: OrderData[];
+  totalPages: number;
+  totalElements: number;
+  first: boolean;
+  last: boolean;
+}
+
+export interface OrderDetailPage {
+  content: OrderDetailData[];
   totalPages: number;
   totalElements: number;
   first: boolean;
@@ -153,5 +164,63 @@ export function confirmOrder(orderId: number, accessToken?: string | null): Prom
   return request<void>(`/api/v1/order/${orderId}/confirm`, {
     method: 'POST',
     accessToken,
+  });
+}
+
+// ---- Admin ----
+
+export function getOrdersForAdmin(
+  accessToken: string,
+  filters?: {
+    status?: OrderStatus;
+    deliveryStatus?: DeliveryStatus;
+    userId?: number;
+    from?: string;
+    to?: string;
+  },
+  page = 0,
+  size = 20,
+  signal?: AbortSignal,
+): Promise<OrderDetailPage> {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (filters?.status) query.set('status', filters.status);
+  if (filters?.deliveryStatus) query.set('deliveryStatus', filters.deliveryStatus);
+  if (filters?.userId) query.set('userId', String(filters.userId));
+  if (filters?.from) query.set('from', filters.from);
+  if (filters?.to) query.set('to', filters.to);
+  return request<OrderDetailPage>(`/api/v1/admin/order?${query.toString()}`, { accessToken, signal });
+}
+
+export function getOrderForAdmin(
+  orderId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<OrderDetailData> {
+  return request<OrderDetailData>(`/api/v1/admin/order/${orderId}`, { accessToken, signal });
+}
+
+export function shipOrderForAdmin(orderId: number, accessToken: string): Promise<OrderData> {
+  return request<OrderData>(`/api/v1/admin/order/${orderId}/ship`, {
+    method: 'PATCH',
+    accessToken,
+  });
+}
+
+export function deliverOrderForAdmin(orderId: number, accessToken: string): Promise<OrderData> {
+  return request<OrderData>(`/api/v1/admin/order/${orderId}/deliver`, {
+    method: 'PATCH',
+    accessToken,
+  });
+}
+
+export function cancelOrderForAdmin(
+  orderId: number,
+  reason: string | undefined,
+  accessToken: string,
+): Promise<OrderData> {
+  return request<OrderData>(`/api/v1/admin/order/${orderId}/cancel`, {
+    method: 'PATCH',
+    accessToken,
+    body: JSON.stringify({ reason }),
   });
 }

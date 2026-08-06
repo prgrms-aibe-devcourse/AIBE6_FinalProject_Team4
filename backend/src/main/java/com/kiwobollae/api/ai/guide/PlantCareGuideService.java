@@ -58,7 +58,6 @@ public class PlantCareGuideService {
   private final AiClient aiClient;
   private final AiRequestGuard requestGuard;
   private final PlantCareGuideGenerationLockStore generationLockStore;
-  private final PlantCareGuideProperties properties;
   private final ObjectMapper objectMapper;
   private final Clock seoulClock;
 
@@ -69,7 +68,6 @@ public class PlantCareGuideService {
       AiClient aiClient,
       AiRequestGuard requestGuard,
       PlantCareGuideGenerationLockStore generationLockStore,
-      PlantCareGuideProperties properties,
       ObjectMapper objectMapper,
       Clock seoulClock) {
     this.plantSpeciesService = plantSpeciesService;
@@ -78,7 +76,6 @@ public class PlantCareGuideService {
     this.aiClient = aiClient;
     this.requestGuard = requestGuard;
     this.generationLockStore = generationLockStore;
-    this.properties = properties;
     this.objectMapper = objectMapper;
     this.seoulClock = seoulClock;
   }
@@ -158,11 +155,9 @@ public class PlantCareGuideService {
     PlantCareGuideGenerationKey key =
         new PlantCareGuideGenerationKey(
             speciesName, PlantCareGuideSchema.VERSION, sourceContextHash);
-    Optional<PlantCareGuideGenerationLockStore.Lease> lease =
-        generationLockStore.tryAcquire(
-            key, LocalDateTime.now(seoulClock), properties.generationLockLease());
+    Optional<PlantCareGuideGenerationLockStore.Lease> lease = generationLockStore.tryAcquire(key);
     if (lease.isEmpty()) {
-      // 소유자가 캐시를 저장하고 lease를 반납하는 바로 그 순간일 수 있으므로 한 번 더 읽는다.
+      // 소유자가 캐시를 저장하고 선점을 반납하는 바로 그 순간일 수 있으므로 한 번 더 읽는다.
       // 그래도 없으면 진행 중 요청을 기다리지 않고 409로 끝내 외부 AI 호출을 절대 중복하지 않는다.
       return findCachedGuide(speciesName, sourceContextHash)
           .orElseThrow(
@@ -172,8 +167,8 @@ public class PlantCareGuideService {
     }
 
     try {
-      // lease 선점 전 캐시 미스를 읽은 뒤 다른 요청이 저장을 끝냈을 수도 있다. 이 재조회가 있어야
-      // lease를 새로 잡은 요청도 불필요한 AI 호출을 하지 않는다.
+      // 선점 전 캐시 미스를 읽은 뒤 다른 요청이 저장을 끝냈을 수도 있다. 이 재조회가 있어야
+      // 새로 선점한 요청도 불필요한 AI 호출을 하지 않는다.
       Optional<PlantCareGuide> cached = findCachedGuide(speciesName, sourceContextHash);
       if (cached.isPresent()) {
         return cached.get();
@@ -181,7 +176,9 @@ public class PlantCareGuideService {
       return generateAndStore(
           userId, speciesName, sourceSpeciesId, category, officialGuide, sourceContextHash);
     } finally {
-      releaseGenerationLease(lease.get());
+      // 만료라는 안전망이 없으므로 어떤 경로로 빠져나가든 반드시 반납한다. 반납이 누락되면 그 종은
+      // 프로세스가 살아 있는 내내 409만 돌려주게 된다.
+      generationLockStore.release(lease.get());
     }
   }
 
@@ -224,16 +221,6 @@ public class PlantCareGuideService {
         .findBySpeciesNameAndGuideVersionAndSourceContextHash(
             speciesName, PlantCareGuideSchema.VERSION, sourceContextHash)
         .map(cache -> PlantCareGuide.of(speciesName, validateGuide(readGuide(cache)), true));
-  }
-
-  private void releaseGenerationLease(PlantCareGuideGenerationLockStore.Lease lease) {
-    try {
-      generationLockStore.release(lease);
-    } catch (RuntimeException exception) {
-      // 저장본은 이미 확정됐을 수 있으므로 release 실패가 성공 응답을 덮어쓰게 하지 않는다. lease가
-      // 만료되면 자동 회수되며, 이 문제는 다음 생성 요청에서만 일시적인 409로 보인다.
-      log.warn("재배 가이드 생성 lease 반납에 실패했습니다: species={}", lease.key().speciesName(), exception);
-    }
   }
 
   /**

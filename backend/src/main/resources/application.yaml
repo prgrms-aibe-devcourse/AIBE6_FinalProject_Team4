@@ -118,9 +118,6 @@ ai:
     global-rate-limit:
       max-requests: ${AI_GLOBAL_RATE_LIMIT_MAX_REQUESTS:100}
       window: ${AI_GLOBAL_RATE_LIMIT_WINDOW:1d}
-  plant-care-guide:
-    # OpenAI read timeout보다 길게 둬야 정상 생성 중 lease가 만료되어 중복 호출되는 일을 막는다.
-    generation-lock-lease: ${AI_PLANT_CARE_GUIDE_GENERATION_LOCK_LEASE:1m}
 
 aws:
   s3:

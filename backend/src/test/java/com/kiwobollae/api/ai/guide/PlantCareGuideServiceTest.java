@@ -28,7 +28,6 @@ import com.kiwobollae.api.content.service.PlantSpeciesService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -82,26 +81,16 @@ class PlantCareGuideServiceTest {
   @Mock private PlantCareGuideGenerationLockStore generationLockStore;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
-  private final PlantCareGuideProperties properties =
-      new PlantCareGuideProperties(Duration.ofMinutes(1));
 
   @BeforeEach
   void acquireGenerationLeaseByDefault() {
     lenient()
-        .when(
-            generationLockStore.tryAcquire(
-                any(PlantCareGuideGenerationKey.class),
-                any(LocalDateTime.class),
-                any(Duration.class)))
+        .when(generationLockStore.tryAcquire(any(PlantCareGuideGenerationKey.class)))
         .thenAnswer(
-            invocation -> {
-              PlantCareGuideGenerationKey key = invocation.getArgument(0);
-              LocalDateTime now = invocation.getArgument(1);
-              Duration duration = invocation.getArgument(2);
-              return Optional.of(
-                  new PlantCareGuideGenerationLockStore.Lease(
-                      key, now.plus(duration), "test-generation-owner"));
-            });
+            invocation ->
+                Optional.of(
+                    new PlantCareGuideGenerationLockStore.Lease(
+                        invocation.getArgument(0), new Object())));
   }
 
   private PlantCareGuideService service() {
@@ -112,7 +101,6 @@ class PlantCareGuideServiceTest {
         aiClient,
         requestGuard,
         generationLockStore,
-        properties,
         objectMapper,
         FIXED_KST_CLOCK);
   }
@@ -228,11 +216,7 @@ class PlantCareGuideServiceTest {
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.empty());
-    given(
-            generationLockStore.tryAcquire(
-                any(PlantCareGuideGenerationKey.class),
-                any(LocalDateTime.class),
-                any(Duration.class)))
+    given(generationLockStore.tryAcquire(any(PlantCareGuideGenerationKey.class)))
         .willReturn(Optional.empty());
 
     assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
