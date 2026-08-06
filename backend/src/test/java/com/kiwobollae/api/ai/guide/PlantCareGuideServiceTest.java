@@ -212,6 +212,7 @@ class PlantCareGuideServiceTest {
             Optional.of(
                 PlantCareGuideCache.builder()
                     .speciesName("청상추")
+                    .sourceContextHash("test-hash")
                     .guideVersion(PlantCareGuideSchema.VERSION)
                     .model("text-model")
                     .guideJson("not-json")

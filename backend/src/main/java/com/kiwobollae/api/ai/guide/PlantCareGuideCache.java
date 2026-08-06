@@ -45,8 +45,13 @@ public class PlantCareGuideCache extends BaseEntity {
   @Column(name = "source_species_id")
   private Long sourceSpeciesId;
 
-  /** 생성 시점에 사용한 종 분류·공식 가이드 fingerprint. 원본 변경 시 기존 캐시를 무효화한다. */
-  @Column(name = "source_context_hash", length = 64)
+  /**
+   * 생성 시점에 사용한 종 분류·공식 가이드 fingerprint. 원본 변경 시 기존 캐시를 무효화한다.
+   *
+   * <p><b>NOT NULL이어야 한다.</b> MySQL 유니크 인덱스는 NULL끼리를 서로 다른 값으로 취급해서, 이 컬럼이 비면 위 유니크 제약이 같은 종·같은 버전의
+   * 중복 행을 전혀 막지 못한다. 분류·공식 가이드가 없는 종도 빈 문자열을 해싱해 값이 항상 채워진다.
+   */
+  @Column(name = "source_context_hash", nullable = false, length = 64)
   private String sourceContextHash;
 
   /** 응답 스키마 버전. 스키마를 바꾸면 이 값을 올려 옛 저장본을 자연히 무효화한다 — 지우거나 마이그레이션 하지 않고 새 버전으로만 조회하면 된다. */
