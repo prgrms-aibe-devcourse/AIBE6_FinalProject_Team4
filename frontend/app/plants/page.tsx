@@ -5,13 +5,14 @@ import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
-import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
+import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
 import { getJournals } from '@/lib/journal-api';
 import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { localToday } from '@/lib/format';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
+const BULK_STATUS_OPTIONS: [PlantStatus, string][] = [['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -44,6 +45,8 @@ export default function PlantsPage() {
   });
   const [todayWrittenIds, setTodayWrittenIds] = useState<Set<number>>(new Set());
   const [writtenTodayOnly, setWrittenTodayOnly] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [query, setQuery] = useState('');
   const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -131,6 +134,49 @@ export default function PlantsPage() {
     if (selected && selected.name !== value) {
       setReg({ ...reg, speciesId: null });
     }
+  };
+
+  const toggleSelected = (plantId: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(plantId)) next.delete(plantId);
+      else next.add(plantId);
+      return next;
+    });
+  };
+
+  const applyBulkStatus = (status: PlantStatus, statusLabel: string) => {
+    if (!state.accessToken || selectedIds.size === 0) return;
+    const accessToken = state.accessToken;
+    const targetIds = Array.from(selectedIds);
+
+    askConfirm({
+      icon: 'check',
+      title: `선택한 ${targetIds.length}개 식물을 '${statusLabel}'(으)로 변경할까요?`,
+      ok: '변경',
+      onOk: async () => {
+        const results = await Promise.allSettled(
+          targetIds.map((id) => updatePlant(id, { status }, accessToken)),
+        );
+        const succeededIds = new Set<number>();
+        let failCount = 0;
+        results.forEach((result, i) => {
+          if (result.status === 'fulfilled') succeededIds.add(targetIds[i]);
+          else failCount += 1;
+        });
+        if (succeededIds.size > 0) {
+          setPlants((prev) => prev.map((p) => (succeededIds.has(p.id) ? { ...p, status } : p)));
+        }
+        showToast(
+          failCount === 0
+            ? `${succeededIds.size}개 식물 상태를 변경했어요.`
+            : `${succeededIds.size}개 변경 완료, ${failCount}개는 실패했어요.`,
+          failCount === 0 ? 'ok' : 'err',
+        );
+        setSelectedIds(new Set());
+        setSelectMode(false);
+      },
+    });
   };
 
   const clearSpeciesSelection = () => {
@@ -231,19 +277,33 @@ export default function PlantsPage() {
       <h1 className="mb-1 text-[27px] font-extrabold">내 식물</h1>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
 
-      <div className="mb-3 flex flex-wrap items-center gap-[9px]">
-        {FILTERS.map(([k, label]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setFilter(k)}
-            className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2 text-sm font-bold ${
-              filter === k ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-[9px]">
+        <div className="flex flex-wrap items-center gap-[9px]">
+          {FILTERS.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setFilter(k)}
+              className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2 text-sm font-bold ${
+                filter === k ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectMode(!selectMode);
+            setSelectedIds(new Set());
+          }}
+          className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2 text-sm font-bold ${
+            selectMode ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
+          }`}
+        >
+          {selectMode ? '선택 취소' : '선택'}
+        </button>
       </div>
 
       <label className="mb-[22px] flex w-fit cursor-pointer items-center gap-2 text-[13.5px] font-bold text-[#6d7a68]">
@@ -276,8 +336,20 @@ export default function PlantsPage() {
           {list.map((p) => {
             const b = (BADGE as Record<string, { label: string; bg: string; color: string }>)[p.status];
             const thumb = plantThumbnail(p.thumbnailUrl, p.speciesName);
+            const selected = selectedIds.has(p.id);
             return (
-              <Link key={p.id} href={`/plants/${p.id}`} className="relative block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
+              <Link
+                key={p.id}
+                href={`/plants/${p.id}`}
+                onClick={(e) => {
+                  if (!selectMode) return;
+                  e.preventDefault();
+                  toggleSelected(p.id);
+                }}
+                className={`relative block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink ${
+                  selectMode && selected ? 'ring-[3px] ring-brand' : ''
+                }`}
+              >
                 {thumb.type === 'image' ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={resolveImageUrl(thumb.url)} alt="" className="h-[150px] w-full object-cover" />
@@ -285,6 +357,15 @@ export default function PlantsPage() {
                   <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
                 )}
                 <div className="absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
+                {selectMode && (
+                  <div
+                    className={`absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border-2 text-sm font-extrabold ${
+                      selected ? 'border-brand bg-brand text-white' : 'border-white bg-white/70 text-transparent'
+                    }`}
+                  >
+                    ✓
+                  </div>
+                )}
                 <div className="p-[15px]">
                   <div className="text-base font-extrabold">{p.nickname}</div>
                   <div className="mt-0.5 text-[13px] text-sub">{p.speciesName}</div>
@@ -298,13 +379,33 @@ export default function PlantsPage() {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-[84px] right-6 z-30 cursor-pointer rounded-full bg-brand px-[22px] py-[15px] font-extrabold text-white shadow-[0_10px_26px_rgba(124,179,66,.45)]"
-      >
-        + 새 식물 등록
-      </button>
+      {!selectMode && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-[84px] right-6 z-30 cursor-pointer rounded-full bg-brand px-[22px] py-[15px] font-extrabold text-white shadow-[0_10px_26px_rgba(124,179,66,.45)]"
+        >
+          + 새 식물 등록
+        </button>
+      )}
+
+      {selectMode && selectedIds.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 bg-white px-5 py-4 shadow-[0_-6px_20px_rgba(0,0,0,.08)]">
+          <span className="text-sm font-extrabold text-[#6d7a68]">{selectedIds.size}개 선택됨</span>
+          <div className="flex flex-wrap gap-2">
+            {BULK_STATUS_OPTIONS.map(([status, label]) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => applyBulkStatus(status, label)}
+                className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-3.5 py-2 text-[13px] font-bold text-[#6d7a68]"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {open && (
         <div onClick={() => !submitting && closeRegisterModal()} className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10">
