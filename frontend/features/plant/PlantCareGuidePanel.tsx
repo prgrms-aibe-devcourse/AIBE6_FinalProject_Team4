@@ -64,6 +64,9 @@ export default function PlantCareGuidePanel({
   const [guide, setGuide] = useState<PlantCareGuideData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<GuideError | null>(null);
+  // 가이드가 길어서 특히 등록 모달에서는 아래 입력값(재배 시작일·대표 사진)이 한참 밀린다. 접어도
+  // 받아둔 가이드는 그대로 들고 있어 다시 펼칠 때 AI를 부르지 않는다.
+  const [expanded, setExpanded] = useState(true);
   // loading 상태만으로는 같은 tick에 두 번 눌린 클릭을 막지 못한다 — 리렌더 전이라 두 번째 핸들러가
   // 보는 클로저의 loading은 아직 false다. 실제 호출 여부는 ref로 판정해 AI를 두 번 부르지 않는다.
   const inFlightRef = useRef(false);
@@ -75,6 +78,7 @@ export default function PlantCareGuidePanel({
     setGuide(null);
     setError(null);
     setLoading(false);
+    setExpanded(true);
     return () => {
       controllerRef.current?.abort();
       controllerRef.current = null;
@@ -123,8 +127,26 @@ export default function PlantCareGuidePanel({
 
   return (
     <section className={outerClass}>
-      <Heading className={headingClass}>🌿 AI 재배 가이드</Heading>
-      <p className="mt-1 text-[13px] text-sub">{speciesName} 재배법을 AI가 정리해 드려요.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Heading className={headingClass}>🌿 AI 재배 가이드</Heading>
+          <p className="mt-1 text-[13px] text-sub">{speciesName} 재배법을 AI가 정리해 드려요.</p>
+        </div>
+        {guide && (
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            aria-expanded={expanded}
+            className="flex flex-none cursor-pointer items-center gap-0.5 rounded-[10px] border-[1.5px] border-line bg-white px-2.5 py-1.5 text-xs font-bold text-[#6d7a68] hover:bg-brand-soft hover:text-brand-dark"
+          >
+            {/* 아이콘 폰트는 리거처라 글자("expand_less")가 그대로 버튼 이름에 섞인다. 장식이므로 숨긴다. */}
+            <span aria-hidden="true" className="material-symbols-outlined text-[16px]">
+              {expanded ? 'expand_less' : 'expand_more'}
+            </span>
+            {expanded ? '접기' : '펼치기'}
+          </button>
+        )}
+      </div>
 
       {!guide && (
         <>
@@ -165,7 +187,7 @@ export default function PlantCareGuidePanel({
         </>
       )}
 
-      {guide && (
+      {guide && expanded && (
         <div className="mt-4 flex flex-col gap-5">
           <div>
             <span

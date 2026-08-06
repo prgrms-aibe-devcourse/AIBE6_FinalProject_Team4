@@ -125,6 +125,31 @@ describe('PlantCareGuidePanel', () => {
     expect(screen.getByText('난이도 초급')).toBeInTheDocument();
   });
 
+  // 가이드가 길어 등록 모달에서는 뒤따르는 입력값이 한참 밀린다.
+  it('가이드를 접었다 펼쳐도 다시 요청하지 않는다', async () => {
+    mockedGetGuide.mockResolvedValueOnce(GUIDE);
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: '재배 가이드 보기' }));
+    await screen.findByText('난이도 초급');
+
+    fireEvent.click(screen.getByRole('button', { name: '접기' }));
+
+    expect(screen.queryByText('난이도 초급')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '환경 조건' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '펼치기' }));
+
+    expect(screen.getByText('난이도 초급')).toBeInTheDocument();
+    expect(mockedGetGuide).toHaveBeenCalledTimes(1);
+  });
+
+  it('가이드를 받기 전에는 접기 버튼을 보여주지 않는다', () => {
+    renderPanel();
+
+    expect(screen.queryByRole('button', { name: '접기' })).not.toBeInTheDocument();
+  });
+
   // 캐시 미스 생성은 수십 초짜리 외부 호출이다. 연타로 두 번 나가면 그대로 비용이 두 배다.
   it('응답을 기다리는 동안 다시 눌러도 요청을 한 번만 보낸다', async () => {
     mockedGetGuide.mockReturnValueOnce(new Promise<PlantCareGuideData>(() => {}));
