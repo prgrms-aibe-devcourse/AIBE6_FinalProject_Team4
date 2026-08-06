@@ -8,6 +8,7 @@ import { ApiError } from '@/lib/api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { plantVisual } from '@/lib/plant-visual';
 import { createJournal, PlantJournalCreateData, deleteJournalImage, uploadJournalImage } from '@/lib/journal-api';
+import { localToday } from '@/lib/format';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -15,8 +16,10 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 // 저장해두고, 저장된 날짜가 오늘과 다르면(자정이 지나면) 다시 보여준다.
 const PHOTO_GUIDE_DISMISS_KEY = 'kwb_photo_guide_dismissed_date';
 
+// localToday()로 KST 기준 날짜를 쓴다 — new Date().toISOString()은 UTC라 KST 자정~오전 9시
+// 사이에는 아직 전날로 계산돼, 자정이 지났는데도 최대 9시간 동안 모달이 안 뜨는 버그가 있었다.
 function todayString() {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 interface Draft {
