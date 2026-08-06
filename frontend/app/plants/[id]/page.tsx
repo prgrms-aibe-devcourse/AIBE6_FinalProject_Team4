@@ -104,31 +104,52 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   }, [hydrated, state.accessToken, id, plant?.status]);
 
   // PENDING/PROCESSING인 동안에만 짧은 간격으로 재조회한다. COMPLETED/FAILED가 되는 순간
-  // 이 effect의 조건이 더 이상 맞지 않아 스스로 멈추는 바운디드 폴링 — 완료/실패 결과를
-  // 페이지 재진입 없이도 반영하기 위함(무한 폴링 아님).
+  // status가 바뀌어 effect 조건이 더 이상 맞지 않으므로 스스로 멈추는 바운디드 폴링 — 완료/실패
+  // 결과를 페이지 재진입 없이도 반영하기 위함(무한 폴링 아님).
+  //
+  // 재시도는 setTimelapse(data)가 만드는 새 객체 참조에 기대지 않고 poll() 재귀 호출로 직접
+  // 스스로 이어간다 — 예전엔 effect 의존성 배열의 timelapse 참조 변화로만 다음 타이머가
+  // 잡혔는데, fetch가 실패하면 setTimelapse가 아예 안 불려서 effect가 재실행되지 않고
+  // 폴링이 영구 정지했다(네트워크 오류 한 번으로 완료/실패를 영영 못 받아오는 버그).
   useEffect(() => {
-    if (!hydrated || !state.accessToken || !timelapse) return;
-    if (timelapse.status !== 'PENDING' && timelapse.status !== 'PROCESSING') return;
+    const status = timelapse?.status;
+    if (!hydrated || !state.accessToken || (status !== 'PENDING' && status !== 'PROCESSING')) return;
     const accessToken = state.accessToken;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      getTimelapse(id, accessToken, controller.signal)
-        .then((data) => {
-          setTimelapse(data);
-          // 완료/실패 알림은 백엔드가 이 시점에 만들어 두므로, 벨 배지도 같이 최신화한다 —
-          // 안 그러면 전역 30초 폴링(store.tsx)이 돌 때까지 뱃지 숫자가 안 늘어난 것처럼 보인다.
-          if (data.status === 'COMPLETED' || data.status === 'FAILED') {
-            void refreshUnreadCount();
-          }
-        })
-        .catch(() => {});
-    }, 3000);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let controller: AbortController | null = null;
+
+    const poll = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        controller = new AbortController();
+        getTimelapse(id, accessToken, controller.signal)
+          .then((data) => {
+            if (cancelled) return;
+            setTimelapse(data);
+            if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+              // 완료/실패 알림은 백엔드가 이 시점에 만들어 두므로, 벨 배지도 같이 최신화한다 —
+              // 안 그러면 전역 30초 폴링(store.tsx)이 돌 때까지 뱃지 숫자가 안 늘어난 것처럼 보인다.
+              void refreshUnreadCount();
+              return;
+            }
+            poll();
+          })
+          .catch((requestError) => {
+            if (cancelled || (requestError instanceof DOMException && requestError.name === 'AbortError')) return;
+            poll();
+          });
+      }, 3000);
+    };
+
+    poll();
 
     return () => {
+      cancelled = true;
       clearTimeout(timer);
-      controller.abort();
+      controller?.abort();
     };
-  }, [hydrated, state.accessToken, id, timelapse, refreshUnreadCount]);
+  }, [hydrated, state.accessToken, id, timelapse?.status, refreshUnreadCount]);
 
   const remove = () => {
     if (!plant || !state.accessToken) return;
