@@ -6,6 +6,7 @@ import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideContent;
+import com.kiwobollae.api.ai.guide.dto.PlantCareGuideInvalidation;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
@@ -56,6 +57,8 @@ public class PlantCareGuideService {
   private final PlantCareGuideCacheWriter cacheWriter;
   private final AiClient aiClient;
   private final AiRequestGuard requestGuard;
+  private final PlantCareGuideGenerationLockStore generationLockStore;
+  private final PlantCareGuideProperties properties;
   private final ObjectMapper objectMapper;
   private final Clock seoulClock;
 
@@ -65,6 +68,8 @@ public class PlantCareGuideService {
       PlantCareGuideCacheWriter cacheWriter,
       AiClient aiClient,
       AiRequestGuard requestGuard,
+      PlantCareGuideGenerationLockStore generationLockStore,
+      PlantCareGuideProperties properties,
       ObjectMapper objectMapper,
       Clock seoulClock) {
     this.plantSpeciesService = plantSpeciesService;
@@ -72,17 +77,58 @@ public class PlantCareGuideService {
     this.cacheWriter = cacheWriter;
     this.aiClient = aiClient;
     this.requestGuard = requestGuard;
+    this.generationLockStore = generationLockStore;
+    this.properties = properties;
     this.objectMapper = objectMapper;
     this.seoulClock = seoulClock;
   }
 
   /** 등록된 종 id로 가이드를 조회한다. 저장본이 없으면 AI를 호출해 생성하고 저장한다. */
   public PlantCareGuide getGuideBySpeciesId(Long userId, Long speciesId) {
+    PlantSpeciesResponse species = requireSpecies(speciesId);
+    return resolveGuide(userId, species.name(), speciesId, species.category(), species.careGuide());
+  }
+
+  /**
+   * [관리자] 해당 종의 저장본을 지운다. AI는 호출하지 않는다.
+   *
+   * <p>생성된 가이드 내용이 부정확할 때 쓴다. 다음 사용자 요청에서 자연히 다시 생성되므로, 지금 당장 새 가이드가 필요한 게 아니라면 재생성보다 이쪽이 싸다 — 아무도
+   * 그 종을 보지 않으면 AI 호출도 일어나지 않는다.
+   */
+  public PlantCareGuideInvalidation invalidateBySpeciesId(Long speciesId) {
+    String speciesName = normalizeSpeciesName(requireSpecies(speciesId).name());
+    long deleted = cacheWriter.deleteAllBySpeciesName(speciesName);
+    log.info("재배 가이드 캐시를 무효화했습니다: species={}, deleted={}", speciesName, deleted);
+    return new PlantCareGuideInvalidation(speciesName, deleted);
+  }
+
+  /**
+   * [관리자] 해당 종의 저장본을 지우고 즉시 새로 생성한다.
+   *
+   * <p>다음 사용자가 낡은 가이드를 보는 일 없이 바로 교체해야 할 때 쓴다. <b>실제 외부 호출이므로 일반 요청과 똑같이 호출 제한을 소모한다</b> — 관리자를 예외로
+   * 두면 비용 상한(전역 한도)이 의미를 잃는다.
+   *
+   * <p>새 응답도 AI가 만든 것이라 이전 것과 마찬가지로 부정확할 수 있다. 이 API는 "고쳐 준다"가 아니라 "다시 뽑는다"까지만 보장한다.
+   */
+  public PlantCareGuide regenerateBySpeciesId(Long adminUserId, Long speciesId) {
+    PlantSpeciesResponse species = requireSpecies(speciesId);
+    String speciesName = normalizeSpeciesName(species.name());
+    long deleted = cacheWriter.deleteAllBySpeciesName(speciesName);
+    log.info("재배 가이드를 강제 재생성합니다: species={}, deleted={}", speciesName, deleted);
+    return generateAndCache(
+        adminUserId,
+        speciesName,
+        speciesId,
+        species.category(),
+        species.careGuide(),
+        sourceContextHash(species.category(), species.careGuide()));
+  }
+
+  private PlantSpeciesResponse requireSpecies(Long speciesId) {
     if (speciesId == null || speciesId < 1) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "식물 종 ID가 필요합니다.");
     }
-    PlantSpeciesResponse species = plantSpeciesService.getSpecies(speciesId);
-    return resolveGuide(userId, species.name(), speciesId, species.category(), species.careGuide());
+    return plantSpeciesService.getSpecies(speciesId);
   }
 
   private PlantCareGuide resolveGuide(
@@ -90,14 +136,63 @@ public class PlantCareGuideService {
     String speciesName = normalizeSpeciesName(rawName);
     String sourceContextHash = sourceContextHash(category, officialGuide);
 
-    Optional<PlantCareGuideCache> cached =
-        cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+    return findCachedGuide(speciesName, sourceContextHash)
+        .orElseGet(
+            () ->
+                generateAndCache(
+                    userId,
+                    speciesName,
+                    sourceSpeciesId,
+                    category,
+                    officialGuide,
+                    sourceContextHash));
+  }
+
+  private PlantCareGuide generateAndCache(
+      Long userId,
+      String speciesName,
+      Long sourceSpeciesId,
+      String category,
+      String officialGuide,
+      String sourceContextHash) {
+    PlantCareGuideGenerationKey key =
+        new PlantCareGuideGenerationKey(
             speciesName, PlantCareGuideSchema.VERSION, sourceContextHash);
-    if (cached.isPresent()) {
-      return PlantCareGuide.of(speciesName, validateGuide(readGuide(cached.get())), true);
+    Optional<PlantCareGuideGenerationLockStore.Lease> lease =
+        generationLockStore.tryAcquire(
+            key, LocalDateTime.now(seoulClock), properties.generationLockLease());
+    if (lease.isEmpty()) {
+      // 소유자가 캐시를 저장하고 lease를 반납하는 바로 그 순간일 수 있으므로 한 번 더 읽는다.
+      // 그래도 없으면 진행 중 요청을 기다리지 않고 409로 끝내 외부 AI 호출을 절대 중복하지 않는다.
+      return findCachedGuide(speciesName, sourceContextHash)
+          .orElseThrow(
+              () ->
+                  new BusinessException(
+                      ErrorCode.COMMON_DATA_CONFLICT, "재배 가이드를 생성하고 있습니다. 잠시 후 다시 시도해 주세요."));
     }
 
-    // 캐시 미스에서만 외부 호출이 일어나므로 이 지점에서만 사용자별·전역 예산을 함께 예약한다.
+    try {
+      // lease 선점 전 캐시 미스를 읽은 뒤 다른 요청이 저장을 끝냈을 수도 있다. 이 재조회가 있어야
+      // lease를 새로 잡은 요청도 불필요한 AI 호출을 하지 않는다.
+      Optional<PlantCareGuide> cached = findCachedGuide(speciesName, sourceContextHash);
+      if (cached.isPresent()) {
+        return cached.get();
+      }
+      return generateAndStore(
+          userId, speciesName, sourceSpeciesId, category, officialGuide, sourceContextHash);
+    } finally {
+      releaseGenerationLease(lease.get());
+    }
+  }
+
+  private PlantCareGuide generateAndStore(
+      Long userId,
+      String speciesName,
+      Long sourceSpeciesId,
+      String category,
+      String officialGuide,
+      String sourceContextHash) {
+    // 저장본을 쓰지 않고 외부 호출이 확정된 지점이므로 여기서만 사용자별·전역 예산을 함께 예약한다.
     requestGuard.checkRateLimit(userId, AiFeature.PLANT_CARE_GUIDE);
 
     AiResponse response = aiClient.generate(buildRequest(speciesName, category, officialGuide));
@@ -121,6 +216,23 @@ public class PlantCareGuideService {
               speciesName, PlantCareGuideSchema.VERSION, sourceContextHash)
           .map(cache -> PlantCareGuide.of(speciesName, validateGuide(readGuide(cache)), true))
           .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_DATA_CONFLICT));
+    }
+  }
+
+  private Optional<PlantCareGuide> findCachedGuide(String speciesName, String sourceContextHash) {
+    return cacheRepository
+        .findBySpeciesNameAndGuideVersionAndSourceContextHash(
+            speciesName, PlantCareGuideSchema.VERSION, sourceContextHash)
+        .map(cache -> PlantCareGuide.of(speciesName, validateGuide(readGuide(cache)), true));
+  }
+
+  private void releaseGenerationLease(PlantCareGuideGenerationLockStore.Lease lease) {
+    try {
+      generationLockStore.release(lease);
+    } catch (RuntimeException exception) {
+      // 저장본은 이미 확정됐을 수 있으므로 release 실패가 성공 응답을 덮어쓰게 하지 않는다. lease가
+      // 만료되면 자동 회수되며, 이 문제는 다음 생성 요청에서만 일시적인 409로 보인다.
+      log.warn("재배 가이드 생성 lease 반납에 실패했습니다: species={}", lease.key().speciesName(), exception);
     }
   }
 

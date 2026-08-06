@@ -8,6 +8,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -17,6 +19,7 @@ import com.kiwobollae.api.ai.client.AiModelRole;
 import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
+import com.kiwobollae.api.ai.guide.dto.PlantCareGuideInvalidation;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
@@ -25,13 +28,16 @@ import com.kiwobollae.api.content.service.PlantSpeciesService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -73,8 +79,30 @@ class PlantCareGuideServiceTest {
   @Mock private PlantCareGuideCacheWriter cacheWriter;
   @Mock private AiClient aiClient;
   @Mock private AiRequestGuard requestGuard;
+  @Mock private PlantCareGuideGenerationLockStore generationLockStore;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+  private final PlantCareGuideProperties properties =
+      new PlantCareGuideProperties(Duration.ofMinutes(1));
+
+  @BeforeEach
+  void acquireGenerationLeaseByDefault() {
+    lenient()
+        .when(
+            generationLockStore.tryAcquire(
+                any(PlantCareGuideGenerationKey.class),
+                any(LocalDateTime.class),
+                any(Duration.class)))
+        .thenAnswer(
+            invocation -> {
+              PlantCareGuideGenerationKey key = invocation.getArgument(0);
+              LocalDateTime now = invocation.getArgument(1);
+              Duration duration = invocation.getArgument(2);
+              return Optional.of(
+                  new PlantCareGuideGenerationLockStore.Lease(
+                      key, now.plus(duration), "test-generation-owner"));
+            });
+  }
 
   private PlantCareGuideService service() {
     return new PlantCareGuideService(
@@ -83,6 +111,8 @@ class PlantCareGuideServiceTest {
         cacheWriter,
         aiClient,
         requestGuard,
+        generationLockStore,
+        properties,
         objectMapper,
         FIXED_KST_CLOCK);
   }
@@ -105,6 +135,7 @@ class PlantCareGuideServiceTest {
     assertThat(guide.pitfalls()).hasSize(2);
     verifyNoInteractions(aiClient);
     verifyNoInteractions(requestGuard);
+    verifyNoInteractions(generationLockStore);
     verify(cacheRepository, never()).save(any());
   }
 
@@ -169,14 +200,14 @@ class PlantCareGuideServiceTest {
     assertThat(guide.speciesName()).isEqualTo("스위트 바질");
   }
 
-  // 같은 종을 동시에 요청하면 둘 다 AI를 부를 수 있다(외부 호출 구간에 락을 걸지 않는 트레이드오프).
-  // 저장본은 하나로 유지되어야 하므로 먼저 저장된 쪽을 정본으로 삼는다.
+  // lease 만료 뒤의 극히 드문 중복 저장도 캐시 유니크 제약으로 안전하게 수습한다.
   @Test
   void fallsBackToExistingRowWhenConcurrentRequestStoredFirst() {
     given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
+        .willReturn(Optional.empty())
         .willReturn(Optional.empty())
         .willReturn(Optional.of(cache("청상추")));
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
@@ -188,6 +219,121 @@ class PlantCareGuideServiceTest {
 
     assertThat(guide.difficulty()).isEqualTo("초급");
     assertThat(guide.cached()).isTrue();
+  }
+
+  @Test
+  void rejectsConcurrentCacheMissWithoutCallingAi() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
+        .willReturn(Optional.empty());
+    given(
+            generationLockStore.tryAcquire(
+                any(PlantCareGuideGenerationKey.class),
+                any(LocalDateTime.class),
+                any(Duration.class)))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception -> {
+              assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_DATA_CONFLICT);
+              assertThat(exception.getMessage()).contains("생성하고 있습니다");
+            });
+
+    verifyNoInteractions(aiClient);
+    verifyNoInteractions(requestGuard);
+    verify(cacheWriter, never()).save(any());
+    verify(generationLockStore, never()).release(any());
+  }
+
+  @Test
+  void servesGuideSavedWhileGenerationLeaseWasAcquired() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
+        .willReturn(Optional.empty())
+        .willReturn(Optional.of(cache("청상추")));
+
+    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+
+    assertThat(guide.cached()).isTrue();
+    verifyNoInteractions(aiClient);
+    verifyNoInteractions(requestGuard);
+    verify(generationLockStore).release(any(PlantCareGuideGenerationLockStore.Lease.class));
+  }
+
+  // 무효화는 저장본만 지운다. 여기서 AI를 부르면 아무도 보지 않는 종까지 비용을 태우게 된다.
+  @Test
+  void invalidateDeletesStoredGuidesWithoutCallingAi() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(cacheWriter.deleteAllBySpeciesName("청상추")).willReturn(2L);
+
+    PlantCareGuideInvalidation result = service().invalidateBySpeciesId(21L);
+
+    assertThat(result.speciesName()).isEqualTo("청상추");
+    assertThat(result.deletedCount()).isEqualTo(2L);
+    verifyNoInteractions(aiClient);
+    verifyNoInteractions(requestGuard);
+  }
+
+  // 지울 게 없어도 오류가 아니다 — 관리자가 이미 비어 있는 종을 지시했을 뿐이다.
+  @Test
+  void invalidateReportsZeroWhenNothingStored() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(cacheWriter.deleteAllBySpeciesName("청상추")).willReturn(0L);
+
+    assertThat(service().invalidateBySpeciesId(21L).deletedCount()).isZero();
+  }
+
+  // 재생성은 반드시 저장본을 먼저 지운다. 안 지우면 유니크 충돌로 옛 가이드가 그대로 돌아온다.
+  @Test
+  void regenerateDeletesStoredGuideThenGeneratesFreshOne() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
+
+    PlantCareGuide guide = service().regenerateBySpeciesId(9L, 21L);
+
+    assertThat(guide.cached()).isFalse();
+    assertThat(guide.speciesName()).isEqualTo("청상추");
+
+    InOrder inOrder = inOrder(cacheWriter, aiClient);
+    inOrder.verify(cacheWriter).deleteAllBySpeciesName("청상추");
+    inOrder.verify(aiClient).generate(any(AiRequest.class));
+    inOrder.verify(cacheWriter).save(any(PlantCareGuideCache.class));
+    // 선점 뒤의 재조회로, 관리자와 일반 사용자가 경쟁해도 중복 외부 호출을 막는다.
+    verify(cacheRepository)
+        .findBySpeciesNameAndGuideVersionAndSourceContextHash(anyString(), anyInt(), anyString());
+  }
+
+  // 관리자를 한도 밖에 두면 전역 호출 상한이 실제 비용 상한 역할을 못 한다.
+  @Test
+  void regenerateConsumesRateLimitLikeAnyOtherCall() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
+
+    service().regenerateBySpeciesId(9L, 21L);
+
+    verify(requestGuard).checkRateLimit(9L, AiFeature.PLANT_CARE_GUIDE);
+  }
+
+  @Test
+  void rejectsInvalidSpeciesIdForAdminOperations() {
+    assertThatThrownBy(() -> service().invalidateBySpeciesId(0L))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+    assertThatThrownBy(() -> service().regenerateBySpeciesId(9L, null))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+    verifyNoInteractions(cacheWriter);
+    verifyNoInteractions(aiClient);
   }
 
   @Test

@@ -1,6 +1,7 @@
 package com.kiwobollae.api.ai.guide;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -15,9 +16,11 @@ import com.kiwobollae.api.content.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.content.service.PlantSpeciesService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
@@ -107,12 +110,26 @@ class PlantCareGuideSmokeTest {
                 LocalDateTime.now(KST)));
 
     // 저장소는 stub 없이 두면 Mockito가 Optional.empty()를 돌려주므로 항상 캐시 미스가 된다.
+    PlantCareGuideGenerationLockStore generationLockStore =
+        mock(PlantCareGuideGenerationLockStore.class);
+    given(generationLockStore.tryAcquire(any(), any(), any()))
+        .willAnswer(
+            invocation -> {
+              PlantCareGuideGenerationKey key = invocation.getArgument(0);
+              LocalDateTime now = invocation.getArgument(1);
+              Duration duration = invocation.getArgument(2);
+              return Optional.of(
+                  new PlantCareGuideGenerationLockStore.Lease(
+                      key, now.plus(duration), "smoke-test-generation-owner"));
+            });
     return new PlantCareGuideService(
         plantSpeciesService,
         mock(PlantCareGuideCacheRepository.class),
         mock(PlantCareGuideCacheWriter.class),
         client,
         mock(AiRequestGuard.class),
+        generationLockStore,
+        new PlantCareGuideProperties(Duration.ofMinutes(1)),
         new ObjectMapper(),
         Clock.fixed(Instant.parse("2026-08-05T01:00:00Z"), KST));
   }
