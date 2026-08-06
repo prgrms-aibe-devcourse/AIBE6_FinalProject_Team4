@@ -97,7 +97,7 @@ public class PlantCareGuideService {
       return PlantCareGuide.of(speciesName, validateGuide(readGuide(cached.get())), true);
     }
 
-    // 캐시 미스에서만 외부 호출이 일어나므로 이 지점에서만 제한을 센다.
+    // 캐시 미스에서만 외부 호출이 일어나므로 이 지점에서만 사용자별·전역 예산을 함께 예약한다.
     requestGuard.checkRateLimit(userId, AiFeature.PLANT_CARE_GUIDE);
 
     AiResponse response = aiClient.generate(buildRequest(speciesName, category, officialGuide));

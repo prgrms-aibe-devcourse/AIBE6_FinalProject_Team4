@@ -44,9 +44,12 @@ class AiRateLimitStoreMySqlIntegrationTest {
 
   @Autowired private AiRateLimitWindowRepository repository;
 
+  @Autowired private AiGlobalRateLimitWindowRepository globalRepository;
+
   @BeforeEach
   void resetWindows() {
     repository.deleteAllInBatch();
+    globalRepository.deleteAllInBatch();
   }
 
   @Test
@@ -67,6 +70,81 @@ class AiRateLimitStoreMySqlIntegrationTest {
     assertThat(consume(1L, AiFeature.JOURNAL_GUIDE, NOW)).isEmpty();
     assertThat(consume(2L, AiFeature.PLANT_CHAT, NOW)).isEmpty();
     assertThat(consume(1L, AiFeature.PLANT_CHAT, NOW)).isPresent();
+  }
+
+  @Test
+  void enforcesGlobalLimitAcrossUsersAndFeatures() {
+    assertThat(consume(1L, AiFeature.PLANT_CHAT, NOW, 2)).isEmpty();
+    assertThat(consume(2L, AiFeature.JOURNAL_GUIDE, NOW, 2)).isEmpty();
+
+    // 사용자와 기능을 바꿔도 전역 예산은 하나다. 이 요청의 사용자별 카운터 증가는 트랜잭션
+    // 롤백으로 남지 않아, 전역 예산이 다시 열렸을 때 정상적으로 첫 호출을 할 수 있다.
+    assertThat(consume(3L, AiFeature.JOURNAL_IMAGE_ANALYSIS, NOW, 2)).contains(60L);
+    assertThat(globalRepository.findById(AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID))
+        .get()
+        .satisfies(window -> assertThat(window.getConsumed()).isEqualTo(2));
+    assertThat(repository.findByUserIdAndFeature(3L, AiFeature.JOURNAL_IMAGE_ANALYSIS)).isEmpty();
+  }
+
+  @Test
+  void enforcesGlobalLimitAtomicallyForConcurrentUsers() throws Exception {
+    int threads = 20;
+    int globalLimit = 5;
+    AiRequestGuard guard =
+        new AiRequestGuard(
+            new AiPolicyProperties(
+                2000,
+                new AiPolicyProperties.RateLimit(100, WINDOW),
+                new AiPolicyProperties.RateLimit(globalLimit, WINDOW)),
+            rateLimitStore,
+            Clock.fixed(NOW.atZone(KST).toInstant(), KST));
+
+    CountDownLatch ready = new CountDownLatch(threads);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    List<Callable<Boolean>> calls =
+        IntStream.range(0, threads)
+            .mapToObj(
+                index ->
+                    (Callable<Boolean>)
+                        () -> {
+                          ready.countDown();
+                          start.await(WAIT_SECONDS, TimeUnit.SECONDS);
+                          try {
+                            guard.checkRateLimit((long) index + 1, AiFeature.PLANT_CARE_GUIDE);
+                            return true;
+                          } catch (BusinessException exception) {
+                            return false;
+                          }
+                        })
+            .toList();
+    List<Future<Boolean>> futures = calls.stream().map(executor::submit).toList();
+
+    try {
+      assertThat(ready.await(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+
+      long allowed = 0;
+      List<Throwable> failures = new ArrayList<>();
+      for (Future<Boolean> future : futures) {
+        try {
+          if (future.get(WAIT_SECONDS, TimeUnit.SECONDS)) {
+            allowed++;
+          }
+        } catch (ExecutionException exception) {
+          failures.add(exception.getCause());
+        }
+      }
+
+      assertThat(failures).isEmpty();
+      assertThat(allowed).isEqualTo(globalLimit);
+      assertThat(globalRepository.findById(AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID))
+          .get()
+          .satisfies(window -> assertThat(window.getConsumed()).isEqualTo(globalLimit));
+    } finally {
+      executor.shutdown();
+      assertThat(executor.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+    }
   }
 
   @Test
@@ -109,7 +187,7 @@ class AiRateLimitStoreMySqlIntegrationTest {
   void enforcesLimitAtomicallyForConcurrentRequests() throws Exception {
     int threads = 20;
     int limit = 5;
-    rateLimitStore.consume(1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit);
+    rateLimitStore.consume(1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit, WINDOW, 100);
 
     CountDownLatch ready = new CountDownLatch(threads);
     CountDownLatch start = new CountDownLatch(1);
@@ -123,9 +201,13 @@ class AiRateLimitStoreMySqlIntegrationTest {
                         () -> {
                           ready.countDown();
                           start.await(WAIT_SECONDS, TimeUnit.SECONDS);
-                          return rateLimitStore
-                              .consume(1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit)
-                              .isEmpty();
+                          try {
+                            rateLimitStore.consume(
+                                1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit, WINDOW, 100);
+                            return true;
+                          } catch (AiQuotaExceededException exception) {
+                            return false;
+                          }
                         })
             .toList();
 
@@ -168,7 +250,10 @@ class AiRateLimitStoreMySqlIntegrationTest {
     int limit = 5;
     AiRequestGuard guard =
         new AiRequestGuard(
-            new AiPolicyProperties(2000, new AiPolicyProperties.RateLimit(limit, WINDOW)),
+            new AiPolicyProperties(
+                2000,
+                new AiPolicyProperties.RateLimit(limit, WINDOW),
+                new AiPolicyProperties.RateLimit(100, WINDOW)),
             rateLimitStore,
             Clock.fixed(NOW.atZone(KST).toInstant(), KST));
 
@@ -219,6 +304,16 @@ class AiRateLimitStoreMySqlIntegrationTest {
   }
 
   private Optional<Long> consume(Long userId, AiFeature feature, LocalDateTime now) {
-    return rateLimitStore.consume(userId, feature, now, WINDOW, 2);
+    return consume(userId, feature, now, 100);
+  }
+
+  private Optional<Long> consume(
+      Long userId, AiFeature feature, LocalDateTime now, int globalMaxRequests) {
+    try {
+      rateLimitStore.consume(userId, feature, now, WINDOW, 2, WINDOW, globalMaxRequests);
+      return Optional.empty();
+    } catch (AiQuotaExceededException exception) {
+      return Optional.of(exception.retryAfterSeconds());
+    }
   }
 }
