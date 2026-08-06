@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.global.common.ApiVersion;
+import java.io.ByteArrayOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +22,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @ExtendWith(MockitoExtension.class)
 class PlantTimelapseVideoStorageServiceTest {
@@ -55,8 +57,14 @@ class PlantTimelapseVideoStorageServiceTest {
 				req.key().equals("plant_profile_timelapse/7/old-uuid.mp4")));
 	}
 
+	private static byte[] writeBody(org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody body) throws Exception {
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		body.writeTo(out);
+		return out.toByteArray();
+	}
+
 	@Test
-	void downloadReturnsVideoBytesWithMp4ContentType() {
+	void downloadReturnsVideoBytesWithMp4ContentType() throws Exception {
 		byte[] content = "video-bytes".getBytes();
 		GetObjectResponse response = GetObjectResponse.builder().build();
 		given(s3Client.getObject(any(GetObjectRequest.class)))
@@ -65,13 +73,13 @@ class PlantTimelapseVideoStorageServiceTest {
 		var result = videoStorageService.download(7L, "abc.mp4", null);
 
 		assertThat(result.getStatusCode().value()).isEqualTo(200);
-		assertThat(result.getBody()).isEqualTo(content);
+		assertThat(writeBody(result.getBody())).isEqualTo(content);
 		assertThat(result.getHeaders().getContentType().toString()).isEqualTo("video/mp4");
 		assertThat(result.getHeaders().getFirst("Accept-Ranges")).isEqualTo("bytes");
 	}
 
 	@Test
-	void downloadWithRangeHeaderForwardsRangeToS3AndReturnsPartialContent() {
+	void downloadWithRangeHeaderForwardsRangeToS3AndReturnsPartialContent() throws Exception {
 		byte[] chunk = "chunk".getBytes();
 		GetObjectResponse response = GetObjectResponse.builder().contentRange("bytes 0-4/11").build();
 		given(s3Client.getObject(argThat((GetObjectRequest req) -> "bytes=0-4".equals(req.range()))))
@@ -80,7 +88,30 @@ class PlantTimelapseVideoStorageServiceTest {
 		var result = videoStorageService.download(7L, "abc.mp4", "bytes=0-4");
 
 		assertThat(result.getStatusCode().value()).isEqualTo(206);
-		assertThat(result.getBody()).isEqualTo(chunk);
+		assertThat(writeBody(result.getBody())).isEqualTo(chunk);
 		assertThat(result.getHeaders().getFirst("Content-Range")).isEqualTo("bytes 0-4/11");
+	}
+
+	@Test
+	void downloadWithMultiRangeHeaderIgnoresRangeAndServesFullContent() throws Exception {
+		byte[] content = "video-bytes".getBytes();
+		GetObjectResponse response = GetObjectResponse.builder().build();
+		given(s3Client.getObject(argThat((GetObjectRequest req) -> req.range() == null)))
+				.willReturn(new ResponseInputStream<>(response, AbortableInputStream.create(new java.io.ByteArrayInputStream(content))));
+
+		var result = videoStorageService.download(7L, "abc.mp4", "bytes=0-0,100-200");
+
+		assertThat(result.getStatusCode().value()).isEqualTo(200);
+		assertThat(writeBody(result.getBody())).isEqualTo(content);
+	}
+
+	@Test
+	void downloadWithOutOfRangeHeaderReturns416() {
+		given(s3Client.getObject(any(GetObjectRequest.class)))
+				.willThrow((S3Exception) S3Exception.builder().statusCode(416).build());
+
+		var result = videoStorageService.download(7L, "abc.mp4", "bytes=999999-9999999");
+
+		assertThat(result.getStatusCode().value()).isEqualTo(416);
 	}
 }

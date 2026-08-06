@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,8 +33,18 @@ class PlantTimelapseTransactionServiceTest {
 	@Mock private FfmpegTimelapseEncoder encoder;
 	@Mock private NotificationService notificationService;
 
-	@InjectMocks
+	// 테스트에서는 실제 스레드풀 대신 호출한 스레드에서 바로 실행하는 executor를 쓴다 — 병렬 실행
+	// 자체를 검증하는 게 목적이 아니라 join() 이후 결과 조립 로직이 맞는지가 중요하기 때문.
+	private final java.util.concurrent.Executor downloadExecutor = Runnable::run;
+
 	private PlantTimelapseTransactionService transactionService;
+
+	@org.junit.jupiter.api.BeforeEach
+	void setUp() {
+		transactionService = new PlantTimelapseTransactionService(
+				plantTimelapseRepository, journalImageRepository, journalImageUploadService,
+				videoStorageService, encoder, notificationService, downloadExecutor);
+	}
 
 	@Test
 	void claimReturnsFalseWhenNoRowClaimed() {

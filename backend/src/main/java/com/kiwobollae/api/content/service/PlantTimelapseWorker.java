@@ -26,7 +26,8 @@ public class PlantTimelapseWorker {
 
 	// fail() 자체가 실패하면(그 사이 프로필/행이 삭제됐거나 DB 오류 등) 이 예외가 그대로 새어나가
 	// @Async 메서드 밖에서 조용히 사라지고, 행은 PROCESSING에 영구히 남아 재요청도 막힌다
-	// (TIMELAPSE_ALREADY_PROCESSING). 자동 복구는 범위 밖(functional-spec §8)이라 여기서는
+	// (TIMELAPSE_ALREADY_PROCESSING). 자동 복구는 범위 밖v
+	// functional-spec §8)이라 여기서는
 	// 최소한 로그로 남겨 운영에서 인지·수동 개입할 수 있게 한다.
 	private void markFailed(Long profileId, String reason) {
 		try {
