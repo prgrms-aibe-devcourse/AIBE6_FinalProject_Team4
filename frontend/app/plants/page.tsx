@@ -9,6 +9,7 @@ import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStat
 import { getProfileIdsWrittenToday } from '@/lib/journal-api';
 import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const BULK_STATUS_OPTIONS: [PlantStatus, string][] = [['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
@@ -141,6 +142,7 @@ export default function PlantsPage() {
   }, [filter, writtenTodayFilterActive, plants, todayWrittenIds]);
   const regV = nickValid(reg.nick);
   const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
+  const selectedSpecies = speciesList.find((sp) => sp.id === reg.speciesId) || null;
 
   const handleSpeciesQueryChange = (value: string) => {
     setQuery(value);
@@ -507,6 +509,19 @@ export default function PlantsPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* 등록 전에 "이 종을 내가 키울 수 있나"를 확인할 수 있는 자리 — 가이드 요청은 AI 호출이라
+                자동으로 부르지 않고, 종을 고른 뒤 사용자가 버튼을 눌렀을 때만 나간다. */}
+            {selectedSpecies && (
+              <div className="mb-[18px]">
+                <PlantCareGuidePanel
+                  speciesId={selectedSpecies.id}
+                  speciesName={selectedSpecies.name}
+                  accessToken={state.accessToken}
+                  variant="inline"
+                />
               </div>
             )}
 
