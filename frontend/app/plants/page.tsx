@@ -6,8 +6,10 @@ import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, uploadPlantImage } from '@/lib/plant-api';
+import { getJournals } from '@/lib/journal-api';
 import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import { localToday } from '@/lib/format';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -40,6 +42,7 @@ export default function PlantsPage() {
   const [reg, setReg] = useState<{ nick: string; speciesId: number | null; photoIdx: number; startDate: string }>({
     nick: '', speciesId: null, photoIdx: 0, startDate: today(),
   });
+  const [todayWrittenIds, setTodayWrittenIds] = useState<Set<number>>(new Set());
   const [query, setQuery] = useState('');
   const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -91,6 +94,25 @@ export default function PlantsPage() {
       })
       .finally(() => {
         if (!controller.signal.aborted) setSpeciesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken]);
+
+  useEffect(() => {
+    if (!hydrated || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+    const now = new Date();
+
+    getJournals({ year: now.getFullYear(), month: now.getMonth() + 1, size: 200 }, accessToken, controller.signal)
+      .then((data) => {
+        const today = localToday();
+        setTodayWrittenIds(new Set(data.content.filter((j) => j.writtenDate === today).map((j) => j.plantProfileId)));
+      })
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setTodayWrittenIds(new Set());
       });
 
     return () => controller.abort();
