@@ -26,8 +26,10 @@ const ENVIRONMENT_ROWS: { key: keyof PlantCareGuideData['environment']; label: s
 
 // 서버 메시지는 이미 사용자용 한국어라 그대로 쓰고(lib/api.ts 주석 참고), 여기서는 "그래서 어떻게
 // 하면 되는지"만 덧붙인다. 429·409는 재시도로 풀리는 상황이라 안내가 특히 중요하다.
+// 서버 메시지에 이미 있는 말("잠시 후 다시 시도해 주세요")은 반복하지 않는다 — 두 줄이 나란히
+// 뜨는 자리라 같은 말을 두 번 하면 힌트가 정보가 아니라 잡음이 된다.
 const ERROR_HINTS: Record<string, string> = {
-  COMMON_DATA_CONFLICT: '다른 요청이 같은 종의 가이드를 만들고 있어요. 잠시 후 다시 시도하면 완성된 가이드를 바로 볼 수 있어요.',
+  COMMON_DATA_CONFLICT: '먼저 시작된 생성이 끝나면 저장된 가이드가 바로 나와요.',
   COMMON_RATE_LIMITED: 'AI 호출 횟수 제한에 걸렸어요. 잠시 뒤에 다시 시도해 주세요.',
   AI_REQUEST_TIMEOUT: '생성이 예상보다 오래 걸리고 있어요. 다시 시도해 주세요.',
   AI_PROVIDER_UNAVAILABLE: 'AI 서비스가 일시적으로 불안정해요. 잠시 뒤에 다시 시도해 주세요.',

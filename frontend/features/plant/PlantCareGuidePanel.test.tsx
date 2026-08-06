@@ -187,7 +187,11 @@ describe('PlantCareGuidePanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: '재배 가이드 보기' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('재배 가이드를 생성하고 있습니다.');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('재배 가이드를 생성하고 있습니다.');
+    // 서버 메시지가 이미 "잠시 후 다시 시도"라고 하므로 힌트는 그 말을 되풀이하지 않는다.
+    expect(alert).toHaveTextContent('먼저 시작된 생성이 끝나면 저장된 가이드가 바로 나와요.');
+    expect(alert.textContent?.match(/다시 시도/g) ?? []).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
 
