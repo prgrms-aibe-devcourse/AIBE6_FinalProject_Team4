@@ -3,7 +3,6 @@ package com.kiwobollae.api.ai.guide;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
@@ -67,9 +66,12 @@ public class PlantCareGuideCache extends BaseEntity {
    *
    * <p>가이드는 읽기 전용 문서라 컬럼으로 쪼갤 이유가 없다. 통째로 저장하면 응답 스키마가 바뀌어도 테이블 구조는 그대로 두고 guide_version만 올리면 되고,
    * 원본 종 정보가 바뀌면 source_context_hash가 기존 저장본을 무효화한다.
+   *
+   * <p><b>{@code @Lob}을 쓰지 않고 컬럼 타입을 직접 못 박는다.</b> Hibernate 6에서 {@code @Lob} + String은 MySQL에서
+   * {@code tinytext}(255바이트)로 생성돼, 한국어 가이드 JSON(수 KB)이 들어가지 못하고 매번 "Data too long"으로 저장이 실패했다. 캐시가
+   * 통째로 동작하지 않아 요청마다 AI를 새로 부르는 상태였다.
    */
-  @Lob
-  @Column(name = "guide_json", nullable = false)
+  @Column(name = "guide_json", nullable = false, columnDefinition = "longtext")
   private String guideJson;
 
   @Column(name = "created_at", nullable = false, updatable = false)
