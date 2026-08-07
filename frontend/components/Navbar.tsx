@@ -35,6 +35,7 @@ const NAV = [
   { key: 'shop', label: '상점', href: '/shop' },
   { key: 'cards', label: '쿠폰', href: '/cards' },
   { key: 'gacha', label: '가챠', href: '/gacha' },
+  { key: 'market', label: '거래소', href: '/card-market' },
 ];
 
 // 모바일 하단 탭은 식물/일지를 "식물" 하나로 합치고 쿠폰과 가챠를 각각 바로 접근하게 한다.
@@ -52,6 +53,7 @@ function activeKey(pathname: string) {
   if (pathname.startsWith('/plants')) return 'plants';
   if (pathname.startsWith('/journals')) return 'journal';
   if (pathname.startsWith('/cards')) return 'cards';
+  if (pathname.startsWith('/card-market')) return 'market';
   if (pathname.startsWith('/gacha')) return 'gacha';
   if (pathname.startsWith('/shop')) return 'shop';
   if (pathname.startsWith('/my')) return 'account';
