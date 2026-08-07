@@ -14,6 +14,7 @@ import {
   GachaDrawPage,
   GachaRateData,
   GachaRarity,
+  GACHA_COLLECTION_CHANGED_EVENT,
   getGachaCatalog,
   getGachaDraws,
   getGachaRates,
@@ -209,6 +210,22 @@ export default function GachaPage({
     };
   }, [hydrated, refreshOwnedState, state.accessToken]);
 
+  useEffect(() => {
+    if (!state.accessToken) return;
+    const refreshAfterTestGrant = () => {
+      void refreshCollection().catch(() => undefined);
+    };
+    window.addEventListener(
+      GACHA_COLLECTION_CHANGED_EVENT,
+      refreshAfterTestGrant,
+    );
+    return () =>
+      window.removeEventListener(
+        GACHA_COLLECTION_CHANGED_EVENT,
+        refreshAfterTestGrant,
+      );
+  }, [refreshCollection, state.accessToken]);
+
   const hasProcessingDraw =
     history?.content.some((draw) =>
       ["PENDING", "PROCESSING", "RETRYABLE_FAILED"].includes(draw.status),
@@ -347,7 +364,10 @@ export default function GachaPage({
                 : "text-sub disabled:cursor-not-allowed disabled:opacity-35"
             }`}
           >
-            <span className="material-symbols-outlined text-[19px]">
+            <span
+              aria-hidden="true"
+              className="material-symbols-outlined text-[19px]"
+            >
               {icon}
             </span>
             {label}

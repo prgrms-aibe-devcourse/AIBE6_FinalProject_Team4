@@ -110,6 +110,9 @@ describe("GachaPage", () => {
     ).not.toBeInTheDocument();
     expect(mockedCollection).not.toHaveBeenCalled();
     expect(mockedDraws).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("link", { name: /카드 거래소/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("보유 카드 갤러리에서 원본 일러스트를 확대한다", async () => {
