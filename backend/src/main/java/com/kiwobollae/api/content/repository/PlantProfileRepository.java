@@ -1,9 +1,12 @@
 package com.kiwobollae.api.content.repository;
 
 import com.kiwobollae.api.content.entity.PlantProfile;
+import com.kiwobollae.api.content.entity.enums.PlantStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +17,13 @@ public interface PlantProfileRepository extends JpaRepository<PlantProfile, Long
 	@Query("select p from PlantProfile p join fetch p.species "
 			+ "where p.user.id = :userId order by p.createdAt desc")
 	List<PlantProfile> findAllByUserId(@Param("userId") Long userId);
+
+	@Query(value = "select p from PlantProfile p join fetch p.species "
+			+ "where p.user.id = :userId and (:status is null or p.status = :status)",
+			countQuery = "select count(p) from PlantProfile p "
+			+ "where p.user.id = :userId and (:status is null or p.status = :status)")
+	Page<PlantProfile> findAllByUserIdAndStatus(@Param("userId") Long userId,
+			@Param("status") PlantStatus status, Pageable pageable);
 
 	@Query("select p from PlantProfile p join fetch p.species "
 			+ "where p.id = :id and p.user.id = :userId")

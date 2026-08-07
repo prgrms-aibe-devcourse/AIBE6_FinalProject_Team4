@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.content.dto.request.PlantProfileUpdateRequest;
+import com.kiwobollae.api.content.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
@@ -16,6 +17,8 @@ import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
 import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.content.repository.PlantTimelapseRepository;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +27,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -149,6 +156,33 @@ class PlantProfileServiceTest {
 		plantProfileService.updateProfile(7L, 21L, request);
 
 		verify(plantImageUploadService, never()).delete(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong());
+	}
+
+	// ---- getMyProfiles ----
+
+	@Test
+	void getMyProfilesMapsRepositoryPageWhenStatusIsNull() {
+		Pageable pageable = PageRequest.of(0, 20);
+		PlantProfile profile = profile(21L, user(7L), "emoji:🌱");
+		given(plantProfileRepository.findAllByUserIdAndStatus(7L, null, pageable))
+				.willReturn(new PageImpl<>(List.of(profile)));
+
+		Page<PlantProfileResponse> result = plantProfileService.getMyProfiles(7L, null, pageable);
+
+		assertThat(result.getContent()).hasSize(1);
+		assertThat(result.getContent().get(0).id()).isEqualTo(21L);
+	}
+
+	@Test
+	void getMyProfilesFiltersByStatus() {
+		Pageable pageable = PageRequest.of(0, 20);
+		given(plantProfileRepository.findAllByUserIdAndStatus(7L, PlantStatus.HARVESTED, pageable))
+				.willReturn(new PageImpl<>(List.of()));
+
+		Page<PlantProfileResponse> result = plantProfileService.getMyProfiles(7L, PlantStatus.HARVESTED, pageable);
+
+		assertThat(result.getContent()).isEmpty();
+		verify(plantProfileRepository).findAllByUserIdAndStatus(7L, PlantStatus.HARVESTED, pageable);
 	}
 
 	private User user(Long id) {

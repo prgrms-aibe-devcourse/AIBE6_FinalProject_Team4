@@ -8,6 +8,7 @@ import com.kiwobollae.api.content.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.content.entity.JournalImage;
 import com.kiwobollae.api.content.entity.PlantProfile;
 import com.kiwobollae.api.content.entity.PlantSpecies;
+import com.kiwobollae.api.content.entity.enums.PlantStatus;
 import com.kiwobollae.api.content.repository.JournalImageRepository;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.repository.PlantProfileRepository;
@@ -17,6 +18,8 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,10 +52,9 @@ public class PlantProfileService {
 		return PlantProfileResponse.from(saved);
 	}
 
-	public List<PlantProfileResponse> getMyProfiles(Long userId) {
-		return plantProfileRepository.findAllByUserId(userId).stream()
-				.map(PlantProfileResponse::from)
-				.toList();
+	public Page<PlantProfileResponse> getMyProfiles(Long userId, PlantStatus status, Pageable pageable) {
+		return plantProfileRepository.findAllByUserIdAndStatus(userId, status, pageable)
+				.map(PlantProfileResponse::from);
 	}
 
 	public PlantProfileResponse getProfile(Long userId, Long profileId) {
