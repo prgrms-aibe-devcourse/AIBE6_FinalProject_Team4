@@ -53,8 +53,8 @@ function NewJournalInner() {
     const controller = new AbortController();
     setPlantsLoading(true);
 
-    getMyPlants(accessToken, controller.signal)
-      .then((data) => setPlants(data))
+    getMyPlants({ accessToken, size: 100, signal: controller.signal })
+      .then((data) => setPlants(data.content))
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setPlants([]);

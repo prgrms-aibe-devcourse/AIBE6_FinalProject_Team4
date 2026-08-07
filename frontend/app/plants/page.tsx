@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
@@ -31,6 +31,8 @@ export default function PlantsPage() {
   const { state, hydrated, set } = useStore();
   const { showToast, askConfirm } = useUI();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
@@ -53,18 +55,27 @@ export default function PlantsPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!hydrated || !state.accessToken) return;
+  const writtenTodayFilterActive = writtenTodayOnly && !todayWrittenError;
+
+  const loadPlants = useCallback(() => {
+    if (!hydrated || !state.accessToken) return () => {};
     const accessToken = state.accessToken;
     const controller = new AbortController();
     setLoading(true);
     setError('');
 
-    getMyPlants(accessToken, controller.signal)
-      .then((data) => setPlants(data))
+    // "오늘 일지 안 쓴 것만 보기"는 항상 GROWING만 대상으로 하므로 그 상태를 서버 필터로 요청한다.
+    const status = writtenTodayFilterActive ? 'GROWING' : filter === 'all' ? undefined : (filter as PlantStatus);
+
+    getMyPlants({ accessToken, status, page, signal: controller.signal })
+      .then((data) => {
+        setPlants(data.content);
+        setTotalPages(data.totalPages);
+      })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setPlants([]);
+        setTotalPages(0);
         setError(
           requestError instanceof ApiError
             ? requestError.message
@@ -76,7 +87,9 @@ export default function PlantsPage() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+  }, [hydrated, state.accessToken, filter, writtenTodayFilterActive, page]);
+
+  useEffect(() => loadPlants(), [loadPlants]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -121,24 +134,23 @@ export default function PlantsPage() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  const writtenTodayFilterActive = writtenTodayOnly && !todayWrittenError;
+  // status 필터는 이제 서버에 요청하므로 plants는 이미 필터링된 현재 페이지 결과다.
+  // "오늘 일지 안 쓴 것만 보기"만 그 위에 클라이언트에서 한 번 더 좁힌다(현재 페이지 범위 내에서).
   const list = writtenTodayFilterActive
-    ? plants.filter((p) => p.status === 'GROWING' && !todayWrittenIds.has(p.id))
-    : plants.filter((p) => filter === 'all' || p.status === filter);
+    ? plants.filter((p) => !todayWrittenIds.has(p.id))
+    : plants;
 
   // 필터로 화면에서 사라진 식물이 선택 상태로 계속 남아, 안 보이는 항목까지 일괄 변경 대상이
   // 되는 걸 막는다 — 보이는 목록(list)이 바뀌면 선택도 그 목록 기준으로 다시 걸러준다.
   useEffect(() => {
     const visibleIds = new Set(
-      plants
-        .filter((p) => (writtenTodayFilterActive ? p.status === 'GROWING' && !todayWrittenIds.has(p.id) : filter === 'all' || p.status === filter))
-        .map((p) => p.id),
+      (writtenTodayFilterActive ? plants.filter((p) => !todayWrittenIds.has(p.id)) : plants).map((p) => p.id),
     );
     setSelectedIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIds.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [filter, writtenTodayFilterActive, plants, todayWrittenIds]);
+  }, [writtenTodayFilterActive, plants, todayWrittenIds]);
   const regV = nickValid(reg.nick);
   const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
 
@@ -178,8 +190,10 @@ export default function PlantsPage() {
           if (result.status === 'fulfilled') succeededIds.add(targetIds[i]);
           else failCount += 1;
         });
+        // 상태 필터가 서버 쪽으로 넘어갔으므로, 현재 필터에 더 이상 맞지 않는 항목은
+        // 재조회해야 화면에서 사라진다 — 로컬 상태만 바꿔서는 부정확하다.
         if (succeededIds.size > 0) {
-          setPlants((prev) => prev.map((p) => (succeededIds.has(p.id) ? { ...p, status } : p)));
+          loadPlants();
         }
         showToast(
           failCount === 0
@@ -271,7 +285,13 @@ export default function PlantsPage() {
         }
         throw createError;
       }
-      setPlants([created, ...plants]);
+      // 새 식물은 항상 GROWING으로 생성되므로, 다른 상태 필터를 보고 있었다면 새로 생긴
+      // 식물이 안 보일 수 있다 — 전체 필터·첫 페이지로 돌아가 방금 등록한 걸 바로 보여준다.
+      const alreadyAtDefaultView = filter === 'all' && !writtenTodayOnly && page === 0;
+      setFilter('all');
+      setWrittenTodayOnly(false);
+      setPage(0);
+      if (alreadyAtDefaultView) loadPlants();
       set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
       setOpen(false);
       resetRegisterForm();
@@ -303,6 +323,7 @@ export default function PlantsPage() {
                 // 필터는 해제한다.
                 setFilter(k);
                 setWrittenTodayOnly(false);
+                setPage(0);
               }}
               className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2 text-sm font-bold ${
                 filter === k ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
@@ -342,6 +363,7 @@ export default function PlantsPage() {
               // 실제로 뭘 보고 있는지 헷갈린다 — 필터를 켜는 순간 상태 pill도 '전체'로 맞춘다.
               setWrittenTodayOnly(e.target.checked);
               if (e.target.checked) setFilter('all');
+              setPage(0);
             }}
             className="h-4 w-4 accent-brand"
           />
@@ -414,6 +436,30 @@ export default function PlantsPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {!loading && !error && !writtenTodayFilterActive && totalPages > 1 && (
+        <div className="mt-7 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            className="cursor-pointer rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            이전
+          </button>
+          <span className="text-sm font-bold text-sub">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page + 1 >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+            className="cursor-pointer rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            다음
+          </button>
         </div>
       )}
 
