@@ -11,6 +11,7 @@ import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJ
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { getTimelapse, requestTimelapse, PlantTimelapseData } from '@/lib/timelapse-api';
 import { nickValid } from '@/lib/plant-validation';
+import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -34,7 +35,6 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   const [plant, setPlant] = useState<PlantProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [careOpen, setCareOpen] = useState(true);
   const [statusOpen, setStatusOpen] = useState(false);
   const [editNick, setEditNick] = useState('');
   const [editStatus, setEditStatus] = useState<PlantStatus>('GROWING');
@@ -362,6 +362,12 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           </div>
         </div>
       </div>
+
+      <PlantCareGuidePanel
+        speciesId={plant.speciesId}
+        speciesName={plant.speciesName}
+        accessToken={state.accessToken}
+      />
 
       {plant.status !== 'GROWING' && timelapse && (
         <div className="mt-7 rounded-2xl bg-white p-5 shadow-card">
