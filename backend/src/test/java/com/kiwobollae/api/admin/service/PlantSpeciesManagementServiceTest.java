@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
-import com.kiwobollae.api.content.dto.request.PlantSpeciesRequest;
-import com.kiwobollae.api.content.dto.response.PlantSpeciesResponse;
-import com.kiwobollae.api.content.entity.PlantSpecies;
-import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
+import com.kiwobollae.api.species.dto.request.PlantSpeciesRequest;
+import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
+import com.kiwobollae.api.species.entity.PlantSpecies;
+import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

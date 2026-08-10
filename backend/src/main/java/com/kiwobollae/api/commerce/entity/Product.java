@@ -2,7 +2,7 @@ package com.kiwobollae.api.commerce.entity;
 
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
-import com.kiwobollae.api.content.entity.PlantSpecies;
+import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
