@@ -385,6 +385,15 @@ export default function PlantsPage() {
           <div className="animate-floaty text-[70px]">🌿</div>
           <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">오늘 일지 안 쓴 식물이 없어요 🌿</p>
         </div>
+      ) : list.length === 0 && filter !== 'all' ? (
+        // 진짜로 식물이 하나도 없는 것과, 상태 필터에 맞는 게 지금 없는 것은 다른 상황이다 —
+        // 후자는 "등록하기" 유도가 아니라 필터에 걸린 것뿐이라는 걸 알려줘야 한다.
+        <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
+          <div className="animate-floaty text-[70px]">🌱</div>
+          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
+            {FILTERS.find(([key]) => key === filter)?.[1]} 상태의 식물이 없어요.
+          </p>
+        </div>
       ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌱</div>
