@@ -1,4 +1,4 @@
-package com.kiwobollae.api.journal.dto.requset;
+package com.kiwobollae.api.journal.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

@@ -1,7 +1,7 @@
 package com.kiwobollae.api.journal.controller;
 
-import com.kiwobollae.api.journal.dto.requset.PlantJournalRequest;
-import com.kiwobollae.api.journal.dto.requset.PlantJournalUpdateRequest;
+import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
+import com.kiwobollae.api.journal.dto.request.PlantJournalUpdateRequest;
 import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.journal.service.PlantJournalService;
