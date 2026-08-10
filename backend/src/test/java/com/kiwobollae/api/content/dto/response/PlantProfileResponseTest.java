@@ -46,10 +46,22 @@ class PlantProfileResponseTest {
 		assertThat(response.journalRewardGrantedToday()).isFalse();
 	}
 
+	@Test
+	void fromMapsSpeciesCareGuide() {
+		PlantProfile profile = profile(null);
+
+		PlantProfileResponse response = PlantProfileResponse.from(profile);
+
+		assertThat(response.careGuide()).isEqualTo("정중앙에서 촬영하면 나중에 타임랩스가 예뻐요.");
+	}
+
 	private PlantProfile profile(LocalDateTime journalRewardGrantedAt) {
 		User user = User.builder().build();
 		ReflectionTestUtils.setField(user, "id", 7L);
-		PlantSpecies species = PlantSpecies.builder().name("바질").build();
+		PlantSpecies species = PlantSpecies.builder()
+				.name("바질")
+				.careGuide("정중앙에서 촬영하면 나중에 타임랩스가 예뻐요.")
+				.build();
 		ReflectionTestUtils.setField(species, "id", 3L);
 		PlantProfile profile = PlantProfile.builder()
 				.user(user)
