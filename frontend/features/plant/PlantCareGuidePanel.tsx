@@ -30,8 +30,8 @@ const ENVIRONMENT_ROWS: { key: keyof PlantCareGuideData['environment']; label: s
 // 뜨는 자리라 같은 말을 두 번 하면 힌트가 정보가 아니라 잡음이 된다.
 const ERROR_HINTS: Record<string, string> = {
   COMMON_DATA_CONFLICT: '먼저 시작된 생성이 끝나면 저장된 가이드가 바로 나와요.',
-  COMMON_RATE_LIMITED: 'AI 호출 횟수 제한에 걸렸어요. 잠시 뒤에 다시 시도해 주세요.',
-  AI_REQUEST_TIMEOUT: '생성이 예상보다 오래 걸리고 있어요. 다시 시도해 주세요.',
+  COMMON_RATE_LIMITED: 'AI 호출 횟수 제한에 걸렸어요.',
+  AI_REQUEST_TIMEOUT: '생성이 예상보다 오래 걸리고 있어요.',
   AI_PROVIDER_UNAVAILABLE: 'AI 서비스가 일시적으로 불안정해요. 잠시 뒤에 다시 시도해 주세요.',
   AI_CONFIGURATION_INVALID: '지금은 가이드를 제공할 수 없어요. 문제가 계속되면 문의해 주세요.',
   AI_RESPONSE_INVALID: '가이드를 만드는 데 실패했어요. 다시 시도해 주세요.',

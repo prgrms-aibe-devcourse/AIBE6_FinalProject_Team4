@@ -164,17 +164,35 @@ describe('PlantCareGuidePanel', () => {
     expect(mockedGetGuide).toHaveBeenCalledTimes(1);
   });
 
-  it('호출 제한에 걸리면 서버 메시지와 재시도 안내를 함께 보여준다', async () => {
-    mockedGetGuide.mockRejectedValueOnce(
-      new ApiError('COMMON_RATE_LIMITED', '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.', 429),
-    );
+  it.each([
+    {
+      name: '호출 제한',
+      error: new ApiError(
+        'COMMON_RATE_LIMITED',
+        '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+        429,
+      ),
+      hint: 'AI 호출 횟수 제한에 걸렸어요.',
+    },
+    {
+      name: '응답 시간 초과',
+      error: new ApiError(
+        'AI_REQUEST_TIMEOUT',
+        'AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.',
+        504,
+      ),
+      hint: '생성이 예상보다 오래 걸리고 있어요.',
+    },
+  ])('$name 오류는 서버 메시지와 힌트의 재시도 문구를 중복하지 않는다', async ({ error, hint }) => {
+    mockedGetGuide.mockRejectedValueOnce(error);
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: '재배 가이드 보기' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
-    expect(alert).toHaveTextContent('AI 호출 횟수 제한에 걸렸어요.');
+    expect(alert).toHaveTextContent(error.message);
+    expect(alert).toHaveTextContent(hint);
+    expect(alert.textContent?.match(/다시 시도/g) ?? []).toHaveLength(1);
   });
 
   // 다른 요청이 같은 종을 생성 중이면 서버가 기다리지 않고 409로 끊는다 — 재시도가 유일한 진행 방법이다.
