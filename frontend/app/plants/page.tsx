@@ -390,7 +390,11 @@ export default function PlantsPage() {
       ) : list.length === 0 && writtenTodayFilterActive ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌿</div>
-          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">오늘 일지 안 쓴 식물이 없어요 🌿</p>
+          {/* 서버가 status=GROWING으로 페이징해 주므로 이 페이지 뒤에 더 있을 수 있다 —
+              "안 쓴 식물이 없다"는 전체에 대한 단정이 아니라 이 페이지 한정임을 명시한다. */}
+          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
+            {totalPages > 1 ? '이 페이지에는 오늘 일지 안 쓴 식물이 없어요 🌿' : '오늘 일지 안 쓴 식물이 없어요 🌿'}
+          </p>
         </div>
       ) : list.length === 0 && filter !== 'all' ? (
         // 진짜로 식물이 하나도 없는 것과, 상태 필터에 맞는 게 지금 없는 것은 다른 상황이다 —
@@ -455,7 +459,9 @@ export default function PlantsPage() {
         </div>
       )}
 
-      {!loading && !error && !writtenTodayFilterActive && totalPages > 1 && (
+      {/* "오늘 일지 안 쓴 것만 보기"도 서버가 status=GROWING으로 페이징해 주므로, 이 모드에서도
+          페이저를 그대로 노출해야 뒤 페이지의 미작성 항목에 닿을 수 있다. */}
+      {!loading && !error && totalPages > 1 && (
         <div className="mt-7 flex items-center justify-center gap-3">
           <button
             type="button"
