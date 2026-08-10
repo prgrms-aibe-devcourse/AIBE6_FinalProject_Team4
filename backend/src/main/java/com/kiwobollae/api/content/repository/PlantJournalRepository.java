@@ -36,6 +36,12 @@ public interface PlantJournalRepository extends JpaRepository<PlantJournal, Long
 			+ "where j.id = :id and j.user.id = :userId and j.deletedAt is null")
 	Optional<PlantJournal> findOwnedActive(@Param("id") Long id, @Param("userId") Long userId);
 
+	@Query("select j from PlantJournal j "
+			+ "where j.user.id = :userId and j.plantProfile.id = :profileId and j.deletedAt is null "
+			+ "order by j.writtenDate desc, j.id desc")
+	List<PlantJournal> findRecentActiveByProfile(@Param("userId") Long userId,
+			@Param("profileId") Long profileId, Pageable pageable);
+
 	boolean existsByIdAndDeletedAtIsNull(Long id);
 
 	boolean existsByPlantProfileIdAndWrittenDateAndDeletedAtIsNull(Long plantProfileId, LocalDate writtenDate);
