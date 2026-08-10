@@ -34,7 +34,9 @@ public class PlantTimelapseService {
 	public PlantTimelapseResponse requestTimelapse(Long userId, Long profileId) {
 		PlantProfile profile = plantProfileRepository.findByIdAndUserId(profileId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
-		if (profile.getStatus() == PlantStatus.GROWING) {
+		// 블랙리스트(GROWING만 거부) 대신 화이트리스트로 검사한다 — PlantStatus에 새 값이
+		// 추가돼도 여기서 명시적으로 허용하지 않는 한 자동으로 타임랩스 생성이 열리지 않는다.
+		if (profile.getStatus() != PlantStatus.HARVESTED && profile.getStatus() != PlantStatus.FAILED) {
 			throw new BusinessException(ErrorCode.TIMELAPSE_NOT_HARVESTED);
 		}
 		int imageCount = journalImageRepository.findRepresentativeByProfileIdOrderByWrittenDateAsc(profileId).size();
