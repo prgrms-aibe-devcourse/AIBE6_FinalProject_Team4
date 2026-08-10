@@ -191,9 +191,12 @@ export default function PlantsPage() {
           else failCount += 1;
         });
         // 상태 필터가 서버 쪽으로 넘어갔으므로, 현재 필터에 더 이상 맞지 않는 항목은
-        // 재조회해야 화면에서 사라진다 — 로컬 상태만 바꿔서는 부정확하다.
+        // 재조회해야 화면에서 사라진다 — 로컬 상태만 바꿔서는 부정확하다. 이 변경으로 현재
+        // 페이지의 항목이 전부 필터에서 빠지면 totalPages가 줄어 지금 page가 범위 밖이
+        // 될 수 있으므로, 항상 0페이지로 돌아가 안전한 상태에서 다시 불러온다.
         if (succeededIds.size > 0) {
-          loadPlants();
+          if (page === 0) loadPlants();
+          else setPage(0);
         }
         showToast(
           failCount === 0
@@ -287,7 +290,11 @@ export default function PlantsPage() {
       }
       // 새 식물은 항상 GROWING으로 생성되므로, 다른 상태 필터를 보고 있었다면 새로 생긴
       // 식물이 안 보일 수 있다 — 전체 필터·첫 페이지로 돌아가 방금 등록한 걸 바로 보여준다.
-      const alreadyAtDefaultView = filter === 'all' && !writtenTodayOnly && page === 0;
+      // writtenTodayOnly가 아니라 writtenTodayFilterActive를 봐야 한다: 에러로 이미 무력화된
+      // 상태(writtenTodayOnly=true, todayWrittenError=true)에서는 이 값이 이미 false라
+      // setWrittenTodayOnly(false)를 호출해도 loadPlants의 deps가 안 바뀌어 effect가 재실행되지
+      // 않는다 — 원시 상태로 판단하면 이 경우를 "이미 기본 화면"으로 놓쳐 재조회가 누락된다.
+      const alreadyAtDefaultView = filter === 'all' && !writtenTodayFilterActive && page === 0;
       setFilter('all');
       setWrittenTodayOnly(false);
       setPage(0);

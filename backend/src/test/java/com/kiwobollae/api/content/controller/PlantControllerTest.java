@@ -97,4 +97,13 @@ class PlantControllerTest {
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
 	}
+
+	@Test
+	void getMyProfilesRejectsPageSizeOverCap() throws Exception {
+		authenticateAs(7L);
+
+		mockMvc.perform(get("/api/v1/plants").param("size", "999999"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
+	}
 }

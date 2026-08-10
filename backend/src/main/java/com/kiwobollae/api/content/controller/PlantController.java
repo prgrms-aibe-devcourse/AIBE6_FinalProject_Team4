@@ -7,6 +7,8 @@ import com.kiwobollae.api.content.entity.enums.PlantStatus;
 import com.kiwobollae.api.content.service.PlantProfileService;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
+import com.kiwobollae.api.global.exception.BusinessException;
+import com.kiwobollae.api.global.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,6 +37,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(ApiVersion.V1 + "/plants")
 public class PlantController {
 
+	// 프레임워크 기본 상한(2000)은 개인 식물 목록치고 과도하다 — 화면에서 쓰는 값(최대 100, journals류의
+	// "사실상 전체" 조회 포함)보다만 넉넉하게 잡아, 그 이상은 오용으로 보고 거부한다.
+	private static final int MAX_PAGE_SIZE = 100;
+
 	private final PlantProfileService plantProfileService;
 
 	@Operation(summary = "내 식물 등록", description = "별명/종/재배 시작일/대표 사진으로 새 식물 프로필을 등록합니다.")
@@ -53,6 +59,9 @@ public class PlantController {
 			@RequestParam(required = false) PlantStatus status,
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
+		if (pageable.getPageSize() > MAX_PAGE_SIZE) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "size는 최대 " + MAX_PAGE_SIZE + "까지 가능합니다.");
+		}
 		return ResponseEntity.ok(ApiResponse.success(plantProfileService.getMyProfiles(userId, status, pageable)));
 	}
 
