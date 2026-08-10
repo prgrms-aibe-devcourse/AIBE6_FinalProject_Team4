@@ -10,6 +10,7 @@ import { deletePlant, deletePlantImage, getPlant, PlantProfileData, PlantStatus,
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { getTimelapse, requestTimelapse, PlantTimelapseData } from '@/lib/timelapse-api';
+import { nickValid } from '@/lib/plant-validation';
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -252,8 +253,11 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     }
   };
 
+  const editNickValid = nickValid(editNick);
+
   const saveStatus = async () => {
     if (!plant || !state.accessToken) return;
+    if (!editNickValid.ok) return showToast(editNickValid.msg, 'err');
     setSaving(true);
     try {
       let thumbnailUrl: string | undefined;
@@ -441,8 +445,14 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
             <input
               value={editNick}
               onChange={(e) => setEditNick(e.target.value)}
-              className="mb-4 mt-1.5 w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none"
+              maxLength={50}
+              className={`mt-1.5 w-full rounded-xl border-[1.5px] px-[13px] py-3 outline-none ${
+                editNick ? (editNickValid.ok ? 'border-[#AED581]' : 'border-[#f0c9a0]') : 'border-line'
+              }`}
             />
+            <div className={`mb-4 mt-[5px] text-xs ${editNick ? (editNickValid.ok ? 'text-brand' : 'text-[#e08a3c]') : 'text-faint'}`}>
+              {editNick ? editNickValid.msg : '특수문자 없이 50자 이내로 지어주세요.'}
+            </div>
 
             <div className="flex items-center justify-between">
               <label className="text-[13px] font-bold text-[#6d7a68]">대표 사진</label>

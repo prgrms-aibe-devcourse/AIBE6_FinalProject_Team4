@@ -7,12 +7,14 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.kiwobollae.api.plantProfile.controller.PlantController;
 import com.kiwobollae.api.plantProfile.dto.requset.PlantProfileRequest;
+import com.kiwobollae.api.plantProfile.dto.requset.PlantProfileUpdateRequest;
 import com.kiwobollae.api.plantProfile.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.plantProfile.service.PlantProfileService;
@@ -127,5 +129,19 @@ class PlantControllerTest {
 				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
 
 		verify(plantProfileService, never()).createProfile(any(), any());
+	}
+
+	@Test
+	void updateProfileRejectsNicknameWithSpecialCharacters() throws Exception {
+		authenticateAs(7L);
+		PlantProfileUpdateRequest request = new PlantProfileUpdateRequest("바질#", null, null);
+
+		mockMvc.perform(patch("/api/v1/plants/1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
+
+		verify(plantProfileService, never()).updateProfile(any(), any(), any());
 	}
 }
