@@ -9,6 +9,7 @@ import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { plantVisual } from '@/lib/plant-visual';
 import { createJournal, PlantJournalCreateData, deleteJournalImage, uploadJournalImage } from '@/lib/journal-api';
 import { localToday } from '@/lib/format';
+import PlantJournalAssistant from '@/features/journal/PlantJournalAssistant';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -262,6 +263,19 @@ function NewJournalInner() {
             className="min-h-[130px] w-full resize-y rounded-[14px] border-[1.5px] border-line p-3.5 text-[15px] leading-[1.6] outline-none"
           />
           <div className="mt-[5px] text-right text-xs text-faint">{draft.content.length} / 2000</div>
+          <PlantJournalAssistant
+            plant={
+              selectedPlant
+                ? {
+                    id: selectedPlant.id,
+                    nickname: selectedPlant.nickname,
+                    speciesName: selectedPlant.speciesName,
+                  }
+                : null
+            }
+            currentJournalContent={draft.content}
+            accessToken={state.accessToken}
+          />
           <button
             type="button"
             onClick={submit}
