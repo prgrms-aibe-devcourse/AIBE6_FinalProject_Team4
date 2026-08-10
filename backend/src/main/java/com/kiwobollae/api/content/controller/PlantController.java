@@ -3,14 +3,21 @@ package com.kiwobollae.api.content.controller;
 import com.kiwobollae.api.content.dto.request.PlantProfileRequest;
 import com.kiwobollae.api.content.dto.request.PlantProfileUpdateRequest;
 import com.kiwobollae.api.content.dto.response.PlantProfileResponse;
+import com.kiwobollae.api.content.entity.enums.PlantStatus;
 import com.kiwobollae.api.content.service.PlantProfileService;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
+import com.kiwobollae.api.global.exception.BusinessException;
+import com.kiwobollae.api.global.exception.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "내 식물", description = "반려 식물 등록/조회 관련 API")
@@ -28,6 +36,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping(ApiVersion.V1 + "/plants")
 public class PlantController {
+
+	// 프레임워크 기본 상한(2000)은 개인 식물 목록치고 과도하다 — 화면에서 쓰는 값(최대 100, journals류의
+	// "사실상 전체" 조회 포함)보다만 넉넉하게 잡아, 그 이상은 오용으로 보고 거부한다.
+	private static final int MAX_PAGE_SIZE = 100;
 
 	private final PlantProfileService plantProfileService;
 
@@ -40,11 +52,17 @@ public class PlantController {
 				.body(ApiResponse.success(plantProfileService.createProfile(userId, request)));
 	}
 
-	@Operation(summary = "내 식물 목록 조회", description = "로그인한 사용자의 식물 프로필 목록을 최신순으로 조회합니다.")
+	@Operation(summary = "내 식물 목록 조회", description = "로그인한 사용자의 식물 프로필 목록을 status로 필터링하여 페이징 조회합니다.")
 	@GetMapping
-	public ResponseEntity<ApiResponse<List<PlantProfileResponse>>> getMyProfiles(
-			@AuthenticationPrincipal Long userId) {
-		return ResponseEntity.ok(ApiResponse.success(plantProfileService.getMyProfiles(userId)));
+	public ResponseEntity<ApiResponse<Page<PlantProfileResponse>>> getMyProfiles(
+			@AuthenticationPrincipal Long userId,
+			@RequestParam(required = false) PlantStatus status,
+			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+			Pageable pageable) {
+		if (pageable.getPageSize() > MAX_PAGE_SIZE) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "size는 최대 " + MAX_PAGE_SIZE + "까지 가능합니다.");
+		}
+		return ResponseEntity.ok(ApiResponse.success(plantProfileService.getMyProfiles(userId, status, pageable)));
 	}
 
 	@Operation(summary = "내 식물 상세 조회", description = "본인 소유의 식물 프로필 단건을 조회합니다.")

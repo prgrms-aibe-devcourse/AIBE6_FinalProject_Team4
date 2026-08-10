@@ -35,11 +35,11 @@ export default function JournalsPage() {
     const [year, month] = monthFilter ? monthFilter.split('-').map(Number) : [undefined, undefined];
 
     Promise.all([
-      getMyPlants(accessToken, controller.signal),
+      getMyPlants({ accessToken, size: 100, signal: controller.signal }),
       getJournals({ year, month, size: 100 }, accessToken, controller.signal),
     ])
-      .then(([plantList, journalPage]) => {
-        setPlants(plantList);
+      .then(([plantPage, journalPage]) => {
+        setPlants(plantPage.content);
         setJournals(journalPage.content);
       })
       .catch((requestError) => {

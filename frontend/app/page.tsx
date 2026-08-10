@@ -50,9 +50,9 @@ export default function Home() {
     const today = kstToday();
     const [year, month] = today.split('-').map(Number);
 
-    getMyPlants(accessToken, controller.signal)
-      .then((plantList) => {
-        setPlants(plantList.slice(0, 4));
+    getMyPlants({ accessToken, signal: controller.signal })
+      .then((plantPage) => {
+        setPlants(plantPage.content.slice(0, 4));
       })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
