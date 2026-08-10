@@ -12,9 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.kiwobollae.api.plantProfile.controller.PlantController;
-import com.kiwobollae.api.plantProfile.dto.requset.PlantProfileRequest;
-import com.kiwobollae.api.plantProfile.dto.requset.PlantProfileUpdateRequest;
+import com.kiwobollae.api.plantProfile.dto.request.PlantProfileRequest;
+import com.kiwobollae.api.plantProfile.dto.request.PlantProfileUpdateRequest;
 import com.kiwobollae.api.plantProfile.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.plantProfile.service.PlantProfileService;

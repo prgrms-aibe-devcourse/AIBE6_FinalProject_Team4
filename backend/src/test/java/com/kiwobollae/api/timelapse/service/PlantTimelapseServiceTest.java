@@ -100,6 +100,23 @@ class PlantTimelapseServiceTest {
 		verify(eventPublisher).publishEvent(new PlantTimelapseRequestedEvent(21L, null));
 	}
 
+	// 블랙리스트(GROWING만 거부)가 아니라 화이트리스트(HARVESTED/FAILED만 허용)로 바뀌었으므로,
+	// HARVESTED 성공 케이스뿐 아니라 FAILED도 명시적으로 허용되는지 검증한다.
+	@Test
+	void requestTimelapseAllowsFailedStatus() {
+		PlantProfile profile = profile(21L, PlantStatus.FAILED);
+		given(plantProfileRepository.findByIdAndUserId(21L, 7L)).willReturn(Optional.of(profile));
+		given(journalImageRepository.findRepresentativeByProfileIdOrderByWrittenDateAsc(21L))
+				.willReturn(List.of(journalImage(), journalImage()));
+		given(plantTimelapseRepository.findByPlantProfileId(21L)).willReturn(Optional.empty());
+		given(plantTimelapseRepository.save(any(PlantTimelapse.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+		PlantTimelapseResponse response = plantTimelapseService.requestTimelapse(7L, 21L);
+
+		assertThat(response.status()).isEqualTo("PENDING");
+		verify(eventPublisher).publishEvent(new PlantTimelapseRequestedEvent(21L, null));
+	}
+
 	@Test
 	void requestTimelapseRestartsExistingCompletedRecord() {
 		PlantProfile profile = profile(21L, PlantStatus.HARVESTED);

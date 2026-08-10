@@ -1,4 +1,4 @@
-package com.kiwobollae.api.plantProfile.dto.requset;
+package com.kiwobollae.api.plantProfile.dto.request;
 
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import jakarta.validation.constraints.Pattern;

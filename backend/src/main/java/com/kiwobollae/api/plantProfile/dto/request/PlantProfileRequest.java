@@ -1,4 +1,4 @@
-package com.kiwobollae.api.plantProfile.dto.requset;
+package com.kiwobollae.api.plantProfile.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
