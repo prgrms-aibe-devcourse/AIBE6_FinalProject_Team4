@@ -135,7 +135,8 @@ class PointScenarioInitDataMySqlIntegrationTest {
 								"https://placehold.co/800x800/E8F3D8/4B7A1E?text=Today+Reward",
 								"point-scenario-today-reward-test",
 								true
-						))
+						)),
+						false
 				)
 		);
 

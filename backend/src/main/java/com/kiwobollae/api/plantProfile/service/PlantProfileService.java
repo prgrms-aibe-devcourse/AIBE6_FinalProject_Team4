@@ -60,6 +60,18 @@ public class PlantProfileService {
 				.map(PlantProfileResponse::from);
 	}
 
+	// 일지 작성 시 "대표사진으로 지정" 옵션에서도 재사용된다(저널 도메인 → 프로필 도메인 연동 지점).
+	// 이전 사진이 S3 업로드본이었다면 updateProfile()과 동일하게 정리한다.
+	@Transactional
+	public void updateThumbnail(Long userId, PlantProfile profile, String newThumbnailUrl) {
+		String previousThumbnailUrl = profile.getPlantImage();
+		if (newThumbnailUrl.equals(previousThumbnailUrl)) {
+			return;
+		}
+		profile.updateProfile(null, newThumbnailUrl, null);
+		deleteThumbnailIfUploaded(previousThumbnailUrl, userId);
+	}
+
 	public PlantProfileResponse getProfile(Long userId, Long profileId) {
 		return PlantProfileResponse.from(findOwned(userId, profileId));
 	}

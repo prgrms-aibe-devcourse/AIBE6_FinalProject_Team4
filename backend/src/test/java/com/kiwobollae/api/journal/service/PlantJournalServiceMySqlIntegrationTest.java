@@ -117,7 +117,8 @@ class PlantJournalServiceMySqlIntegrationTest {
 						"/api/v1/journals/images/rollback-test.webp",
 						"rollback-image-hash",
 						true
-				))
+				)),
+				false
 		);
 
 		assertThatThrownBy(() -> plantJournalService.createJournal(userId, request))

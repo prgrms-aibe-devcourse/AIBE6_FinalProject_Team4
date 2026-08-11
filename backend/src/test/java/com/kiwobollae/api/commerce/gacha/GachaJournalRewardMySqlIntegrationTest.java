@@ -103,6 +103,6 @@ class GachaJournalRewardMySqlIntegrationTest {
 
   private PlantJournalRequest request(Long profileId, String imageUrl, String imageHash) {
     return new PlantJournalRequest(
-        profileId, "실제 가챠 지급 통합 테스트", List.of(new JournalImageRequest(imageUrl, imageHash, true)));
+        profileId, "실제 가챠 지급 통합 테스트", List.of(new JournalImageRequest(imageUrl, imageHash, true)), false);
   }
 }

@@ -161,6 +161,40 @@ class PlantProfileServiceTest {
 		verify(plantImageUploadService, never()).delete(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong());
 	}
 
+	// ---- updateThumbnail ----
+
+	@Test
+	void updateThumbnailReplacesImageAndCleansUpPreviousUpload() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "https://cdn.test/plants/7/old.jpg");
+
+		plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg");
+
+		assertThat(profile.getPlantImage()).isEqualTo("https://cdn.test/journals/7/new.jpg");
+		verify(plantImageUploadService).delete("https://cdn.test/plants/7/old.jpg", 7L);
+	}
+
+	@Test
+	void updateThumbnailSkipsCleanupWhenPreviousWasEmoji() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "emoji:🌱");
+
+		plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg");
+
+		assertThat(profile.getPlantImage()).isEqualTo("https://cdn.test/journals/7/new.jpg");
+		verifyNoInteractions(plantImageUploadService);
+	}
+
+	@Test
+	void updateThumbnailDoesNothingWhenUrlUnchanged() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "https://cdn.test/plants/7/same.jpg");
+
+		plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/plants/7/same.jpg");
+
+		verifyNoInteractions(plantImageUploadService);
+	}
+
 	// ---- getMyProfiles ----
 
 	@Test

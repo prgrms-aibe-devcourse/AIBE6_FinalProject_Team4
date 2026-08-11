@@ -16,6 +16,7 @@ import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
+import com.kiwobollae.api.plantProfile.service.PlantProfileService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.dto.response.JournalRewardResult;
@@ -45,6 +46,7 @@ public class PlantJournalService {
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
 	private final PlantProfileRepository plantProfileRepository;
+	private final PlantProfileService plantProfileService;
 	private final UserRepository userRepository;
 	private final WalletService walletService;
 	private final GachaRewardReservationService gachaRewardReservationService;
@@ -67,6 +69,15 @@ public class PlantJournalService {
 						img.representative(), today))
 				.toList();
 		journalImageRepository.saveAll(images);
+
+		if (request.setAsPlantThumbnail()) {
+			String representativeImageUrl = images.stream()
+					.filter(JournalImage::isRepresentative)
+					.findFirst()
+					.orElseThrow()
+					.getImageUrl();
+			plantProfileService.updateThumbnail(userId, profile, representativeImageUrl);
+		}
 
 		// 작성완료 체크(1식물 1일 1회, 매일 리셋): 오늘 아직 지급 안 됐을 때만 원자적으로 클레임하고,
 		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
