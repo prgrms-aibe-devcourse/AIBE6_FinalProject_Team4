@@ -3,6 +3,7 @@ package com.kiwobollae.api.plantProfile.service;
 import com.kiwobollae.api.journal.controller.JournalImageUploadController;
 import com.kiwobollae.api.journal.dto.response.JournalImageUploadResponse;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
+import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
@@ -53,6 +54,7 @@ public class JournalImageUploadService {
 
 	private final S3Client s3Client;
 	private final JournalImageRepository journalImageRepository;
+	private final PlantProfileRepository plantProfileRepository;
 
 	@Value("${aws.s3.bucket}")
 	private String bucket;
@@ -113,6 +115,12 @@ public class JournalImageUploadService {
 		// deleteJournal)에는 항상 false라 정상적으로 삭제가 진행된다.
 		if (journalImageRepository.existsByImageUrl(imageUrl)) {
 			log.warn("Refused to delete journal image still referenced by a journal: {}", key);
+			return;
+		}
+		// 일지 사진을 식물 "대표사진으로 지정" 옵션으로 저장한 경우, 같은 URL이 PlantProfile.plantImage로도
+		// 참조될 수 있다 — 이 경우에도 지우면 대표사진이 깨진 이미지로 남는다.
+		if (plantProfileRepository.existsByPlantImage(imageUrl)) {
+			log.warn("Refused to delete journal image still referenced as a plant thumbnail: {}", key);
 			return;
 		}
 		try {

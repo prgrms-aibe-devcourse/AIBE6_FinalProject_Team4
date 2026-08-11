@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.global.common.ApiVersion;
+import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import java.io.ByteArrayInputStream;
 
 import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
@@ -31,6 +32,7 @@ class JournalImageUploadServiceTest {
 
 	@Mock private S3Client s3Client;
 	@Mock private JournalImageRepository journalImageRepository;
+	@Mock private PlantProfileRepository plantProfileRepository;
 
 	@InjectMocks
 	private JournalImageUploadService journalImageUploadService;
@@ -54,10 +56,21 @@ class JournalImageUploadServiceTest {
 	@Test
 	void deleteProceedsWhenOwnedAndNotReferenced() {
 		given(journalImageRepository.existsByImageUrl(IMAGE_URL)).willReturn(false);
+		given(plantProfileRepository.existsByPlantImage(IMAGE_URL)).willReturn(false);
 
 		journalImageUploadService.delete(IMAGE_URL, 7L);
 
 		verify(s3Client).deleteObject(argThat((DeleteObjectRequest req) -> req.key().equals("journals/7/photo.jpg")));
+	}
+
+	@Test
+	void deleteRefusesWhenStillReferencedAsPlantThumbnail() {
+		given(journalImageRepository.existsByImageUrl(IMAGE_URL)).willReturn(false);
+		given(plantProfileRepository.existsByPlantImage(IMAGE_URL)).willReturn(true);
+
+		journalImageUploadService.delete(IMAGE_URL, 7L);
+
+		verify(s3Client, never()).deleteObject(any(DeleteObjectRequest.class));
 	}
 
 	@Test
