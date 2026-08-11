@@ -44,10 +44,12 @@ describe("PlantJournalAssistant", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     openAssistant();
     expect(
-      screen.getByRole("dialog", { name: "식물 도우미" }),
+      screen.getByRole("dialog", { name: "AI 식물 도우미" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "식물 도우미 닫기" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "AI 식물 도우미 닫기" }),
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -120,10 +122,9 @@ describe("PlantJournalAssistant", () => {
     expect(screen.getByText("준비된 답변")).toBeInTheDocument();
     expect(screen.getByText(/보이는 모습.*오늘 한 관리/)).toBeInTheDocument();
     expect(screen.getByText("지금 해볼 일")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /1:1 문의하기/ })).toHaveAttribute(
-      "href",
-      "/my/inquiries",
-    );
+    expect(
+      screen.queryByRole("link", { name: /1:1 문의하기/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("직접 질문하면 선택 식물·작성 중인 일지와 함께 AI 응답을 요청한다", async () => {

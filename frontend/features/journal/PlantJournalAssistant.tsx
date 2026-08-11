@@ -298,7 +298,6 @@ export default function PlantJournalAssistant({
   };
 
   const activeFaqs = getPlantCareFaqs(activeCategory);
-  const hasAnswer = messages.some((message) => message.role === "ASSISTANT");
 
   return (
     <>
@@ -323,7 +322,7 @@ export default function PlantJournalAssistant({
                 id="plant-journal-assistant-title"
                 className="block text-[17px] font-extrabold text-ink"
               >
-                식물 도우미
+                AI 식물 도우미
               </span>
               <span className="mt-0.5 block text-[11.5px] font-semibold text-sub">
                 성장 기록과 함께 답을 찾아드려요
@@ -333,7 +332,7 @@ export default function PlantJournalAssistant({
               ref={closeButtonRef}
               type="button"
               onClick={closeAssistant}
-              aria-label="식물 도우미 닫기"
+              aria-label="AI 식물 도우미 닫기"
               className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-line bg-white/85 text-sub hover:text-ink"
             >
               <span
@@ -501,7 +500,7 @@ export default function PlantJournalAssistant({
                   <div
                     role="log"
                     aria-live="polite"
-                    aria-label="식물 도우미 대화"
+                    aria-label="AI 식물 도우미 대화"
                     className="mt-4 space-y-3 border-t border-[#dde6d4] pt-4"
                   >
                     {messages.map((message) =>
@@ -525,18 +524,6 @@ export default function PlantJournalAssistant({
                       </div>
                     )}
                     <div ref={messagesEndRef} />
-                  </div>
-                )}
-
-                {hasAnswer && (
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3.5 py-3 text-[12.5px] text-sub">
-                    <span>그래도 궁금한 점이 해결되지 않았나요?</span>
-                    <Link
-                      href="/my/inquiries"
-                      className="font-extrabold text-brand-dark"
-                    >
-                      1:1 문의하기 →
-                    </Link>
                   </div>
                 )}
               </div>
@@ -603,7 +590,7 @@ export default function PlantJournalAssistant({
         onClick={() => setExpanded(true)}
         aria-expanded={expanded}
         aria-controls={PANEL_ID}
-        aria-label="식물을 키우다 궁금한 점이 있나요? 식물 도우미 열기"
+        aria-label="식물을 키우다 궁금한 점이 있나요? AI 식물 도우미 열기"
         aria-hidden={expanded}
         tabIndex={expanded ? -1 : 0}
         className={`fixed bottom-[82px] right-4 z-[54] flex h-14 cursor-pointer items-center gap-2.5 rounded-full border border-[#d7e5c8] bg-brand-dark px-3.5 text-white [box-shadow:0_12px_32px_rgba(85,139,47,.32)] md:bottom-6 md:right-6 ${
@@ -616,7 +603,9 @@ export default function PlantJournalAssistant({
           🌱
         </span>
         <span className="hidden pr-1 text-left sm:block">
-          <span className="block text-[13px] font-extrabold">식물 도우미</span>
+          <span className="block text-[13px] font-extrabold">
+            AI 식물 도우미
+          </span>
           <span className="block text-[10px] font-semibold text-white/75">
             궁금한 점을 물어보세요
           </span>
