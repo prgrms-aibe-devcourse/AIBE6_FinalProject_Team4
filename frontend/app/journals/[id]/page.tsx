@@ -278,6 +278,9 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
               </button>
             )}
           </div>
+          {editPhotos.length === 0 && (
+            <div className="mb-3 text-[12.5px] font-bold text-[#e5533b]">사진을 최소 한 장은 남겨주세요.</div>
+          )}
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
@@ -288,7 +291,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
             <button
               type="button"
               onClick={saveEdit}
-              disabled={saving}
+              disabled={saving || editPhotos.length === 0}
               className="flex-1 cursor-pointer rounded-[13px] bg-brand p-3.5 font-extrabold text-white disabled:opacity-60"
             >
               {saving ? '저장 중...' : '저장하기'}
