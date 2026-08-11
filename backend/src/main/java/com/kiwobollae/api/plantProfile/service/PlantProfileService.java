@@ -82,6 +82,23 @@ public class PlantProfileService {
 		});
 	}
 
+	// 대표사진을 제공하던 일지가 삭제될 때 재동기화한다(저널 도메인 → 프로필 도메인 연동 지점).
+	// 다른 사진으로 이미 교체된 뒤라면(더 이상 이 URL을 가리키지 않으면) 아무것도 하지 않는다 — 그
+	// 사이에 사용자가 프로필 대표사진을 직접 바꿨을 수도 있으므로, 무조건 지우면 그 변경을 덮어쓴다.
+	@Transactional
+	public void clearThumbnailIfMatches(Long userId, PlantProfile profile, String imageUrl) {
+		if (!imageUrl.equals(profile.getPlantImage())) {
+			return;
+		}
+		profile.clearPlantImage();
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				deleteThumbnailIfUploaded(imageUrl, userId);
+			}
+		});
+	}
+
 	public PlantProfileResponse getProfile(Long userId, Long profileId) {
 		return PlantProfileResponse.from(findOwned(userId, profileId));
 	}

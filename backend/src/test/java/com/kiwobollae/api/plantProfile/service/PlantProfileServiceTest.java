@@ -213,6 +213,42 @@ class PlantProfileServiceTest {
 		verifyNoInteractions(plantImageUploadService);
 	}
 
+	// ---- clearThumbnailIfMatches ----
+
+	@Test
+	void clearThumbnailIfMatchesClearsAndCleansUpWhenUrlMatches() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "https://cdn.test/journals/7/thumb.jpg");
+
+		runInCommittedTransaction(() ->
+				plantProfileService.clearThumbnailIfMatches(7L, profile, "https://cdn.test/journals/7/thumb.jpg"));
+
+		assertThat(profile.getPlantImage()).isNull();
+		verify(plantImageUploadService).delete("https://cdn.test/journals/7/thumb.jpg", 7L);
+	}
+
+	@Test
+	void clearThumbnailIfMatchesDoesNothingWhenUrlAlreadyReplaced() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "https://cdn.test/plants/7/other.jpg");
+
+		plantProfileService.clearThumbnailIfMatches(7L, profile, "https://cdn.test/journals/7/thumb.jpg");
+
+		assertThat(profile.getPlantImage()).isEqualTo("https://cdn.test/plants/7/other.jpg");
+		verifyNoInteractions(plantImageUploadService);
+	}
+
+	@Test
+	void clearThumbnailIfMatchesSkipsS3CleanupWhenTransactionRollsBack() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "https://cdn.test/journals/7/thumb.jpg");
+
+		runInRolledBackTransaction(() ->
+				plantProfileService.clearThumbnailIfMatches(7L, profile, "https://cdn.test/journals/7/thumb.jpg"));
+
+		verifyNoInteractions(plantImageUploadService);
+	}
+
 	private void runInCommittedTransaction(Runnable action) {
 		TransactionSynchronizationManager.initSynchronization();
 		try {

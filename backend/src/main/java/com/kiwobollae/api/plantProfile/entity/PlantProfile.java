@@ -84,4 +84,10 @@ public class PlantProfile extends BaseEntity {
 			this.status = status;
 		}
 	}
+
+	// updateProfile()은 null을 "값 유지"로 해석하므로 대표사진을 비우는 용도로 쓸 수 없다 —
+	// 대표사진을 제공하던 일지가 삭제돼 대체할 사진이 없을 때 전용으로 쓴다.
+	public void clearPlantImage() {
+		this.plantImage = null;
+	}
 }

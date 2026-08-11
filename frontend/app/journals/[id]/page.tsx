@@ -36,6 +36,13 @@ function editPhotoSrc(photo: EditPhoto): string {
   return photo.kind === 'existing' ? resolveImageUrl(photo.imageUrl) : photo.preview;
 }
 
+// 'new' 사진의 blob 미리보기 URL만 해제한다 ('existing'은 서버 URL이라 해제 대상이 아니다).
+function revokeNewPhotoBlobs(photos: EditPhoto[]) {
+  photos.forEach((photo) => {
+    if (photo.kind === 'new') URL.revokeObjectURL(photo.preview);
+  });
+}
+
 export default function JournalDetail({ params }: { params: { id: string } }) {
   const { state, hydrated } = useStore();
   const { showToast, askConfirm } = useUI();
@@ -110,11 +117,17 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
 
   const openEdit = () => {
     if (!journal) return;
+    revokeNewPhotoBlobs(editPhotos);
     setEditContent(journal.content);
     setEditPhotos(journal.images.map((img) => ({ kind: 'existing', imageUrl: img.imageUrl, imageHash: img.imageHash })));
     const repIndex = journal.images.findIndex((img) => img.representative);
     setEditRepresentativeIndex(repIndex >= 0 ? repIndex : 0);
     setEditing(true);
+  };
+
+  const closeEdit = () => {
+    revokeNewPhotoBlobs(editPhotos);
+    setEditing(false);
   };
 
   const pickEditPhoto = (file: File | null) => {
@@ -171,6 +184,8 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
         newlyUploaded.forEach((imageUrl) => deleteJournalImage(imageUrl, accessToken).catch(() => {}));
         throw updateError;
       }
+      // 새로 업로드한 사진은 이제 서버에 반영됐으니 로컬 blob 미리보기는 더 이상 필요 없다.
+      revokeNewPhotoBlobs(editPhotos);
       setJournal(updated);
       setEditing(false);
       showToast('일지를 수정했어요 🌿');
@@ -225,7 +240,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   if (editing) {
     return (
       <div className="container">
-        <button type="button" onClick={() => setEditing(false)} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 일지 상세</button>
+        <button type="button" onClick={closeEdit} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 일지 상세</button>
         <h1 className="mb-[18px] mt-3.5 text-2xl font-extrabold">일지 수정</h1>
         <div className="max-w-[640px] rounded-[20px] bg-white p-6 shadow-card">
           <div className="mb-2 text-[13px] text-faint">
@@ -296,7 +311,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
             >
               {saving ? '저장 중...' : '저장하기'}
             </button>
-            <button type="button" onClick={() => setEditing(false)} className="cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white px-[22px] py-3.5 font-bold text-sub">
+            <button type="button" onClick={closeEdit} className="cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white px-[22px] py-3.5 font-bold text-sub">
               취소
             </button>
           </div>

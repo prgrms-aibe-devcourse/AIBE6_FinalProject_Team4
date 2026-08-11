@@ -182,6 +182,36 @@ class PlantJournalServiceTest {
 	}
 
 	@Test
+	void deleteJournalClearsPlantThumbnailWhenRepresentativeImageMatches() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, null);
+		PlantJournal journal = journal(31L, user, profile);
+		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
+		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
+				journalImage("https://example.test/thumb.jpg", true)
+		));
+
+		plantJournalService.deleteJournal(7L, 31L);
+
+		verify(plantProfileService).clearThumbnailIfMatches(7L, profile, "https://example.test/thumb.jpg");
+	}
+
+	@Test
+	void deleteJournalDoesNotTouchThumbnailWhenNoImageIsRepresentative() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, null);
+		PlantJournal journal = journal(31L, user, profile);
+		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
+		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
+				journalImage("https://example.test/a.jpg")
+		));
+
+		plantJournalService.deleteJournal(7L, 31L);
+
+		verifyNoInteractions(plantProfileService);
+	}
+
+	@Test
 	void deleteJournalCleansUpAllImages() {
 		User user = user(7L);
 		PlantProfile profile = profile(21L, user, null);
@@ -227,9 +257,37 @@ class PlantJournalServiceTest {
 		verify(journalImageUploadService, never()).delete("https://example.test/new.jpg", 7L);
 	}
 
+	@Test
+	void updateJournalUpdatesPlantThumbnailWithNewRepresentativeImage() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, null);
+		PlantJournal journal = journal(31L, user, profile);
+		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
+		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
+				journalImage("https://example.test/old.jpg", true)
+		));
+		PlantJournalUpdateRequest request = new PlantJournalUpdateRequest(
+				"수정된 기록",
+				List.of(new JournalImageRequest("https://example.test/new-thumb.jpg", "hash-new-thumb", true))
+		);
+		given(journalImageRepository.findExistingHashes(
+				eq(7L), eq(List.of("hash-new-thumb")), any(LocalDate.class)
+		)).willReturn(List.of());
+		given(userRepository.getReferenceById(7L)).willReturn(user);
+
+		plantJournalService.updateJournal(7L, 31L, request);
+
+		verify(plantProfileService).updateThumbnail(7L, profile, "https://example.test/new-thumb.jpg");
+	}
+
 	private JournalImage journalImage(String imageUrl) {
+		return journalImage(imageUrl, false);
+	}
+
+	private JournalImage journalImage(String imageUrl, boolean representative) {
 		return JournalImage.builder()
 				.imageUrl(imageUrl)
+				.representative(representative)
 				.build();
 	}
 
