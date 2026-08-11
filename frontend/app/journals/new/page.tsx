@@ -40,6 +40,7 @@ function NewJournalInner() {
   const [draft, setDraft] = useState<Draft>({ plantId: preselect ? Number(preselect) : null, content: '' });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [setAsThumbnail, setSetAsThumbnail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [createResult, setCreateResult] = useState<PlantJournalCreateData | null>(null);
@@ -113,6 +114,7 @@ function NewJournalInner() {
             plantProfileId: draft.plantId,
             content: draft.content,
             images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
+            setAsPlantThumbnail: setAsThumbnail,
           },
           state.accessToken,
         );
@@ -145,6 +147,7 @@ function NewJournalInner() {
     setDraft({ plantId: null, content: '' });
     setPhotoFile(null);
     setPhotoPreview(null);
+    setSetAsThumbnail(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -251,6 +254,15 @@ function NewJournalInner() {
                 <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
               </button>
             )}
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-[13px] font-bold text-[#6d7a68]">
+              <input
+                type="checkbox"
+                checked={setAsThumbnail}
+                onChange={(e) => setSetAsThumbnail(e.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              이 사진을 대표사진으로 설정
+            </label>
           </div>
 
           <div className="mb-2.5 font-extrabold">3. 오늘의 기록</div>
