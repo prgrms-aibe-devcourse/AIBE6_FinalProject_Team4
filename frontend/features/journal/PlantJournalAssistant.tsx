@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   getPlantCareFaqs,
   PlantCareFaq,
@@ -19,6 +19,7 @@ const MAX_QUESTION_LENGTH = 2000;
 const MAX_CONTEXT_MESSAGES = 6;
 const MAX_CONTEXT_MESSAGE_LENGTH = 1000;
 const MAX_CONTEXT_TOTAL_LENGTH = 4000;
+const PANEL_ID = "plant-journal-assistant-panel";
 const AI_DISCLAIMER =
   "AI 답변은 식물 프로필과 최근 일지를 바탕으로 만든 참고 정보이며 정확성을 보장하지 않습니다.";
 
@@ -41,6 +42,9 @@ interface DisplayMessage {
 
 interface PlantJournalAssistantProps {
   plant: PlantSummary | null;
+  plantOptions?: readonly PlantSummary[];
+  plantOptionsLoading?: boolean;
+  onPlantChange?: (plantId: number) => void;
   currentJournalContent: string;
   accessToken: string | null;
 }
@@ -86,8 +90,14 @@ function toErrorMessage(requestError: unknown): string {
 
 function AssistantMessage({ message }: { message: DisplayMessage }) {
   return (
-    <div className="max-w-[92%] rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-3 text-[14px] leading-[1.65] text-[#4a5647] shadow-sm">
-      <div className="mb-1.5 text-[11px] font-extrabold text-brand-text">
+    <div className="max-w-[94%] rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-3 text-[14px] leading-[1.65] text-[#4a5647] shadow-sm">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold text-brand-text">
+        <span
+          aria-hidden="true"
+          className="material-symbols-outlined text-[15px]"
+        >
+          {message.source === "FAQ" ? "menu_book" : "auto_awesome"}
+        </span>
         {message.source === "FAQ" ? "준비된 답변" : "내 식물 기록 기반 AI 답변"}
       </div>
       <p className="whitespace-pre-wrap">{message.content}</p>
@@ -123,6 +133,9 @@ function AssistantMessage({ message }: { message: DisplayMessage }) {
 
 export default function PlantJournalAssistant({
   plant,
+  plantOptions,
+  plantOptionsLoading = false,
+  onPlantChange,
   currentJournalContent,
   accessToken,
 }: PlantJournalAssistantProps) {
@@ -137,6 +150,14 @@ export default function PlantJournalAssistant({
   const nextMessageId = useRef(0);
   const inFlightRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const closeAssistant = () => {
+    setExpanded(false);
+    launcherRef.current?.focus();
+  };
 
   useEffect(() => {
     controllerRef.current?.abort();
@@ -154,6 +175,25 @@ export default function PlantJournalAssistant({
       inFlightRef.current = false;
     };
   }, [plantId]);
+
+  useEffect(() => {
+    if (!expanded) return;
+
+    closeButtonRef.current?.focus();
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setExpanded(false);
+        launcherRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [expanded]);
+
+  useEffect(() => {
+    if (!expanded || messages.length === 0) return;
+    messagesEndRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [expanded, loading, messages]);
 
   const newMessageId = () => {
     nextMessageId.current += 1;
@@ -244,7 +284,9 @@ export default function PlantJournalAssistant({
     }
   };
 
-  const handleQuestionKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleQuestionKeyDown = (
+    event: ReactKeyboardEvent<HTMLTextAreaElement>,
+  ) => {
     if (
       event.key !== "Enter" ||
       event.shiftKey ||
@@ -259,136 +301,262 @@ export default function PlantJournalAssistant({
   const hasAnswer = messages.some((message) => message.role === "ASSISTANT");
 
   return (
-    <section className="mt-4 overflow-hidden rounded-[16px] border-[1.5px] border-[#dce8ce] bg-[#f8fbf3]">
-      <button
-        type="button"
-        onClick={() => setExpanded((current) => !current)}
-        aria-expanded={expanded}
-        aria-controls="plant-journal-assistant-content"
-        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left"
-      >
-        <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-brand text-xl text-white">
-          🌱
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-extrabold text-ink">
-            식물을 키우다 궁금한 점이 있나요?
-          </span>
-          <span className="mt-0.5 block text-[12px] text-sub">
-            무료 준비 답변 또는 내 일지 기반 AI에게 물어보세요.
-          </span>
-        </span>
-        <span
-          aria-hidden="true"
-          className="material-symbols-outlined flex-none text-brand-dark"
-        >
-          {expanded ? "expand_less" : "expand_more"}
-        </span>
-      </button>
-
+    <>
       {expanded && (
-        <div
-          id="plant-journal-assistant-content"
-          className="border-t border-[#dce8ce] px-4 pb-4 pt-3.5"
+        <section
+          id={PANEL_ID}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="plant-journal-assistant-title"
+          className="fixed bottom-[82px] right-4 z-[55] flex h-[min(720px,calc(100dvh-108px))] w-[calc(100vw-32px)] max-w-[430px] animate-pop flex-col overflow-hidden rounded-[24px] border border-[#dbe6cf] bg-[#f7faef] [box-shadow:0_24px_70px_rgba(62,74,61,.24)] md:bottom-6 md:right-6 md:h-[min(720px,calc(100dvh-48px))]"
         >
-          {!plant ? (
-            <div className="rounded-xl bg-white px-4 py-4 text-center text-sm font-semibold text-sub">
-              위에서 식물을 먼저 선택하면 준비 답변과 맞춤 AI 질문을 이용할 수
-              있어요.
+          <header className="relative flex flex-none items-center gap-3 overflow-hidden border-b border-[#dbe6cf] bg-[linear-gradient(135deg,#eef5e4_0%,#fffdf6_100%)] px-4 py-3.5">
+            <span
+              aria-hidden="true"
+              className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-brand/10"
+            />
+            <span className="relative flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-brand text-[23px] shadow-sm">
+              🌱
+            </span>
+            <span className="relative min-w-0 flex-1">
+              <span
+                id="plant-journal-assistant-title"
+                className="block text-[17px] font-extrabold text-ink"
+              >
+                식물 도우미
+              </span>
+              <span className="mt-0.5 block text-[11.5px] font-semibold text-sub">
+                성장 기록과 함께 답을 찾아드려요
+              </span>
+            </span>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={closeAssistant}
+              aria-label="식물 도우미 닫기"
+              className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-line bg-white/85 text-sub hover:text-ink"
+            >
+              <span
+                aria-hidden="true"
+                className="material-symbols-outlined text-[20px]"
+              >
+                close
+              </span>
+            </button>
+          </header>
+
+          {plantOptionsLoading ? (
+            <div
+              role="status"
+              className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-sm font-semibold text-sub"
+            >
+              <span className="text-3xl">🌿</span>내 식물을 불러오고 있어요…
+            </div>
+          ) : !plant ? (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-soft text-3xl">
+                🪴
+              </span>
+              <h2 className="mt-4 text-lg font-extrabold text-ink">
+                먼저 상담할 식물이 필요해요
+              </h2>
+              <p className="mt-2 max-w-[280px] text-sm leading-[1.6] text-sub">
+                식물을 먼저 선택하면 준비 답변과 내 기록 기반 AI 질문을 이용할
+                수 있어요.
+              </p>
+              {plantOptions && (
+                <Link
+                  href="/plants"
+                  className="mt-5 rounded-xl bg-brand px-4 py-2.5 text-sm font-extrabold text-white hover:text-white"
+                >
+                  내 식물 보러 가기
+                </Link>
+              )}
             </div>
           ) : (
             <>
-              <div className="mb-3">
-                <div className="text-[14px] font-extrabold text-ink">
-                  {plant.nickname}({plant.speciesName})에 대해 무엇이
-                  궁금한가요?
-                </div>
-                <p className="mt-1 text-xs leading-[1.55] text-sub">
-                  준비 답변은 바로 확인할 수 있고 AI 호출 횟수를 사용하지
-                  않아요.
+              <div className="flex-none border-b border-[#e2ead8] bg-white/80 px-4 py-3">
+                {plantOptions && plantOptions.length > 1 && onPlantChange ? (
+                  <label className="flex items-center gap-3">
+                    <span className="flex-none text-[12px] font-extrabold text-[#52604f]">
+                      상담할 식물
+                    </span>
+                    <span className="relative min-w-0 flex-1">
+                      <select
+                        aria-label="상담할 식물 선택"
+                        value={plant.id}
+                        onChange={(event) =>
+                          onPlantChange(Number(event.target.value))
+                        }
+                        disabled={loading}
+                        className="w-full appearance-none rounded-xl border border-line bg-white py-2 pl-3 pr-9 text-[13px] font-extrabold text-ink outline-none focus:border-brand disabled:bg-[#f3f4ef]"
+                      >
+                        {plantOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.nickname} ({option.speciesName})
+                          </option>
+                        ))}
+                      </select>
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-sub"
+                      >
+                        expand_more
+                      </span>
+                    </span>
+                  </label>
+                ) : (
+                  <div className="flex items-center gap-2 text-[13px] font-extrabold text-ink">
+                    <span
+                      aria-hidden="true"
+                      className="material-symbols-outlined text-[18px] text-brand-dark"
+                    >
+                      potted_plant
+                    </span>
+                    {plant.nickname}({plant.speciesName})
+                  </div>
+                )}
+                <p className="mt-1.5 text-[11px] text-sub">
+                  선택한 식물의 프로필과 최근 일지를 참고해요.
                 </p>
               </div>
 
-              <div
-                className="flex gap-1.5 overflow-x-auto pb-1"
-                aria-label="자주 묻는 질문 분류"
-              >
-                {PLANT_CARE_FAQ_CATEGORIES.map((category) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => setActiveCategory(category.id)}
-                    aria-pressed={activeCategory === category.id}
-                    disabled={loading}
-                    className={`flex flex-none cursor-pointer items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-extrabold disabled:cursor-not-allowed disabled:opacity-60 ${
-                      activeCategory === category.id
-                        ? "border-brand bg-brand text-white"
-                        : "border-line bg-white text-[#6d7a68]"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="material-symbols-outlined text-[15px]"
-                    >
-                      {category.icon}
-                    </span>
-                    {category.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {activeFaqs.map((faq) => (
-                  <button
-                    key={faq.id}
-                    type="button"
-                    onClick={() => selectFaq(faq)}
-                    disabled={loading}
-                    className="cursor-pointer rounded-xl border border-line bg-white px-3 py-2 text-left text-[13px] font-bold leading-[1.45] text-[#52604f] hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {faq.question}
-                  </button>
-                ))}
-              </div>
-
-              {messages.length > 0 && (
-                <div
-                  role="log"
-                  aria-live="polite"
-                  aria-label="식물 도우미 대화"
-                  className="mt-4 max-h-[480px] space-y-3 overflow-y-auto rounded-2xl bg-[#f1f5eb] p-3"
-                >
-                  {messages.map((message) =>
-                    message.role === "USER" ? (
-                      <div key={message.id} className="flex justify-end">
-                        <div className="max-w-[88%] rounded-2xl rounded-tr-sm bg-brand px-3.5 py-2.5 text-[14px] leading-[1.6] text-white">
-                          {message.content}
-                        </div>
-                      </div>
-                    ) : (
-                      <div key={message.id} className="flex justify-start">
-                        <AssistantMessage message={message} />
-                      </div>
-                    ),
-                  )}
-                  {loading && (
-                    <div role="status" className="flex justify-start">
-                      <div className="rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-3 text-sm font-semibold text-sub">
-                        {plant.nickname}의 기록을 살펴보고 있어요…
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                {messages.length === 0 && (
+                  <div className="mb-4 rounded-2xl border border-[#dde8d2] bg-white px-4 py-4 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-brand-soft text-xl">
+                        🌿
+                      </span>
+                      <div>
+                        <h2 className="text-[15px] font-extrabold text-ink">
+                          {plant.nickname}를 키우며 무엇이 궁금한가요?
+                        </h2>
+                        <p className="mt-1 text-[12.5px] leading-[1.55] text-sub">
+                          자주 묻는 질문은 무료로 바로 확인하고, 더 궁금한
+                          내용은 아래에서 AI에게 물어보세요.
+                        </p>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
-              <div className="mt-4 border-t border-[#dce8ce] pt-3.5">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h2 className="text-[13px] font-extrabold text-[#52604f]">
+                    자주 묻는 질문
+                  </h2>
+                  <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-brand-dark">
+                    AI 호출 없음
+                  </span>
+                </div>
+                <div
+                  className="flex gap-1.5 overflow-x-auto pb-1"
+                  aria-label="자주 묻는 질문 분류"
+                >
+                  {PLANT_CARE_FAQ_CATEGORIES.map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => setActiveCategory(category.id)}
+                      aria-pressed={activeCategory === category.id}
+                      disabled={loading}
+                      className={`flex flex-none cursor-pointer items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-extrabold disabled:cursor-not-allowed disabled:opacity-60 ${
+                        activeCategory === category.id
+                          ? "border-brand bg-brand text-white"
+                          : "border-line bg-white text-[#6d7a68]"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[15px]"
+                      >
+                        {category.icon}
+                      </span>
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-2.5 grid gap-2">
+                  {activeFaqs.map((faq) => (
+                    <button
+                      key={faq.id}
+                      type="button"
+                      onClick={() => selectFaq(faq)}
+                      disabled={loading}
+                      className="group flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-white px-3 py-2.5 text-left text-[13px] font-bold leading-[1.45] text-[#52604f] hover:border-brand hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="min-w-0 flex-1">{faq.question}</span>
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined flex-none text-[17px] text-faint group-hover:text-brand-dark"
+                      >
+                        chevron_right
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {messages.length > 0 && (
+                  <div
+                    role="log"
+                    aria-live="polite"
+                    aria-label="식물 도우미 대화"
+                    className="mt-4 space-y-3 border-t border-[#dde6d4] pt-4"
+                  >
+                    {messages.map((message) =>
+                      message.role === "USER" ? (
+                        <div key={message.id} className="flex justify-end">
+                          <div className="max-w-[88%] rounded-2xl rounded-tr-sm bg-brand px-3.5 py-2.5 text-[14px] leading-[1.6] text-white shadow-sm">
+                            {message.content}
+                          </div>
+                        </div>
+                      ) : (
+                        <div key={message.id} className="flex justify-start">
+                          <AssistantMessage message={message} />
+                        </div>
+                      ),
+                    )}
+                    {loading && (
+                      <div role="status" className="flex justify-start">
+                        <div className="rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-3 text-sm font-semibold text-sub">
+                          {plant.nickname}의 기록을 살펴보고 있어요…
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
+
+                {hasAnswer && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3.5 py-3 text-[12.5px] text-sub">
+                    <span>그래도 궁금한 점이 해결되지 않았나요?</span>
+                    <Link
+                      href="/my/inquiries"
+                      className="font-extrabold text-brand-dark"
+                    >
+                      1:1 문의하기 →
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-none border-t border-[#dbe6cf] bg-white px-3.5 pb-3 pt-3">
+                {error && (
+                  <div
+                    role="alert"
+                    className="mb-2.5 rounded-xl bg-danger-soft px-3.5 py-2.5 text-[13px] font-semibold text-danger"
+                  >
+                    {error}
+                  </div>
+                )}
                 <label
                   htmlFor="plant-journal-chat-question"
-                  className="text-[13px] font-extrabold text-[#52604f]"
+                  className="sr-only"
                 >
                   내 식물 기록을 바탕으로 직접 질문하기
                 </label>
-                <div className="mt-2 flex items-end gap-2">
+                <div className="rounded-2xl border-[1.5px] border-line bg-[#fdfdf9] p-2.5 focus-within:border-brand">
                   <textarea
                     id="plant-journal-chat-question"
                     value={question}
@@ -397,54 +565,63 @@ export default function PlantJournalAssistant({
                     maxLength={MAX_QUESTION_LENGTH}
                     rows={2}
                     disabled={loading}
-                    placeholder={`${plant.nickname}의 잎이나 물주기처럼 궁금한 점을 적어보세요.`}
-                    className="min-h-[72px] flex-1 resize-y rounded-xl border-[1.5px] border-line bg-white px-3 py-2.5 text-[14px] leading-[1.5] outline-none focus:border-brand disabled:bg-[#f3f4ef]"
+                    placeholder={`${plant.nickname}에 대해 궁금한 점을 입력해 주세요.`}
+                    className="min-h-[54px] w-full resize-none bg-transparent px-1 text-[14px] leading-[1.5] text-ink outline-none placeholder:text-faint disabled:text-sub"
                   />
-                  <button
-                    type="button"
-                    onClick={() => void sendQuestion()}
-                    disabled={loading || !accessToken || !question.trim()}
-                    className="h-[44px] flex-none cursor-pointer rounded-xl bg-brand px-4 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {loading ? "답변 중" : "AI에게 묻기"}
-                  </button>
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span className="pl-1 text-[10.5px] text-faint">
+                      {question.length} / {MAX_QUESTION_LENGTH}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void sendQuestion()}
+                      disabled={loading || !accessToken || !question.trim()}
+                      aria-label="AI에게 묻기"
+                      className="flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full bg-brand text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="material-symbols-outlined text-[20px]"
+                      >
+                        arrow_upward
+                      </span>
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between gap-3 text-[11px] text-faint">
-                  <span>Enter로 전송 · Shift+Enter로 줄바꿈</span>
-                  <span>
-                    {question.length} / {MAX_QUESTION_LENGTH}
-                  </span>
-                </div>
+                <p className="mt-2 text-center text-[10px] leading-[1.45] text-faint">
+                  {AI_DISCLAIMER}
+                </p>
               </div>
-
-              {error && (
-                <div
-                  role="alert"
-                  className="mt-3 rounded-xl bg-danger-soft px-3.5 py-3 text-[13px] font-semibold text-danger"
-                >
-                  {error}
-                </div>
-              )}
-
-              <p className="mt-3 text-[11px] leading-[1.55] text-faint">
-                {AI_DISCLAIMER}
-              </p>
-
-              {hasAnswer && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3.5 py-3 text-[12.5px] text-sub">
-                  <span>그래도 궁금한 점이 해결되지 않았나요?</span>
-                  <Link
-                    href="/my/inquiries"
-                    className="font-extrabold text-brand-dark"
-                  >
-                    1:1 문의하기 →
-                  </Link>
-                </div>
-              )}
             </>
           )}
-        </div>
+        </section>
       )}
-    </section>
+
+      <button
+        ref={launcherRef}
+        type="button"
+        onClick={() => setExpanded(true)}
+        aria-expanded={expanded}
+        aria-controls={PANEL_ID}
+        aria-label="식물을 키우다 궁금한 점이 있나요? 식물 도우미 열기"
+        aria-hidden={expanded}
+        tabIndex={expanded ? -1 : 0}
+        className={`fixed bottom-[82px] right-4 z-[54] flex h-14 cursor-pointer items-center gap-2.5 rounded-full border border-[#d7e5c8] bg-brand-dark px-3.5 text-white [box-shadow:0_12px_32px_rgba(85,139,47,.32)] md:bottom-6 md:right-6 ${
+          expanded
+            ? "pointer-events-none translate-y-2 opacity-0"
+            : "opacity-100"
+        }`}
+      >
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-xl">
+          🌱
+        </span>
+        <span className="hidden pr-1 text-left sm:block">
+          <span className="block text-[13px] font-extrabold">식물 도우미</span>
+          <span className="block text-[10px] font-semibold text-white/75">
+            궁금한 점을 물어보세요
+          </span>
+        </span>
+      </button>
+    </>
   );
 }

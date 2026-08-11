@@ -38,6 +38,42 @@ describe("PlantJournalAssistant", () => {
     vi.clearAllMocks();
   });
 
+  it("일지 페이지에서는 플로팅 버튼으로 열고 닫을 수 있다", () => {
+    renderAssistant();
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    openAssistant();
+    expect(
+      screen.getByRole("dialog", { name: "식물 도우미" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "식물 도우미 닫기" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("여러 식물 중 상담할 식물을 바꿀 수 있다", () => {
+    const onPlantChange = vi.fn();
+    render(
+      <PlantJournalAssistant
+        plant={PLANT}
+        plantOptions={[
+          PLANT,
+          { id: 22, nickname: "상추", speciesName: "청상추" },
+        ]}
+        onPlantChange={onPlantChange}
+        currentJournalContent=""
+        accessToken="access-token"
+      />,
+    );
+    openAssistant();
+
+    fireEvent.change(screen.getByLabelText("상담할 식물 선택"), {
+      target: { value: "22" },
+    });
+
+    expect(onPlantChange).toHaveBeenCalledWith(22);
+  });
+
   it("식물을 고르기 전에는 질문 기능을 안내만 하고 비활성 상태로 둔다", () => {
     renderAssistant(null);
     openAssistant();
