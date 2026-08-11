@@ -8,7 +8,6 @@ import java.util.List;
 public record PlantJournalRequest(
 		@NotNull Long plantProfileId,
 		@Size(max = 2000) String content,
-		@NotNull @Size(min = 1, max = 3) @Valid List<JournalImageRequest> images,
-		boolean setAsPlantThumbnail
+		@NotNull @Size(min = 1, max = 3) @Valid List<JournalImageRequest> images
 ) {
 }

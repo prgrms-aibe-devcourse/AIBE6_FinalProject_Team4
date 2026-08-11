@@ -62,8 +62,7 @@ class PlantJournalServiceTest {
 		PlantJournalRequest request = new PlantJournalRequest(
 				21L,
 				"오늘의 성장 기록",
-				List.of(new JournalImageRequest("https://example.test/journal.jpg", "hash", true)),
-				false
+				List.of(new JournalImageRequest("https://example.test/journal.jpg", "hash", true))
 		);
 		given(plantProfileRepository.findByIdAndUserId(21L, 7L))
 				.willReturn(Optional.of(profile));
@@ -104,8 +103,7 @@ class PlantJournalServiceTest {
 		PlantJournalRequest request = new PlantJournalRequest(
 				21L,
 				"같은 날 두 번째 성장 기록",
-				List.of(new JournalImageRequest("https://example.test/journal-2.jpg", "hash-2", true)),
-				false
+				List.of(new JournalImageRequest("https://example.test/journal-2.jpg", "hash-2", true))
 		);
 		given(plantProfileRepository.findByIdAndUserId(21L, 7L))
 				.willReturn(Optional.of(profile));
@@ -135,14 +133,13 @@ class PlantJournalServiceTest {
 	}
 
 	@Test
-	void createJournalUpdatesPlantThumbnailWhenOptionEnabled() {
+	void createJournalAlwaysUpdatesPlantThumbnailWithRepresentativeImage() {
 		User user = user(7L);
 		PlantProfile profile = profile(21L, user, null);
 		PlantJournalRequest request = new PlantJournalRequest(
 				21L,
 				"대표사진 지정 테스트",
-				List.of(new JournalImageRequest("https://example.test/thumb.jpg", "hash-thumb", true)),
-				true
+				List.of(new JournalImageRequest("https://example.test/thumb.jpg", "hash-thumb", true))
 		);
 		given(plantProfileRepository.findByIdAndUserId(21L, 7L))
 				.willReturn(Optional.of(profile));
@@ -166,40 +163,6 @@ class PlantJournalServiceTest {
 		plantJournalService.createJournal(7L, request);
 
 		verify(plantProfileService).updateThumbnail(7L, profile, "https://example.test/thumb.jpg");
-	}
-
-	@Test
-	void createJournalDoesNotUpdatePlantThumbnailWhenOptionDisabled() {
-		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
-		PlantJournalRequest request = new PlantJournalRequest(
-				21L,
-				"기본 옵션 테스트",
-				List.of(new JournalImageRequest("https://example.test/thumb2.jpg", "hash-thumb-2", true)),
-				false
-		);
-		given(plantProfileRepository.findByIdAndUserId(21L, 7L))
-				.willReturn(Optional.of(profile));
-		given(journalImageRepository.findExistingHashes(
-				eq(7L),
-				eq(List.of("hash-thumb-2")),
-				any(LocalDate.class)
-		)).willReturn(List.of());
-		given(userRepository.getReferenceById(7L)).willReturn(user);
-		given(plantJournalRepository.save(any(PlantJournal.class))).willAnswer(invocation -> {
-			PlantJournal journal = invocation.getArgument(0);
-			ReflectionTestUtils.setField(journal, "id", 34L);
-			return journal;
-		});
-		given(plantProfileRepository.claimJournalReward(
-				eq(21L),
-				any(LocalDateTime.class),
-				any(LocalDateTime.class)
-		)).willReturn(0);
-
-		plantJournalService.createJournal(7L, request);
-
-		verifyNoInteractions(plantProfileService);
 	}
 
 	@Test

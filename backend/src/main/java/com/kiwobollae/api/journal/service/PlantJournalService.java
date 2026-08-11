@@ -70,14 +70,13 @@ public class PlantJournalService {
 				.toList();
 		journalImageRepository.saveAll(images);
 
-		if (request.setAsPlantThumbnail()) {
-			String representativeImageUrl = images.stream()
-					.filter(JournalImage::isRepresentative)
-					.findFirst()
-					.orElseThrow()
-					.getImageUrl();
-			plantProfileService.updateThumbnail(userId, profile, representativeImageUrl);
-		}
+		// 오늘의 사진 중 대표(★)로 고른 사진을 항상 식물 대표사진으로도 반영한다.
+		String representativeImageUrl = images.stream()
+				.filter(JournalImage::isRepresentative)
+				.findFirst()
+				.orElseThrow()
+				.getImageUrl();
+		plantProfileService.updateThumbnail(userId, profile, representativeImageUrl);
 
 		// 작성완료 체크(1식물 1일 1회, 매일 리셋): 오늘 아직 지급 안 됐을 때만 원자적으로 클레임하고,
 		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).

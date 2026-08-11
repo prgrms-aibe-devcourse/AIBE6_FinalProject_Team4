@@ -137,7 +137,6 @@ export interface CreateJournalPayload {
   plantProfileId: number;
   content: string;
   images: JournalImagePayload[];
-  setAsPlantThumbnail: boolean;
 }
 
 export interface PlantJournalCreateData {
