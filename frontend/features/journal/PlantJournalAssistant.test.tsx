@@ -46,6 +46,8 @@ describe("PlantJournalAssistant", () => {
     expect(
       screen.getByRole("dialog", { name: "AI 식물 도우미" }),
     ).toBeInTheDocument();
+    expect(screen.queryByText("무료 · 바로 확인")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Enter 전송/)).not.toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: "AI 식물 도우미 닫기" }),
@@ -125,6 +127,45 @@ describe("PlantJournalAssistant", () => {
     expect(
       screen.queryByRole("link", { name: /1:1 문의하기/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("FAQ를 고르면 목록이 접히고 카테고리 칩으로 다시 펼칠 수 있다", () => {
+    renderAssistant();
+    openAssistant();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "오늘 일지에는 무엇을 적으면 좋을까요?",
+      }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "자주 묻는 질문 목록 펼치기" }),
+    ).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: /물주기/ }));
+
+    expect(
+      screen.getByRole("button", { name: "자주 묻는 질문 목록 접기" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("목록이 접힌 뒤에도 FAQ 버튼은 같은 노드로 DOM에 남는다", () => {
+    // 접기를 조건부 렌더로 "정리"하면 대화 맥락 전달(위 테스트)이 조용히 깨진다. 그 회귀를 막는 가드다.
+    renderAssistant();
+    openAssistant();
+
+    const faqButton = screen.getByRole("button", {
+      name: "오늘 일지에는 무엇을 적으면 좋을까요?",
+    });
+    fireEvent.click(faqButton);
+
+    expect(faqButton).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "오늘 일지에는 무엇을 적으면 좋을까요?",
+      }),
+    ).toBe(faqButton);
   });
 
   it("직접 질문하면 선택 식물·작성 중인 일지와 함께 AI 응답을 요청한다", async () => {
