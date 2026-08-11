@@ -2,11 +2,11 @@ package com.kiwobollae.api.global.config;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
-import com.kiwobollae.api.content.entity.PlantProfile;
-import com.kiwobollae.api.content.entity.PlantSpecies;
-import com.kiwobollae.api.content.entity.enums.PlantStatus;
-import com.kiwobollae.api.content.repository.PlantProfileRepository;
-import com.kiwobollae.api.content.repository.PlantSpeciesRepository;
+import com.kiwobollae.api.plantProfile.entity.PlantProfile;
+import com.kiwobollae.api.species.entity.PlantSpecies;
+import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
+import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
+import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.function.Function;
