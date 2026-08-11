@@ -15,7 +15,6 @@ import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
 import com.kiwobollae.api.plantProfile.service.PlantProfileService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;

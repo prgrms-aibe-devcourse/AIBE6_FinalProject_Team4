@@ -1,4 +1,4 @@
-package com.kiwobollae.api.plantProfile.service;
+package com.kiwobollae.api.journal.service;
 
 import com.kiwobollae.api.journal.controller.JournalImageUploadController;
 import com.kiwobollae.api.journal.dto.response.JournalImageUploadResponse;

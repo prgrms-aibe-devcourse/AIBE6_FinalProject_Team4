@@ -12,7 +12,6 @@ import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import java.io.ByteArrayInputStream;
 
-import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

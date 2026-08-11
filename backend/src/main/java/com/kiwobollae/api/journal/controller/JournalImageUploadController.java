@@ -1,7 +1,7 @@
 package com.kiwobollae.api.journal.controller;
 
 import com.kiwobollae.api.journal.dto.response.JournalImageUploadResponse;
-import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
+import com.kiwobollae.api.journal.service.JournalImageUploadService;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;

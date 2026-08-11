@@ -1,8 +1,8 @@
-package com.kiwobollae.api.journal.service;
+package com.kiwobollae.api.plantProfile.service;
 
+import com.kiwobollae.api.journal.service.JournalImageUploadService;
 import com.kiwobollae.api.plantProfile.dto.response.PlantImageUploadResponse;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
 import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;

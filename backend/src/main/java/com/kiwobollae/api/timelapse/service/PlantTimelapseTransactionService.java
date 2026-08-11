@@ -4,7 +4,7 @@ import com.kiwobollae.api.journal.entity.JournalImage;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.timelapse.entity.PlantTimelapse;
 import com.kiwobollae.api.timelapse.repository.PlantTimelapseRepository;
-import com.kiwobollae.api.plantProfile.service.JournalImageUploadService;
+import com.kiwobollae.api.journal.service.JournalImageUploadService;
 import com.kiwobollae.api.notification.entity.enums.NotificationType;
 import com.kiwobollae.api.notification.service.NotificationService;
 import java.time.LocalDateTime;

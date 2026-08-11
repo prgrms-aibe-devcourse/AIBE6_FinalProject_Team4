@@ -7,7 +7,7 @@ import com.kiwobollae.api.plantProfile.dto.request.PlantProfileUpdateRequest;
 import com.kiwobollae.api.plantProfile.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.journal.entity.JournalImage;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
-import com.kiwobollae.api.journal.service.PlantImageUploadService;
+import com.kiwobollae.api.journal.service.JournalImageUploadService;
 import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;

@@ -8,7 +8,6 @@ import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import com.kiwobollae.api.global.common.ApiVersion;
-import com.kiwobollae.api.journal.service.PlantImageUploadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
