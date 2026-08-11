@@ -565,7 +565,7 @@ export default function PlantJournalAssistant({
                     maxLength={MAX_QUESTION_LENGTH}
                     rows={2}
                     disabled={loading}
-                    placeholder={`${plant.nickname}에 대해 궁금한 점을 입력해 주세요.`}
+                    placeholder={`${plant.speciesName}에 대해 궁금한 점을 입력해 주세요.`}
                     className="min-h-[54px] w-full resize-none bg-transparent px-1 text-[14px] leading-[1.5] text-ink outline-none placeholder:text-faint disabled:text-sub"
                   />
                   <div className="mt-1 flex items-center justify-between gap-3">

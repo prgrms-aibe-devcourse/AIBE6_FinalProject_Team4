@@ -74,6 +74,28 @@ describe("PlantJournalAssistant", () => {
     expect(onPlantChange).toHaveBeenCalledWith(22);
   });
 
+  it("질문 입력 예시는 식물 닉네임이 아닌 실제 종명을 사용한다", () => {
+    render(
+      <PlantJournalAssistant
+        plant={{ id: 23, nickname: "딸기공주", speciesName: "설향 딸기" }}
+        currentJournalContent=""
+        accessToken="access-token"
+      />,
+    );
+    openAssistant();
+
+    expect(
+      screen.getByPlaceholderText(
+        "설향 딸기에 대해 궁금한 점을 입력해 주세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText(
+        "딸기공주에 대해 궁금한 점을 입력해 주세요.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("식물을 고르기 전에는 질문 기능을 안내만 하고 비활성 상태로 둔다", () => {
     renderAssistant(null);
     openAssistant();
