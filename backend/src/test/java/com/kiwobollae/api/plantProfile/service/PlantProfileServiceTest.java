@@ -35,6 +35,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class PlantProfileServiceTest {
@@ -162,13 +164,16 @@ class PlantProfileServiceTest {
 	}
 
 	// ---- updateThumbnail ----
+	// updateThumbnail()은 S3 삭제를 트랜잭션 afterCommit까지 미룬다 — 여기서는 실제 Spring 트랜잭션
+	// 없이 TransactionSynchronizationManager를 직접 열고/닫아 커밋·롤백 각각을 시뮬레이션한다.
 
 	@Test
-	void updateThumbnailReplacesImageAndCleansUpPreviousUpload() {
+	void updateThumbnailReplacesImageAndCleansUpPreviousUploadAfterCommit() {
 		User user = user(7L);
 		PlantProfile profile = profile(21L, user, "https://cdn.test/plants/7/old.jpg");
 
-		plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg");
+		runInCommittedTransaction(() ->
+				plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg"));
 
 		assertThat(profile.getPlantImage()).isEqualTo("https://cdn.test/journals/7/new.jpg");
 		verify(plantImageUploadService).delete("https://cdn.test/plants/7/old.jpg", 7L);
@@ -179,7 +184,8 @@ class PlantProfileServiceTest {
 		User user = user(7L);
 		PlantProfile profile = profile(21L, user, "emoji:🌱");
 
-		plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg");
+		runInCommittedTransaction(() ->
+				plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg"));
 
 		assertThat(profile.getPlantImage()).isEqualTo("https://cdn.test/journals/7/new.jpg");
 		verifyNoInteractions(plantImageUploadService);
@@ -193,6 +199,37 @@ class PlantProfileServiceTest {
 		plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/plants/7/same.jpg");
 
 		verifyNoInteractions(plantImageUploadService);
+	}
+
+	@Test
+	void updateThumbnailSkipsS3CleanupWhenTransactionRollsBack() {
+		User user = user(7L);
+		PlantProfile profile = profile(21L, user, "https://cdn.test/plants/7/old.jpg");
+
+		// afterCommit을 트리거하지 않고 그대로 닫는다 — 트랜잭션 롤백 시 afterCommit이 호출되지 않는 것과 동일하다.
+		runInRolledBackTransaction(() ->
+				plantProfileService.updateThumbnail(7L, profile, "https://cdn.test/journals/7/new.jpg"));
+
+		verifyNoInteractions(plantImageUploadService);
+	}
+
+	private void runInCommittedTransaction(Runnable action) {
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			action.run();
+			TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
+	}
+
+	private void runInRolledBackTransaction(Runnable action) {
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			action.run();
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
 	}
 
 	// ---- getMyProfiles ----

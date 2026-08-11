@@ -25,6 +25,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -60,8 +62,8 @@ public class PlantProfileService {
 				.map(PlantProfileResponse::from);
 	}
 
-	// 일지 작성 시 "대표사진으로 지정" 옵션에서도 재사용된다(저널 도메인 → 프로필 도메인 연동 지점).
-	// 이전 사진이 S3 업로드본이었다면 updateProfile()과 동일하게 정리한다.
+	// 일지 작성 시 대표(★) 사진을 식물 대표사진으로 반영할 때도 재사용된다(저널 도메인 → 프로필 도메인
+	// 연동 지점). 이전 사진이 S3 업로드본이었다면 updateProfile()과 동일하게 정리한다.
 	@Transactional
 	public void updateThumbnail(Long userId, PlantProfile profile, String newThumbnailUrl) {
 		String previousThumbnailUrl = profile.getPlantImage();
@@ -69,7 +71,15 @@ public class PlantProfileService {
 			return;
 		}
 		profile.updateProfile(null, newThumbnailUrl, null);
-		deleteThumbnailIfUploaded(previousThumbnailUrl, userId);
+		// S3 삭제를 즉시 실행하면, 이 트랜잭션에 편승한 이후 작업(예: createJournal의 포인트 지급/가챠
+		// 예약)이 실패해 롤백될 때 DB의 plantImage는 이전 URL로 되돌아가는데 실제 S3 객체는 이미
+		// 사라져 대표사진이 깨진다. 커밋이 확정된 뒤에만 지우도록 미룬다.
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				deleteThumbnailIfUploaded(previousThumbnailUrl, userId);
+			}
+		});
 	}
 
 	public PlantProfileResponse getProfile(Long userId, Long profileId) {
