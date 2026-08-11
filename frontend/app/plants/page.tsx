@@ -16,6 +16,11 @@ const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수
 const BULK_STATUS_OPTIONS: [PlantStatus, string][] = [['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PAGE_SIZE = 8;
+// "오늘 일지 안 쓴 것만 보기"는 서버 페이징 결과를 클라이언트에서 한 번 더 걸러내므로, 서버
+// 페이지 단위로는 totalPages를 정확히 셀 수 없다 — 대신 GROWING 전체를 한 번에 받아와 클라이언트
+// 에서 걸러내고 다시 페이징한다. 이 한도(백엔드 MAX_PAGE_SIZE와 동일)면 사실상 전체를 커버한다.
+const RAW_FETCH_SIZE = 100;
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
@@ -26,6 +31,8 @@ export default function PlantsPage() {
   const { state, hydrated, set } = useStore();
   const { showToast, askConfirm } = useUI();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  // "오늘 일지 안 쓴 것만 보기"일 때만 쓰는, 필터링 전 GROWING 전체 목록.
+  const [rawGrowing, setRawGrowing] = useState<PlantProfileData[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -59,10 +66,31 @@ export default function PlantsPage() {
     setLoading(true);
     setError('');
 
-    // "오늘 일지 안 쓴 것만 보기"는 항상 GROWING만 대상으로 하므로 그 상태를 서버 필터로 요청한다.
-    const status = writtenTodayFilterActive ? 'GROWING' : filter === 'all' ? undefined : (filter as PlantStatus);
+    if (writtenTodayFilterActive) {
+      // 서버 페이지 단위로 받으면 그 안에서 클라이언트 필터링을 한 번 더 하게 되어 totalPages가
+      // 실제로 보이는 개수와 어긋난다 — GROWING 전체를 한 번에 받아 아래 effect에서 걸러내고
+      // 다시 페이징한다(plants/totalPages는 그 effect가 채운다).
+      getMyPlants({ accessToken, status: 'GROWING', page: 0, size: RAW_FETCH_SIZE, signal: controller.signal })
+        .then((data) => setRawGrowing(data.content))
+        .catch((requestError) => {
+          if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+          setRawGrowing([]);
+          setError(
+            requestError instanceof ApiError
+              ? requestError.message
+              : '식물 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          );
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
 
-    getMyPlants({ accessToken, status, page, signal: controller.signal })
+      return () => controller.abort();
+    }
+
+    const status = filter === 'all' ? undefined : (filter as PlantStatus);
+
+    getMyPlants({ accessToken, status, page, size: PAGE_SIZE, signal: controller.signal })
       .then((data) => {
         setPlants(data.content);
         setTotalPages(data.totalPages);
@@ -85,6 +113,15 @@ export default function PlantsPage() {
   }, [hydrated, state.accessToken, filter, writtenTodayFilterActive, page]);
 
   useEffect(() => loadPlants(), [loadPlants]);
+
+  // "오늘 일지 안 쓴 것만 보기"일 때는 네트워크 재조회 없이 rawGrowing을 다시 걸러/페이징한다 —
+  // totalPages도 여기서 실제 필터링된 개수 기준으로 계산해야 화면과 어긋나지 않는다.
+  useEffect(() => {
+    if (!writtenTodayFilterActive) return;
+    const filtered = rawGrowing.filter((p) => !todayWrittenIds.has(p.id));
+    setTotalPages(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+    setPlants(filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
+  }, [writtenTodayFilterActive, rawGrowing, todayWrittenIds, page]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -129,23 +166,19 @@ export default function PlantsPage() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  // status 필터는 이제 서버에 요청하므로 plants는 이미 필터링된 현재 페이지 결과다.
-  // "오늘 일지 안 쓴 것만 보기"만 그 위에 클라이언트에서 한 번 더 좁힌다(현재 페이지 범위 내에서).
-  const list = writtenTodayFilterActive
-    ? plants.filter((p) => !todayWrittenIds.has(p.id))
-    : plants;
+  // plants는 (필터 모드와 무관하게) 이미 화면에 보일 현재 페이지 결과 그 자체다 — 서버 페이징
+  // 결과이거나, 위 effect가 rawGrowing을 걸러/페이징해 채운 결과이거나 둘 중 하나.
+  const list = plants;
 
   // 필터로 화면에서 사라진 식물이 선택 상태로 계속 남아, 안 보이는 항목까지 일괄 변경 대상이
-  // 되는 걸 막는다 — 보이는 목록(list)이 바뀌면 선택도 그 목록 기준으로 다시 걸러준다.
+  // 되는 걸 막는다 — 보이는 목록(plants)이 바뀌면 선택도 그 목록 기준으로 다시 걸러준다.
   useEffect(() => {
-    const visibleIds = new Set(
-      (writtenTodayFilterActive ? plants.filter((p) => !todayWrittenIds.has(p.id)) : plants).map((p) => p.id),
-    );
+    const visibleIds = new Set(plants.map((p) => p.id));
     setSelectedIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIds.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [writtenTodayFilterActive, plants, todayWrittenIds]);
+  }, [plants]);
   const regV = nickValid(reg.nick);
   const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
   const selectedSpecies = speciesList.find((sp) => sp.id === reg.speciesId) || null;
@@ -311,7 +344,18 @@ export default function PlantsPage() {
 
   return (
     <div className="container">
-      <h1 className="mb-1 text-[27px] font-extrabold">내 식물</h1>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[27px] font-extrabold">내 식물</h1>
+        {!selectMode && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="cursor-pointer rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white"
+          >
+            + 새 식물 등록
+          </button>
+        )}
+      </div>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-[9px]">
@@ -386,8 +430,9 @@ export default function PlantsPage() {
       ) : list.length === 0 && writtenTodayFilterActive ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌿</div>
-          {/* 서버가 status=GROWING으로 페이징해 주므로 이 페이지 뒤에 더 있을 수 있다 —
-              "안 쓴 식물이 없다"는 전체에 대한 단정이 아니라 이 페이지 한정임을 명시한다. */}
+          {/* totalPages는 이제 필터링된 실제 개수 기준이라 정확하지만, 필터를 켠 채로 다른 곳에서
+              오늘 일지를 써서 목록이 줄어들면 머무르고 있던 page가 범위를 벗어날 수 있다 —
+              그 경우엔 "안 쓴 식물이 없다"가 전체가 아니라 이 페이지 한정이라는 걸 명시한다. */}
           <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
             {totalPages > 1 ? '이 페이지에는 오늘 일지 안 쓴 식물이 없어요 🌿' : '오늘 일지 안 쓴 식물이 없어요 🌿'}
           </p>
@@ -479,16 +524,6 @@ export default function PlantsPage() {
             다음
           </button>
         </div>
-      )}
-
-      {!selectMode && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="fixed bottom-[84px] right-6 z-30 cursor-pointer rounded-full bg-brand px-[22px] py-[15px] font-extrabold text-white shadow-[0_10px_26px_rgba(124,179,66,.45)]"
-        >
-          + 새 식물 등록
-        </button>
       )}
 
       {selectMode && selectedIds.size > 0 && (
