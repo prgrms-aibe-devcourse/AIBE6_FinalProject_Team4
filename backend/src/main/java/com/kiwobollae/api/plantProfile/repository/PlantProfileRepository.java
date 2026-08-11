@@ -18,8 +18,12 @@ public interface PlantProfileRepository extends JpaRepository<PlantProfile, Long
 			+ "where p.user.id = :userId order by p.createdAt desc")
 	List<PlantProfile> findAllByUserId(@Param("userId") Long userId);
 
+	// 상태 우선순위(재배중 → 재배완료 → 실패)로 먼저 정렬하고, Pageable의 정렬(기본 createdAt desc)이 뒤이어
+	// 그룹 내 정렬 기준으로 적용된다(Spring Data JPA가 기존 order by 뒤에 이어붙인다).
 	@Query(value = "select p from PlantProfile p join fetch p.species "
-			+ "where p.user.id = :userId and (:status is null or p.status = :status)",
+			+ "where p.user.id = :userId and (:status is null or p.status = :status) "
+			+ "order by case when p.status = com.kiwobollae.api.plantProfile.entity.enums.PlantStatus.GROWING then 0 "
+			+ "when p.status = com.kiwobollae.api.plantProfile.entity.enums.PlantStatus.HARVESTED then 1 else 2 end",
 			countQuery = "select count(p) from PlantProfile p "
 			+ "where p.user.id = :userId and (:status is null or p.status = :status)")
 	Page<PlantProfile> findAllByUserIdAndStatus(@Param("userId") Long userId,
