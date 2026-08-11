@@ -311,7 +311,16 @@ export default function PlantsPage() {
 
   return (
     <div className="container">
-      <h1 className="mb-1 text-[27px] font-extrabold">내 식물</h1>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[27px] font-extrabold">내 식물</h1>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="cursor-pointer rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white"
+        >
+          + 새 식물 등록
+        </button>
+      </div>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-[9px]">
@@ -479,16 +488,6 @@ export default function PlantsPage() {
             다음
           </button>
         </div>
-      )}
-
-      {!selectMode && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="fixed bottom-[84px] right-6 z-30 cursor-pointer rounded-full bg-brand px-[22px] py-[15px] font-extrabold text-white shadow-[0_10px_26px_rgba(124,179,66,.45)]"
-        >
-          + 새 식물 등록
-        </button>
       )}
 
       {selectMode && selectedIds.size > 0 && (
