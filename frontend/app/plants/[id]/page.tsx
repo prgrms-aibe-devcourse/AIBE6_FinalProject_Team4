@@ -26,6 +26,13 @@ function revokeIfBlobUrl(url: string | null) {
   if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
 }
 
+// 백엔드(PlantTimelapseService.requestTimelapse)와 동일하게 화이트리스트로 판단한다 — GROWING만
+// 제외하는 블랙리스트였다면, 나중에 PlantStatus에 새 값이 추가될 때 백엔드는 막는데 프론트는
+// 여전히 타임랩스 버튼을 보여줘서 사용자가 눌렀다가 예상 못한 에러를 보는 불일치가 생긴다.
+function canHaveTimelapse(status: PlantStatus) {
+  return status === 'HARVESTED' || status === 'FAILED';
+}
+
 export default function PlantDetail({ params }: { params: { id: string } }) {
   const { state, hydrated, set, refreshUnreadCount } = useStore();
   const { showToast, askConfirm } = useUI();
@@ -89,8 +96,9 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   }, [hydrated, state.accessToken, id]);
 
   useEffect(() => {
-    // GROWING인 동안엔 타임랩스를 만들 수 없으므로(TIMELAPSE_NOT_HARVESTED) 조회 자체를 스킵한다.
-    if (!hydrated || !state.accessToken || !plant || plant.status === 'GROWING') return;
+    // HARVESTED/FAILED가 아니면(=GROWING이거나 향후 추가될 상태면) 타임랩스를 만들 수 없으므로
+    // (TIMELAPSE_NOT_HARVESTED) 조회 자체를 스킵한다.
+    if (!hydrated || !state.accessToken || !plant || !canHaveTimelapse(plant.status)) return;
     const accessToken = state.accessToken;
     const controller = new AbortController();
 
@@ -369,7 +377,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
         accessToken={state.accessToken}
       />
 
-      {plant.status !== 'GROWING' && timelapse && (
+      {canHaveTimelapse(plant.status) && timelapse && (
         <div className="mt-7 rounded-2xl bg-white p-5 shadow-card">
           <h2 className="mb-3 text-[19px] font-extrabold">타임랩스</h2>
           {timelapse.status === 'NONE' && (
