@@ -193,9 +193,10 @@ export default function PlantJournalAssistant({
   const controllerRef = useRef<AbortController | null>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastUserRef = useRef<HTMLDivElement>(null);
-  const anchoredUserIdRef = useRef<number | null>(null);
+  const scrollTargetRef = useRef<HTMLDivElement>(null);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+  const lastScrollTargetKeyRef = useRef<string | null>(null);
+  const wasExpandedRef = useRef(false);
   const activeChipRef = useRef<HTMLButtonElement>(null);
 
   const closeAssistant = () => {
@@ -207,7 +208,7 @@ export default function PlantJournalAssistant({
     controllerRef.current?.abort();
     controllerRef.current = null;
     inFlightRef.current = false;
-    anchoredUserIdRef.current = null;
+    lastScrollTargetKeyRef.current = null;
     setMessages([]);
     setQuestion("");
     setError("");
@@ -237,25 +238,38 @@ export default function PlantJournalAssistant({
   }, [expanded]);
 
   const isEmptyChat = messages.length === 0;
-  const lastUserMessageId =
-    [...messages].reverse().find((message) => message.role === "USER")?.id ??
-    null;
+  const lastMessage = messages[messages.length - 1] ?? null;
+  const scrollTargetKey = error
+    ? null
+    : loading
+      ? `loading:${lastMessage?.id ?? "none"}`
+      : lastMessage
+        ? `message:${lastMessage.id}`
+        : null;
 
   useEffect(() => {
-    if (!expanded || messages.length === 0) return;
+    const justOpened = expanded && !wasExpandedRef.current;
+    wasExpandedRef.current = expanded;
 
-    // 새 질문이 생겼을 때만 "그 질문"을 화면 최상단으로 1회 정렬한다.
-    // 매 리렌더마다 정렬하면 긴 답변을 읽으려 스크롤한 뒤 로딩 종료 리렌더에서 맨 위로 튕긴다.
-    if (
-      lastUserMessageId !== null &&
-      lastUserMessageId !== anchoredUserIdRef.current
-    ) {
-      anchoredUserIdRef.current = lastUserMessageId;
-      lastUserRef.current?.scrollIntoView?.({ block: "start" });
+    if (!expanded) return;
+
+    if (justOpened && messages.length > 0) {
+      lastScrollTargetKeyRef.current = scrollTargetKey;
+      conversationEndRef.current?.scrollIntoView?.({ block: "end" });
       return;
     }
-    messagesEndRef.current?.scrollIntoView?.({ block: "nearest" });
-  }, [expanded, loading, messages, lastUserMessageId]);
+
+    if (
+      scrollTargetKey === null ||
+      scrollTargetKey === lastScrollTargetKeyRef.current
+    )
+      return;
+
+    // 새 질문의 로딩 말풍선과 새 답변을 필요한 만큼만 이동해 보이게 한다.
+    // nearest를 유지해 이전 대화가 화면 위로 과도하게 밀려나는 것도 막는다.
+    lastScrollTargetKeyRef.current = scrollTargetKey;
+    scrollTargetRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [expanded, messages.length, scrollTargetKey]);
 
   const newMessageId = () => {
     nextMessageId.current += 1;
@@ -479,47 +493,67 @@ export default function PlantJournalAssistant({
             <>
               <div className="relative min-h-0 flex-1 overflow-hidden bg-[#edf2e8]">
                 <div className="absolute inset-0 overflow-y-auto overscroll-contain px-3.5 py-3">
-                  {/* 메시지가 0건이어도 항상 마운트한다. 첫 메시지와 동시에 생기면
-                      스크린리더가 첫 답변을 읽지 못한다. */}
-                  <div
-                    role="log"
-                    aria-live="polite"
-                    aria-label="AI 식물 도우미 대화"
-                    className="space-y-2.5"
-                  >
-                    {messages.map((message) =>
-                      message.role === "USER" ? (
-                        <div
-                          key={message.id}
-                          ref={
-                            message.id === lastUserMessageId
-                              ? lastUserRef
-                              : undefined
-                          }
-                          className="flex scroll-mt-3 justify-end"
-                        >
-                          <div className="max-w-[88%] rounded-[18px] rounded-tr-[6px] bg-brand-dark px-3.5 py-2.5 text-[14px] leading-[1.6] text-white">
-                            {message.content}
+                  {/* 짧은 대화는 입력창 가까이에 붙이고, 길어진 대화는 이 내부 높이가 자연스럽게
+                      늘어나도록 해 이전 FAQ와 직접 질문 사이에 빈 여백이 생기지 않게 한다. */}
+                  <div className="flex min-h-full flex-col justify-end">
+                    {/* 메시지가 0건이어도 항상 마운트한다. 첫 메시지와 동시에 생기면
+                        스크린리더가 첫 답변을 읽지 못한다. */}
+                    <div
+                      role="log"
+                      aria-live="polite"
+                      aria-label="AI 식물 도우미 대화"
+                      className="space-y-2.5"
+                    >
+                      {messages.map((message) =>
+                        message.role === "USER" ? (
+                          <div
+                            key={message.id}
+                            ref={
+                              !loading && message.id === lastMessage?.id
+                                ? scrollTargetRef
+                                : undefined
+                            }
+                            className="flex scroll-mb-3 scroll-mt-3 justify-end"
+                          >
+                            <div className="max-w-[88%] rounded-[18px] rounded-tr-[6px] bg-brand-dark px-3.5 py-2.5 text-[14px] leading-[1.6] text-white">
+                              {message.content}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div key={message.id} className="flex justify-start">
-                          <AssistantMessage message={message} />
-                        </div>
-                      ),
-                    )}
-                  </div>
-
-                  {/* 화면 전체에서 role="status"는 이것 하나뿐이어야 한다.
-                      레일·컴포저·시트에 별도 "답변 중" 표시를 추가하지 말 것. */}
-                  {loading && (
-                    <div role="status" className="mt-2.5 flex justify-start">
-                      <div className="rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-3 text-sm font-semibold text-sub">
-                        {plant.nickname}의 기록을 살펴보고 있어요…
-                      </div>
+                        ) : (
+                          <div
+                            key={message.id}
+                            ref={
+                              !loading && message.id === lastMessage?.id
+                                ? scrollTargetRef
+                                : undefined
+                            }
+                            className="flex scroll-mb-3 scroll-mt-3 justify-start"
+                          >
+                            <AssistantMessage message={message} />
+                          </div>
+                        ),
+                      )}
                     </div>
-                  )}
-                  <div ref={messagesEndRef} />
+
+                    {/* 화면 전체에서 role="status"는 이것 하나뿐이어야 한다.
+                        레일·컴포저·시트에 별도 "답변 중" 표시를 추가하지 말 것. */}
+                    {loading && (
+                      <div
+                        ref={scrollTargetRef}
+                        role="status"
+                        className="mt-2.5 flex scroll-mb-3 scroll-mt-3 justify-start"
+                      >
+                        <div className="rounded-2xl rounded-tl-sm border border-line bg-white px-4 py-3 text-sm font-semibold text-sub">
+                          {plant.nickname}의 기록을 살펴보고 있어요…
+                        </div>
+                      </div>
+                    )}
+                    <div
+                      ref={conversationEndRef}
+                      data-testid="plant-journal-chat-end"
+                      aria-hidden="true"
+                    />
+                  </div>
                 </div>
 
                 {!isEmptyChat && (
@@ -720,9 +754,11 @@ export default function PlantJournalAssistant({
                 <div className="relative flex items-end gap-2 rounded-[18px] border-[1.5px] border-[#c4d0bc] bg-white p-2 focus-within:border-brand-dark focus-within:[box-shadow:0_0_0_3px_rgba(124,179,66,.16)]">
                   <textarea
                     id="plant-journal-chat-question"
+                    name="plantJournalAiQuestion"
                     value={question}
                     onChange={(event) => setQuestion(event.target.value)}
                     onKeyDown={handleQuestionKeyDown}
+                    autoComplete="off"
                     maxLength={MAX_QUESTION_LENGTH}
                     rows={2}
                     disabled={loading}

@@ -16,6 +16,12 @@ vi.mock("@/features/journal/plant-chat-api", () => ({
 
 const mockedAskPlantChat = vi.mocked(askPlantChat);
 const PLANT = { id: 21, nickname: "바질이", speciesName: "바질" };
+const scrollIntoViewMock = vi.fn();
+
+Object.defineProperty(Element.prototype, "scrollIntoView", {
+  configurable: true,
+  value: scrollIntoViewMock,
+});
 
 function renderAssistant(plant: typeof PLANT | null = PLANT) {
   return render(
@@ -100,6 +106,17 @@ describe("PlantJournalAssistant", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("질문 입력란은 브라우저 자동완성과 비밀번호 저장 대상에서 제외한다", () => {
+    renderAssistant();
+    openAssistant();
+
+    const questionInput = screen.getByLabelText(
+      "내 식물 기록을 바탕으로 직접 질문하기",
+    );
+    expect(questionInput).toHaveAttribute("name", "plantJournalAiQuestion");
+    expect(questionInput).toHaveAttribute("autocomplete", "off");
+  });
+
   it("식물을 고르기 전에는 질문 기능을 안내만 하고 비활성 상태로 둔다", () => {
     renderAssistant(null);
     openAssistant();
@@ -166,6 +183,109 @@ describe("PlantJournalAssistant", () => {
         name: "오늘 일지에는 무엇을 적으면 좋을까요?",
       }),
     ).toBe(faqButton);
+  });
+
+  it("FAQ 답변과 직접 AI 답변을 같은 흐름에서 바로 보이게 한다", async () => {
+    let resolveResponse = (
+      _value: Awaited<ReturnType<typeof askPlantChat>>,
+    ) => {};
+    const pendingResponse = new Promise<
+      Awaited<ReturnType<typeof askPlantChat>>
+    >((resolve) => {
+      resolveResponse = resolve;
+    });
+    mockedAskPlantChat.mockReturnValueOnce(pendingResponse);
+    renderAssistant();
+    openAssistant();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "오늘 일지에는 무엇을 적으면 좋을까요?",
+      }),
+    );
+    await waitFor(() =>
+      expect(scrollIntoViewMock).toHaveBeenLastCalledWith({ block: "nearest" }),
+    );
+    expect(scrollIntoViewMock.mock.instances.at(-1)).toHaveTextContent(
+      "보이는 모습",
+    );
+    scrollIntoViewMock.mockClear();
+
+    fireEvent.change(
+      screen.getByLabelText("내 식물 기록을 바탕으로 직접 질문하기"),
+      {
+        target: { value: "딸기는 어떤 상태에서 수확하면 좋을까요?" },
+      },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalledTimes(1));
+    expect(scrollIntoViewMock).toHaveBeenLastCalledWith({ block: "nearest" });
+    expect(scrollIntoViewMock.mock.instances.at(-1)).toHaveTextContent(
+      "기록을 살펴보고 있어요",
+    );
+    const log = screen.getByRole("log", { name: "AI 식물 도우미 대화" });
+    expect(log.parentElement).toHaveClass(
+      "flex",
+      "min-h-full",
+      "flex-col",
+      "justify-end",
+    );
+
+    await act(async () => {
+      resolveResponse({
+        answer: "열매 전체가 고르게 붉고 향이 진할 때 수확해 주세요.",
+        recommendedActions: ["아침에 꼭지째 수확해 주세요."],
+        additionalChecks: [],
+      });
+      await pendingResponse;
+    });
+
+    expect(
+      await screen.findByText(
+        "열매 전체가 고르게 붉고 향이 진할 때 수확해 주세요.",
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalledTimes(2));
+    expect(scrollIntoViewMock.mock.instances.at(-1)).toHaveTextContent(
+      "열매 전체가 고르게 붉고 향이 진할 때 수확해 주세요.",
+    );
+    const turnTexts = Array.from(log.children).map(
+      (message) => message.textContent ?? "",
+    );
+    expect(turnTexts).toHaveLength(4);
+    expect(turnTexts[0]).toContain("오늘 일지에는 무엇을 적으면 좋을까요?");
+    expect(turnTexts[1]).toContain("보이는 모습");
+    expect(turnTexts[2]).toContain("딸기는 어떤 상태에서 수확하면 좋을까요?");
+    expect(turnTexts[3]).toContain(
+      "열매 전체가 고르게 붉고 향이 진할 때 수확해 주세요.",
+    );
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("대화창을 닫았다 다시 열면 가장 최근 답변이 있는 최하단을 보여준다", async () => {
+    renderAssistant();
+    openAssistant();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "오늘 일지에는 무엇을 적으면 좋을까요?",
+      }),
+    );
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalled());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "AI 식물 도우미 닫기" }),
+    );
+    scrollIntoViewMock.mockClear();
+    openAssistant();
+
+    await waitFor(() =>
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ block: "end" }),
+    );
+    expect(scrollIntoViewMock.mock.instances.at(-1)).toBe(
+      screen.getByTestId("plant-journal-chat-end"),
+    );
+    expect(screen.getByText("준비된 답변")).toBeInTheDocument();
   });
 
   it("직접 질문하면 선택 식물·작성 중인 일지와 함께 AI 응답을 요청한다", async () => {
