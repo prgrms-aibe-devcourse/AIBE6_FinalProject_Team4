@@ -62,7 +62,7 @@ export default function PlantsPage() {
     // "오늘 일지 안 쓴 것만 보기"는 항상 GROWING만 대상으로 하므로 그 상태를 서버 필터로 요청한다.
     const status = writtenTodayFilterActive ? 'GROWING' : filter === 'all' ? undefined : (filter as PlantStatus);
 
-    getMyPlants({ accessToken, status, page, signal: controller.signal })
+    getMyPlants({ accessToken, status, page, size: 8, signal: controller.signal })
       .then((data) => {
         setPlants(data.content);
         setTotalPages(data.totalPages);
