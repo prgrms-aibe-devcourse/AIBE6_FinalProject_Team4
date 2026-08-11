@@ -11,6 +11,7 @@ import { createReport } from '@/lib/report-api';
 
 const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘텐츠'], ['stolen', '사진 도용'], ['etc', '기타']];
 const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_PHOTOS = 3;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Raw (server-relative) image — pass this back to updateJournal as-is, never resolveImageUrl()
@@ -25,9 +26,21 @@ function representativeImage(journal: PlantJournalData): string | null {
   return url ? resolveImageUrl(url) : null;
 }
 
-// editPreview는 서버 이미지 URL(재사용, 해제하면 안 됨)이나 로컬 blob 미리보기(해제해야 함) 둘 다 담을 수 있다.
-function revokeIfBlobUrl(url: string | null) {
-  if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+// 수정 화면의 사진 한 장 — 기존에 저장돼 있던 사진(재업로드 없이 그대로 재사용)이거나
+// 새로 첨부한 사진(저장 시 업로드 필요) 둘 중 하나다.
+type EditPhoto =
+  | { kind: 'existing'; imageUrl: string; imageHash: string }
+  | { kind: 'new'; file: File; preview: string };
+
+function editPhotoSrc(photo: EditPhoto): string {
+  return photo.kind === 'existing' ? resolveImageUrl(photo.imageUrl) : photo.preview;
+}
+
+// 'new' 사진의 blob 미리보기 URL만 해제한다 ('existing'은 서버 URL이라 해제 대상이 아니다).
+function revokeNewPhotoBlobs(photos: EditPhoto[]) {
+  photos.forEach((photo) => {
+    if (photo.kind === 'new') URL.revokeObjectURL(photo.preview);
+  });
 }
 
 export default function JournalDetail({ params }: { params: { id: string } }) {
@@ -44,9 +57,10 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   const [submittingReport, setSubmittingReport] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
-  const [editPhoto, setEditPhoto] = useState<File | null>(null);
-  const [editPreview, setEditPreview] = useState<string | null>(null);
+  const [editPhotos, setEditPhotos] = useState<EditPhoto[]>([]);
+  const [editRepresentativeIndex, setEditRepresentativeIndex] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [viewIndex, setViewIndex] = useState(0);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -74,6 +88,12 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
     return () => controller.abort();
   }, [hydrated, state.accessToken, id]);
 
+  useEffect(() => {
+    if (!journal) return;
+    const repIndex = journal.images.findIndex((img) => img.representative);
+    setViewIndex(repIndex >= 0 ? repIndex : 0);
+  }, [journal]);
+
   const confirmDelete = () => {
     if (!journal || !state.accessToken) return;
     const accessToken = state.accessToken;
@@ -97,32 +117,58 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
 
   const openEdit = () => {
     if (!journal) return;
-    revokeIfBlobUrl(editPreview);
+    revokeNewPhotoBlobs(editPhotos);
     setEditContent(journal.content);
-    setEditPhoto(null);
-    setEditPreview(representativeImage(journal));
+    setEditPhotos(journal.images.map((img) => ({ kind: 'existing', imageUrl: img.imageUrl, imageHash: img.imageHash })));
+    const repIndex = journal.images.findIndex((img) => img.representative);
+    setEditRepresentativeIndex(repIndex >= 0 ? repIndex : 0);
     setEditing(true);
+  };
+
+  const closeEdit = () => {
+    revokeNewPhotoBlobs(editPhotos);
+    setEditing(false);
   };
 
   const pickEditPhoto = (file: File | null) => {
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) return showToast('jpg, png, webp 형식만 가능해요.', 'err');
     if (file.size > MAX_SIZE) return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
-    revokeIfBlobUrl(editPreview);
-    setEditPhoto(file);
-    setEditPreview(URL.createObjectURL(file));
+    if (editPhotos.length >= MAX_PHOTOS) return showToast(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있어요.`, 'err');
+    setEditPhotos((prev) => [...prev, { kind: 'new', file, preview: URL.createObjectURL(file) }]);
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
+  };
+
+  const removeEditPhoto = (index: number) => {
+    setEditPhotos((prev) => {
+      const target = prev[index];
+      if (target.kind === 'new') URL.revokeObjectURL(target.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+    setEditRepresentativeIndex((prev) => {
+      if (index === prev) return 0;
+      return index < prev ? prev - 1 : prev;
+    });
   };
 
   const saveEdit = async () => {
     if (!journal || !state.accessToken) return;
+    if (editPhotos.length === 0) return showToast('사진을 최소 한 장은 남겨주세요.', 'err');
     const accessToken = state.accessToken;
 
     setSaving(true);
+    const newlyUploaded: string[] = [];
     try {
-      const image = editPhoto
-        ? await uploadJournalImage(editPhoto, accessToken)
-        : representativeJournalImage(journal);
-      if (!image) return showToast('사진을 선택해 주세요.', 'err');
+      const uploadedImages = [];
+      for (const photo of editPhotos) {
+        if (photo.kind === 'existing') {
+          uploadedImages.push({ imageUrl: photo.imageUrl, imageHash: photo.imageHash });
+        } else {
+          const uploaded = await uploadJournalImage(photo.file, accessToken);
+          newlyUploaded.push(uploaded.imageUrl);
+          uploadedImages.push(uploaded);
+        }
+      }
 
       let updated;
       try {
@@ -130,16 +176,16 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
           journal.id,
           {
             content: editContent,
-            images: [{ imageUrl: image.imageUrl, imageHash: image.imageHash, representative: true }],
+            images: uploadedImages.map((img, i) => ({ ...img, representative: i === editRepresentativeIndex })),
           },
           accessToken,
         );
       } catch (updateError) {
-        if (editPhoto) {
-          deleteJournalImage(image.imageUrl, accessToken).catch(() => {});
-        }
+        newlyUploaded.forEach((imageUrl) => deleteJournalImage(imageUrl, accessToken).catch(() => {}));
         throw updateError;
       }
+      // 새로 업로드한 사진은 이제 서버에 반영됐으니 로컬 blob 미리보기는 더 이상 필요 없다.
+      revokeNewPhotoBlobs(editPhotos);
       setJournal(updated);
       setEditing(false);
       showToast('일지를 수정했어요 🌿');
@@ -194,41 +240,62 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   if (editing) {
     return (
       <div className="container">
-        <button type="button" onClick={() => setEditing(false)} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 일지 상세</button>
+        <button type="button" onClick={closeEdit} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 일지 상세</button>
         <h1 className="mb-[18px] mt-3.5 text-2xl font-extrabold">일지 수정</h1>
         <div className="max-w-[640px] rounded-[20px] bg-white p-6 shadow-card">
-          <div className="mb-5 flex items-center gap-4">
-            <input
-              ref={editFileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => pickEditPhoto(e.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => editFileInputRef.current?.click()}
-              className={`flex h-[100px] w-[100px] flex-none cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[14px] border-[1.5px] ${
-                editPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
-              }`}
-            >
-              {editPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={editPreview} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-2xl">photo_camera</span>
-                  <span className="text-[11px] font-bold">사진 선택</span>
-                </>
-              )}
-            </button>
-            <div className="flex min-w-[180px] flex-1 flex-col justify-center gap-2">
-              <div className="flex gap-3.5 text-[13px] text-faint">
-                <span>작성일 {formatDate(journal.writtenDate)}</span>
-                <span>{journal.plantProfileNickname}</span>
-              </div>
-            </div>
+          <div className="mb-2 text-[13px] text-faint">
+            <span>작성일 {formatDate(journal.writtenDate)}</span> · <span>{journal.plantProfileNickname}</span>
           </div>
+          <div className="mb-2.5 text-[12.5px] text-[#a9b3a0]">최대 {MAX_PHOTOS}장, 탭해서 대표 사진 선택</div>
+          <input
+            ref={editFileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => pickEditPhoto(e.target.files?.[0] ?? null)}
+            className="hidden"
+          />
+          <div className="mb-5 flex flex-wrap gap-2.5">
+            {editPhotos.map((photo, i) => (
+              <button
+                key={photo.kind === 'existing' ? photo.imageUrl : photo.preview}
+                type="button"
+                onClick={() => setEditRepresentativeIndex(i)}
+                className={`relative h-[100px] w-[100px] cursor-pointer overflow-hidden rounded-[14px] border-[2.5px] ${
+                  i === editRepresentativeIndex ? 'border-brand' : 'border-transparent'
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={editPhotoSrc(photo)} alt="" className="h-full w-full object-cover" />
+                {i === editRepresentativeIndex && (
+                  <span className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] text-white">★</span>
+                )}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeEditPhoto(i);
+                  }}
+                  className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/55 text-white"
+                >
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </span>
+              </button>
+            ))}
+            {editPhotos.length < MAX_PHOTOS && (
+              <button
+                type="button"
+                onClick={() => editFileInputRef.current?.click()}
+                className="flex h-[100px] w-[100px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[14px] border-[1.5px] border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]"
+              >
+                <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                <span className="text-[11px] font-bold">사진 추가</span>
+              </button>
+            )}
+          </div>
+          {editPhotos.length === 0 && (
+            <div className="mb-3 text-[12.5px] font-bold text-[#e5533b]">사진을 최소 한 장은 남겨주세요.</div>
+          )}
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
@@ -239,12 +306,12 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
             <button
               type="button"
               onClick={saveEdit}
-              disabled={saving}
+              disabled={saving || editPhotos.length === 0}
               className="flex-1 cursor-pointer rounded-[13px] bg-brand p-3.5 font-extrabold text-white disabled:opacity-60"
             >
               {saving ? '저장 중...' : '저장하기'}
             </button>
-            <button type="button" onClick={() => setEditing(false)} className="cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white px-[22px] py-3.5 font-bold text-sub">
+            <button type="button" onClick={closeEdit} className="cursor-pointer rounded-[13px] border-[1.5px] border-line bg-white px-[22px] py-3.5 font-bold text-sub">
               취소
             </button>
           </div>
@@ -254,17 +321,37 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   }
 
   const image = representativeImage(journal);
+  const activeImage = journal.images[viewIndex] ? resolveImageUrl(journal.images[viewIndex].imageUrl) : image;
 
   return (
     <div className="container">
       <button type="button" onClick={() => router.back()} className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark">← 뒤로</button>
       <div className="mt-4 grid items-start gap-6 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[20px] bg-brand-soft text-[150px]">
-          {image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={image} alt="" className="h-full w-full object-cover" />
-          ) : (
-            '🌿'
+        <div>
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[20px] bg-brand-soft text-[150px]">
+            {activeImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={activeImage} alt="" className="h-full w-full object-cover" />
+            ) : (
+              '🌿'
+            )}
+          </div>
+          {journal.images.length > 1 && (
+            <div className="mt-2.5 flex gap-2">
+              {journal.images.map((img, i) => (
+                <button
+                  key={img.imageUrl}
+                  type="button"
+                  onClick={() => setViewIndex(i)}
+                  className={`h-[60px] w-[60px] cursor-pointer overflow-hidden rounded-[10px] border-[2px] ${
+                    i === viewIndex ? 'border-brand' : 'border-transparent'
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={resolveImageUrl(img.imageUrl)} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
         <div>

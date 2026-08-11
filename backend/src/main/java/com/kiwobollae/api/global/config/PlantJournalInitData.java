@@ -2,12 +2,12 @@ package com.kiwobollae.api.global.config;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
-import com.kiwobollae.api.content.entity.JournalImage;
-import com.kiwobollae.api.content.entity.PlantJournal;
-import com.kiwobollae.api.content.entity.PlantProfile;
-import com.kiwobollae.api.content.repository.JournalImageRepository;
-import com.kiwobollae.api.content.repository.PlantJournalRepository;
-import com.kiwobollae.api.content.repository.PlantProfileRepository;
+import com.kiwobollae.api.journal.entity.JournalImage;
+import com.kiwobollae.api.journal.entity.PlantJournal;
+import com.kiwobollae.api.plantProfile.entity.PlantProfile;
+import com.kiwobollae.api.journal.repository.JournalImageRepository;
+import com.kiwobollae.api.journal.repository.PlantJournalRepository;
+import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;

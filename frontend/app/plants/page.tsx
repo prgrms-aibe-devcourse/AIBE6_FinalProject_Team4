@@ -9,6 +9,7 @@ import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStat
 import { getProfileIdsWrittenToday } from '@/lib/journal-api';
 import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import { nickValid } from '@/lib/plant-validation';
 import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
@@ -18,13 +19,6 @@ const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
-
-function nickValid(v: string) {
-  if (!v) return { ok: false, msg: '별명을 입력해 주세요.' };
-  if (v.length > 50) return { ok: false, msg: '50자 이내로 지어주세요.' };
-  if (/[^가-힣a-zA-Z0-9 ]/.test(v)) return { ok: false, msg: '특수문자 없이 예쁜 이름으로 지어주세요 🌱' };
-  return { ok: true, msg: '좋은 이름이에요! 🌿' };
-}
 
 const today = () => new Date().toISOString().slice(0, 10);
 

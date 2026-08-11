@@ -11,6 +11,7 @@ import { createJournal, PlantJournalCreateData, deleteJournalImage, uploadJourna
 import { localToday } from '@/lib/format';
 
 const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_PHOTOS = 3;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 // 오늘 하루 가이드 모달을 다시 안 보기로 선택했는지 기억하는 키 — 날짜 문자열(YYYY-MM-DD)을
 // 저장해두고, 저장된 날짜가 오늘과 다르면(자정이 지나면) 다시 보여준다.
@@ -27,6 +28,11 @@ interface Draft {
   content: string;
 }
 
+interface Photo {
+  file: File;
+  preview: string;
+}
+
 function NewJournalInner() {
   const router = useRouter();
   const params = useSearchParams();
@@ -38,8 +44,8 @@ function NewJournalInner() {
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [plantsLoading, setPlantsLoading] = useState(true);
   const [draft, setDraft] = useState<Draft>({ plantId: preselect ? Number(preselect) : null, content: '' });
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [representativeIndex, setRepresentativeIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [createResult, setCreateResult] = useState<PlantJournalCreateData | null>(null);
@@ -66,9 +72,10 @@ function NewJournalInner() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  // 사진 선택/교체 버튼을 누르면 여기로 온다 — 오늘 이미 "다시 안 보기"를 선택했으면 가이드
+  // 사진 추가 버튼을 누르면 여기로 온다 — 오늘 이미 "다시 안 보기"를 선택했으면 가이드
   // 모달 없이 바로 파일 선택창을 띄우고, 아니면 매번 가이드 모달부터 보여준다.
   const openPhotoPicker = () => {
+    if (photos.length >= MAX_PHOTOS) return;
     if (typeof window !== 'undefined' && window.localStorage.getItem(PHOTO_GUIDE_DISMISS_KEY) === todayString()) {
       fileInputRef.current?.click();
       return;
@@ -93,31 +100,48 @@ function NewJournalInner() {
     if (file.size > MAX_SIZE) {
       return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
     }
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    if (photos.length >= MAX_PHOTOS) {
+      return showToast(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있어요.`, 'err');
+    }
+    setPhotos((prev) => [...prev, { file, preview: URL.createObjectURL(file) }]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
+    setRepresentativeIndex((prev) => {
+      if (index === prev) return 0;
+      return index < prev ? prev - 1 : prev;
+    });
   };
 
   const submit = async () => {
-    if (!photoFile) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요 📷', 'err');
+    if (photos.length === 0) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요 📷', 'err');
     if (draft.plantId === null) return showToast('먼저 어떤 식물인지 골라주세요 🌿', 'err');
     if (!state.accessToken) return;
+    const accessToken = state.accessToken;
 
     setSubmitting(true);
+    const uploaded: { imageUrl: string; imageHash: string }[] = [];
     try {
-      const uploaded = await uploadJournalImage(photoFile, state.accessToken);
+      for (const photo of photos) {
+        uploaded.push(await uploadJournalImage(photo.file, accessToken));
+      }
       let result;
       try {
         result = await createJournal(
           {
             plantProfileId: draft.plantId,
             content: draft.content,
-            images: [{ imageUrl: uploaded.imageUrl, imageHash: uploaded.imageHash, representative: true }],
+            images: uploaded.map((img, i) => ({ ...img, representative: i === representativeIndex })),
           },
-          state.accessToken,
+          accessToken,
         );
       } catch (createError) {
-        deleteJournalImage(uploaded.imageUrl, state.accessToken).catch(() => {});
+        uploaded.forEach((img) => deleteJournalImage(img.imageUrl, accessToken).catch(() => {}));
         throw createError;
       }
       await refreshWallet();
@@ -139,12 +163,12 @@ function NewJournalInner() {
   };
 
   const reset = () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    photos.forEach((photo) => URL.revokeObjectURL(photo.preview));
     setSaved(false);
     setCreateResult(null);
     setDraft({ plantId: null, content: '' });
-    setPhotoFile(null);
-    setPhotoPreview(null);
+    setPhotos([]);
+    setRepresentativeIndex(0);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -216,7 +240,7 @@ function NewJournalInner() {
           )}
 
           <div className="mb-[5px] font-extrabold">2. 오늘의 사진 <span className="text-[#e5533b]">*</span></div>
-          <div className="mb-3 text-[12.5px] text-[#a9b3a0]">jpg · png · webp / 5MB 이하</div>
+          <div className="mb-3 text-[12.5px] text-[#a9b3a0]">jpg · png · webp / 5MB 이하 · 최대 {MAX_PHOTOS}장, 탭해서 대표 사진 선택</div>
           <input
             ref={fileInputRef}
             type="file"
@@ -225,32 +249,45 @@ function NewJournalInner() {
             className="hidden"
           />
           <div className="mb-[26px]">
-            <button
-              type="button"
-              onClick={openPhotoPicker}
-              className={`flex aspect-square w-full max-w-[360px] cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-[16px] border-[1.5px] ${
-                photoPreview ? 'border-transparent' : 'border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]'
-              }`}
-            >
-              {photoPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreview} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-4xl">photo_camera</span>
-                  <span className="text-[13px] font-bold">사진 선택</span>
-                </>
+            <div className="flex flex-wrap gap-2.5">
+              {photos.map((photo, i) => (
+                <button
+                  key={photo.preview}
+                  type="button"
+                  onClick={() => setRepresentativeIndex(i)}
+                  className={`relative h-[104px] w-[104px] cursor-pointer overflow-hidden rounded-[14px] border-[2.5px] ${
+                    i === representativeIndex ? 'border-brand' : 'border-transparent'
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.preview} alt="" className="h-full w-full object-cover" />
+                  {i === representativeIndex && (
+                    <span className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[11px] text-white">★</span>
+                  )}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removePhoto(i);
+                    }}
+                    className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/55 text-white"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </span>
+                </button>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <button
+                  type="button"
+                  onClick={openPhotoPicker}
+                  className="flex h-[104px] w-[104px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[14px] border-[1.5px] border-dashed border-line bg-[#f9faf6] text-[#a9b3a0]"
+                >
+                  <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                  <span className="text-[12px] font-bold">사진 추가</span>
+                </button>
               )}
-            </button>
-            {photoPreview && (
-              <button
-                type="button"
-                onClick={openPhotoPicker}
-                className="mt-3 cursor-pointer rounded-[11px] bg-brand-soft px-4 py-2.5 font-bold text-brand-dark"
-              >
-                <span className="material-symbols-outlined text-base">photo_camera</span> 사진 교체
-              </button>
-            )}
+            </div>
           </div>
 
           <div className="mb-2.5 font-extrabold">3. 오늘의 기록</div>
