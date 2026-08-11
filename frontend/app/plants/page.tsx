@@ -313,13 +313,15 @@ export default function PlantsPage() {
     <div className="container">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[27px] font-extrabold">내 식물</h1>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="cursor-pointer rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white"
-        >
-          + 새 식물 등록
-        </button>
+        {!selectMode && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="cursor-pointer rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white"
+          >
+            + 새 식물 등록
+          </button>
+        )}
       </div>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
 
