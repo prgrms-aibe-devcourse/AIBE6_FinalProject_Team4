@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api";
 import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
 import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
 import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
+import AdminChargeProductPanel from "@/features/payment/AdminChargeProductPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
 import { formatPhone } from "@/components/AddressForm";
 import {
@@ -705,6 +706,7 @@ export default function Admin() {
     ["coupons", "쿠폰 관리"],
     ["gacha-operations", "가챠 장애 관리"],
     ["points", "포인트 관리"],
+    ["charge-products", "충전 상품 관리"],
     ["reports", "신고 관리"],
     ["species", "종 관리"],
   ];
@@ -824,7 +826,9 @@ export default function Admin() {
                     {o.address} {o.addressDetail}
                     {cancelled && (o.cancelReason || o.cancelledBy) && (
                       <span className="ml-2 font-semibold text-[#b5502f]">
-                        {o.cancelledBy === "ADMIN" ? "관리자 취소" : "본인 취소"}
+                        {o.cancelledBy === "ADMIN"
+                          ? "관리자 취소"
+                          : "본인 취소"}
                         {o.cancelReason && ` · 사유: ${o.cancelReason}`}
                       </span>
                     )}
@@ -836,7 +840,8 @@ export default function Admin() {
                         ? "표시할 상품 정보가 없어요."
                         : orderItemsById[o.id]
                             .map(
-                              (item) => `${item.productName} × ${item.quantity}`,
+                              (item) =>
+                                `${item.productName} × ${item.quantity}`,
                             )
                             .join(", ")}
                   </div>
@@ -1265,8 +1270,18 @@ export default function Admin() {
         </div>
       )}
 
-      {tab === "points" && (
-        <AdminPointAdjustmentPanel accessToken={state.accessToken} />
+      {tab === "points" && state.accessToken && state.user && (
+        <AdminPointAdjustmentPanel
+          accessToken={state.accessToken}
+          adminUserId={state.user.id}
+        />
+      )}
+
+      {tab === "charge-products" && state.accessToken && state.user && (
+        <AdminChargeProductPanel
+          accessToken={state.accessToken}
+          adminUserId={state.user.id}
+        />
       )}
 
       {tab === "coupons" && state.accessToken && (
