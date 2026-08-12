@@ -392,7 +392,7 @@ export default function AdminPointAdjustmentPanel({
                 disabled={formDisabled}
                 required
               >
-                <option value="">사유를 선택해 주세요</option>
+                <option value="">사유 선택</option>
                 {(mode === "GRANT"
                   ? ADMIN_POINT_GRANT_REASONS
                   : ADMIN_POINT_DEDUCT_REASONS
