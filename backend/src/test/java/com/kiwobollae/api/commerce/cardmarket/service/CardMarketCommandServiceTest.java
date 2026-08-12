@@ -36,6 +36,7 @@ import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardStatus;
 import com.kiwobollae.api.commerce.gacha.repository.GoldenCardInstanceRepository;
 import com.kiwobollae.api.commerce.gacha.repository.TradingCardRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
+import com.kiwobollae.api.commerce.service.CommerceAssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.entity.IdempotencyKey;
@@ -91,8 +92,8 @@ class CardMarketCommandServiceTest {
             userRepository,
             pointPort,
             notificationService,
-            idempotencyService,
-            new ObjectMapper(),
+            new CardMarketIdempotencyExecutor(idempotencyService, new ObjectMapper()),
+            new CardMarketResponseMapper(new CommerceAssetUrlResolver("")),
             Clock.fixed(Instant.parse("2026-08-05T15:00:00Z"), ZoneOffset.UTC));
     seller = user(1L, "판매자");
     buyer = user(2L, "구매자");

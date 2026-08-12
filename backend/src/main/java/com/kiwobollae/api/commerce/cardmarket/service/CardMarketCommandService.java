@@ -31,27 +31,17 @@ import com.kiwobollae.api.commerce.gacha.repository.TradingCardRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
-import com.kiwobollae.api.infra.service.IdempotencyExecution;
-import com.kiwobollae.api.infra.service.IdempotencyService;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
-import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -69,12 +59,9 @@ public class CardMarketCommandService {
   private final UserRepository userRepository;
   private final CardMarketPointPort pointPort;
   private final CardMarketNotificationService notificationService;
-  private final IdempotencyService idempotencyService;
-  private final ObjectMapper objectMapper;
+  private final CardMarketIdempotencyExecutor idempotencyExecutor;
+  private final CardMarketResponseMapper responseMapper;
   private final Clock seoulClock;
-
-  @Value("${app.asset.base-url:}")
-  private String assetBaseUrl;
 
   @Transactional(isolation = Isolation.READ_COMMITTED)
   public CardMarketListingResponse createListing(
@@ -85,7 +72,7 @@ public class CardMarketCommandService {
     if (request == null) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_LISTING_CREATE",
@@ -99,7 +86,7 @@ public class CardMarketCommandService {
   public CardMarketListingResponse cancelListing(
       Long userId, Long listingId, String idempotencyKey) {
     requireUserAndKey(userId, idempotencyKey);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_LISTING_CANCEL",
@@ -113,7 +100,7 @@ public class CardMarketCommandService {
   public CardMarketTradeResponse buyNow(
       Long userId, Long listingId, String idempotencyKey) {
     requireUserAndKey(userId, idempotencyKey);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_BUY_NOW",
@@ -131,7 +118,7 @@ public class CardMarketCommandService {
       CardMarketProposalRequest request) {
     requireUserAndKey(userId, idempotencyKey);
     requireProposalRequest(request);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_OFFER_CREATE",
@@ -149,7 +136,7 @@ public class CardMarketCommandService {
       CardMarketProposalRequest request) {
     requireUserAndKey(userId, idempotencyKey);
     requireProposalRequest(request);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_OFFER_PROPOSE",
@@ -163,7 +150,7 @@ public class CardMarketCommandService {
   public CardMarketTradeResponse accept(
       Long userId, Long negotiationId, String idempotencyKey) {
     requireUserAndKey(userId, idempotencyKey);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_OFFER_ACCEPT",
@@ -177,7 +164,7 @@ public class CardMarketCommandService {
   public CardMarketNegotiationResponse reject(
       Long userId, Long negotiationId, String idempotencyKey) {
     requireUserAndKey(userId, idempotencyKey);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_OFFER_REJECT",
@@ -191,7 +178,7 @@ public class CardMarketCommandService {
   public CardMarketNegotiationResponse cancelNegotiation(
       Long userId, Long negotiationId, String idempotencyKey) {
     requireUserAndKey(userId, idempotencyKey);
-    return idempotent(
+    return idempotencyExecutor.execute(
         userId,
         idempotencyKey,
         "CARD_MARKET_OFFER_CANCEL",
@@ -258,7 +245,7 @@ public class CardMarketCommandService {
                 .createdAt(now)
                 .updatedAt(now)
                 .build());
-    return listingResponse(listing, 0);
+    return responseMapper.listing(listing, 0);
   }
 
   private CardMarketListingResponse doCancelListing(Long userId, Long listingId) {
@@ -274,7 +261,7 @@ public class CardMarketCommandService {
       collectionRepository.incrementOwnedCount(userId, listing.getCard().getId(), now);
     }
     listing.cancel("SELLER_CANCELLED", now);
-    return listingResponse(listing, 0);
+    return responseMapper.listing(listing, 0);
   }
 
   private CardMarketTradeResponse doBuyNow(Long userId, Long listingId) {
@@ -297,7 +284,7 @@ public class CardMarketCommandService {
     listing.markSold("BUY_NOW", now);
     notificationService.tradeCompleted(
         listing, buyer.getId(), trade.getId(), trade.getTradePrice());
-    return tradeResponse(trade);
+    return responseMapper.trade(trade);
   }
 
   private CardMarketNegotiationResponse doCreateNegotiation(
@@ -343,7 +330,7 @@ public class CardMarketCommandService {
             .createdAt(now)
             .build());
     notificationService.offerCreated(negotiation);
-    return negotiationResponse(negotiation);
+    return responseMapper.negotiation(negotiation, List.of());
   }
 
   private CardMarketNegotiationResponse doPropose(
@@ -383,7 +370,7 @@ public class CardMarketCommandService {
             .createdAt(now)
             .build());
     notificationService.counterProposed(negotiation, userId);
-    return negotiationResponse(negotiation);
+    return responseMapper.negotiation(negotiation, List.of());
   }
 
   private CardMarketTradeResponse doAccept(Long userId, Long negotiationId) {
@@ -429,7 +416,7 @@ public class CardMarketCommandService {
     listing.markSold("NEGOTIATED", now);
     notificationService.tradeCompleted(
         listing, negotiation.getBuyer().getId(), trade.getId(), trade.getTradePrice());
-    return tradeResponse(trade);
+    return responseMapper.trade(trade);
   }
 
   private CardMarketNegotiationResponse doReject(Long userId, Long negotiationId) {
@@ -447,7 +434,7 @@ public class CardMarketCommandService {
     pointPort.releaseOffer(
         negotiation.getBuyer().getId(), release, negotiation.getId());
     notificationService.negotiationRejected(negotiation, userId);
-    return negotiationResponse(negotiation);
+    return responseMapper.negotiation(negotiation, List.of());
   }
 
   private CardMarketNegotiationResponse doCancelNegotiation(Long userId, Long negotiationId) {
@@ -464,7 +451,7 @@ public class CardMarketCommandService {
             CardMarketNegotiationStatus.CANCELLED, "BUYER_CANCELLED", now);
     pointPort.releaseOffer(userId, release, negotiationId);
     notificationService.negotiationCancelled(negotiation);
-    return negotiationResponse(negotiation);
+    return responseMapper.negotiation(negotiation, List.of());
   }
 
   private CardMarketTrade createTrade(
@@ -647,32 +634,6 @@ public class CardMarketCommandService {
     return CardMarketPolicy.negotiationExpiresAt(listing.getExpiresAt(), now);
   }
 
-  private CardMarketListingResponse listingResponse(CardMarketListing listing, long offers) {
-    return CardMarketListingResponse.from(
-        listing, imageUrl(listing.getCard().getImageKey()), offers);
-  }
-
-  private CardMarketNegotiationResponse negotiationResponse(
-      CardMarketNegotiation negotiation) {
-    return CardMarketNegotiationResponse.from(
-        negotiation, imageUrl(negotiation.getListing().getCard().getImageKey()), List.of());
-  }
-
-  private CardMarketTradeResponse tradeResponse(CardMarketTrade trade) {
-    return CardMarketTradeResponse.from(trade, imageUrl(trade.getImageKeySnapshot()));
-  }
-
-  private String imageUrl(String imageKey) {
-    if (imageKey == null || imageKey.isBlank()) {
-      return null;
-    }
-    String normalized = imageKey.startsWith("/") ? imageKey.substring(1) : imageKey;
-    if (assetBaseUrl == null || assetBaseUrl.isBlank()) {
-      return "/" + normalized;
-    }
-    return assetBaseUrl.replaceAll("/+$", "") + "/" + normalized;
-  }
-
   private LocalDateTime now() {
     return LocalDateTime.ofInstant(seoulClock.instant(), KST);
   }
@@ -686,53 +647,4 @@ public class CardMarketCommandService {
     }
   }
 
-  private <T> T idempotent(
-      Long userId,
-      String key,
-      String apiType,
-      String canonicalRequest,
-      Class<T> responseType,
-      Function<T, Long> resourceId,
-      Supplier<T> action) {
-    String hash = hash(canonicalRequest);
-    var replay = idempotencyService.replayIfPresent(userId, apiType, key, hash);
-    if (replay.isPresent()) {
-      return deserialize(replay.get().key().getResponseSnapshot(), responseType);
-    }
-    IdempotencyExecution execution = idempotencyService.start(userId, apiType, key, hash);
-    if (execution.replay()) {
-      return deserialize(execution.key().getResponseSnapshot(), responseType);
-    }
-    T response = action.get();
-    idempotencyService.succeed(
-        execution.key(), 200, serialize(response), "CARD_MARKET", resourceId.apply(response));
-    return response;
-  }
-
-  private String hash(String value) {
-    try {
-      return HexFormat.of()
-          .formatHex(
-              MessageDigest.getInstance("SHA-256")
-                  .digest(value.getBytes(StandardCharsets.UTF_8)));
-    } catch (NoSuchAlgorithmException exception) {
-      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR);
-    }
-  }
-
-  private String serialize(Object response) {
-    try {
-      return objectMapper.writeValueAsString(response);
-    } catch (Exception exception) {
-      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR);
-    }
-  }
-
-  private <T> T deserialize(String snapshot, Class<T> responseType) {
-    try {
-      return objectMapper.readValue(snapshot, responseType);
-    } catch (Exception exception) {
-      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR);
-    }
-  }
 }

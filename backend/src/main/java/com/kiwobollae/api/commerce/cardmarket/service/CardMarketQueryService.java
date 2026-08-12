@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -51,10 +50,8 @@ public class CardMarketQueryService {
   private final UserCardCollectionRepository collectionRepository;
   private final GoldenCardInstanceRepository goldenInstanceRepository;
   private final CardMarketPointPort pointPort;
+  private final CardMarketResponseMapper responseMapper;
   private final Clock seoulClock;
-
-  @Value("${app.asset.base-url:}")
-  private String assetBaseUrl;
 
   public CardMarketPageResponse<CardMarketListingResponse> getListings(
       CardMarketAssetType assetType, Long cardId, String keyword, Pageable pageable) {
@@ -110,10 +107,7 @@ public class CardMarketQueryService {
     return CardMarketPageResponse.from(
         tradeRepository
             .findAllByBuyer_IdOrSeller_Id(userId, userId, pageable)
-            .map(
-                trade ->
-                    CardMarketTradeResponse.from(
-                        trade, imageUrl(trade.getImageKeySnapshot()))));
+            .map(responseMapper::trade));
   }
 
   public CardMarketNegotiationResponse getMyNegotiation(Long userId, Long negotiationId) {
@@ -174,7 +168,7 @@ public class CardMarketQueryService {
                   card.getId(),
                   card.getName(),
                   card.getRarity(),
-                  imageUrl(card.getImageKey()),
+                  responseMapper.imageUrl(card.getImageKey()),
                   collection.getOwnedCount(),
                   sellableCount,
                   instances);
@@ -186,8 +180,7 @@ public class CardMarketQueryService {
     long offerCount =
         negotiationRepository.countByListing_IdAndStatus(
             listing.getId(), CardMarketNegotiationStatus.NEGOTIATING);
-    return CardMarketListingResponse.from(
-        listing, imageUrl(listing.getCard().getImageKey()), offerCount);
+    return responseMapper.listing(listing, offerCount);
   }
 
   private CardMarketPageResponse<CardMarketListingResponse> listingPageResponse(
@@ -208,10 +201,8 @@ public class CardMarketQueryService {
         page.getContent().stream()
             .map(
                 listing ->
-                    CardMarketListingResponse.from(
-                        listing,
-                        imageUrl(listing.getCard().getImageKey()),
-                        offerCounts.getOrDefault(listing.getId(), 0L)))
+                    responseMapper.listing(
+                        listing, offerCounts.getOrDefault(listing.getId(), 0L)))
             .toList();
     return pageResponse(page, content);
   }
@@ -221,8 +212,7 @@ public class CardMarketQueryService {
         proposalRepository.findAllByNegotiation_IdOrderBySequenceNoAsc(negotiation.getId()).stream()
             .map(CardMarketProposalResponse::from)
             .toList();
-    return CardMarketNegotiationResponse.from(
-        negotiation, imageUrl(negotiation.getListing().getCard().getImageKey()), proposals);
+    return responseMapper.negotiation(negotiation, proposals);
   }
 
   private CardMarketPageResponse<CardMarketNegotiationResponse> negotiationPageResponse(
@@ -244,9 +234,8 @@ public class CardMarketQueryService {
         page.getContent().stream()
             .map(
                 negotiation ->
-                    CardMarketNegotiationResponse.from(
+                    responseMapper.negotiation(
                         negotiation,
-                        imageUrl(negotiation.getListing().getCard().getImageKey()),
                         proposalsByNegotiation.getOrDefault(negotiation.getId(), List.of())))
             .toList();
     return pageResponse(page, content);
@@ -268,17 +257,6 @@ public class CardMarketQueryService {
     return listingRepository
         .findWithDetailsById(listingId)
         .orElseThrow(() -> new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND));
-  }
-
-  private String imageUrl(String imageKey) {
-    if (imageKey == null || imageKey.isBlank()) {
-      return null;
-    }
-    String normalized = imageKey.startsWith("/") ? imageKey.substring(1) : imageKey;
-    if (assetBaseUrl == null || assetBaseUrl.isBlank()) {
-      return "/" + normalized;
-    }
-    return assetBaseUrl.replaceAll("/+$", "") + "/" + normalized;
   }
 
   private void requireUser(Long userId) {
