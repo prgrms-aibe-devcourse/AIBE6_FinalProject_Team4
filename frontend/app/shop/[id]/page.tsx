@@ -248,7 +248,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           </p>
           {isGachaPack && (
             <p className="mb-[18px] rounded-[14px] border border-[#ddd4f3] bg-[#f7f4ff] px-4 py-3 text-[13px] font-semibold leading-6 text-[#5f527d]">
-              무상포인트가 먼저 차감됩니다. 잔액 부족 시 유상포인트로 결제됩니다.
+              보너스 포인트가 먼저 차감됩니다. 잔액 부족 시 충전포인트로 결제됩니다.
             </p>
           )}
           <div className={`mb-[18px] text-[13px] font-bold ${product.soldOut ? 'text-danger' : 'text-brand'}`}>

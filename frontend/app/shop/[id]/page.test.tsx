@@ -92,7 +92,7 @@ describe("shop gacha pack detail", () => {
     expect(screen.getByText("팩은 한 번에 1개씩 구매할 수 있어요")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "무상포인트가 먼저 차감됩니다. 잔액 부족 시 유상포인트로 결제됩니다.",
+        "보너스 포인트가 먼저 차감됩니다. 잔액 부족 시 충전포인트로 결제됩니다.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("수량")).not.toBeInTheDocument();
@@ -133,7 +133,7 @@ describe("shop gacha pack detail", () => {
     expect(await screen.findByText("방울토마토 키트")).toBeInTheDocument();
     expect(
       screen.queryByText(
-        "무상포인트가 먼저 차감됩니다. 잔액 부족 시 유상포인트로 결제됩니다.",
+        "보너스 포인트가 먼저 차감됩니다. 잔액 부족 시 충전포인트로 결제됩니다.",
       ),
     ).not.toBeInTheDocument();
   });
