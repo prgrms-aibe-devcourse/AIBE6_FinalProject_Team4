@@ -42,6 +42,8 @@ function kstToday(): string {
 export default function Home() {
   const { state, hydrated, balance } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  const [plantsLoading, setPlantsLoading] = useState(true);
+  const [plantsError, setPlantsError] = useState('');
   const [wroteToday, setWroteToday] = useState(false);
   // 대표사진 URL은 있지만 실제 로드가 실패한(삭제됨 등) 식물 id — 이모지로 대신 보여준다.
   const [brokenThumbIds, setBrokenThumbIds] = useState<Set<number>>(new Set());
@@ -55,6 +57,8 @@ export default function Home() {
 
     // 미리보기는 "오늘 돌봐야 할 식물"을 보여주는 게 목적이라 재배중인 것만 노출한다 —
     // 수확완료/실패 개수는 위 "내 식물 현황" 카드에서 이미 따로 보여준다.
+    setPlantsLoading(true);
+    setPlantsError('');
     getMyPlants({ accessToken, status: 'GROWING', signal: controller.signal })
       .then((plantPage) => {
         setPlants(plantPage.content.slice(0, 4));
@@ -62,6 +66,12 @@ export default function Home() {
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setPlants([]);
+        // 조회 실패를 빈 배열로 처리하면 "재배중인 식물이 없어요"로 보여, 실제로는 있는데
+        // 없다고 오해할 수 있다 — 로딩/에러 상태를 따로 두고 성공했을 때만 빈 상태 UI를 보여준다.
+        setPlantsError('식물 목록을 불러오지 못했어요.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPlantsLoading(false);
       });
 
     getJournals({ year, month, size: 1 }, accessToken, controller.signal)
@@ -191,7 +201,11 @@ export default function Home() {
         <h2 className="text-xl font-extrabold">재배중인 식물</h2>
         <Link href="/plants" className="text-sm font-bold text-brand-dark">전체보기 →</Link>
       </div>
-      {plants.length === 0 ? (
+      {plantsLoading ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
+      ) : plantsError ? (
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{plantsError}</div>
+      ) : plants.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[50px] text-center shadow-card">
           <div className="animate-floaty text-[56px]">🌱</div>
           {state.plantCount > 0 ? (
