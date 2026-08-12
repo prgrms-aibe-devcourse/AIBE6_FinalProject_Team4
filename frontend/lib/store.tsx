@@ -11,6 +11,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback, Re
 import { ApiError, AUTH_EXPIRED_EVENT, reissue, logout as apiLogout, setAccessToken, setUnauthorizedHandler } from '@/lib/api';
 import { getWallet } from '@/features/point/api';
 import { getCart } from '@/lib/order-api';
+import { getMyPlants } from '@/lib/plant-api';
 import {
   getNotifications,
   getUnreadNotificationCount,
@@ -74,6 +75,7 @@ export interface StoreContextValue {
   logout: () => void;
   refreshWallet: () => Promise<void>;
   refreshCartCount: () => Promise<void>;
+  refreshPlantStats: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   refreshUnreadCount: () => Promise<void>;
 }
@@ -105,6 +107,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const walletRequestId = useRef(0);
   const cartCountRequestId = useRef(0);
   const notificationsRequestId = useRef(0);
+  const plantStatsRequestId = useRef(0);
 
   const clearAuthentication = useCallback((expired: boolean) => {
     walletRequestId.current += 1;
@@ -246,6 +249,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     void refreshCartCount();
   }, [hydrated, refreshCartCount]);
 
+  // 대시보드의 "키우는 식물" 개수 등은 등록/삭제 화면이 낙관적으로 +1/-1 해주지만, 로그인 직후나
+  // 새로고침 시점엔 그 낙관적 갱신을 거치지 않아 하드코딩 기본값이 그대로 남는다 — 여기서 실제
+  // 서버 값으로 채운다. 전체 목록을 받을 필요 없이 totalElements만 필요하므로 size=1로 조회한다.
+  const refreshPlantStats = useCallback(async () => {
+    const requestId = ++plantStatsRequestId.current;
+    if (!state.authed || !state.accessToken) {
+      setState((s) => ({ ...s, growingCount: 0, plantCount: 0 }));
+      return;
+    }
+    try {
+      const [growingPage, allPage] = await Promise.all([
+        getMyPlants({ accessToken: state.accessToken, status: 'GROWING', size: 1 }),
+        getMyPlants({ accessToken: state.accessToken, size: 1 }),
+      ]);
+      if (requestId !== plantStatsRequestId.current) return;
+      setState((s) => ({ ...s, growingCount: growingPage.totalElements, plantCount: allPage.totalElements }));
+    } catch {
+      // 조용히 무시한다 — 다음 갱신 시점(재로그인/새로고침)에 다시 시도된다.
+    }
+  }, [state.accessToken, state.authed]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void refreshPlantStats();
+  }, [hydrated, refreshPlantStats]);
+
   // 벨 배지·미리보기용. 읽음/전체읽음/삭제 뒤에도 이걸 다시 호출해 서버 상태로 재동기화한다 —
   // 장바구니 배지와 같은 이유로 클라이언트에서 카운트를 임의로 -1 하지 않는다.
   const refreshNotifications = useCallback(async () => {
@@ -385,6 +414,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         logout,
         refreshWallet,
         refreshCartCount,
+        refreshPlantStats,
         refreshNotifications,
         refreshUnreadCount,
       }}

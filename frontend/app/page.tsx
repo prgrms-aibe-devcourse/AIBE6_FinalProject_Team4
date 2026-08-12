@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useStore, fmt } from '@/lib/store';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { getJournals } from '@/lib/journal-api';
-import { dPlus, plantVisual } from '@/lib/plant-visual';
+import { resolveImageUrl } from '@/lib/api';
+import { dPlus, plantThumbnail } from '@/lib/plant-visual';
 
 const CONFETTI = [
   { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
@@ -127,7 +128,7 @@ export default function Home() {
 
   return (
     <div className="container animate-upIn">
-      <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, 초록님! 오늘도 푸릇한 하루예요 ☀️</h1>
+      <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, {state.user?.nickname}님! 오늘도 푸릇한 하루예요 ☀️</h1>
       <p className="mb-6 text-sub">작은 기록이 모여 큰 수확이 돼요.</p>
 
       {state.readyCards > 0 && (
@@ -183,20 +184,33 @@ export default function Home() {
         <h2 className="text-xl font-extrabold">내 식물 미리보기</h2>
         <Link href="/plants" className="text-sm font-bold text-brand-dark">전체보기 →</Link>
       </div>
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-        {plants.map((p) => {
-          const visual = plantVisual(p.speciesName);
-          return (
-            <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-              <div className="flex h-[120px] items-center justify-center text-[60px]" style={{ background: visual.grad }}>{visual.emoji}</div>
-              <div className="p-3.5">
-                <div className="font-extrabold">{p.nickname}</div>
-                <div className="mt-0.5 text-[13px] text-sub">{p.speciesName} · D+{dPlus(p.startDate)}</div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      {plants.length === 0 ? (
+        <div className="rounded-[22px] bg-white px-5 py-[50px] text-center shadow-card">
+          <div className="animate-floaty text-[56px]">🌱</div>
+          <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">아직 함께하는 식물이 없네요.<br />첫 반려식물을 등록해 볼까요?</p>
+          <Link href="/plants" className="inline-block rounded-xl bg-brand px-[22px] py-[11px] font-bold text-white hover:text-white">+ 새 식물 등록</Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+          {plants.map((p) => {
+            const thumb = plantThumbnail(p.thumbnailUrl, p.speciesName);
+            return (
+              <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
+                {thumb.type === 'image' ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={resolveImageUrl(thumb.url)} alt="" className="h-[120px] w-full object-cover" />
+                ) : (
+                  <div className="flex h-[120px] items-center justify-center text-[60px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
+                )}
+                <div className="p-3.5">
+                  <div className="font-extrabold">{p.nickname}</div>
+                  <div className="mt-0.5 text-[13px] text-sub">{p.speciesName} · D+{dPlus(p.startDate)}</div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
