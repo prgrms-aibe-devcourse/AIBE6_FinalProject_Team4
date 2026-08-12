@@ -237,6 +237,79 @@ class GachaPackPurchaseServiceTest {
   }
 
   @Test
+  void legacyRetryReplaysPricedFormatSuccessWithSameProductAndQuantity() throws Exception {
+    ProductService productService = mock(ProductService.class);
+    WalletService walletService = mock(WalletService.class);
+    IdempotencyService idempotencyService = mock(IdempotencyService.class);
+    GachaDrawRepository drawRepository = mock(GachaDrawRepository.class);
+    ObjectMapper objectMapper = new ObjectMapper();
+    GachaPackPurchaseService service =
+        new GachaPackPurchaseService(
+            productService,
+            walletService,
+            idempotencyService,
+            drawRepository,
+            mock(UserRepository.class),
+            mock(ApplicationEventPublisher.class),
+            objectMapper);
+    IdempotencyKey purchaseKey = mock(IdempotencyKey.class);
+    GachaPackPurchaseResponse pricedResponse =
+        new GachaPackPurchaseResponse(
+            501L, 9L, "시즌 1 가챠 카드팩", 1, 100L, 100L, 60L, 40L, 800L, List.of(701L));
+
+    when(idempotencyService.start(7L, "GACHA_PACK_PURCHASE", "purchase-key", sha256("9:1")))
+        .thenThrow(new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT));
+    when(idempotencyService.replaySucceededIgnoringHash(7L, "GACHA_PACK_PURCHASE", "purchase-key"))
+        .thenReturn(new IdempotencyExecution(purchaseKey, true));
+    when(purchaseKey.getResponseSnapshot())
+        .thenReturn(objectMapper.writeValueAsString(pricedResponse));
+
+    GachaPackPurchaseResponse response =
+        service.purchase(7L, "purchase-key", new GachaPackPurchaseRequest(9L, 1, null));
+
+    assertThat(response).isEqualTo(pricedResponse);
+    verifyNoInteractions(productService, walletService, drawRepository);
+  }
+
+  @Test
+  void legacyRetryDoesNotReplayPricedFormatSuccessForDifferentProduct() throws Exception {
+    ProductService productService = mock(ProductService.class);
+    WalletService walletService = mock(WalletService.class);
+    IdempotencyService idempotencyService = mock(IdempotencyService.class);
+    GachaDrawRepository drawRepository = mock(GachaDrawRepository.class);
+    ObjectMapper objectMapper = new ObjectMapper();
+    GachaPackPurchaseService service =
+        new GachaPackPurchaseService(
+            productService,
+            walletService,
+            idempotencyService,
+            drawRepository,
+            mock(UserRepository.class),
+            mock(ApplicationEventPublisher.class),
+            objectMapper);
+    IdempotencyKey purchaseKey = mock(IdempotencyKey.class);
+    GachaPackPurchaseResponse pricedResponse =
+        new GachaPackPurchaseResponse(
+            501L, 10L, "다른 카드팩", 1, 100L, 100L, 60L, 40L, 800L, List.of(701L));
+
+    when(idempotencyService.start(7L, "GACHA_PACK_PURCHASE", "purchase-key", sha256("9:1")))
+        .thenThrow(new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT));
+    when(idempotencyService.replaySucceededIgnoringHash(7L, "GACHA_PACK_PURCHASE", "purchase-key"))
+        .thenReturn(new IdempotencyExecution(purchaseKey, true));
+    when(purchaseKey.getResponseSnapshot())
+        .thenReturn(objectMapper.writeValueAsString(pricedResponse));
+
+    assertThatThrownBy(
+            () -> service.purchase(7L, "purchase-key", new GachaPackPurchaseRequest(9L, 1, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT));
+    verifyNoInteractions(productService, walletService, drawRepository);
+  }
+
+  @Test
   void legacyRequestKeepsExistingInProgressSemantics() {
     ProductService productService = mock(ProductService.class);
     WalletService walletService = mock(WalletService.class);

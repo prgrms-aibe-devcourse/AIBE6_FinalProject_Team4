@@ -46,20 +46,27 @@ public class GachaPackPurchaseService {
       Long userId, String idempotencyKey, GachaPackPurchaseRequest request) {
     validate(userId, idempotencyKey, request);
     String legacyRequestHash = sha256(request.productId() + ":" + request.quantity());
-    IdempotencyExecution execution =
-        request.expectedUnitPoint() == null
-            ? idempotencyService.start(userId, API_TYPE, idempotencyKey, legacyRequestHash)
-            : idempotencyService.startWithCompatibleHash(
-                userId,
-                API_TYPE,
-                idempotencyKey,
-                sha256(
-                    request.productId()
-                        + ":"
-                        + request.quantity()
-                        + ":"
-                        + request.expectedUnitPoint()),
-                legacyRequestHash);
+    IdempotencyExecution execution;
+    if (request.expectedUnitPoint() == null) {
+      try {
+        execution = idempotencyService.start(userId, API_TYPE, idempotencyKey, legacyRequestHash);
+      } catch (BusinessException exception) {
+        return replayPricedFormatSuccess(request, userId, idempotencyKey, exception);
+      }
+    } else {
+      execution =
+          idempotencyService.startWithCompatibleHash(
+              userId,
+              API_TYPE,
+              idempotencyKey,
+              sha256(
+                  request.productId()
+                      + ":"
+                      + request.quantity()
+                      + ":"
+                      + request.expectedUnitPoint()),
+              legacyRequestHash);
+    }
     if (execution.replay()) {
       return deserialize(execution.key().getResponseSnapshot());
     }
@@ -96,6 +103,25 @@ public class GachaPackPurchaseService {
             List.of(drawId));
     idempotencyService.succeed(
         execution.key(), 200, serialize(response), "GACHA_PACK_PURCHASE", execution.key().getId());
+    return response;
+  }
+
+  private GachaPackPurchaseResponse replayPricedFormatSuccess(
+      GachaPackPurchaseRequest request,
+      Long userId,
+      String idempotencyKey,
+      BusinessException startException) {
+    if (startException.getErrorCode() != ErrorCode.COMMON_IDEMPOTENCY_CONFLICT) {
+      throw startException;
+    }
+
+    IdempotencyExecution existing =
+        idempotencyService.replaySucceededIgnoringHash(userId, API_TYPE, idempotencyKey);
+    GachaPackPurchaseResponse response = deserialize(existing.key().getResponseSnapshot());
+    if (!request.productId().equals(response.productId())
+        || !request.quantity().equals(response.quantity())) {
+      throw startException;
+    }
     return response;
   }
 

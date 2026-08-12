@@ -33,6 +33,24 @@ public class IdempotencyService {
 				.map(existing -> validateExisting(existing, requestHash));
 	}
 
+	/**
+	 * 요청 해시 형식 변경의 전환 기간에만 사용한다. 호출자는 재생 응답으로 원래 요청의 의미를
+	 * 직접 대조해야 하며, 새 요청을 실행하는 용도로 사용하면 안 된다.
+	 */
+	public IdempotencyExecution replaySucceededIgnoringHash(
+			Long userId,
+			String apiType,
+			String clientKey
+	) {
+		IdempotencyKey existing = idempotencyKeyRepository
+				.findByUser_IdAndApiTypeAndClientKey(userId, apiType, clientKey)
+				.orElseThrow(() -> new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT));
+		if (existing.getStatus() == IdempotencyStatus.SUCCEEDED) {
+			return new IdempotencyExecution(existing, true);
+		}
+		throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS);
+	}
+
 	public IdempotencyExecution start(
 			Long userId,
 			String apiType,
