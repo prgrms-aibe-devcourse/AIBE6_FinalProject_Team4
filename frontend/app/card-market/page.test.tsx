@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CardMarketPage from "./page";
 import {
   createMarketNegotiation,
+  createMarketListing,
+  buyMarketListing,
   getMarketListings,
   getMarketSellableCards,
   getMarketWallet,
@@ -22,6 +24,20 @@ const auth = vi.hoisted(() => ({
   user: null as { id: number } | null,
 }));
 const refreshWallet = vi.hoisted(() => vi.fn());
+const navigation = vi.hoisted(() => ({
+  replace: vi.fn(),
+  params: new URLSearchParams(),
+}));
+const ui = vi.hoisted(() => ({ askConfirm: vi.fn() }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: navigation.replace }),
+  useSearchParams: () => navigation.params,
+}));
+
+vi.mock("@/lib/ui", () => ({
+  useUI: () => ({ askConfirm: ui.askConfirm }),
+}));
 
 vi.mock("@/lib/store", () => ({
   useStore: () => ({
@@ -43,6 +59,8 @@ vi.mock("@/lib/card-market-api", async (importOriginal) => {
     getMyMarketNegotiations: vi.fn(),
     getMyMarketTrades: vi.fn(),
     createMarketNegotiation: vi.fn(),
+    createMarketListing: vi.fn(),
+    buyMarketListing: vi.fn(),
   };
 });
 
@@ -53,6 +71,8 @@ const mockedMyListings = vi.mocked(getMyMarketListings);
 const mockedNegotiations = vi.mocked(getMyMarketNegotiations);
 const mockedTrades = vi.mocked(getMyMarketTrades);
 const mockedCreateOffer = vi.mocked(createMarketNegotiation);
+const mockedCreateListing = vi.mocked(createMarketListing);
+const mockedBuy = vi.mocked(buyMarketListing);
 
 const listing = {
   id: 17,
@@ -79,6 +99,7 @@ describe("CardMarketPage", () => {
     vi.clearAllMocks();
     auth.accessToken = null;
     auth.user = null;
+    navigation.params = new URLSearchParams();
     mockedListings.mockResolvedValue({
       content: [listing],
       page: 0,
@@ -98,6 +119,8 @@ describe("CardMarketPage", () => {
     mockedNegotiations.mockResolvedValue([]);
     mockedTrades.mockResolvedValue([]);
     mockedCreateOffer.mockResolvedValue({} as never);
+    mockedCreateListing.mockResolvedValue({} as never);
+    mockedBuy.mockResolvedValue({} as never);
     refreshWallet.mockResolvedValue(undefined);
   });
 
@@ -165,5 +188,145 @@ describe("CardMarketPage", () => {
     expect(
       await screen.findByText("판매자에게 가격을 제안했어요."),
     ).toBeInTheDocument();
+  });
+
+  it("바로 구매 전 취소 불가 확인을 받는다", async () => {
+    auth.accessToken = "access-token";
+    auth.user = { id: 7 };
+    render(<CardMarketPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "거래하기" }));
+    fireEvent.click(screen.getByRole("button", { name: /바로 구매/ }));
+
+    expect(ui.askConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "이 카드를 바로 구매할까요?",
+        ok: "구매 확정",
+      }),
+    );
+    expect(mockedBuy).not.toHaveBeenCalled();
+  });
+
+  it("매물 페이지와 등급 필터를 URL에 보존한다", async () => {
+    mockedListings.mockResolvedValue({
+      content: [listing],
+      page: 0,
+      size: 20,
+      totalElements: 21,
+      totalPages: 2,
+    });
+    render(<CardMarketPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    expect(navigation.replace).toHaveBeenCalledWith("/card-market?page=2", {
+      scroll: false,
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "골든" }));
+    expect(navigation.replace).toHaveBeenCalledWith(
+      "/card-market?rarity=GOLDEN_RARE",
+      { scroll: false },
+    );
+  });
+
+  it("골든 판매 개체를 실제 카드명과 고유 ID로 표시한다", async () => {
+    auth.accessToken = "access-token";
+    auth.user = { id: 7 };
+    mockedSellable.mockResolvedValue([
+      {
+        cardId: 43,
+        cardName: "황금 옥수수",
+        rarity: "GOLDEN_RARE",
+        imageUrl: null,
+        ownedCount: 1,
+        sellableCount: 1,
+        goldenInstances: [{ id: 731, originRank: 12, listed: false }],
+      },
+    ]);
+    render(<CardMarketPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /내 판매/ }));
+
+    expect(
+      screen.getByRole("option", { name: "황금 옥수수 · 개체 #731" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("골든 #12")).not.toBeInTheDocument();
+  });
+
+  it("판매 등록 전에 가격과 수수료 및 예상 정산액을 안내한다", async () => {
+    auth.accessToken = "access-token";
+    auth.user = { id: 7 };
+    mockedSellable.mockResolvedValue([
+      {
+        cardId: 11,
+        cardName: "하이퍼 토마토",
+        rarity: "HYPER_RARE",
+        imageUrl: null,
+        ownedCount: 2,
+        sellableCount: 1,
+        goldenInstances: [],
+      },
+    ]);
+    render(<CardMarketPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /내 판매/ }));
+    expect(
+      screen.getByText(/판매 가능 가격 100P ~ 99,999,999P/),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("판매 가격 100P 이상"), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "등록" }));
+
+    expect(ui.askConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "판매 등록을 확인해 주세요",
+        body: expect.stringContaining(
+          "판매 카드: 하이퍼 토마토. 등록 가격은 1,000P이며, 거래 완료 시 수수료 20%를 제외한 800P",
+        ),
+        ok: "판매 등록",
+      }),
+    );
+    expect(mockedCreateListing).not.toHaveBeenCalled();
+  });
+
+  it("골든 카드는 일반 확인 뒤 위험 확인을 한 번 더 받는다", async () => {
+    auth.accessToken = "access-token";
+    auth.user = { id: 7 };
+    mockedSellable.mockResolvedValue([
+      {
+        cardId: 43,
+        cardName: "황금 옥수수",
+        rarity: "GOLDEN_RARE",
+        imageUrl: null,
+        ownedCount: 1,
+        sellableCount: 1,
+        goldenInstances: [{ id: 731, originRank: 12, listed: false }],
+      },
+    ]);
+    render(<CardMarketPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /내 판매/ }));
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "731" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("판매 가격 100P 이상"), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "등록" }));
+
+    const firstConfirm = ui.askConfirm.mock.calls[0][0];
+    firstConfirm.onOk();
+
+    await waitFor(() => expect(ui.askConfirm).toHaveBeenCalledTimes(2));
+    expect(ui.askConfirm).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: "귀중한 골든 카드를 정말 판매할까요?",
+        ok: "위험을 확인하고 등록",
+        danger: true,
+        body: expect.stringContaining("황금 옥수수 · 개체 #731"),
+      }),
+    );
+    expect(mockedCreateListing).not.toHaveBeenCalled();
   });
 });

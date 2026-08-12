@@ -12,10 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketListingResponse;
 import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketPageResponse;
 import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketWalletResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.AdminCardMarketRevenueResponse;
 import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketAssetType;
 import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketListingStatus;
 import com.kiwobollae.api.commerce.cardmarket.service.CardMarketCommandService;
 import com.kiwobollae.api.commerce.cardmarket.service.CardMarketQueryService;
+import com.kiwobollae.api.commerce.cardmarket.service.AdminCardMarketRevenueService;
 import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardRarity;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -50,6 +52,7 @@ class CardMarketControllerAuthorizationTest {
 
   @MockitoBean private CardMarketQueryService queryService;
   @MockitoBean private CardMarketCommandService commandService;
+  @MockitoBean private AdminCardMarketRevenueService revenueService;
 
   @Test
   void anonymousUserCanBrowseOpenListings() throws Exception {
@@ -135,5 +138,25 @@ class CardMarketControllerAuthorizationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"cardId\":11,\"askingPrice\":1000}"))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void onlyAdminCanReadMarketRevenue() throws Exception {
+    String userToken = jwtTokenProvider.generateAccessToken(7L, "USER");
+    String adminToken = jwtTokenProvider.generateAccessToken(1L, "ADMIN");
+    given(revenueService.getRevenue(0, 20))
+        .willReturn(new AdminCardMarketRevenueResponse(0, 0, 0, 0, List.of(), 0, 20, 0, 0));
+
+    mockMvc
+        .perform(
+            get("/api/v1/admin/card/market/revenue")
+                .header("Authorization", "Bearer " + userToken))
+        .andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            get("/api/v1/admin/card/market/revenue")
+                .header("Authorization", "Bearer " + adminToken))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.totalFeePoint").value(0));
   }
 }

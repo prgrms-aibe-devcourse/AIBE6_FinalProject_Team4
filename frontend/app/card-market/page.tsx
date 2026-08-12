@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import {
   MarketAssetType,
@@ -25,6 +26,7 @@ import {
   rejectMarketNegotiation,
 } from "@/lib/card-market-api";
 import { useStore } from "@/lib/store";
+import { useUI } from "@/lib/ui";
 
 type Tab = "market" | "sell" | "sent" | "received" | "trades";
 
@@ -72,9 +74,40 @@ function CardImage({ src, name }: { src: string | null; name: string }) {
 }
 
 export default function CardMarketPage() {
+  return (
+    <Suspense fallback={<CardMarketPageFallback />}>
+      <CardMarketPageContent />
+    </Suspense>
+  );
+}
+
+function CardMarketPageFallback() {
+  return (
+    <main className="min-h-screen bg-[#f4f6f1] px-4 py-24 text-center font-bold text-[#7a8476]">
+      거래소를 불러오는 중...
+    </main>
+  );
+}
+
+function CardMarketPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { askConfirm } = useUI();
   const { state, hydrated, refreshWallet } = useStore();
   const [tab, setTab] = useState<Tab>("market");
-  const [assetType, setAssetType] = useState<MarketAssetType | undefined>();
+  const requestedAssetType = searchParams.get("rarity");
+  const requestedPage = Number(searchParams.get("page"));
+  const [assetType, setAssetType] = useState<MarketAssetType | undefined>(() =>
+    requestedAssetType === "HYPER_RARE" || requestedAssetType === "GOLDEN_RARE"
+      ? requestedAssetType
+      : undefined,
+  );
+  const [marketPage, setMarketPage] = useState(() =>
+    Number.isInteger(requestedPage) && requestedPage > 0
+      ? requestedPage - 1
+      : 0,
+  );
+  const [marketTotalPages, setMarketTotalPages] = useState(0);
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [myListings, setMyListings] = useState<MarketListing[]>([]);
   const [sent, setSent] = useState<MarketNegotiation[]>([]);
@@ -106,8 +139,9 @@ export default function CardMarketPage() {
       setLoading(true);
       setError("");
       try {
-        const market = await getMarketListings(assetType, 0, signal);
+        const market = await getMarketListings(assetType, marketPage, signal);
         setListings(market.content);
+        setMarketTotalPages(market.totalPages);
         if (token) {
           const [walletData, cards, mine, sentData, receivedData, tradeData] =
             await Promise.all([
@@ -142,8 +176,21 @@ export default function CardMarketPage() {
         setLoading(false);
       }
     },
-    [assetType, token],
+    [assetType, marketPage, token],
   );
+
+  useEffect(() => {
+    const nextAssetType = searchParams.get("rarity");
+    setAssetType(
+      nextAssetType === "HYPER_RARE" || nextAssetType === "GOLDEN_RARE"
+        ? nextAssetType
+        : undefined,
+    );
+    const nextPage = Number(searchParams.get("page"));
+    setMarketPage(
+      Number.isInteger(nextPage) && nextPage > 0 ? nextPage - 1 : 0,
+    );
+  }, [searchParams]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -175,6 +222,23 @@ export default function CardMarketPage() {
       return;
     }
     setTab(next);
+  };
+
+  const changeMarketQuery = (
+    nextAssetType: MarketAssetType | undefined,
+    nextPage: number,
+  ) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextAssetType) params.set("rarity", nextAssetType);
+    else params.delete("rarity");
+    if (nextPage > 0) params.set("page", String(nextPage + 1));
+    else params.delete("page");
+    setAssetType(nextAssetType);
+    setMarketPage(nextPage);
+    const query = params.toString();
+    router.replace(query ? `/card-market?${query}` : "/card-market", {
+      scroll: false,
+    });
   };
 
   const activeListings = useMemo(
@@ -327,7 +391,7 @@ export default function CardMarketPage() {
                     <button
                       key={type ?? "ALL"}
                       type="button"
-                      onClick={() => setAssetType(type)}
+                      onClick={() => changeMarketQuery(type, 0)}
                       className={`rounded-full px-4 py-2 text-xs font-black ${assetType === type ? "bg-[#344b32] text-white" : "bg-white text-[#667260]"}`}
                     >
                       {type === undefined
@@ -341,21 +405,50 @@ export default function CardMarketPage() {
               </div>
             </div>
             {listings.length ? (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {listings.map((listing) => (
-                  <ListingCard
-                    key={listing.id}
-                    listing={listing}
-                    mine={listing.sellerUserId === userId}
-                    onBuy={() => {
-                      if (!token)
-                        return setNotice("로그인 후 구매할 수 있어요.");
-                      setSelectedListing(listing);
-                      setOfferPrice("");
-                    }}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {listings.map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      mine={listing.sellerUserId === userId}
+                      onBuy={() => {
+                        if (!token)
+                          return setNotice("로그인 후 구매할 수 있어요.");
+                        setSelectedListing(listing);
+                        setOfferPrice("");
+                      }}
+                    />
+                  ))}
+                </div>
+                {marketTotalPages > 1 ? (
+                  <div className="mt-8 flex items-center justify-center gap-3 border-t border-[#dfe5da] pt-6">
+                    <button
+                      type="button"
+                      disabled={marketPage <= 0}
+                      onClick={() =>
+                        changeMarketQuery(assetType, marketPage - 1)
+                      }
+                      className="rounded-xl border border-[#cad5c5] bg-white px-5 py-2.5 text-sm font-black text-[#53644e] disabled:opacity-35"
+                    >
+                      이전
+                    </button>
+                    <span className="min-w-20 text-center text-sm font-black text-[#667260]">
+                      {marketPage + 1} / {marketTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={marketPage + 1 >= marketTotalPages}
+                      onClick={() =>
+                        changeMarketQuery(assetType, marketPage + 1)
+                      }
+                      className="rounded-xl border border-[#cad5c5] bg-white px-5 py-2.5 text-sm font-black text-[#53644e] disabled:opacity-35"
+                    >
+                      다음
+                    </button>
+                  </div>
+                ) : null}
+              </>
             ) : (
               <Empty text="현재 판매 중인 카드가 없어요." />
             )}
@@ -394,18 +487,48 @@ export default function CardMarketPage() {
                       }
                       onSubmit={() => {
                         const priceValue = Number(sellPrices[card.cardId]);
-                        void runAction(
-                          () =>
-                            createMarketListing(
-                              card.cardId,
-                              card.rarity === "GOLDEN_RARE"
-                                ? (selectedGolden[card.cardId] ?? null)
-                                : null,
-                              priceValue,
-                              token,
-                            ),
-                          "판매글을 등록했어요.",
-                        );
+                        const sellerReceived = Math.floor(priceValue * 0.8);
+                        const assetGuide =
+                          card.rarity === "GOLDEN_RARE"
+                            ? `선택한 개체 #${selectedGolden[card.cardId]}가 판매 등록됩니다.`
+                            : "판매 중에는 해당 카드 1장이 보유 수량에서 분리되며, 판매 취소나 기간 만료 시 돌아옵니다.";
+                        const submitListing = () =>
+                          void runAction(
+                            () =>
+                              createMarketListing(
+                                card.cardId,
+                                card.rarity === "GOLDEN_RARE"
+                                  ? (selectedGolden[card.cardId] ?? null)
+                                  : null,
+                                priceValue,
+                                token,
+                              ),
+                            "판매글을 등록했어요.",
+                          );
+                        askConfirm({
+                          icon: "sell",
+                          title: "판매 등록을 확인해 주세요",
+                          body: `판매 카드: ${card.cardName}. 등록 가격은 ${point(priceValue)}이며, 거래 완료 시 수수료 20%를 제외한 ${point(sellerReceived)}를 받습니다. ${assetGuide}`,
+                          ok: "판매 등록",
+                          onOk: () => {
+                            if (card.rarity !== "GOLDEN_RARE") {
+                              submitListing();
+                              return;
+                            }
+                            window.setTimeout(
+                              () =>
+                                askConfirm({
+                                  icon: "warning",
+                                  title: "귀중한 골든 카드를 정말 판매할까요?",
+                                  body: `${card.cardName} · 개체 #${selectedGolden[card.cardId]}를 판매합니다. 등록 중에는 다른 거래에 사용할 수 없고, 판매가 완료되면 소유권이 구매자에게 즉시 이전되어 되돌릴 수 없습니다.`,
+                                  ok: "위험을 확인하고 등록",
+                                  danger: true,
+                                  onOk: submitListing,
+                                }),
+                              0,
+                            );
+                          },
+                        });
                       }}
                     />
                   ))}
@@ -483,10 +606,17 @@ export default function CardMarketPage() {
                     }))
                   }
                   onAccept={() =>
-                    void runAction(
-                      () => acceptMarketNegotiation(negotiation.id, token),
-                      "가격 제안을 수락해 거래를 완료했어요.",
-                    )
+                    askConfirm({
+                      icon: "handshake",
+                      title: "이 가격으로 거래를 완료할까요?",
+                      body: `${negotiation.cardName}을 ${point(negotiation.currentPrice)}에 거래합니다. 거래가 완료되면 카드와 포인트 이동을 취소할 수 없습니다.`,
+                      ok: "제안 수락",
+                      onOk: () =>
+                        void runAction(
+                          () => acceptMarketNegotiation(negotiation.id, token),
+                          "가격 제안을 수락해 거래를 완료했어요.",
+                        ),
+                    })
                   }
                   onReject={() =>
                     void runAction(
@@ -635,10 +765,17 @@ export default function CardMarketPage() {
               type="button"
               disabled={actionLoading}
               onClick={() =>
-                void runAction(
-                  () => buyMarketListing(selectedListing.id, token),
-                  "카드 구매를 완료했어요.",
-                )
+                askConfirm({
+                  icon: "shopping_bag",
+                  title: "이 카드를 바로 구매할까요?",
+                  body: `${selectedListing.cardName}을 ${point(selectedListing.askingPrice)}에 구매합니다. 거래 가능 포인트가 사용되며 완료 후 취소하거나 환불할 수 없습니다.`,
+                  ok: "구매 확정",
+                  onOk: () =>
+                    void runAction(
+                      () => buyMarketListing(selectedListing.id, token),
+                      "카드 구매를 완료했어요.",
+                    ),
+                })
               }
               className="mt-4 w-full rounded-2xl bg-[#344b32] py-4 font-black text-white shadow-lg disabled:opacity-40"
             >
@@ -791,7 +928,7 @@ function SellableCardRow({
                 .filter((item) => !item.listed)
                 .map((item) => (
                   <option key={item.id} value={item.id}>
-                    골든 #{item.originRank ?? item.id}
+                    {card.cardName} · 개체 #{item.id}
                   </option>
                 ))}
             </select>
@@ -821,7 +958,8 @@ function SellableCardRow({
             </button>
           </div>
           <p className="mt-2 text-[11px] text-[#8b947f]">
-            판매 완료 시 수수료 20%가 차감됩니다.
+            판매 가능 가격 100P ~ 99,999,999P · 판매 완료 시 수수료 20%가
+            차감됩니다.
           </p>
         </div>
       </div>

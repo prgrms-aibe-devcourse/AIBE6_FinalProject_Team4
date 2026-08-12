@@ -9,6 +9,9 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,19 +24,25 @@ public class CardMarketExpiryScheduler {
   private final CardMarketExpiryProcessor processor;
   private final Clock seoulClock;
 
+  @Value("${card-market.expiry.batch-size:100}")
+  private int batchSize;
+
   @Scheduled(fixedDelayString = "${card-market.expiry.fixed-delay-ms:60000}")
   public void expireDueResources() {
     LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), ZoneOffset.UTC);
+    int effectiveBatchSize = Math.max(1, Math.min(batchSize, 500));
+    PageRequest batch =
+        PageRequest.of(0, effectiveBatchSize, Sort.by(Sort.Direction.ASC, "id"));
     negotiationRepository
         .findAllByStatusAndExpiresAtLessThanEqual(
-            CardMarketNegotiationStatus.NEGOTIATING, now)
+            CardMarketNegotiationStatus.NEGOTIATING, now, batch)
         .forEach(negotiation -> processor.expireNegotiation(negotiation.getId()));
     listingRepository
-        .findAllByStatusAndExpiresAtLessThanEqual(CardMarketListingStatus.OPEN, now)
+        .findAllByStatusAndExpiresAtLessThanEqual(CardMarketListingStatus.OPEN, now, batch)
         .forEach(listing -> processor.expireListing(listing.getId()));
     listingRepository
         .findAllByStatusAndCard_StatusNot(
-            CardMarketListingStatus.OPEN, TradingCardStatus.ACTIVE)
+            CardMarketListingStatus.OPEN, TradingCardStatus.ACTIVE, batch)
         .forEach(listing -> processor.closeHiddenCardListing(listing.getId()));
   }
 }

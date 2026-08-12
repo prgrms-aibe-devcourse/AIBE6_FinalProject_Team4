@@ -49,8 +49,8 @@ public interface CardMarketListingRepository extends JpaRepository<CardMarketLis
   boolean existsByGoldenInstance_IdAndStatus(Long goldenInstanceId, CardMarketListingStatus status);
 
   List<CardMarketListing> findAllByStatusAndExpiresAtLessThanEqual(
-      CardMarketListingStatus status, LocalDateTime now);
+      CardMarketListingStatus status, LocalDateTime now, Pageable pageable);
 
   List<CardMarketListing> findAllByStatusAndCard_StatusNot(
-      CardMarketListingStatus status, TradingCardStatus cardStatus);
+      CardMarketListingStatus status, TradingCardStatus cardStatus, Pageable pageable);
 }

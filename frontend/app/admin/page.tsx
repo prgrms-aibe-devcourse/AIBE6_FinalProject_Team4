@@ -3,6 +3,7 @@ import { ApiError } from "@/lib/api";
 import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
 import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
 import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
+import AdminCardMarketRevenuePanel from "@/components/admin/AdminCardMarketRevenuePanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
 import { formatPhone } from "@/components/AddressForm";
 import {
@@ -143,6 +144,7 @@ const ADMIN_TABS = [
   ["products", "상품 관리"],
   ["coupons", "쿠폰 관리"],
   ["gacha-operations", "가챠 장애 관리"],
+  ["card-market-revenue", "거래소 수익"],
   ["points", "포인트 관리"],
   ["reports", "신고 관리"],
   ["species", "종 관리"],
@@ -1410,6 +1412,10 @@ export default function Admin({
 
       {tab === "gacha-operations" && state.accessToken && (
         <AdminGachaOperationsPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "card-market-revenue" && state.accessToken && (
+        <AdminCardMarketRevenuePanel accessToken={state.accessToken} />
       )}
 
       {tab === "species" && (
