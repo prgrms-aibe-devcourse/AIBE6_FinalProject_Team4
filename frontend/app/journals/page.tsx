@@ -4,6 +4,7 @@ import { formatDate } from '@/lib/format';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { useStore } from '@/lib/store';
+import PlantJournalAssistant from '@/features/journal/PlantJournalAssistant';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -21,6 +22,7 @@ export default function JournalsPage() {
   const [selectedProfileIds, setSelectedProfileIds] = useState<number[]>([]); // [] = 전체
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [monthFilter, setMonthFilter] = useState(currentMonth); // "" = 전체, else "YYYY-MM"
+  const [chatPlantId, setChatPlantId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const monthInputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +72,7 @@ export default function JournalsPage() {
 
   // 실패한 식물은 더 이상 새 일지를 못 쓰므로(journals/new의 selectPlant 참고) 오늘 포인트 요약 대상에서 뺀다.
   const eligiblePlants = plants.filter((p) => p.status !== 'FAILED');
+  const chatPlant = eligiblePlants.find((plant) => plant.id === chatPlantId) ?? eligiblePlants[0] ?? null;
   const rewardedTodayCount = eligiblePlants.filter((p) => p.journalRewardGrantedToday).length;
   const todayRewardSummary =
     eligiblePlants.length === 0
@@ -204,6 +207,26 @@ export default function JournalsPage() {
           </div>
         </div>
       )}
+
+      <PlantJournalAssistant
+        plant={
+          chatPlant
+            ? {
+                id: chatPlant.id,
+                nickname: chatPlant.nickname,
+                speciesName: chatPlant.speciesName,
+              }
+            : null
+        }
+        plantOptions={eligiblePlants.map((plant) => ({
+          id: plant.id,
+          nickname: plant.nickname,
+          speciesName: plant.speciesName,
+        }))}
+        plantOptionsLoading={loading}
+        onPlantChange={setChatPlantId}
+        accessToken={state.accessToken}
+      />
     </div>
   );
 }

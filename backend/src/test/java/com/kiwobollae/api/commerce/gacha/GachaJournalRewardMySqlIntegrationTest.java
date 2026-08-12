@@ -13,11 +13,11 @@ import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository
 import com.kiwobollae.api.journal.dto.request.JournalImageRequest;
 import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
-import com.kiwobollae.api.plantProfile.entity.PlantProfile;
-import com.kiwobollae.api.species.entity.PlantSpecies;
-import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.journal.service.PlantJournalService;
+import com.kiwobollae.api.plantProfile.entity.PlantProfile;
+import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
+import com.kiwobollae.api.species.entity.PlantSpecies;
+import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
