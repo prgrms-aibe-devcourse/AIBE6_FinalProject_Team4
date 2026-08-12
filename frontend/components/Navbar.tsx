@@ -10,6 +10,13 @@ import Skeleton from './Skeleton';
 import { useGachaCosmetics } from '@/features/gacha/use-gacha-cosmetics';
 import GachaTitleBadge from '@/components/gacha/GachaTitleBadge';
 import ProfileCosmeticFrame from '@/components/gacha/ProfileCosmeticFrame';
+import {
+  GACHA_COLLECTION_CHANGED_EVENT,
+  grantLocalTestGachaCard,
+} from '@/lib/gacha-api';
+import { ApiError } from '@/lib/api';
+
+const SHOW_LOCAL_GACHA_TEST_CONTROLS = process.env.NODE_ENV !== 'production';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
   DELIVERY: '📦',
@@ -19,6 +26,7 @@ const NOTIF_ICON: Record<NotificationType, string> = {
   INQUIRY: '💬',
   NOTICE: '📢',
   TIMELAPSE: '🎬',
+  CARD_MARKET: '🤝',
 };
 
 const NAV = [
@@ -28,6 +36,7 @@ const NAV = [
   { key: 'shop', label: '상점', href: '/shop' },
   { key: 'cards', label: '쿠폰', href: '/cards' },
   { key: 'gacha', label: '가챠', href: '/gacha' },
+  { key: 'market', label: '거래소', href: '/card-market' },
 ];
 
 // 모바일 하단 탭은 식물/일지를 "식물" 하나로 합치고 쿠폰과 가챠를 각각 바로 접근하게 한다.
@@ -45,6 +54,7 @@ function activeKey(pathname: string) {
   if (pathname.startsWith('/plants')) return 'plants';
   if (pathname.startsWith('/journals')) return 'journal';
   if (pathname.startsWith('/cards')) return 'cards';
+  if (pathname.startsWith('/card-market')) return 'market';
   if (pathname.startsWith('/gacha')) return 'gacha';
   if (pathname.startsWith('/shop')) return 'shop';
   if (pathname.startsWith('/my')) return 'account';
@@ -64,6 +74,9 @@ export default function Navbar() {
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [testCardLoading, setTestCardLoading] = useState<
+    'HYPER_RARE' | 'GOLDEN_RARE' | null
+  >(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,6 +100,31 @@ export default function Navbar() {
     logout();
     showToast('로그아웃했어요.');
     router.push('/');
+  };
+
+  const grantTestCard = async (
+    rarity: 'HYPER_RARE' | 'GOLDEN_RARE',
+    quantity: 1 | 2,
+  ) => {
+    if (!state.accessToken || testCardLoading) return;
+    setTestCardLoading(rarity);
+    try {
+      const result = await grantLocalTestGachaCard(
+        rarity,
+        quantity,
+        state.accessToken,
+      );
+      window.dispatchEvent(new Event(GACHA_COLLECTION_CHANGED_EVENT));
+      showToast(`${result.cardName} ${result.grantedQuantity}장을 지급했어요.`);
+    } catch (error) {
+      showToast(
+        error instanceof ApiError
+          ? error.message
+          : '테스트 카드를 지급하지 못했어요.',
+      );
+    } finally {
+      setTestCardLoading(null);
+    }
   };
 
   if (pathname.startsWith('/auth')) return null;
@@ -244,6 +282,35 @@ export default function Navbar() {
                     <Link href="/my/inquiries" onClick={() => setProfileOpen(false)} className="block px-4 py-2.5 text-[14px] font-semibold text-ink transition-colors duration-150 hover:bg-brand-soft hover:text-ink">
                       1:1 문의
                     </Link>
+                    {SHOW_LOCAL_GACHA_TEST_CONTROLS && (
+                      <div className="border-t border-[#F2ECDD] bg-[#fffaf0] p-2.5">
+                        <p className="mb-2 px-1 text-[11px] font-extrabold text-[#8a6a20]">
+                          로컬 거래소 테스트
+                        </p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <button
+                            type="button"
+                            disabled={testCardLoading !== null}
+                            onClick={() => void grantTestCard('HYPER_RARE', 2)}
+                            className="rounded-lg bg-[#ede4fa] px-2 py-2 text-[11px] font-extrabold text-[#684398] transition hover:bg-[#dfcff5] disabled:opacity-50"
+                          >
+                            {testCardLoading === 'HYPER_RARE'
+                              ? '지급 중...'
+                              : '하이퍼 2장'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={testCardLoading !== null}
+                            onClick={() => void grantTestCard('GOLDEN_RARE', 1)}
+                            className="rounded-lg bg-[#fff0ad] px-2 py-2 text-[11px] font-extrabold text-[#765600] transition hover:bg-[#f8df72] disabled:opacity-50"
+                          >
+                            {testCardLoading === 'GOLDEN_RARE'
+                              ? '지급 중...'
+                              : '골든 1장'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={doLogout}

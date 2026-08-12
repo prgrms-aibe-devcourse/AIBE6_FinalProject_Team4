@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "관리자 쿠폰", description = "실물 교환 쿠폰 마스터 관리 API")
 @RestController
@@ -72,5 +75,12 @@ public class AdminCardController {
   @DeleteMapping("/{cardId}")
   public ResponseEntity<ApiResponse<AdminCardResponse>> hide(@PathVariable Long cardId) {
     return ResponseEntity.ok(ApiResponse.success(adminCardService.hide(cardId)));
+  }
+
+  @Operation(summary = "쿠폰 이미지 업로드")
+  @PostMapping(path = "/{cardId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ApiResponse<AdminCardResponse>> uploadImage(
+      @PathVariable Long cardId, @RequestPart("file") MultipartFile file) {
+    return ResponseEntity.ok(ApiResponse.success(adminCardService.uploadImage(cardId, file)));
   }
 }

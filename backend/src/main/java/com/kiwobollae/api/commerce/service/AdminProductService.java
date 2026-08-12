@@ -16,6 +16,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +30,7 @@ public class AdminProductService {
   private final PlantSpeciesRepository plantSpeciesRepository;
   private final CommerceAssetKeyValidator assetKeyValidator;
   private final AssetUrlResolver assetUrlResolver;
+  private final CommerceAssetStorageService assetStorageService;
 
   public List<AdminProductResponse> getProducts() {
     return productRepository.findAllByCategoryInOrderByCreatedAtDesc(MANAGED_CATEGORIES).stream()
@@ -107,6 +109,13 @@ public class AdminProductService {
   @Transactional
   public AdminProductResponse hide(Long productId) {
     return changeStatus(productId, ProductStatus.HIDDEN);
+  }
+
+  @Transactional
+  public AdminProductResponse uploadImage(Long productId, MultipartFile file) {
+    Product product = findManagedForUpdate(productId);
+    product.updateImage(assetStorageService.upload(file, "products", productId));
+    return response(product);
   }
 
   private ValidatedProduct validate(AdminProductRequest request) {

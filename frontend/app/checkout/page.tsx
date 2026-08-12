@@ -187,7 +187,18 @@ function CheckoutInner() {
           <div className="rounded-2xl bg-white px-[18px] py-1.5 shadow-card">
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3 border-b border-[#f4f5ee] py-3 last:border-b-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-[11px] bg-brand-soft text-2xl">🌱</div>
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-[11px] bg-brand-soft bg-cover bg-center text-2xl"
+                  style={
+                    item.imageUrl
+                      ? { backgroundImage: `url("${item.imageUrl}")` }
+                      : undefined
+                  }
+                  role={item.imageUrl ? "img" : undefined}
+                  aria-label={item.imageUrl ? item.productName : undefined}
+                >
+                  {!item.imageUrl && "🌱"}
+                </div>
                 <div className="flex-1">
                   <div className="text-sm font-bold">{item.productName}</div>
                   <div className="text-[12.5px] text-sub">수량 {item.quantity}</div>

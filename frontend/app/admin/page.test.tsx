@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   askConfirm: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
 vi.mock("@/lib/store", () => ({
   fmt: (value: number) => value.toLocaleString("ko-KR"),
   useStore: () => ({

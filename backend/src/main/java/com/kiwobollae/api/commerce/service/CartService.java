@@ -9,6 +9,7 @@ import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.CartItemRepository;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.service.WalletService;
@@ -32,6 +33,7 @@ public class CartService {
 	private final ProductRepository productRepository;
 	private final UserRepository userRepository;
 	private final WalletService walletService;
+	private final AssetUrlResolver assetUrlResolver;
 
 	@Transactional
 	public CartItemResponse addItem(Long userId, CartItemRequest request) {
@@ -56,12 +58,12 @@ public class CartService {
 		} else {
 			cartItem.changeQuantity(newQuantity);
 		}
-		return CartItemResponse.from(cartItem);
+		return response(cartItem);
 	}
 
 	public CartResponse getCart(Long userId) {
 		List<CartItemResponse> items = cartItemRepository.findAllByUserIdOrderByIdDesc(userId).stream()
-				.map(CartItemResponse::from)
+				.map(this::response)
 				.toList();
 		long expectedTotal = items.stream()
 				.mapToLong(item -> item.unitPrice() * item.quantity())
@@ -84,7 +86,7 @@ public class CartService {
 			throw new BusinessException(ErrorCode.CART_QUANTITY_LIMIT_EXCEEDED);
 		}
 		cartItem.changeQuantity(quantity);
-		return CartItemResponse.from(cartItem);
+		return response(cartItem);
 	}
 
 	@Transactional
@@ -117,5 +119,12 @@ public class CartService {
 					Map.of("availableStock", product.getStock())
 			);
 		}
+	}
+
+	private CartItemResponse response(CartItem cartItem) {
+		return CartItemResponse.from(
+				cartItem,
+				assetUrlResolver.resolve(cartItem.getProduct().getImageUrl())
+		);
 	}
 }

@@ -102,8 +102,14 @@ describe("GachaOpenPage", () => {
     }
     fireEvent.click(screen.getByRole("button", { name: "전체 결과 보기" }));
     expect(
-      await screen.findByRole("link", { name: "상점으로 가기" }),
-    ).toHaveAttribute("href", "/shop");
+      await screen.findByRole("link", { name: "카드팩 구매하기" }),
+    ).toHaveAttribute("href", "/shop?category=GACHA_PACK&sort=new&page=1");
+    expect(
+      screen.getByRole("link", { name: "일지 보러 가기" }),
+    ).toHaveAttribute("href", "/journals");
+    expect(
+      screen.getByRole("link", { name: "다른 개봉 내역 보기" }),
+    ).toHaveAttribute("href", "/gacha?tab=history");
   });
 
   it("환불된 팩은 포인트 반환 안내 후 대기를 종료한다", async () => {

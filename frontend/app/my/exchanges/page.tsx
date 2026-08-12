@@ -8,6 +8,7 @@ import { cancelExchange, ExchangeOrderData, ExchangeStatus, getMyExchanges } fro
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { formatPhone } from '@/components/AddressForm';
+import { useRouter } from 'next/navigation';
 
 const STEPS: [ExchangeStatus, string][] = [['REQUESTED', '신청됨'], ['PREPARING', '준비중'], ['SHIPPING', '배송중'], ['DELIVERED', '배송완료']];
 
@@ -17,7 +18,12 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 
-export default function MyExchanges() {
+export default function MyExchanges({
+  searchParams,
+}: {
+  searchParams?: { page?: string | string[] };
+}) {
+  const router = useRouter();
   const { state, hydrated } = useStore();
   const { showToast, askConfirm } = useUI();
   const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
@@ -25,6 +31,20 @@ export default function MyExchanges() {
   const [loading, setLoading] = useState(true);
   const [cardsLoading, setCardsLoading] = useState(true);
   const [error, setError] = useState('');
+  const requestedPage = Number(
+    Array.isArray(searchParams?.page) ? searchParams?.page[0] : searchParams?.page,
+  );
+  const [page, setPage] = useState(
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage - 1 : 0,
+  );
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    const nextPage = Number(
+      Array.isArray(searchParams?.page) ? searchParams?.page[0] : searchParams?.page,
+    );
+    setPage(Number.isInteger(nextPage) && nextPage > 0 ? nextPage - 1 : 0);
+  }, [searchParams?.page]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -34,8 +54,11 @@ export default function MyExchanges() {
     setLoading(true);
     setError('');
 
-    getMyExchanges(accessToken, 0, 50, controller.signal)
-      .then((page) => setExchanges(page.content))
+    getMyExchanges(accessToken, page, 10, controller.signal)
+      .then((response) => {
+        setExchanges(response.content);
+        setTotalPages(response.totalPages);
+      })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setExchanges([]);
@@ -50,7 +73,12 @@ export default function MyExchanges() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+  }, [hydrated, page, state.accessToken]);
+
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    router.replace(`/my/exchanges?page=${nextPage + 1}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -212,6 +240,13 @@ export default function MyExchanges() {
           })}
         </div>
       )}
+      {!loading && !error && totalPages > 1 ? (
+        <div className="mt-7 flex items-center justify-center gap-3">
+          <button type="button" disabled={page === 0} onClick={() => changePage(page - 1)} className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40">이전</button>
+          <span className="text-sm font-bold text-sub">{page + 1} / {totalPages}</span>
+          <button type="button" disabled={page + 1 >= totalPages} onClick={() => changePage(page + 1)} className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40">다음</button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -69,4 +69,8 @@ public class Card extends BaseTimeEntity {
 	public void changeStatus(ActiveStatus status) {
 		this.status = status;
 	}
+
+	public void updateImage(String imageUrl) {
+		this.imageUrl = imageUrl;
+	}
 }

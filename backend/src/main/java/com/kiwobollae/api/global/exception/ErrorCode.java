@@ -52,6 +52,8 @@ public enum ErrorCode {
 
 	// --- Domain codes (error-codes.md §5) ---
 	PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+	COMMERCE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "5MB 이하의 jpg, png, webp 이미지만 업로드할 수 있습니다."),
+	COMMERCE_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "상품 이미지를 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요."),
 	PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 상품입니다."),
 	PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "재고가 부족합니다."),
 
@@ -78,6 +80,19 @@ public enum ErrorCode {
 	GACHA_COSMETIC_NOT_FOUND(HttpStatus.NOT_FOUND, "칭호 또는 테두리를 찾을 수 없습니다."),
 	GACHA_COSMETIC_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 해금한 칭호 또는 테두리입니다."),
 	GACHA_COSMETIC_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "해금하지 않은 칭호 또는 테두리입니다."),
+	CARD_MARKET_LISTING_NOT_FOUND(HttpStatus.NOT_FOUND, "판매글을 찾을 수 없습니다."),
+	CARD_MARKET_LISTING_NOT_OPEN(HttpStatus.CONFLICT, "이미 종료된 판매글입니다."),
+	CARD_MARKET_CARD_NOT_TRADABLE(HttpStatus.UNPROCESSABLE_CONTENT, "거래할 수 없는 등급의 카드입니다."),
+	CARD_MARKET_CARD_KEEP_ONE_REQUIRED(HttpStatus.CONFLICT, "하이퍼 카드는 최소 1장을 보유해야 합니다."),
+	CARD_MARKET_GOLDEN_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "보유하지 않은 골든 카드입니다."),
+	CARD_MARKET_GOLDEN_ALREADY_LISTED(HttpStatus.CONFLICT, "이미 판매 중인 골든 카드입니다."),
+	CARD_MARKET_PRICE_INVALID(HttpStatus.BAD_REQUEST, "거래 가격은 100P 이상 99,999,999P 이하여야 합니다."),
+	CARD_MARKET_SELF_TRADE(HttpStatus.BAD_REQUEST, "자신의 판매글은 구매하거나 가격을 제안할 수 없습니다."),
+	CARD_MARKET_NEGOTIATION_NOT_FOUND(HttpStatus.NOT_FOUND, "가격 협상을 찾을 수 없습니다."),
+	CARD_MARKET_NEGOTIATION_DUPLICATE(HttpStatus.CONFLICT, "이미 진행 중인 가격 협상이 있습니다."),
+	CARD_MARKET_NEGOTIATION_INVALID_STATE(HttpStatus.CONFLICT, "이미 종료된 가격 협상입니다."),
+	CARD_MARKET_NEGOTIATION_TURN_CONFLICT(HttpStatus.CONFLICT, "현재 가격을 제안하거나 응답할 차례가 아닙니다."),
+	CARD_MARKET_PROPOSAL_PRICE_INVALID(HttpStatus.BAD_REQUEST, "현재 협상 범위에서 제안할 수 없는 가격입니다."),
 
 	EXCHANGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 상품을 찾을 수 없습니다."),
 	EXCHANGE_PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "교환 상품의 재고가 부족합니다."),
