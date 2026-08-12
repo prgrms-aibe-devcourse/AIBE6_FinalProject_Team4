@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import FilterBar from '@/components/FilterBar';
 import PointPrice from '@/components/PointPrice';
-import { ApiError } from '@/lib/api';
+import { firstSearchParam, parseOneBasedPage } from '@/features/commerce/list-query';
+import { commerceErrorMessage, isAbortError } from '@/features/commerce/presentation';
 import {
   getProducts,
   ProductCategory,
@@ -42,22 +43,18 @@ type ShopSearchParams = {
   page?: string | string[];
 };
 
-const queryValue = (value?: string | string[]) =>
-  Array.isArray(value) ? value[0] : value;
-
 const initialCategory = (params?: ShopSearchParams) => {
-  const value = queryValue(params?.category);
+  const value = firstSearchParam(params?.category);
   return TABS.some((tab) => tab.key === value) ? value! : 'all';
 };
 
 const initialSort = (params?: ShopSearchParams) => {
-  const value = queryValue(params?.sort);
+  const value = firstSearchParam(params?.sort);
   return SORTS.some((sort) => sort.key === value) ? value! : 'new';
 };
 
 const initialPage = (params?: ShopSearchParams) => {
-  const value = Number(queryValue(params?.page));
-  return Number.isInteger(value) && value > 0 ? value - 1 : 0;
+  return parseOneBasedPage(params?.page);
 };
 
 export default function Shop({ searchParams }: { searchParams?: ShopSearchParams }) {
@@ -95,12 +92,13 @@ export default function Shop({ searchParams }: { searchParams?: ShopSearchParams
         setTotalPages(response.totalPages);
       })
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (isAbortError(requestError)) return;
         setProducts([]);
         setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : '상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          commerceErrorMessage(
+            requestError,
+            '상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          ),
         );
       })
       .finally(() => {

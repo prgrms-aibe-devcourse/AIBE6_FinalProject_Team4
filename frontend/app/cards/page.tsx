@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import FilterBar from '@/components/FilterBar';
 import PointPrice from '@/components/PointPrice';
-import { ApiError } from '@/lib/api';
+import { firstSearchParam, parseOneBasedPage } from '@/features/commerce/list-query';
+import { commerceErrorMessage, isAbortError } from '@/features/commerce/presentation';
 import { CardData, getCards } from '@/lib/card-api';
 import { couponName } from '@/lib/coupon-label';
 import { useStore } from '@/lib/store';
@@ -32,18 +33,14 @@ type CardSearchParams = {
   page?: string | string[];
 };
 
-const queryValue = (value?: string | string[]) =>
-  Array.isArray(value) ? value[0] : value;
-
 export default function Cards({ searchParams }: { searchParams?: CardSearchParams }) {
   const router = useRouter();
   const { state, hydrated } = useStore();
-  const requestedFilter = queryValue(searchParams?.tab);
-  const requestedSort = queryValue(searchParams?.sort);
-  const requestedPage = Number(queryValue(searchParams?.page));
+  const requestedFilter = firstSearchParam(searchParams?.tab);
+  const requestedSort = firstSearchParam(searchParams?.sort);
   const urlFilter = TABS.some((tab) => tab.key === requestedFilter) ? requestedFilter! : 'all';
   const urlSort = SORTS.some((item) => item.key === requestedSort) ? requestedSort! : 'new';
-  const urlPage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage - 1 : 0;
+  const urlPage = parseOneBasedPage(searchParams?.page);
   const [filter, setFilter] = useState(urlFilter);
   const [sort, setSort] = useState(urlSort);
   const [page, setPage] = useState(urlPage);
@@ -70,12 +67,13 @@ export default function Cards({ searchParams }: { searchParams?: CardSearchParam
         setCards(allCards);
       })
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (isAbortError(requestError)) return;
         setCards([]);
         setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : '쿠폰을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          commerceErrorMessage(
+            requestError,
+            '쿠폰을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          ),
         );
       })
       .finally(() => {
