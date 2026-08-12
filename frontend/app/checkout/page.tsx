@@ -256,8 +256,8 @@ function CheckoutInner() {
           <div className="border-t border-[#f2f3ec] pt-2 text-[14.5px]">
             <div className="flex justify-between py-1.5"><span className="text-sub">충전 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedPaidPoint)}P</span></div>
             <div className="flex justify-between py-1.5"><span className="text-sub">보너스 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedFreePoint)}P</span></div>
-            <div className="mt-1.5 flex justify-between border-t border-[#f2f3ec] py-2"><span className="text-sub">결제 후 유상 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingPaidPoint))}P</span></div>
-            <div className="flex justify-between pb-2"><span className="text-sub">결제 후 무상 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingFreePoint))}P</span></div>
+            <div className="mt-1.5 flex justify-between border-t border-[#f2f3ec] py-2"><span className="text-sub">충전 포인트 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingPaidPoint))}P</span></div>
+            <div className="flex justify-between pb-2"><span className="text-sub">보너스 포인트 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingFreePoint))}P</span></div>
           </div>
 
           {pointUsage.error && (
@@ -275,7 +275,7 @@ function CheckoutInner() {
               askConfirm({
                 icon: 'shopping_cart_checkout',
                 title: '주문을 완료할까요?',
-                body: `유상 ${fmt(pointUsage.usedPaidPoint)}P, 무상 ${fmt(pointUsage.usedFreePoint)}P가 사용돼요.`,
+                body: `충전 포인트 ${fmt(pointUsage.usedPaidPoint)}P, 보너스 포인트 ${fmt(pointUsage.usedFreePoint)}P가 사용돼요.`,
                 ok: '결제하고 주문 완료',
                 onOk: place,
               })
