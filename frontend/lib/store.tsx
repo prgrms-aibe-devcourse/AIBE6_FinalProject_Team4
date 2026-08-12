@@ -48,6 +48,7 @@ export interface StoreState {
   wallet: Wallet;
   growingCount: number;
   plantCount: number;
+  failedCount: number;
   readyCards: number;
   cartCount: number;
   // 벨 드롭다운 미리보기용 최근 알림 몇 건. 전체 목록·페이지네이션은 /notifications
@@ -89,6 +90,7 @@ const DEFAULTS: StoreState = {
   wallet: EMPTY_WALLET,
   growingCount: 3,
   plantCount: 5,
+  failedCount: 1,
   readyCards: 2,
   cartCount: 0,
   notifications: [],
@@ -255,16 +257,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshPlantStats = useCallback(async () => {
     const requestId = ++plantStatsRequestId.current;
     if (!state.authed || !state.accessToken) {
-      setState((s) => ({ ...s, growingCount: 0, plantCount: 0 }));
+      setState((s) => ({ ...s, growingCount: 0, plantCount: 0, failedCount: 0 }));
       return;
     }
     try {
-      const [growingPage, allPage] = await Promise.all([
+      const [growingPage, failedPage, allPage] = await Promise.all([
         getMyPlants({ accessToken: state.accessToken, status: 'GROWING', size: 1 }),
+        getMyPlants({ accessToken: state.accessToken, status: 'FAILED', size: 1 }),
         getMyPlants({ accessToken: state.accessToken, size: 1 }),
       ]);
       if (requestId !== plantStatsRequestId.current) return;
-      setState((s) => ({ ...s, growingCount: growingPage.totalElements, plantCount: allPage.totalElements }));
+      setState((s) => ({
+        ...s,
+        growingCount: growingPage.totalElements,
+        failedCount: failedPage.totalElements,
+        plantCount: allPage.totalElements,
+      }));
     } catch {
       // 조용히 무시한다 — 다음 갱신 시점(재로그인/새로고침)에 다시 시도된다.
     }
