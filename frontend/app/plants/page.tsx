@@ -28,7 +28,7 @@ const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PlantsPage() {
-  const { state, hydrated, set } = useStore();
+  const { state, hydrated, refreshPlantStats } = useStore();
   const { showToast, askConfirm } = useUI();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   // "오늘 일지 안 쓴 것만 보기"일 때만 쓰는, 필터링 전 GROWING 전체 목록.
@@ -226,6 +226,9 @@ export default function PlantsPage() {
         if (succeededIds.size > 0) {
           if (page === 0) loadPlants();
           else setPage(0);
+          // 대시보드의 "내 식물 현황" 등은 이 store 값을 쓰는데, 상태 변경으로 재배중/실패
+          // 구성이 바뀌었으니 다시 채워야 한다 — 낙관적 +1/-1로는 3개 카운트를 다 못 맞춘다.
+          void refreshPlantStats();
         }
         showToast(
           failCount === 0
@@ -328,7 +331,7 @@ export default function PlantsPage() {
       setWrittenTodayOnly(false);
       setPage(0);
       if (alreadyAtDefaultView) loadPlants();
-      set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
+      void refreshPlantStats();
       setOpen(false);
       resetRegisterForm();
       showToast(`'${created.nickname}'와의 여정이 시작됐어요! 🌿`);

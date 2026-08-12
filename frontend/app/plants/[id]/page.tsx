@@ -34,7 +34,7 @@ function canHaveTimelapse(status: PlantStatus) {
 }
 
 export default function PlantDetail({ params }: { params: { id: string } }) {
-  const { state, hydrated, set, refreshUnreadCount } = useStore();
+  const { state, hydrated, refreshUnreadCount, refreshPlantStats } = useStore();
   const { showToast, askConfirm } = useUI();
   const router = useRouter();
   const id = Number(params.id);
@@ -169,10 +169,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       onOk: async () => {
         try {
           await deletePlant(plant.id, accessToken);
-          set((s) => ({
-            plantCount: Math.max(0, s.plantCount - 1),
-            growingCount: plant.status === 'GROWING' ? Math.max(0, s.growingCount - 1) : s.growingCount,
-          }));
+          void refreshPlantStats();
           showToast('식물을 삭제했어요.');
           router.push('/plants');
         } catch (requestError) {
@@ -297,6 +294,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       setPlant(updated);
       setStatusOpen(false);
       setPhotoFile(null);
+      void refreshPlantStats();
       showToast('식물 정보를 수정했어요 🌿');
     } catch (requestError) {
       showToast(

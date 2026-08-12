@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useStore, fmt } from '@/lib/store';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { getJournals } from '@/lib/journal-api';
-import { dPlus, plantVisual } from '@/lib/plant-visual';
+import { resolveImageUrl } from '@/lib/api';
+import { dPlus, plantThumbnail, plantVisual } from '@/lib/plant-visual';
 
 const CONFETTI = [
   { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
@@ -41,7 +42,11 @@ function kstToday(): string {
 export default function Home() {
   const { state, hydrated, balance } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  const [plantsLoading, setPlantsLoading] = useState(true);
+  const [plantsError, setPlantsError] = useState('');
   const [wroteToday, setWroteToday] = useState(false);
+  // 대표사진 URL은 있지만 실제 로드가 실패한(삭제됨 등) 식물 id — 이모지로 대신 보여준다.
+  const [brokenThumbIds, setBrokenThumbIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -50,13 +55,23 @@ export default function Home() {
     const today = kstToday();
     const [year, month] = today.split('-').map(Number);
 
-    getMyPlants({ accessToken, signal: controller.signal })
+    // 미리보기는 "오늘 돌봐야 할 식물"을 보여주는 게 목적이라 재배중인 것만 노출한다 —
+    // 수확완료/실패 개수는 위 "내 식물 현황" 카드에서 이미 따로 보여준다.
+    setPlantsLoading(true);
+    setPlantsError('');
+    getMyPlants({ accessToken, status: 'GROWING', signal: controller.signal })
       .then((plantPage) => {
         setPlants(plantPage.content.slice(0, 4));
       })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setPlants([]);
+        // 조회 실패를 빈 배열로 처리하면 "재배중인 식물이 없어요"로 보여, 실제로는 있는데
+        // 없다고 오해할 수 있다 — 로딩/에러 상태를 따로 두고 성공했을 때만 빈 상태 UI를 보여준다.
+        setPlantsError('식물 목록을 불러오지 못했어요.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPlantsLoading(false);
       });
 
     getJournals({ year, month, size: 1 }, accessToken, controller.signal)
@@ -127,7 +142,7 @@ export default function Home() {
 
   return (
     <div className="container animate-upIn">
-      <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, 초록님! 오늘도 푸릇한 하루예요 ☀️</h1>
+      <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, {state.user?.nickname}님! 오늘도 푸릇한 하루예요 ☀️</h1>
       <p className="mb-6 text-sub">작은 기록이 모여 큰 수확이 돼요.</p>
 
       {state.readyCards > 0 && (
@@ -173,30 +188,65 @@ export default function Home() {
         </div>
 
         <div className="rounded-[18px] bg-white p-[22px] shadow-card">
-          <div className="text-[13px] font-bold text-sub">키우는 식물</div>
-          <div className="mb-0.5 mt-2 text-[31px] font-extrabold">{state.growingCount}<span className="text-base text-faint">개</span></div>
-          <Link href="/plants" className="mt-2.5 inline-block rounded-[10px] bg-brand-soft px-4 py-[9px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white">내 식물 보기</Link>
+          <div className="text-[13px] font-bold text-sub">내 식물 현황</div>
+          <div className="mb-0.5 mt-2 text-[31px] font-extrabold">
+            {state.growingCount} / {state.harvestedCount} / {state.failedCount}
+          </div>
+          <div className="mb-1.5 text-[11.5px] text-faint">재배중 · 수확완료 · 실패</div>
+          <Link href="/plants" className="mt-1 inline-block rounded-[10px] bg-brand-soft px-4 py-[9px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white">내 식물 보기</Link>
         </div>
       </div>
 
       <div className="mb-3.5 flex items-center justify-between">
-        <h2 className="text-xl font-extrabold">내 식물 미리보기</h2>
+        <h2 className="text-xl font-extrabold">재배중인 식물</h2>
         <Link href="/plants" className="text-sm font-bold text-brand-dark">전체보기 →</Link>
       </div>
-      <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-        {plants.map((p) => {
-          const visual = plantVisual(p.speciesName);
-          return (
-            <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-              <div className="flex h-[120px] items-center justify-center text-[60px]" style={{ background: visual.grad }}>{visual.emoji}</div>
-              <div className="p-3.5">
-                <div className="font-extrabold">{p.nickname}</div>
-                <div className="mt-0.5 text-[13px] text-sub">{p.speciesName} · D+{dPlus(p.startDate)}</div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+      {plantsLoading ? (
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
+      ) : plantsError ? (
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{plantsError}</div>
+      ) : plants.length === 0 ? (
+        <div className="rounded-[22px] bg-white px-5 py-[50px] text-center shadow-card">
+          <div className="animate-floaty text-[56px]">🌱</div>
+          {state.plantCount > 0 ? (
+            <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">지금 재배중인 식물이 없어요.<br />새로운 식물을 시작해 볼까요?</p>
+          ) : (
+            <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">아직 함께하는 식물이 없네요.<br />첫 반려식물을 등록해 볼까요?</p>
+          )}
+          <Link href="/plants" className="inline-block rounded-xl bg-brand px-[22px] py-[11px] font-bold text-white hover:text-white">+ 새 식물 등록</Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
+          {plants.map((p) => {
+            const thumb = plantThumbnail(p.thumbnailUrl, p.speciesName);
+            const visual = plantVisual(p.speciesName);
+            return (
+              <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
+                {thumb.type === 'image' && !brokenThumbIds.has(p.id) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={resolveImageUrl(thumb.url)}
+                    alt=""
+                    className="h-[120px] w-full object-cover"
+                    onError={() => setBrokenThumbIds((prev) => new Set(prev).add(p.id))}
+                  />
+                ) : (
+                  <div
+                    className="flex h-[120px] items-center justify-center text-[60px]"
+                    style={{ background: thumb.type === 'emoji' ? thumb.grad : visual.grad }}
+                  >
+                    {thumb.type === 'emoji' ? thumb.emoji : visual.emoji}
+                  </div>
+                )}
+                <div className="p-3.5">
+                  <div className="font-extrabold">{p.nickname}</div>
+                  <div className="mt-0.5 text-[13px] text-sub">{p.speciesName} · D+{dPlus(p.startDate)}</div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
