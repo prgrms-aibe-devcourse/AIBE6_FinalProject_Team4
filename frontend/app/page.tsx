@@ -6,7 +6,7 @@ import { useStore, fmt } from '@/lib/store';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { getJournals } from '@/lib/journal-api';
 import { resolveImageUrl } from '@/lib/api';
-import { dPlus, plantThumbnail } from '@/lib/plant-visual';
+import { dPlus, plantThumbnail, plantVisual } from '@/lib/plant-visual';
 
 const CONFETTI = [
   { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
@@ -43,6 +43,8 @@ export default function Home() {
   const { state, hydrated, balance } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [wroteToday, setWroteToday] = useState(false);
+  // 대표사진 URL은 있지만 실제 로드가 실패한(삭제됨 등) 식물 id — 이모지로 대신 보여준다.
+  const [brokenThumbIds, setBrokenThumbIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -206,13 +208,24 @@ export default function Home() {
         <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
           {plants.map((p) => {
             const thumb = plantThumbnail(p.thumbnailUrl, p.speciesName);
+            const visual = plantVisual(p.speciesName);
             return (
               <Link key={p.id} href={`/plants/${p.id}`} className="block overflow-hidden rounded-[18px] bg-white text-ink shadow-card hover:text-ink">
-                {thumb.type === 'image' ? (
+                {thumb.type === 'image' && !brokenThumbIds.has(p.id) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={resolveImageUrl(thumb.url)} alt="" className="h-[120px] w-full object-cover" />
+                  <img
+                    src={resolveImageUrl(thumb.url)}
+                    alt=""
+                    className="h-[120px] w-full object-cover"
+                    onError={() => setBrokenThumbIds((prev) => new Set(prev).add(p.id))}
+                  />
                 ) : (
-                  <div className="flex h-[120px] items-center justify-center text-[60px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
+                  <div
+                    className="flex h-[120px] items-center justify-center text-[60px]"
+                    style={{ background: thumb.type === 'emoji' ? thumb.grad : visual.grad }}
+                  >
+                    {thumb.type === 'emoji' ? thumb.emoji : visual.emoji}
+                  </div>
                 )}
                 <div className="p-3.5">
                   <div className="font-extrabold">{p.nickname}</div>
