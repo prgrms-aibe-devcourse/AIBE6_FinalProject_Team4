@@ -52,6 +52,8 @@ public enum ErrorCode {
 
 	// --- Domain codes (docs/error-codes.md §5) ---
 	PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+	COMMERCE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "5MB 이하의 jpg, png, webp 이미지만 업로드할 수 있습니다."),
+	COMMERCE_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "상품 이미지를 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요."),
 	PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 상품입니다."),
 	PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "재고가 부족합니다."),
 

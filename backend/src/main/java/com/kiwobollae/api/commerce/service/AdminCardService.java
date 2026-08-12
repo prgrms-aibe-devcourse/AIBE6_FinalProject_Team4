@@ -15,6 +15,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class AdminCardService {
   private final ExchangeProductRepository exchangeProductRepository;
   private final CommerceAssetKeyValidator assetKeyValidator;
   private final AssetUrlResolver assetUrlResolver;
+  private final CommerceAssetStorageService assetStorageService;
 
   public List<AdminCardResponse> getCards() {
     return cardRepository.findAllByOrderByCreatedAtDesc().stream().map(this::response).toList();
@@ -87,6 +89,13 @@ public class AdminCardService {
   @Transactional
   public AdminCardResponse hide(Long cardId) {
     return changeStatus(cardId, ActiveStatus.HIDDEN);
+  }
+
+  @Transactional
+  public AdminCardResponse uploadImage(Long cardId, MultipartFile file) {
+    Card card = findForUpdate(cardId);
+    card.updateImage(assetStorageService.upload(file, "coupons", cardId));
+    return response(card);
   }
 
   private Card findForUpdate(Long cardId) {

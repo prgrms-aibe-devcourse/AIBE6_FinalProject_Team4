@@ -189,8 +189,17 @@ export default function Cart() {
                   >
                     {on ? '✓' : ''}
                   </button>
-                  <div className="flex h-16 w-16 flex-none items-center justify-center rounded-xl bg-brand-soft bg-cover bg-center text-[32px]">
-                    🌱
+                  <div
+                    className="flex h-16 w-16 flex-none items-center justify-center rounded-xl bg-brand-soft bg-cover bg-center text-[32px]"
+                    style={
+                      item.imageUrl
+                        ? { backgroundImage: `url("${item.imageUrl}")` }
+                        : undefined
+                    }
+                    role={item.imageUrl ? "img" : undefined}
+                    aria-label={item.imageUrl ? item.productName : undefined}
+                  >
+                    {!item.imageUrl && "🌱"}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px] font-extrabold">{item.productName}</div>

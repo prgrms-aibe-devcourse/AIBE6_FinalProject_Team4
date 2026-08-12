@@ -32,7 +32,8 @@ public class CardService {
 				.map(card -> CardResponse.from(
 						card,
 						userId == null ? null : ownedCounts.getOrDefault(card.getId(), 0),
-						assetUrlResolver.resolve(card.getImageUrl())
+						assetUrlResolver.resolve(card.getImageUrl()),
+						assetUrlResolver.resolve(card.getExchangeProduct().getImageUrl())
 				))
 				.toList();
 	}
@@ -47,7 +48,12 @@ public class CardService {
 						.map(userCard -> userCard.getCount())
 						.orElse(0);
 
-		return CardResponse.from(card, ownedCount, assetUrlResolver.resolve(card.getImageUrl()));
+		return CardResponse.from(
+				card,
+				ownedCount,
+				assetUrlResolver.resolve(card.getImageUrl()),
+				assetUrlResolver.resolve(card.getExchangeProduct().getImageUrl())
+		);
 	}
 
 	public List<CardResponse> getMyCards(Long userId) {
@@ -58,7 +64,8 @@ public class CardService {
 				.map(userCard -> CardResponse.from(
 						userCard.getCard(),
 						userCard.getCount(),
-						assetUrlResolver.resolve(userCard.getCard().getImageUrl())
+						assetUrlResolver.resolve(userCard.getCard().getImageUrl()),
+						assetUrlResolver.resolve(userCard.getCard().getExchangeProduct().getImageUrl())
 				))
 				.toList();
 	}

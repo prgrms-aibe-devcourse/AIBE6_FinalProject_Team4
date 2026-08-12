@@ -32,7 +32,8 @@ class AdminProductServiceTest {
             productRepository,
             mock(PlantSpeciesRepository.class),
             new CommerceAssetKeyValidator(),
-            new AssetUrlResolver("https://assets.example.com/"));
+            new AssetUrlResolver("https://assets.example.com/"),
+            mock(CommerceAssetStorageService.class));
   }
 
   @Test

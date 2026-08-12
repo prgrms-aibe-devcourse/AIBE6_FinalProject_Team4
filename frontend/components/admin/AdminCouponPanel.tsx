@@ -11,9 +11,9 @@ import {
   getAdminExchangeProductOptions,
   hideAdminCard,
   updateAdminCard,
+  uploadAdminCardImage,
 } from "@/lib/admin-card-api";
 import { ApiError } from "@/lib/api";
-import { validateCommerceAssetKey } from "@/lib/commerce-asset";
 import { useUI } from "@/lib/ui";
 import { useCallback, useEffect, useState } from "react";
 
@@ -23,13 +23,16 @@ const EMPTY_FORM = {
   exchangeProductId: "",
   requiredCountForExchange: "",
   description: "",
-  imageKey: "",
 };
 
 export default function AdminCouponPanel({
   accessToken,
+  page = 0,
+  onPageChange,
 }: {
   accessToken: string;
+  page?: number;
+  onPageChange?: (page: number) => void;
 }) {
   const { askConfirm, showToast } = useUI();
   const [cards, setCards] = useState<AdminCard[]>([]);
@@ -37,11 +40,21 @@ export default function AdminCouponPanel({
     AdminExchangeProductOption[]
   >([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const pageSize = 10;
+  const totalPages = Math.ceil(cards.length / pageSize);
+  const visibleCards = cards.slice(page * pageSize, (page + 1) * pageSize);
+
+  useEffect(() => {
+    if (onPageChange && totalPages > 0 && page >= totalPages) {
+      onPageChange(totalPages - 1);
+    }
+  }, [onPageChange, page, totalPages]);
 
   const load = useCallback(
     (signal?: AbortSignal) => {
@@ -83,6 +96,7 @@ export default function AdminCouponPanel({
   const reset = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setImageFile(null);
   };
 
   const input = (): AdminCardInput | null => {
@@ -96,19 +110,16 @@ export default function AdminCouponPanel({
       return fail("교환 상품 ID를 입력해 주세요.");
     if (!Number.isInteger(requiredCount) || requiredCount < 1)
       return fail("교환 필요 수량은 1 이상의 정수여야 합니다.");
-    const imageError = validateCommerceAssetKey(
-      form.imageKey,
-      "coupons",
-      editingId,
-    );
-    if (imageError) return fail(imageError);
+    const existingImageKey = editingId
+      ? (cards.find((card) => card.id === editingId)?.imageKey ?? null)
+      : null;
     return {
       name: form.name.trim(),
       pointPrice,
       exchangeProductId,
       requiredCountForExchange: requiredCount,
       description: form.description.trim() || null,
-      imageUrl: form.imageKey.trim() || null,
+      imageUrl: existingImageKey,
       status:
         (editingId && cards.find((card) => card.id === editingId)?.status) ||
         "ON_SALE",
@@ -125,9 +136,12 @@ export default function AdminCouponPanel({
     if (!values || submitting) return;
     setSubmitting(true);
     try {
-      const next = editingId
+      let next = editingId
         ? await updateAdminCard(editingId, values, accessToken)
         : await createAdminCard(values, accessToken);
+      if (imageFile) {
+        next = await uploadAdminCardImage(next.id, imageFile, accessToken);
+      }
       setCards((current) =>
         editingId
           ? current.map((card) => (card.id === next.id ? next : card))
@@ -155,8 +169,8 @@ export default function AdminCouponPanel({
       exchangeProductId: String(card.exchangeProductId),
       requiredCountForExchange: String(card.requiredCountForExchange),
       description: card.description ?? "",
-      imageKey: card.imageKey ?? "",
     });
+    setImageFile(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -268,10 +282,15 @@ export default function AdminCouponPanel({
           />
           <div className="md:col-span-2">
             <AdminAssetKeyField
-              value={form.imageKey}
-              onChange={(imageKey) => setForm({ ...form, imageKey })}
-              prefix="coupons"
-              resourceId={editingId}
+              file={imageFile}
+              onFileChange={setImageFile}
+              previewUrl={
+                editingId
+                  ? cards.find((card) => card.id === editingId)?.imageUrl
+                  : null
+              }
+              label="쿠폰 이미지"
+              disabled={submitting}
             />
           </div>
         </div>
@@ -316,7 +335,7 @@ export default function AdminCouponPanel({
         ) : cards.length === 0 ? (
           <div className="p-10 text-center text-sub">등록된 쿠폰이 없어요.</div>
         ) : (
-          cards.map((card) => (
+          visibleCards.map((card) => (
             <div
               key={card.id}
               className="grid grid-cols-[1.5fr_.8fr_1fr_.7fr] items-center gap-3 border-b border-line px-4 py-3 text-sm last:border-b-0"
@@ -376,6 +395,29 @@ export default function AdminCouponPanel({
             </div>
           ))
         )}
+        {onPageChange && totalPages > 1 ? (
+          <div className="flex items-center justify-center gap-3 border-t border-line px-4 py-4">
+            <button
+              type="button"
+              disabled={page <= 0}
+              onClick={() => onPageChange(page - 1)}
+              className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
+            >
+              이전
+            </button>
+            <span className="text-sm font-bold text-sub">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page + 1 >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
+            >
+              다음
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "관리자 상품", description = "상점·가챠 팩 상품 관리 API")
 @RestController
@@ -73,5 +76,12 @@ public class AdminProductController {
   @DeleteMapping("/{productId}")
   public ResponseEntity<ApiResponse<AdminProductResponse>> hide(@PathVariable Long productId) {
     return ResponseEntity.ok(ApiResponse.success(adminProductService.hide(productId)));
+  }
+
+  @Operation(summary = "상품 이미지 업로드")
+  @PostMapping(path = "/{productId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  public ResponseEntity<ApiResponse<AdminProductResponse>> uploadImage(
+      @PathVariable Long productId, @RequestPart("file") MultipartFile file) {
+    return ResponseEntity.ok(ApiResponse.success(adminProductService.uploadImage(productId, file)));
   }
 }
