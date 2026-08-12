@@ -208,6 +208,22 @@ describe("CardMarketPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("판매가 이상으로 입력한 가격 제안은 전송하지 않는다", async () => {
+    auth.accessToken = "access-token";
+    auth.user = { id: 7 };
+    render(<CardMarketPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "거래하기" }));
+    const offerButton = screen.getByRole("button", { name: "제안" });
+    fireEvent.change(screen.getByPlaceholderText("최소 100P"), {
+      target: { value: "1000" },
+    });
+
+    expect(offerButton).toBeDisabled();
+    fireEvent.click(offerButton);
+    expect(mockedCreateOffer).not.toHaveBeenCalled();
+  });
+
   it("바로 구매 전 취소 불가 확인을 받는다", async () => {
     auth.accessToken = "access-token";
     auth.user = { id: 7 };

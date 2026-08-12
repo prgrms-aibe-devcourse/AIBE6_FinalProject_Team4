@@ -48,6 +48,12 @@ public interface CardMarketNegotiationRepository
   long countByListing_IdAndStatus(Long listingId, CardMarketNegotiationStatus status);
 
   @Query(
+      "select n.listing.id as listingId, count(n.id) as offerCount from CardMarketNegotiation n where n.listing.id in :listingIds and n.status = :status group by n.listing.id")
+  List<ListingOfferCount> countByListingIdsAndStatus(
+      @Param("listingIds") List<Long> listingIds,
+      @Param("status") CardMarketNegotiationStatus status);
+
+  @Query(
       "select coalesce(sum(n.escrowedPaidPoint), 0) from CardMarketNegotiation n where n.buyer.id = :buyerId and n.status = :status")
   long sumEscrowedPoint(
       @Param("buyerId") Long buyerId,
@@ -55,4 +61,10 @@ public interface CardMarketNegotiationRepository
 
   List<CardMarketNegotiation> findAllByStatusAndExpiresAtLessThanEqual(
       CardMarketNegotiationStatus status, LocalDateTime now, Pageable pageable);
+
+  interface ListingOfferCount {
+    Long getListingId();
+
+    long getOfferCount();
+  }
 }

@@ -9,6 +9,7 @@ import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketSellableCardResponse
 import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketTradeResponse;
 import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketWalletResponse;
 import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketAssetType;
+import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketListingStatus;
 import com.kiwobollae.api.commerce.cardmarket.service.CardMarketCommandService;
 import com.kiwobollae.api.commerce.cardmarket.service.CardMarketQueryService;
 import com.kiwobollae.api.global.common.ApiResponse;
@@ -82,10 +83,13 @@ public class CardMarketController {
   @GetMapping("/me/listings")
   public ResponseEntity<ApiResponse<CardMarketPageResponse<CardMarketListingResponse>>> myListings(
       @AuthenticationPrincipal Long userId,
+      @RequestParam(required = false) CardMarketListingStatus status,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return ResponseEntity.ok(
-        ApiResponse.success(queryService.getMyListings(userId, boundPrivatePageable(pageable, "createdAt"))));
+        ApiResponse.success(
+            queryService.getMyListings(
+                userId, status, boundPrivatePageable(pageable, "createdAt"))));
   }
 
   @Operation(summary = "내가 보낸 가격 제안")

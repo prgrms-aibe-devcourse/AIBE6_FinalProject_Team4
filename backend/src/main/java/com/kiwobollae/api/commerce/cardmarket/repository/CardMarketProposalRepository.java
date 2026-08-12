@@ -6,4 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CardMarketProposalRepository extends JpaRepository<CardMarketProposal, Long> {
   List<CardMarketProposal> findAllByNegotiation_IdOrderBySequenceNoAsc(Long negotiationId);
+
+  List<CardMarketProposal> findAllByNegotiation_IdInOrderByNegotiation_IdAscSequenceNoAsc(
+      List<Long> negotiationIds);
 }

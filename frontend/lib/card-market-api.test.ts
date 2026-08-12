@@ -9,22 +9,51 @@ import {
   createMarketNegotiation,
   getMarketListings,
   getMarketWallet,
+  getMyMarketListings,
   proposeMarketPrice,
   rejectMarketNegotiation,
 } from "@/lib/card-market-api";
 
-vi.mock("@/lib/api", () => ({
-  request: vi.fn(),
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return { ...actual, request: vi.fn() };
+});
 
 const mockedRequest = vi.mocked(request);
 
 describe("card market api", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     vi.spyOn(crypto, "randomUUID").mockReturnValue(
       "11111111-1111-4111-8111-111111111111",
     );
+  });
+
+  it("응답이 유실된 거래 재시도에는 같은 멱등키를 재사용한다", async () => {
+    vi.mocked(crypto.randomUUID)
+      .mockReturnValueOnce("11111111-1111-4111-8111-111111111111")
+      .mockReturnValueOnce("22222222-2222-4222-8222-222222222222");
+    mockedRequest
+      .mockRejectedValueOnce(new TypeError("network error"))
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+
+    await expect(buyMarketListing(99, "access-token")).rejects.toThrow(
+      "network error",
+    );
+    await buyMarketListing(99, "access-token");
+    await buyMarketListing(99, "access-token");
+
+    const keys = mockedRequest.mock.calls.map(
+      ([, options]) =>
+        (options?.headers as Record<string, string>)["Idempotency-Key"],
+    );
+    expect(keys).toEqual([
+      "11111111-1111-4111-8111-111111111111",
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ]);
   });
 
   it("공개 판매 목록에 검색·정렬·등급·페이지 조건을 전달한다", async () => {
@@ -60,6 +89,23 @@ describe("card market api", () => {
 
     expect(mockedRequest).toHaveBeenCalledWith(
       "/api/v1/card/market/me/wallet",
+      { accessToken: "access-token", signal: undefined },
+    );
+  });
+
+  it("내 판매글에 선택한 상태 필터를 전달한다", async () => {
+    mockedRequest.mockResolvedValueOnce({
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+    });
+
+    await getMyMarketListings("access-token", 2, undefined, "CANCELLED");
+
+    expect(mockedRequest).toHaveBeenCalledWith(
+      "/api/v1/card/market/me/listings?page=2&size=20&status=CANCELLED",
       { accessToken: "access-token", signal: undefined },
     );
   });

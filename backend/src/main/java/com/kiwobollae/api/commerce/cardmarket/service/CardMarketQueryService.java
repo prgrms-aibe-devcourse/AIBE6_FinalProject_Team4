@@ -24,6 +24,9 @@ import com.kiwobollae.api.commerce.gacha.repository.GoldenCardInstanceRepository
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -39,6 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class CardMarketQueryService {
 
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
   private final CardMarketListingRepository listingRepository;
   private final CardMarketNegotiationRepository negotiationRepository;
   private final CardMarketProposalRepository proposalRepository;
@@ -46,6 +51,7 @@ public class CardMarketQueryService {
   private final UserCardCollectionRepository collectionRepository;
   private final GoldenCardInstanceRepository goldenInstanceRepository;
   private final CardMarketPointPort pointPort;
+  private final Clock seoulClock;
 
   @Value("${app.asset.base-url:}")
   private String assetBaseUrl;
@@ -53,21 +59,22 @@ public class CardMarketQueryService {
   public CardMarketPageResponse<CardMarketListingResponse> getListings(
       CardMarketAssetType assetType, Long cardId, String keyword, Pageable pageable) {
     String normalizedKeyword = normalizeKeyword(keyword);
-    Page<CardMarketListingResponse> page =
+    Page<CardMarketListing> page =
         listingRepository
             .search(
                 CardMarketListingStatus.OPEN,
                 assetType,
                 cardId,
                 normalizedKeyword,
-                pageable)
-            .map(this::listingResponse);
-    return CardMarketPageResponse.from(page);
+                now(),
+                pageable);
+    return listingPageResponse(page);
   }
 
   public CardMarketListingResponse getListing(Long listingId) {
     CardMarketListing listing = requireListing(listingId);
     if (listing.getStatus() != CardMarketListingStatus.OPEN
+        || !listing.getExpiresAt().isAfter(now())
         || listing.getCard().getStatus() != TradingCardStatus.ACTIVE) {
       throw new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND);
     }
@@ -75,28 +82,26 @@ public class CardMarketQueryService {
   }
 
   public CardMarketPageResponse<CardMarketListingResponse> getMyListings(
-      Long userId, Pageable pageable) {
+      Long userId, CardMarketListingStatus status, Pageable pageable) {
     requireUser(userId);
-    return CardMarketPageResponse.from(
-        listingRepository
-            .findAllBySeller_IdAndStatus(userId, CardMarketListingStatus.OPEN, pageable)
-            .map(this::listingResponse));
+    Page<CardMarketListing> page =
+        status == null
+            ? listingRepository.findAllBySeller_Id(userId, pageable)
+            : listingRepository.findAllBySeller_IdAndStatus(userId, status, pageable);
+    return listingPageResponse(page);
   }
 
   public CardMarketPageResponse<CardMarketNegotiationResponse> getMySentNegotiations(
       Long userId, Pageable pageable) {
     requireUser(userId);
-    return CardMarketPageResponse.from(
-        negotiationRepository.findAllByBuyer_Id(userId, pageable).map(this::negotiationResponse));
+    return negotiationPageResponse(negotiationRepository.findAllByBuyer_Id(userId, pageable));
   }
 
   public CardMarketPageResponse<CardMarketNegotiationResponse> getMyReceivedNegotiations(
       Long userId, Pageable pageable) {
     requireUser(userId);
-    return CardMarketPageResponse.from(
-        negotiationRepository
-            .findAllByListing_Seller_Id(userId, pageable)
-            .map(this::negotiationResponse));
+    return negotiationPageResponse(
+        negotiationRepository.findAllByListing_Seller_Id(userId, pageable));
   }
 
   public CardMarketPageResponse<CardMarketTradeResponse> getMyTrades(
@@ -185,6 +190,32 @@ public class CardMarketQueryService {
         listing, imageUrl(listing.getCard().getImageKey()), offerCount);
   }
 
+  private CardMarketPageResponse<CardMarketListingResponse> listingPageResponse(
+      Page<CardMarketListing> page) {
+    List<Long> listingIds = page.getContent().stream().map(CardMarketListing::getId).toList();
+    Map<Long, Long> offerCounts =
+        listingIds.isEmpty()
+            ? Map.of()
+            : negotiationRepository
+                .countByListingIdsAndStatus(
+                    listingIds, CardMarketNegotiationStatus.NEGOTIATING)
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        CardMarketNegotiationRepository.ListingOfferCount::getListingId,
+                        CardMarketNegotiationRepository.ListingOfferCount::getOfferCount));
+    List<CardMarketListingResponse> content =
+        page.getContent().stream()
+            .map(
+                listing ->
+                    CardMarketListingResponse.from(
+                        listing,
+                        imageUrl(listing.getCard().getImageKey()),
+                        offerCounts.getOrDefault(listing.getId(), 0L)))
+            .toList();
+    return pageResponse(page, content);
+  }
+
   private CardMarketNegotiationResponse negotiationResponse(CardMarketNegotiation negotiation) {
     List<CardMarketProposalResponse> proposals =
         proposalRepository.findAllByNegotiation_IdOrderBySequenceNoAsc(negotiation.getId()).stream()
@@ -192,6 +223,42 @@ public class CardMarketQueryService {
             .toList();
     return CardMarketNegotiationResponse.from(
         negotiation, imageUrl(negotiation.getListing().getCard().getImageKey()), proposals);
+  }
+
+  private CardMarketPageResponse<CardMarketNegotiationResponse> negotiationPageResponse(
+      Page<CardMarketNegotiation> page) {
+    List<Long> negotiationIds =
+        page.getContent().stream().map(CardMarketNegotiation::getId).toList();
+    Map<Long, List<CardMarketProposalResponse>> proposalsByNegotiation =
+        negotiationIds.isEmpty()
+            ? Map.of()
+            : proposalRepository
+                .findAllByNegotiation_IdInOrderByNegotiation_IdAscSequenceNoAsc(negotiationIds)
+                .stream()
+                .collect(
+                    Collectors.groupingBy(
+                        proposal -> proposal.getNegotiation().getId(),
+                        Collectors.mapping(
+                            CardMarketProposalResponse::from, Collectors.toList())));
+    List<CardMarketNegotiationResponse> content =
+        page.getContent().stream()
+            .map(
+                negotiation ->
+                    CardMarketNegotiationResponse.from(
+                        negotiation,
+                        imageUrl(negotiation.getListing().getCard().getImageKey()),
+                        proposalsByNegotiation.getOrDefault(negotiation.getId(), List.of())))
+            .toList();
+    return pageResponse(page, content);
+  }
+
+  private <S, T> CardMarketPageResponse<T> pageResponse(Page<S> page, List<T> content) {
+    return new CardMarketPageResponse<>(
+        content,
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements(),
+        page.getTotalPages());
   }
 
   private CardMarketListing requireListing(Long listingId) {
@@ -218,6 +285,10 @@ public class CardMarketQueryService {
     if (userId == null || userId < 1) {
       throw new BusinessException(ErrorCode.AUTH_AUTHENTICATION_REQUIRED);
     }
+  }
+
+  private LocalDateTime now() {
+    return LocalDateTime.ofInstant(seoulClock.instant(), KST);
   }
 
   private String normalizeKeyword(String keyword) {

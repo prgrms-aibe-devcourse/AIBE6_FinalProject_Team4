@@ -1,4 +1,4 @@
-import { request } from "@/lib/api";
+import { ApiError, request } from "@/lib/api";
 import type { GachaRarity } from "@/lib/gacha-api";
 
 export type MarketAssetType = "HYPER_RARE" | "GOLDEN_RARE";
@@ -107,7 +107,54 @@ export interface MarketSellableCard {
   goldenInstances: { id: number; originRank: number | null; listed: boolean }[];
 }
 
-export const marketIdempotencyKey = () => crypto.randomUUID();
+const MARKET_IDEMPOTENCY_PREFIX = "kwb:card-market:idempotency:";
+const pendingIdempotencyKeys = new Map<string, string>();
+
+function getPendingIdempotencyKey(operation: string) {
+  const cached = pendingIdempotencyKeys.get(operation);
+  if (cached) return cached;
+
+  const storageKey = MARKET_IDEMPOTENCY_PREFIX + operation;
+  const stored =
+    typeof window === "undefined"
+      ? null
+      : window.sessionStorage.getItem(storageKey);
+  const key = stored ?? crypto.randomUUID();
+  pendingIdempotencyKeys.set(operation, key);
+  if (typeof window !== "undefined") {
+    window.sessionStorage.setItem(storageKey, key);
+  }
+  return key;
+}
+
+function clearPendingIdempotencyKey(operation: string) {
+  pendingIdempotencyKeys.delete(operation);
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(MARKET_IDEMPOTENCY_PREFIX + operation);
+  }
+}
+
+async function marketMutation<T>(
+  operation: string,
+  execute: (idempotencyKey: string) => Promise<T>,
+) {
+  const key = getPendingIdempotencyKey(operation);
+  try {
+    const response = await execute(key);
+    clearPendingIdempotencyKey(operation);
+    return response;
+  } catch (error) {
+    // 응답 유실·서버 오류·처리 중 응답은 결과가 불명확하므로 같은 키로 재시도한다.
+    if (
+      error instanceof ApiError &&
+      error.status < 500 &&
+      error.code !== "COMMON_IDEMPOTENCY_IN_PROGRESS"
+    ) {
+      clearPendingIdempotencyKey(operation);
+    }
+    throw error;
+  }
+}
 
 export function getMarketListings(
   options: {
@@ -158,9 +205,12 @@ export function getMyMarketListings(
   accessToken: string,
   page = 0,
   signal?: AbortSignal,
+  status?: MarketListingStatus,
 ) {
+  const params = new URLSearchParams({ page: String(page), size: "20" });
+  if (status) params.set("status", status);
   return request<MarketPage<MarketListing>>(
-    `/api/v1/card/market/me/listings?page=${page}&size=20`,
+    `/api/v1/card/market/me/listings?${params}`,
     { accessToken, signal },
   );
 }
@@ -208,30 +258,37 @@ export function createMarketListing(
   askingPrice: number,
   accessToken: string,
 ) {
-  return request<MarketListing>("/api/v1/card/market/listings", {
-    method: "POST",
-    accessToken,
-    headers: { "Idempotency-Key": marketIdempotencyKey() },
-    body: JSON.stringify({ cardId, goldenInstanceId, askingPrice }),
-  });
+  const operation = `listing:create:${cardId}:${goldenInstanceId ?? "none"}:${askingPrice}`;
+  return marketMutation(operation, (idempotencyKey) =>
+    request<MarketListing>("/api/v1/card/market/listings", {
+      method: "POST",
+      accessToken,
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ cardId, goldenInstanceId, askingPrice }),
+    }),
+  );
 }
 
 export function cancelMarketListing(listingId: number, accessToken: string) {
-  return request<MarketListing>(`/api/v1/card/market/listings/${listingId}`, {
-    method: "DELETE",
-    accessToken,
-    headers: { "Idempotency-Key": marketIdempotencyKey() },
-  });
+  return marketMutation(`listing:cancel:${listingId}`, (idempotencyKey) =>
+    request<MarketListing>(`/api/v1/card/market/listings/${listingId}`, {
+      method: "DELETE",
+      accessToken,
+      headers: { "Idempotency-Key": idempotencyKey },
+    }),
+  );
 }
 
 export function buyMarketListing(listingId: number, accessToken: string) {
-  return request<MarketTrade>(
-    `/api/v1/card/market/listings/${listingId}/purchases`,
-    {
-      method: "POST",
-      accessToken,
-      headers: { "Idempotency-Key": marketIdempotencyKey() },
-    },
+  return marketMutation(`listing:buy:${listingId}`, (idempotencyKey) =>
+    request<MarketTrade>(
+      `/api/v1/card/market/listings/${listingId}/purchases`,
+      {
+        method: "POST",
+        accessToken,
+        headers: { "Idempotency-Key": idempotencyKey },
+      },
+    ),
   );
 }
 
@@ -241,14 +298,17 @@ export function createMarketNegotiation(
   messageCode: MarketMessageCode | null,
   accessToken: string,
 ) {
-  return request<MarketNegotiation>(
-    `/api/v1/card/market/listings/${listingId}/negotiations`,
-    {
-      method: "POST",
-      accessToken,
-      headers: { "Idempotency-Key": marketIdempotencyKey() },
-      body: JSON.stringify({ price, messageCode }),
-    },
+  const operation = `negotiation:create:${listingId}:${price}:${messageCode ?? "none"}`;
+  return marketMutation(operation, (idempotencyKey) =>
+    request<MarketNegotiation>(
+      `/api/v1/card/market/listings/${listingId}/negotiations`,
+      {
+        method: "POST",
+        accessToken,
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ price, messageCode }),
+      },
+    ),
   );
 }
 
@@ -258,14 +318,17 @@ export function proposeMarketPrice(
   messageCode: MarketMessageCode | null,
   accessToken: string,
 ) {
-  return request<MarketNegotiation>(
-    `/api/v1/card/market/negotiations/${negotiationId}/proposals`,
-    {
-      method: "POST",
-      accessToken,
-      headers: { "Idempotency-Key": marketIdempotencyKey() },
-      body: JSON.stringify({ price, messageCode }),
-    },
+  const operation = `negotiation:propose:${negotiationId}:${price}:${messageCode ?? "none"}`;
+  return marketMutation(operation, (idempotencyKey) =>
+    request<MarketNegotiation>(
+      `/api/v1/card/market/negotiations/${negotiationId}/proposals`,
+      {
+        method: "POST",
+        accessToken,
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ price, messageCode }),
+      },
+    ),
   );
 }
 
@@ -273,13 +336,17 @@ export function acceptMarketNegotiation(
   negotiationId: number,
   accessToken: string,
 ) {
-  return request<MarketTrade>(
-    `/api/v1/card/market/negotiations/${negotiationId}/acceptances`,
-    {
-      method: "POST",
-      accessToken,
-      headers: { "Idempotency-Key": marketIdempotencyKey() },
-    },
+  return marketMutation(
+    `negotiation:accept:${negotiationId}`,
+    (idempotencyKey) =>
+      request<MarketTrade>(
+        `/api/v1/card/market/negotiations/${negotiationId}/acceptances`,
+        {
+          method: "POST",
+          accessToken,
+          headers: { "Idempotency-Key": idempotencyKey },
+        },
+      ),
   );
 }
 
@@ -287,13 +354,17 @@ export function rejectMarketNegotiation(
   negotiationId: number,
   accessToken: string,
 ) {
-  return request<MarketNegotiation>(
-    `/api/v1/card/market/negotiations/${negotiationId}/rejections`,
-    {
-      method: "POST",
-      accessToken,
-      headers: { "Idempotency-Key": marketIdempotencyKey() },
-    },
+  return marketMutation(
+    `negotiation:reject:${negotiationId}`,
+    (idempotencyKey) =>
+      request<MarketNegotiation>(
+        `/api/v1/card/market/negotiations/${negotiationId}/rejections`,
+        {
+          method: "POST",
+          accessToken,
+          headers: { "Idempotency-Key": idempotencyKey },
+        },
+      ),
   );
 }
 
@@ -301,12 +372,16 @@ export function cancelMarketNegotiation(
   negotiationId: number,
   accessToken: string,
 ) {
-  return request<MarketNegotiation>(
-    `/api/v1/card/market/negotiations/${negotiationId}`,
-    {
-      method: "DELETE",
-      accessToken,
-      headers: { "Idempotency-Key": marketIdempotencyKey() },
-    },
+  return marketMutation(
+    `negotiation:cancel:${negotiationId}`,
+    (idempotencyKey) =>
+      request<MarketNegotiation>(
+        `/api/v1/card/market/negotiations/${negotiationId}`,
+        {
+          method: "DELETE",
+          accessToken,
+          headers: { "Idempotency-Key": idempotencyKey },
+        },
+      ),
   );
 }

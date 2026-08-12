@@ -23,6 +23,7 @@ public interface CardMarketListingRepository extends JpaRepository<CardMarketLis
       """
       select l from CardMarketListing l
       where l.status = :status
+        and l.expiresAt > :now
         and l.card.status = com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardStatus.ACTIVE
         and (:assetType is null or l.assetType = :assetType)
         and (:cardId is null or l.card.id = :cardId)
@@ -33,6 +34,7 @@ public interface CardMarketListingRepository extends JpaRepository<CardMarketLis
       @Param("assetType") CardMarketAssetType assetType,
       @Param("cardId") Long cardId,
       @Param("keyword") String keyword,
+      @Param("now") LocalDateTime now,
       Pageable pageable);
 
   @EntityGraph(attributePaths = {"seller", "card", "goldenInstance"})
@@ -43,9 +45,12 @@ public interface CardMarketListingRepository extends JpaRepository<CardMarketLis
   @Query("select l from CardMarketListing l where l.id = :id")
   Optional<CardMarketListing> findByIdForUpdate(@Param("id") Long id);
 
-  @EntityGraph(attributePaths = {"card", "goldenInstance"})
+  @EntityGraph(attributePaths = {"seller", "card", "goldenInstance"})
   Page<CardMarketListing> findAllBySeller_IdAndStatus(
       Long sellerId, CardMarketListingStatus status, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"seller", "card", "goldenInstance"})
+  Page<CardMarketListing> findAllBySeller_Id(Long sellerId, Pageable pageable);
 
   long countBySeller_IdAndStatus(Long sellerId, CardMarketListingStatus status);
 

@@ -399,10 +399,9 @@ public class CardMarketCommandService {
 
     LocalDateTime now = now();
     long tradePrice = negotiation.getCurrentPrice();
-    long additionalBuyerPoint = tradePrice - negotiation.getEscrowedPaidPoint();
-    if (additionalBuyerPoint < 0) {
-      throw new BusinessException(ErrorCode.COMMON_DATA_CONFLICT);
-    }
+    long escrowedPaidPoint = negotiation.getEscrowedPaidPoint();
+    long additionalBuyerPoint = Math.max(0L, tradePrice - escrowedPaidPoint);
+    long excessEscrow = Math.max(0L, escrowedPaidPoint - tradePrice);
     CardMarketTrade trade =
         createTrade(
             listing,
@@ -413,6 +412,11 @@ public class CardMarketCommandService {
             now);
     List<CardMarketPointPort.OfferRelease> releases =
         closeOtherNegotiations(listing.getId(), negotiationId, "LISTING_SOLD", now);
+    if (excessEscrow > 0) {
+      releases.add(
+          new CardMarketPointPort.OfferRelease(
+              negotiation.getBuyer().getId(), excessEscrow, negotiationId));
+    }
     pointPort.settleTrade(
         negotiation.getBuyer().getId(),
         listing.getSeller().getId(),

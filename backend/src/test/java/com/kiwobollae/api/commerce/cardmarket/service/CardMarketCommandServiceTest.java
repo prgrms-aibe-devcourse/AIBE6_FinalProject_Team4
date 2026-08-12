@@ -281,6 +281,38 @@ class CardMarketCommandServiceTest {
   }
 
   @Test
+  void acceptingPriceBelowEscrowReleasesExcessInSameSettlement() {
+    TradingCard card = card(11L, TradingCardRarity.HYPER_RARE);
+    CardMarketListing listing = listing(201L, card, 1_000L);
+    CardMarketNegotiation negotiation = negotiation(401L, listing, buyer, 700L, 800L);
+    ReflectionTestUtils.setField(negotiation, "turn", CardMarketParticipantType.BUYER);
+    ReflectionTestUtils.setField(
+        negotiation, "currentProposerType", CardMarketParticipantType.SELLER);
+    when(negotiationRepository.findById(401L)).thenReturn(Optional.of(negotiation));
+    when(listingRepository.findByIdForUpdate(201L)).thenReturn(Optional.of(listing));
+    when(negotiationRepository.findByIdForUpdate(401L)).thenReturn(Optional.of(negotiation));
+    when(negotiationRepository.findAllByListingIdAndStatusForUpdate(
+            201L, CardMarketNegotiationStatus.NEGOTIATING))
+        .thenReturn(List.of(negotiation));
+    when(tradeRepository.saveAndFlush(any(CardMarketTrade.class)))
+        .thenAnswer(invocation -> withId(invocation.getArgument(0), 503L));
+
+    var response = service.accept(2L, 401L, "accept-lower-key");
+
+    assertThat(response.tradePrice()).isEqualTo(700L);
+    assertThat(response.sellerReceivedPoint()).isEqualTo(560L);
+    verify(pointPort)
+        .settleTrade(
+            2L,
+            1L,
+            0L,
+            560L,
+            503L,
+            List.of(new CardMarketPointPort.OfferRelease(2L, 100L, 401L)));
+    verify(collectionRepository).incrementOwnedCount(2L, 11L, NOW);
+  }
+
+  @Test
   void buyNowChargesFullPricePaysEightyPercentAndReleasesExistingOffers() {
     TradingCard card = card(11L, TradingCardRarity.HYPER_RARE);
     CardMarketListing listing = listing(201L, card, 1_000L);

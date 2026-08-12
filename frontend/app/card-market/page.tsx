@@ -209,7 +209,7 @@ function CardMarketPageContent() {
         if (tab === "sell") {
           const [cards, mine] = await Promise.all([
             getMarketSellableCards(token, signal),
-            getMyMarketListings(token, privatePage, signal),
+            getMyMarketListings(token, privatePage, signal, "OPEN"),
           ]);
           setSellable(cards);
           setMyListings(mine.content);
@@ -936,7 +936,11 @@ function CardMarketPageContent() {
               />
               <button
                 type="button"
-                disabled={actionLoading || Number(offerPrice) < 100}
+                disabled={
+                  actionLoading ||
+                  Number(offerPrice) < 100 ||
+                  Number(offerPrice) >= selectedListing.askingPrice
+                }
                 onClick={() =>
                   void runAction(
                     () =>
