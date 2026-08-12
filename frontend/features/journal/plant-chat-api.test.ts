@@ -16,17 +16,14 @@ describe("plant chat api", () => {
     vi.clearAllMocks();
   });
 
-  it("선택한 식물 프로필과 작성 중인 일지·최근 대화를 전달한다", async () => {
+  it("선택한 식물 프로필과 서버가 발급한 대화 ID를 전달한다", async () => {
     const controller = new AbortController();
     const payload: PlantChatRequestPayload = {
       question: "잎 끝이 갈색인 이유가 뭘까요?",
-      currentJournalContent: "오늘 겉흙이 말라 물을 줬어요.",
-      recentMessages: [
-        { role: "USER", content: "어제도 잎이 조금 말랐어요." },
-        { role: "ASSISTANT", content: "물주기 간격을 확인해 보세요." },
-      ],
+      conversationId: "30a508b8-bffc-43c3-8dd0-539a2068500a",
     };
     mockedRequest.mockResolvedValueOnce({
+      conversationId: "30a508b8-bffc-43c3-8dd0-539a2068500a",
       answer: "최근 기록을 보면 물주기 간격을 먼저 확인해 보세요.",
       recommendedActions: ["겉흙을 확인해 주세요."],
       additionalChecks: [],

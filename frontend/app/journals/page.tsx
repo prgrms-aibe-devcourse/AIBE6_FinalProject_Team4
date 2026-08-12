@@ -225,7 +225,6 @@ export default function JournalsPage() {
         }))}
         plantOptionsLoading={loading}
         onPlantChange={setChatPlantId}
-        currentJournalContent=""
         accessToken={state.accessToken}
       />
     </div>

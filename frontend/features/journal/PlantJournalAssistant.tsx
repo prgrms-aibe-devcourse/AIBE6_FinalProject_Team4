@@ -9,16 +9,10 @@ import {
   PlantCareFaqCategory,
   PLANT_CARE_FAQ_CATEGORIES,
 } from "@/features/journal/plant-care-faqs";
-import {
-  askPlantChat,
-  PlantChatMessagePayload,
-} from "@/features/journal/plant-chat-api";
+import { askPlantChat } from "@/features/journal/plant-chat-api";
 import { ApiError } from "@/lib/api";
 
 const MAX_QUESTION_LENGTH = 2000;
-const MAX_CONTEXT_MESSAGES = 6;
-const MAX_CONTEXT_MESSAGE_LENGTH = 1000;
-const MAX_CONTEXT_TOTAL_LENGTH = 4000;
 const PANEL_ID = "plant-journal-assistant-panel";
 const FAQ_SHEET_ID = "plant-journal-assistant-faq-sheet";
 const AI_DISCLAIMER =
@@ -46,42 +40,7 @@ interface PlantJournalAssistantProps {
   plantOptions?: readonly PlantSummary[];
   plantOptionsLoading?: boolean;
   onPlantChange?: (plantId: number) => void;
-  currentJournalContent: string;
   accessToken: string | null;
-}
-
-function contextContent(message: DisplayMessage): string {
-  const sections = [message.content];
-  if (message.recommendedActions?.length) {
-    sections.push(`권장 행동: ${message.recommendedActions.join(" / ")}`);
-  }
-  if (message.additionalChecks?.length) {
-    sections.push(`추가 확인: ${message.additionalChecks.join(" / ")}`);
-  }
-  return sections.join("\n").slice(0, MAX_CONTEXT_MESSAGE_LENGTH);
-}
-
-function recentMessagePayload(
-  messages: readonly DisplayMessage[],
-): PlantChatMessagePayload[] {
-  const selected: PlantChatMessagePayload[] = [];
-  let totalLength = 0;
-
-  for (
-    let index = messages.length - 1;
-    index >= 0 && selected.length < MAX_CONTEXT_MESSAGES;
-    index -= 1
-  ) {
-    const message = messages[index];
-    const content = contextContent(message).trim();
-    if (!content) continue;
-    if (totalLength + content.length > MAX_CONTEXT_TOTAL_LENGTH) break;
-
-    selected.unshift({ role: message.role, content });
-    totalLength += content.length;
-  }
-
-  return selected;
 }
 
 function toErrorMessage(requestError: unknown): string {
@@ -175,7 +134,6 @@ export default function PlantJournalAssistant({
   plantOptions,
   plantOptionsLoading = false,
   onPlantChange,
-  currentJournalContent,
   accessToken,
 }: PlantJournalAssistantProps) {
   const plantId = plant?.id ?? null;
@@ -189,6 +147,7 @@ export default function PlantJournalAssistant({
   // 열자마자 준비된 질문이 보여야 하므로 초기값은 반드시 true다.
   const [faqOpen, setFaqOpen] = useState(true);
   const nextMessageId = useRef(0);
+  const conversationIdRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
   const controllerRef = useRef<AbortController | null>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -207,6 +166,7 @@ export default function PlantJournalAssistant({
   useEffect(() => {
     controllerRef.current?.abort();
     controllerRef.current = null;
+    conversationIdRef.current = null;
     inFlightRef.current = false;
     lastScrollTargetKeyRef.current = null;
     setMessages([]);
@@ -306,7 +266,6 @@ export default function PlantJournalAssistant({
     if (!plant || !accessToken || !normalizedQuestion || inFlightRef.current)
       return;
 
-    const previousMessages = messages;
     const pendingMessageId = newMessageId();
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -329,13 +288,13 @@ export default function PlantJournalAssistant({
         plant.id,
         {
           question: normalizedQuestion,
-          currentJournalContent: currentJournalContent.trim() || null,
-          recentMessages: recentMessagePayload(previousMessages),
+          conversationId: conversationIdRef.current,
         },
         accessToken,
         controller.signal,
       );
       if (controller.signal.aborted) return;
+      conversationIdRef.current = response.conversationId;
 
       setMessages((current) => [
         ...current,
@@ -351,9 +310,17 @@ export default function PlantJournalAssistant({
       setQuestion("");
     } catch (requestError) {
       if (controller.signal.aborted) return;
-      setMessages((current) =>
-        current.filter((message) => message.id !== pendingMessageId),
-      );
+      if (
+        requestError instanceof ApiError &&
+        requestError.code === "AI_CHAT_CONVERSATION_INVALID"
+      ) {
+        conversationIdRef.current = null;
+        setMessages([]);
+      } else {
+        setMessages((current) =>
+          current.filter((message) => message.id !== pendingMessageId),
+        );
+      }
       setError(toErrorMessage(requestError));
     } finally {
       if (!controller.signal.aborted) {

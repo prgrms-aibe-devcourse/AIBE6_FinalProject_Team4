@@ -1,19 +1,12 @@
 import { request } from "@/lib/api";
 
-export type PlantChatRole = "USER" | "ASSISTANT";
-
-export interface PlantChatMessagePayload {
-  role: PlantChatRole;
-  content: string;
-}
-
 export interface PlantChatRequestPayload {
   question: string;
-  currentJournalContent: string | null;
-  recentMessages: PlantChatMessagePayload[];
+  conversationId: string | null;
 }
 
 export interface PlantChatResponseData {
+  conversationId: string;
   answer: string;
   recommendedActions: string[];
   additionalChecks: string[];

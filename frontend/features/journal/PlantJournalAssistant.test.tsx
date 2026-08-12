@@ -16,6 +16,7 @@ vi.mock("@/features/journal/plant-chat-api", () => ({
 
 const mockedAskPlantChat = vi.mocked(askPlantChat);
 const PLANT = { id: 21, nickname: "바질이", speciesName: "바질" };
+const CONVERSATION_ID = "30a508b8-bffc-43c3-8dd0-539a2068500a";
 const scrollIntoViewMock = vi.fn();
 
 Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -25,11 +26,7 @@ Object.defineProperty(Element.prototype, "scrollIntoView", {
 
 function renderAssistant(plant: typeof PLANT | null = PLANT) {
   return render(
-    <PlantJournalAssistant
-      plant={plant}
-      currentJournalContent="오늘 새잎 끝이 조금 갈색이고 겉흙은 말라 있었어요."
-      accessToken="access-token"
-    />,
+    <PlantJournalAssistant plant={plant} accessToken="access-token" />,
   );
 }
 
@@ -71,7 +68,6 @@ describe("PlantJournalAssistant", () => {
           { id: 22, nickname: "상추", speciesName: "청상추" },
         ]}
         onPlantChange={onPlantChange}
-        currentJournalContent=""
         accessToken="access-token"
       />,
     );
@@ -88,7 +84,6 @@ describe("PlantJournalAssistant", () => {
     render(
       <PlantJournalAssistant
         plant={{ id: 23, nickname: "딸기공주", speciesName: "설향 딸기" }}
-        currentJournalContent=""
         accessToken="access-token"
       />,
     );
@@ -234,6 +229,7 @@ describe("PlantJournalAssistant", () => {
 
     await act(async () => {
       resolveResponse({
+        conversationId: CONVERSATION_ID,
         answer: "열매 전체가 고르게 붉고 향이 진할 때 수확해 주세요.",
         recommendedActions: ["아침에 꼭지째 수확해 주세요."],
         additionalChecks: [],
@@ -288,8 +284,9 @@ describe("PlantJournalAssistant", () => {
     expect(screen.getByText("준비된 답변")).toBeInTheDocument();
   });
 
-  it("직접 질문하면 선택 식물·작성 중인 일지와 함께 AI 응답을 요청한다", async () => {
+  it("첫 직접 질문은 대화 ID 없이 요청하고 서버가 발급한 ID를 보관한다", async () => {
     mockedAskPlantChat.mockResolvedValueOnce({
+      conversationId: CONVERSATION_ID,
       answer: "최근 기록만으로는 원인을 단정하기 어려워요.",
       recommendedActions: ["겉흙 아래 수분을 확인해 주세요."],
       additionalChecks: ["새잎에도 갈변이 생기는지 살펴보세요."],
@@ -310,9 +307,7 @@ describe("PlantJournalAssistant", () => {
         21,
         {
           question: "잎 끝이 갈색인 이유가 뭘까요?",
-          currentJournalContent:
-            "오늘 새잎 끝이 조금 갈색이고 겉흙은 말라 있었어요.",
-          recentMessages: [],
+          conversationId: null,
         },
         "access-token",
         expect.any(AbortSignal),
@@ -332,41 +327,42 @@ describe("PlantJournalAssistant", () => {
     ).toBeInTheDocument();
   });
 
-  it("대화가 길어지면 최근 질문·답변 세 쌍만 다음 AI 요청에 전달한다", async () => {
-    mockedAskPlantChat.mockResolvedValueOnce({
-      answer: "맞춤 답변입니다.",
-      recommendedActions: ["기록을 이어가 주세요."],
-      additionalChecks: [],
-    });
+  it("다음 질문에는 서버가 발급한 대화 ID만 전달한다", async () => {
+    mockedAskPlantChat
+      .mockResolvedValueOnce({
+        conversationId: CONVERSATION_ID,
+        answer: "첫 번째 답변입니다.",
+        recommendedActions: ["흙을 확인해 주세요."],
+        additionalChecks: [],
+      })
+      .mockResolvedValueOnce({
+        conversationId: CONVERSATION_ID,
+        answer: "이전 답변을 이어서 설명해 드릴게요.",
+        recommendedActions: ["관찰을 이어가 주세요."],
+        additionalChecks: [],
+      });
     renderAssistant();
     openAssistant();
 
-    const faqButton = screen.getByRole("button", {
-      name: "오늘 일지에는 무엇을 적으면 좋을까요?",
-    });
-    fireEvent.click(faqButton);
-    fireEvent.click(faqButton);
-    fireEvent.click(faqButton);
-    fireEvent.click(faqButton);
-    fireEvent.change(
-      screen.getByLabelText("내 식물 기록을 바탕으로 직접 질문하기"),
-      {
-        target: { value: "이 기록을 보고 조언해 주세요." },
-      },
+    const input = screen.getByLabelText(
+      "내 식물 기록을 바탕으로 직접 질문하기",
     );
+    fireEvent.change(input, {
+      target: { value: "잎 끝이 갈색인 이유가 뭘까요?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    await screen.findByText("첫 번째 답변입니다.");
+
+    fireEvent.change(input, {
+      target: { value: "첫 번째 방법을 더 설명해 주세요." },
+    });
     fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
 
-    await waitFor(() => expect(mockedAskPlantChat).toHaveBeenCalledTimes(1));
-    const payload = mockedAskPlantChat.mock.calls[0][1];
-    expect(payload.recentMessages).toHaveLength(6);
-    expect(payload.recentMessages.map((message) => message.role)).toEqual([
-      "USER",
-      "ASSISTANT",
-      "USER",
-      "ASSISTANT",
-      "USER",
-      "ASSISTANT",
-    ]);
+    await waitFor(() => expect(mockedAskPlantChat).toHaveBeenCalledTimes(2));
+    expect(mockedAskPlantChat.mock.calls[1][1]).toEqual({
+      question: "첫 번째 방법을 더 설명해 주세요.",
+      conversationId: CONVERSATION_ID,
+    });
   });
 
   it("응답을 기다리는 동안 전송을 다시 눌러도 AI를 한 번만 호출한다", async () => {
@@ -417,6 +413,55 @@ describe("PlantJournalAssistant", () => {
     expect(alert.textContent?.match(/다시 시도/g) ?? []).toHaveLength(1);
   });
 
+  it("대화 세션이 만료되면 이전 화면 대화와 ID를 버리고 새 대화를 준비한다", async () => {
+    mockedAskPlantChat
+      .mockResolvedValueOnce({
+        conversationId: CONVERSATION_ID,
+        answer: "첫 번째 답변입니다.",
+        recommendedActions: ["흙을 확인해 주세요."],
+        additionalChecks: [],
+      })
+      .mockRejectedValueOnce(
+        new ApiError(
+          "AI_CHAT_CONVERSATION_INVALID",
+          "AI 대화가 만료되었어요. 새 대화를 시작해 주세요.",
+          409,
+        ),
+      )
+      .mockResolvedValueOnce({
+        conversationId: "0c104497-ecf4-40a7-830b-8f5c75fe5e7c",
+        answer: "새 대화의 답변입니다.",
+        recommendedActions: ["다시 관찰해 주세요."],
+        additionalChecks: [],
+      });
+    renderAssistant();
+    openAssistant();
+    const input = screen.getByLabelText(
+      "내 식물 기록을 바탕으로 직접 질문하기",
+    );
+
+    fireEvent.change(input, { target: { value: "첫 질문입니다." } });
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    await screen.findByText("첫 번째 답변입니다.");
+
+    fireEvent.change(input, { target: { value: "이어서 설명해 주세요." } });
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "AI 대화가 만료되었어요",
+    );
+    expect(screen.queryByText("첫 번째 답변입니다.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+    await waitFor(() => expect(mockedAskPlantChat).toHaveBeenCalledTimes(3));
+    expect(mockedAskPlantChat.mock.calls[2][1]).toEqual({
+      question: "이어서 설명해 주세요.",
+      conversationId: null,
+    });
+    expect(
+      await screen.findByText("새 대화의 답변입니다."),
+    ).toBeInTheDocument();
+  });
+
   it("질문 중 식물을 바꾸면 이전 요청과 대화를 정리한다", async () => {
     mockedAskPlantChat.mockReturnValueOnce(new Promise(() => {}));
     const { rerender } = renderAssistant();
@@ -433,7 +478,6 @@ describe("PlantJournalAssistant", () => {
     rerender(
       <PlantJournalAssistant
         plant={{ id: 22, nickname: "상추", speciesName: "청상추" }}
-        currentJournalContent="새 식물 기록"
         accessToken="access-token"
       />,
     );
