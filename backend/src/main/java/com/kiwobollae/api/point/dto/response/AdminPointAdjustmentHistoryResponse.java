@@ -2,6 +2,7 @@ package com.kiwobollae.api.point.dto.response;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.point.entity.PointTransaction;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import java.time.LocalDateTime;
 
@@ -12,6 +13,7 @@ public record AdminPointAdjustmentHistoryResponse(
 		String targetNickname,
 		CurrencyType currencyType,
 		Long amount,
+		AdminPointAdjustmentReason adjustmentReason,
 		Long balanceAfter,
 		Long adminUserId,
 		LocalDateTime createdAt
@@ -25,6 +27,7 @@ public record AdminPointAdjustmentHistoryResponse(
 				targetUser.getNickname(),
 				transaction.getCurrencyType(),
 				transaction.getAmount(),
+				transaction.getAdjustmentReason(),
 				transaction.getBalanceAfter(),
 				transaction.getRefId(),
 				transaction.getCreatedAt()

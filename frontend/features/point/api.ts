@@ -18,14 +18,24 @@ export type PointTransactionType =
 
 export type PointCurrencyType = 'FREE' | 'PAID';
 
+export type AdminPointAdjustmentReason =
+  | 'SPECIAL_EVENT'
+  | 'OUTSTANDING_MEMBER'
+  | 'FRAUD_PENALTY';
+
 export interface AdminPointAdjustmentInput {
   userId: number;
   currencyType: PointCurrencyType;
   amount: number;
+  adjustmentReason: AdminPointAdjustmentReason;
 }
 
-export interface AdminPointAdjustmentData extends AdminPointAdjustmentInput {
+export interface AdminPointAdjustmentData {
   transactionId: number;
+  userId: number;
+  currencyType: PointCurrencyType;
+  amount: number;
+  adjustmentReason: AdminPointAdjustmentReason | null;
   balanceAfter: number;
   paidPoint: number;
   freePoint: number;
@@ -42,6 +52,7 @@ export interface AdminPointAdjustmentHistoryData {
   currencyType: PointCurrencyType;
   amount: number;
   balanceAfter: number;
+  adjustmentReason: AdminPointAdjustmentReason | null;
   adminUserId: number | null;
   createdAt: string;
 }
@@ -61,6 +72,7 @@ interface AdminPointAdjustmentHistoryParams {
 export type PointReferenceType =
   | 'ORDER'
   | 'CARD_PURCHASE'
+  | 'GACHA_PURCHASE'
   | 'PAYMENT'
   | 'PAYMENT_REFUND'
   | 'JOURNAL_COMPLETION'
@@ -75,6 +87,7 @@ export interface PointTransaction {
   balanceAfter: number;
   refType: PointReferenceType | null;
   refId: number | null;
+  adjustmentReason: AdminPointAdjustmentReason | null;
   createdAt: string;
 }
 
@@ -95,6 +108,7 @@ export interface PointActivity {
   type: PointTransactionType;
   refType: PointReferenceType | null;
   refId: number | null;
+  adjustmentReason: AdminPointAdjustmentReason | null;
   amount: number;
   paidAmount: number;
   freeAmount: number;

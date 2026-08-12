@@ -20,6 +20,7 @@ import com.kiwobollae.api.commerce.service.OrderService;
 import com.kiwobollae.api.journal.entity.PlantJournal;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentRequest;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -89,17 +90,20 @@ public class PointScenarioInitData implements ApplicationRunner {
 		adminPointAdjustmentService.adjust(
 				adminUserId,
 				"seed-point-free-grant-v1",
-				new AdminPointAdjustmentRequest(userId, CurrencyType.FREE, 800L)
+				new AdminPointAdjustmentRequest(
+						userId, CurrencyType.FREE, 800L, AdminPointAdjustmentReason.SPECIAL_EVENT)
 		);
 		adminPointAdjustmentService.adjust(
 				adminUserId,
 				"seed-point-free-deduct-v1",
-				new AdminPointAdjustmentRequest(userId, CurrencyType.FREE, -100L)
+				new AdminPointAdjustmentRequest(
+						userId, CurrencyType.FREE, -100L, AdminPointAdjustmentReason.FRAUD_PENALTY)
 		);
 		adminPointAdjustmentService.adjust(
 				adminUserId,
 				"seed-point-paid-grant-v1",
-				new AdminPointAdjustmentRequest(userId, CurrencyType.PAID, 5_000L)
+				new AdminPointAdjustmentRequest(
+						userId, CurrencyType.PAID, 5_000L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER)
 		);
 	}
 

@@ -45,6 +45,7 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 					       pt.type AS type,
 					       pt.ref_type AS refType,
 					       pt.ref_id AS refId,
+					       MAX(pt.adjustment_reason) AS adjustmentReason,
 					       CAST(SUM(pt.amount) AS SIGNED) AS amount,
 					       CAST(SUM(CASE WHEN pt.currency_type = 'PAID' THEN pt.amount ELSE 0 END) AS SIGNED) AS paidAmount,
 					       CAST(SUM(CASE WHEN pt.currency_type = 'FREE' THEN pt.amount ELSE 0 END) AS SIGNED) AS freeAmount,
