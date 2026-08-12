@@ -23,6 +23,7 @@ export default function MarketNegotiationDetailPage() {
 
   useEffect(() => {
     if (!hydrated) return;
+    setError("");
     if (!state.accessToken) {
       setError("로그인 후 가격 제안을 확인할 수 있어요.");
       return;
@@ -34,13 +35,19 @@ export default function MarketNegotiationDetailPage() {
       controller.signal,
     )
       .then(setNegotiation)
-      .catch((requestError) =>
+      .catch((requestError) => {
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+        ) {
+          return;
+        }
         setError(
           requestError instanceof ApiError
             ? requestError.message
             : "가격 제안을 불러오지 못했어요.",
-        ),
-      );
+        );
+      });
     return () => controller.abort();
   }, [hydrated, negotiationId, state.accessToken]);
 
