@@ -63,4 +63,9 @@ public class GoldenCardInstance extends BaseEntity {
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
+
+  public void transferTo(User newOwner, LocalDateTime now) {
+    this.ownerUser = newOwner;
+    this.currentOwnerSince = now;
+  }
 }

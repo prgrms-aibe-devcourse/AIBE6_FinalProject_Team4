@@ -35,7 +35,8 @@ class AdminCardServiceTest {
             cardRepository,
             exchangeProductRepository,
             new CommerceAssetKeyValidator(),
-            new AssetUrlResolver("https://assets.example.com/"));
+            new AssetUrlResolver("https://assets.example.com/"),
+            org.mockito.Mockito.mock(CommerceAssetStorageService.class));
   }
 
   @Test

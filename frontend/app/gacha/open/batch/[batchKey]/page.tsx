@@ -180,7 +180,7 @@ export default function GachaBatchOpenPage({
 
   const confirm = () => {
     removeGachaBatch(params.batchKey);
-    router.replace("/gacha");
+    router.replace("/gacha?tab=mine");
   };
 
   const showSummary = () => {
@@ -317,17 +317,29 @@ export default function GachaBatchOpenPage({
 
               <div className="mt-10 flex flex-wrap justify-center gap-3">
                 <Link
-                  href="/shop"
+                  href="/journals"
+                  className="rounded-full border border-white/20 px-8 py-3.5 font-black text-white/80 transition hover:-translate-y-0.5 hover:bg-white/10"
+                >
+                  일지 보러 가기
+                </Link>
+                <Link
+                  href="/shop?category=GACHA_PACK&sort=new&page=1"
                   className="rounded-full border border-[#d7c266]/60 px-8 py-3.5 font-black text-[#f2dc83] transition hover:-translate-y-0.5 hover:bg-[#d7c266]/10"
                 >
-                  상점으로 가기
+                  카드팩 구매하기
+                </Link>
+                <Link
+                  href="/gacha?tab=history"
+                  className="rounded-full border border-white/20 px-8 py-3.5 font-black text-white/80 transition hover:-translate-y-0.5 hover:bg-white/10"
+                >
+                  다른 개봉 내역 보기
                 </Link>
                 <button
                   type="button"
                   onClick={confirm}
                   className="rounded-full bg-white px-8 py-3.5 font-black text-[#253822] shadow-lg transition hover:-translate-y-0.5"
                 >
-                  확인 완료
+                  내 카드 보기
                 </button>
               </div>
             </section>

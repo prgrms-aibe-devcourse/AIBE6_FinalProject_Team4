@@ -1,0 +1,304 @@
+package com.kiwobollae.api.commerce.cardmarket.service;
+
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketListingResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketNegotiationResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketPageResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketProposalResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketSellableCardResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketTradeResponse;
+import com.kiwobollae.api.commerce.cardmarket.dto.CardMarketWalletResponse;
+import com.kiwobollae.api.commerce.cardmarket.entity.CardMarketListing;
+import com.kiwobollae.api.commerce.cardmarket.entity.CardMarketNegotiation;
+import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketAssetType;
+import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketListingStatus;
+import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketNegotiationStatus;
+import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketListingRepository;
+import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketNegotiationRepository;
+import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketProposalRepository;
+import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketTradeRepository;
+import com.kiwobollae.api.commerce.cardmarket.port.CardMarketPointPort;
+import com.kiwobollae.api.commerce.gacha.entity.GoldenCardInstance;
+import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardRarity;
+import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardStatus;
+import com.kiwobollae.api.commerce.gacha.repository.GoldenCardInstanceRepository;
+import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
+import com.kiwobollae.api.global.exception.BusinessException;
+import com.kiwobollae.api.global.exception.ErrorCode;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class CardMarketQueryService {
+
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+  private final CardMarketListingRepository listingRepository;
+  private final CardMarketNegotiationRepository negotiationRepository;
+  private final CardMarketProposalRepository proposalRepository;
+  private final CardMarketTradeRepository tradeRepository;
+  private final UserCardCollectionRepository collectionRepository;
+  private final GoldenCardInstanceRepository goldenInstanceRepository;
+  private final CardMarketPointPort pointPort;
+  private final Clock seoulClock;
+
+  @Value("${app.asset.base-url:}")
+  private String assetBaseUrl;
+
+  public CardMarketPageResponse<CardMarketListingResponse> getListings(
+      CardMarketAssetType assetType, Long cardId, String keyword, Pageable pageable) {
+    String normalizedKeyword = normalizeKeyword(keyword);
+    Page<CardMarketListing> page =
+        listingRepository
+            .search(
+                CardMarketListingStatus.OPEN,
+                assetType,
+                cardId,
+                normalizedKeyword,
+                now(),
+                pageable);
+    return listingPageResponse(page);
+  }
+
+  public CardMarketListingResponse getListing(Long listingId) {
+    CardMarketListing listing = requireListing(listingId);
+    if (listing.getStatus() != CardMarketListingStatus.OPEN
+        || !listing.getExpiresAt().isAfter(now())
+        || listing.getCard().getStatus() != TradingCardStatus.ACTIVE) {
+      throw new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND);
+    }
+    return listingResponse(listing);
+  }
+
+  public CardMarketPageResponse<CardMarketListingResponse> getMyListings(
+      Long userId, CardMarketListingStatus status, Pageable pageable) {
+    requireUser(userId);
+    Page<CardMarketListing> page =
+        status == null
+            ? listingRepository.findAllBySeller_Id(userId, pageable)
+            : listingRepository.findAllBySeller_IdAndStatus(userId, status, pageable);
+    return listingPageResponse(page);
+  }
+
+  public CardMarketPageResponse<CardMarketNegotiationResponse> getMySentNegotiations(
+      Long userId, Pageable pageable) {
+    requireUser(userId);
+    return negotiationPageResponse(negotiationRepository.findAllByBuyer_Id(userId, pageable));
+  }
+
+  public CardMarketPageResponse<CardMarketNegotiationResponse> getMyReceivedNegotiations(
+      Long userId, Pageable pageable) {
+    requireUser(userId);
+    return negotiationPageResponse(
+        negotiationRepository.findAllByListing_Seller_Id(userId, pageable));
+  }
+
+  public CardMarketPageResponse<CardMarketTradeResponse> getMyTrades(
+      Long userId, Pageable pageable) {
+    requireUser(userId);
+    return CardMarketPageResponse.from(
+        tradeRepository
+            .findAllByBuyer_IdOrSeller_Id(userId, userId, pageable)
+            .map(
+                trade ->
+                    CardMarketTradeResponse.from(
+                        trade, imageUrl(trade.getImageKeySnapshot()))));
+  }
+
+  public CardMarketNegotiationResponse getMyNegotiation(Long userId, Long negotiationId) {
+    requireUser(userId);
+    CardMarketNegotiation negotiation =
+        negotiationRepository
+            .findOwnedDetailsById(negotiationId, userId)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.CARD_MARKET_NEGOTIATION_NOT_FOUND));
+    return negotiationResponse(negotiation);
+  }
+
+  public CardMarketWalletResponse getMyWallet(Long userId) {
+    requireUser(userId);
+    CardMarketPointPort.Balance wallet = pointPort.getBalance(userId);
+    long escrowed =
+        negotiationRepository.sumEscrowedPoint(userId, CardMarketNegotiationStatus.NEGOTIATING);
+    return new CardMarketWalletResponse(
+        wallet.paidPoint(),
+        wallet.freePoint(),
+        escrowed,
+        "유상 포인트만 카드 거래에 사용할 수 있습니다.",
+        "무상 포인트는 카드 거래에 사용할 수 없습니다.");
+  }
+
+  public List<CardMarketSellableCardResponse> getMySellableCards(Long userId) {
+    requireUser(userId);
+    List<GoldenCardInstance> goldenInstances =
+        goldenInstanceRepository.findAllByOwnerUser_IdOrderByIdAsc(userId);
+    Map<Long, List<GoldenCardInstance>> goldenByCard =
+        goldenInstances.stream().collect(Collectors.groupingBy(instance -> instance.getCard().getId()));
+
+    return collectionRepository.findAllByUser_Id(userId).stream()
+        .filter(collection -> collection.getOwnedCount() > 0)
+        .filter(collection -> collection.getCard().getStatus() == TradingCardStatus.ACTIVE)
+        .filter(
+            collection ->
+                collection.getCard().getRarity() == TradingCardRarity.HYPER_RARE
+                    || collection.getCard().getRarity() == TradingCardRarity.GOLDEN_RARE)
+        .map(
+            collection -> {
+              var card = collection.getCard();
+              List<CardMarketSellableCardResponse.GoldenInstance> instances =
+                  goldenByCard.getOrDefault(card.getId(), List.of()).stream()
+                      .map(
+                          instance ->
+                              new CardMarketSellableCardResponse.GoldenInstance(
+                                  instance.getId(),
+                                  instance.getGoldenOriginRank(),
+                                  listingRepository.existsByGoldenInstance_IdAndStatus(
+                                      instance.getId(), CardMarketListingStatus.OPEN)))
+                      .toList();
+              int sellableCount =
+                  card.getRarity() == TradingCardRarity.HYPER_RARE
+                      ? Math.max(0, collection.getOwnedCount() - 1)
+                      : (int) instances.stream().filter(instance -> !instance.listed()).count();
+              return new CardMarketSellableCardResponse(
+                  card.getId(),
+                  card.getName(),
+                  card.getRarity(),
+                  imageUrl(card.getImageKey()),
+                  collection.getOwnedCount(),
+                  sellableCount,
+                  instances);
+            })
+        .toList();
+  }
+
+  private CardMarketListingResponse listingResponse(CardMarketListing listing) {
+    long offerCount =
+        negotiationRepository.countByListing_IdAndStatus(
+            listing.getId(), CardMarketNegotiationStatus.NEGOTIATING);
+    return CardMarketListingResponse.from(
+        listing, imageUrl(listing.getCard().getImageKey()), offerCount);
+  }
+
+  private CardMarketPageResponse<CardMarketListingResponse> listingPageResponse(
+      Page<CardMarketListing> page) {
+    List<Long> listingIds = page.getContent().stream().map(CardMarketListing::getId).toList();
+    Map<Long, Long> offerCounts =
+        listingIds.isEmpty()
+            ? Map.of()
+            : negotiationRepository
+                .countByListingIdsAndStatus(
+                    listingIds, CardMarketNegotiationStatus.NEGOTIATING)
+                .stream()
+                .collect(
+                    Collectors.toMap(
+                        CardMarketNegotiationRepository.ListingOfferCount::getListingId,
+                        CardMarketNegotiationRepository.ListingOfferCount::getOfferCount));
+    List<CardMarketListingResponse> content =
+        page.getContent().stream()
+            .map(
+                listing ->
+                    CardMarketListingResponse.from(
+                        listing,
+                        imageUrl(listing.getCard().getImageKey()),
+                        offerCounts.getOrDefault(listing.getId(), 0L)))
+            .toList();
+    return pageResponse(page, content);
+  }
+
+  private CardMarketNegotiationResponse negotiationResponse(CardMarketNegotiation negotiation) {
+    List<CardMarketProposalResponse> proposals =
+        proposalRepository.findAllByNegotiation_IdOrderBySequenceNoAsc(negotiation.getId()).stream()
+            .map(CardMarketProposalResponse::from)
+            .toList();
+    return CardMarketNegotiationResponse.from(
+        negotiation, imageUrl(negotiation.getListing().getCard().getImageKey()), proposals);
+  }
+
+  private CardMarketPageResponse<CardMarketNegotiationResponse> negotiationPageResponse(
+      Page<CardMarketNegotiation> page) {
+    List<Long> negotiationIds =
+        page.getContent().stream().map(CardMarketNegotiation::getId).toList();
+    Map<Long, List<CardMarketProposalResponse>> proposalsByNegotiation =
+        negotiationIds.isEmpty()
+            ? Map.of()
+            : proposalRepository
+                .findAllByNegotiation_IdInOrderByNegotiation_IdAscSequenceNoAsc(negotiationIds)
+                .stream()
+                .collect(
+                    Collectors.groupingBy(
+                        proposal -> proposal.getNegotiation().getId(),
+                        Collectors.mapping(
+                            CardMarketProposalResponse::from, Collectors.toList())));
+    List<CardMarketNegotiationResponse> content =
+        page.getContent().stream()
+            .map(
+                negotiation ->
+                    CardMarketNegotiationResponse.from(
+                        negotiation,
+                        imageUrl(negotiation.getListing().getCard().getImageKey()),
+                        proposalsByNegotiation.getOrDefault(negotiation.getId(), List.of())))
+            .toList();
+    return pageResponse(page, content);
+  }
+
+  private <S, T> CardMarketPageResponse<T> pageResponse(Page<S> page, List<T> content) {
+    return new CardMarketPageResponse<>(
+        content,
+        page.getNumber(),
+        page.getSize(),
+        page.getTotalElements(),
+        page.getTotalPages());
+  }
+
+  private CardMarketListing requireListing(Long listingId) {
+    if (listingId == null || listingId < 1) {
+      throw new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND);
+    }
+    return listingRepository
+        .findWithDetailsById(listingId)
+        .orElseThrow(() -> new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND));
+  }
+
+  private String imageUrl(String imageKey) {
+    if (imageKey == null || imageKey.isBlank()) {
+      return null;
+    }
+    String normalized = imageKey.startsWith("/") ? imageKey.substring(1) : imageKey;
+    if (assetBaseUrl == null || assetBaseUrl.isBlank()) {
+      return "/" + normalized;
+    }
+    return assetBaseUrl.replaceAll("/+$", "") + "/" + normalized;
+  }
+
+  private void requireUser(Long userId) {
+    if (userId == null || userId < 1) {
+      throw new BusinessException(ErrorCode.AUTH_AUTHENTICATION_REQUIRED);
+    }
+  }
+
+  private LocalDateTime now() {
+    return LocalDateTime.ofInstant(seoulClock.instant(), KST);
+  }
+
+  private String normalizeKeyword(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return null;
+    }
+    String normalized = keyword.trim();
+    if (normalized.length() > 50) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return normalized;
+  }
+}

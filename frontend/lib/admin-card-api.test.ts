@@ -6,6 +6,7 @@ import {
   getAdminExchangeProductOptions,
   hideAdminCard,
   updateAdminCard,
+  uploadAdminCardImage,
 } from "@/lib/admin-card-api";
 
 vi.mock("@/lib/api", () => ({ request: vi.fn() }));
@@ -56,5 +57,19 @@ describe("admin card api", () => {
       "/api/v1/admin/card/exchange-products",
       { accessToken: "token", signal: undefined },
     );
+  });
+
+  it("쿠폰 이미지를 multipart로 업로드한다", async () => {
+    mockedRequest.mockResolvedValue({});
+    const file = new File(["image"], "coupon.webp", { type: "image/webp" });
+
+    await uploadAdminCardImage(9, file, "token");
+
+    const options = mockedRequest.mock.calls[0][1];
+    expect(mockedRequest.mock.calls[0][0]).toBe("/api/v1/admin/card/9/image");
+    expect(options?.method).toBe("POST");
+    expect(options?.accessToken).toBe("token");
+    expect(options?.body).toBeInstanceOf(FormData);
+    expect((options?.body as FormData).get("file")).toBe(file);
   });
 });

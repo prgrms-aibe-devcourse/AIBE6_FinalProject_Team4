@@ -15,7 +15,13 @@ const CONFETTI = [
   { left: '82%', dur: '1.6s', delay: '.15s', emoji: '✨' }, { left: '92%', dur: '1.7s', delay: '.25s', emoji: '🎉' },
 ];
 
-export default function CardDetail({ params }: { params: { id: string } }) {
+export default function CardDetail({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { returnTo?: string | string[] };
+}) {
   const router = useRouter();
   const {
     state,
@@ -27,6 +33,12 @@ export default function CardDetail({ params }: { params: { id: string } }) {
   } = useStore();
   const { showToast, askConfirm } = useUI();
   const cardId = Number(params.id);
+  const requestedReturnTo = Array.isArray(searchParams?.returnTo)
+    ? searchParams?.returnTo[0]
+    : searchParams?.returnTo;
+  const returnTo = requestedReturnTo?.startsWith('/cards')
+    ? requestedReturnTo
+    : '/cards';
   const [card, setCard] = useState<CardData | null>(null);
   const [owned, setOwned] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
@@ -84,7 +96,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
           <p>{error || '쿠폰을 찾을 수 없어요.'}</p>
           <Link
-            href="/cards"
+            href={returnTo}
             className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white"
           >
             쿠폰 목록으로 돌아가기
@@ -165,7 +177,7 @@ export default function CardDetail({ params }: { params: { id: string } }) {
 
   return (
     <div className="container">
-      <Link href="/cards" className="text-sm font-semibold text-sub">← 쿠폰</Link>
+      <Link href={returnTo} className="text-sm font-semibold text-sub">← 쿠폰</Link>
       <div className="mt-4 grid items-start gap-7 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
         <div
           className="flex aspect-[3/4] max-h-[420px] items-center justify-center overflow-hidden rounded-[22px] bg-brand-soft bg-cover bg-center text-[150px] shadow-[0_12px_36px_rgba(0,0,0,.1)]"
@@ -211,24 +223,38 @@ export default function CardDetail({ params }: { params: { id: string } }) {
                 <div className="text-base font-extrabold">내 진행도</div>
                 <div className="mt-[3px] text-[13.5px] text-sub">
                   {owned >= card.requiredCountForExchange
-                    ? '모두 모았어요! 교환할 수 있어요 🎉'
+                    ? card.exchangeProductStock > 0
+                      ? '모두 모았어요! 교환할 수 있어요 🎉'
+                      : '쿠폰은 모두 모았지만 교환 상품이 품절됐어요.'
                     : `${card.requiredCountForExchange - owned}장만 더 모으면 교환할 수 있어요`}
                 </div>
+                {owned >= card.requiredCountForExchange ? (
+                  card.exchangeProductStock > 0 ? (
+                    <Link
+                      href={`/exchange/new?cardId=${card.id}`}
+                      className="mt-3 inline-flex rounded-xl bg-brand px-4 py-2.5 text-sm font-extrabold text-white hover:text-white"
+                    >
+                      바로 교환하기
+                    </Link>
+                  ) : (
+                    <span className="mt-3 inline-flex rounded-xl bg-[#eceee8] px-4 py-2.5 text-sm font-extrabold text-sub">
+                      재입고 대기 중
+                    </span>
+                  )
+                ) : null}
               </div>
             </div>
           )}
 
           <div className="mb-[22px] flex items-center gap-3.5 rounded-[18px] bg-white px-5 py-[18px] shadow-card">
-            <div
-              className="flex h-16 w-16 flex-none items-center justify-center rounded-[14px] bg-brand-soft bg-cover bg-center text-[34px]"
-              style={
-                card.exchangeProductImageUrl
-                  ? { backgroundImage: `url("${card.exchangeProductImageUrl}")` }
-                  : undefined
-              }
-            >
-              {!card.exchangeProductImageUrl && '🎁'}
-            </div>
+            {card.exchangeProductImageUrl ? (
+              <div
+                role="img"
+                aria-label={card.exchangeProductName}
+                className="h-16 w-16 flex-none rounded-[14px] bg-brand-soft bg-cover bg-center"
+                style={{ backgroundImage: `url("${card.exchangeProductImageUrl}")` }}
+              />
+            ) : null}
             <div>
               <div className="text-xs font-bold text-faint">교환 상품</div>
               <div className="font-extrabold">{card.exchangeProductName}</div>
@@ -236,6 +262,11 @@ export default function CardDetail({ params }: { params: { id: string } }) {
                 {card.exchangeProductDescription || '교환 상품 설명을 준비하고 있어요.'}
                 {' · '}
                 {card.requiredCountForExchange}장 필요
+              </div>
+              <div className={`mt-1 text-xs font-bold ${card.exchangeProductStock > 0 ? 'text-brand' : 'text-danger'}`}>
+                {card.exchangeProductStock > 0
+                  ? `재고 ${card.exchangeProductStock}개`
+                  : '현재 품절'}
               </div>
             </div>
           </div>
@@ -307,9 +338,15 @@ export default function CardDetail({ params }: { params: { id: string } }) {
             <h3 className="mb-2 mt-3.5 text-xl font-extrabold">축하해요!</h3>
             <p className="mb-6 leading-[1.6] text-[#6d7a68]">{couponName(card.name)}이 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
             <div className="flex gap-2.5">
-              <button type="button" onClick={() => router.push(`/exchange/new?cardId=${card.id}`)} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
-                교환 신청하기
-              </button>
+              {card.exchangeProductStock > 0 ? (
+                <button type="button" onClick={() => router.push(`/exchange/new?cardId=${card.id}`)} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
+                  교환 신청하기
+                </button>
+              ) : (
+                <button type="button" disabled className="flex-1 cursor-not-allowed rounded-xl bg-[#eceee8] p-[13px] font-extrabold text-sub">
+                  교환 상품 품절
+                </button>
+              )}
               <button type="button" onClick={() => setCelebrate(false)} className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-[18px] py-[13px] font-bold text-sub">
                 나중에
               </button>

@@ -20,6 +20,7 @@ const NIC: Record<NotificationType, [string, string]> = {
   INQUIRY: ['chat_bubble', 'bg-[#F0ECF9]'],
   NOTICE: ['campaign', 'bg-[#FBEDE3]'],
   TIMELAPSE: ['movie', 'bg-[#E6F4EA]'],
+  CARD_MARKET: ['handshake', 'bg-[#F7EBC9]'],
 };
 
 const TYPE_TABS: { label: string; type?: NotificationType }[] = [
@@ -27,6 +28,7 @@ const TYPE_TABS: { label: string; type?: NotificationType }[] = [
   { label: '배송', type: 'DELIVERY' },
   { label: '커뮤니티', type: 'COMMUNITY' },
   { label: '재화', type: 'POINT' },
+  { label: '거래소', type: 'CARD_MARKET' },
   { label: '공지', type: 'NOTICE' },
 ];
 

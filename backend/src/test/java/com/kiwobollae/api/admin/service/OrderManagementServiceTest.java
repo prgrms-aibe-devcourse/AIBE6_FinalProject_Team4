@@ -23,6 +23,7 @@ import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
 import com.kiwobollae.api.commerce.repository.OrderItemRepository;
 import com.kiwobollae.api.commerce.repository.OrderRepository;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.notification.entity.enums.NotificationType;
@@ -48,6 +49,7 @@ class OrderManagementServiceTest {
 	@Mock private OrderRepository orderRepository;
 	@Mock private OrderItemRepository orderItemRepository;
 	@Mock private ProductRepository productRepository;
+	@Mock private AssetUrlResolver assetUrlResolver;
 	@Mock private WalletService walletService;
 	@Mock private NotificationService notificationService;
 	@InjectMocks private OrderManagementService orderManagementService;

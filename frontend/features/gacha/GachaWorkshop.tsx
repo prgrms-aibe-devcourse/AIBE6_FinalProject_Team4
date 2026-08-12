@@ -317,27 +317,25 @@ export default function GachaWorkshop({
         </div>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d8e1d5] px-1 pb-5">
-          <button
-            type="button"
-            aria-label="작업 선택으로 돌아가기"
-            onClick={() => setSection("menu")}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#e7efe3] px-4 py-2.5 text-sm font-black text-[#315f3e] transition hover:bg-[#d9e8d5]"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="flex flex-wrap gap-2">
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#c7d9c3] bg-white px-4 py-2.5 text-sm font-black text-[#315f3e] transition hover:bg-[#f1f6ee]"
+              >
+                ← 내 카드 갤러리
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-label="작업 선택으로 돌아가기"
+              onClick={() => setSection("menu")}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#e7efe3] px-4 py-2.5 text-sm font-black text-[#315f3e] transition hover:bg-[#d9e8d5]"
             >
-              <path d="m12.5 4.5-5.5 5.5 5.5 5.5" />
-              <path d="M7.5 10H17" />
-            </svg>
-            작업 선택으로 돌아가기
-          </button>
+              ← 작업 선택
+            </button>
+          </div>
           <p className="text-sm font-black text-[#68766b]">
             현재 작업 · {section === "dismantle" ? "카드 분해" : "이펙트 상점"}
           </p>

@@ -13,9 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/admin",
   useRouter: () => ({ replace: mocks.replace }),
-  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 vi.mock("@/lib/store", () => ({
@@ -171,9 +169,7 @@ describe("Admin product management", () => {
   });
 
   it("URL의 충전 상품 관리 탭을 초기 화면에 복원한다", () => {
-    window.history.replaceState({}, "", "/admin?tab=charge-products");
-
-    render(<Admin />);
+    render(<Admin searchParams={{ tab: "charge-products" }} />);
 
     expect(screen.getByTestId("admin-charge-product-panel")).toHaveTextContent(
       "admin-token:1",

@@ -186,7 +186,7 @@ export default function GachaOpenPage({
   };
 
   const confirm = () => {
-    router.replace("/gacha");
+    router.replace("/gacha?tab=mine");
   };
 
   const replay = () => {
@@ -328,10 +328,22 @@ export default function GachaOpenPage({
               </div>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <Link
-                  href="/shop"
+                  href="/journals"
+                  className="rounded-xl border border-white/25 px-5 py-3 text-sm font-bold"
+                >
+                  일지 보러 가기
+                </Link>
+                <Link
+                  href="/shop?category=GACHA_PACK&sort=new&page=1"
                   className="rounded-xl border border-[#dfca72]/60 px-5 py-3 text-sm font-bold text-[#f3dc82] transition hover:bg-[#dfca72]/10"
                 >
-                  상점으로 가기
+                  카드팩 구매하기
+                </Link>
+                <Link
+                  href="/gacha?tab=history"
+                  className="rounded-xl border border-white/25 px-5 py-3 text-sm font-bold"
+                >
+                  다른 개봉 내역 보기
                 </Link>
                 <button
                   type="button"
@@ -345,7 +357,7 @@ export default function GachaOpenPage({
                   onClick={confirm}
                   className="rounded-xl bg-white px-7 py-3 text-sm font-black text-[#253822]"
                 >
-                  확인하고 내 카드 보기
+                  내 카드 보기
                 </button>
               </div>
             </div>

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NEXT_DIST_DIR=.next-dev next dev",
     "assets:check": "node scripts/validate-card-assets.mjs",
     "prebuild": "npm run assets:check",
     "build": "next build",

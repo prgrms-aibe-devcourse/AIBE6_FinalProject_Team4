@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import Cards from './page';
 import { getCards } from '@/lib/card-api';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
 vi.mock('@/lib/store', () => ({
   fmt: (value: number) => value.toLocaleString('ko-KR'),
   useStore: () => ({

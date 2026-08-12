@@ -16,6 +16,10 @@ import {
 
 const mockAuth = vi.hoisted(() => ({ accessToken: null as string | null }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
 vi.mock("next/image", () => ({
   default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} />,
 }));
@@ -110,6 +114,9 @@ describe("GachaPage", () => {
     ).not.toBeInTheDocument();
     expect(mockedCollection).not.toHaveBeenCalled();
     expect(mockedDraws).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("link", { name: /카드 거래소/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("보유 카드 갤러리에서 원본 일러스트를 확대한다", async () => {

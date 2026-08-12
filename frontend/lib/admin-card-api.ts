@@ -94,3 +94,17 @@ export function hideAdminCard(
     accessToken,
   });
 }
+
+export function uploadAdminCardImage(
+  cardId: number,
+  file: File,
+  accessToken: string,
+): Promise<AdminCard> {
+  const body = new FormData();
+  body.append("file", file);
+  return request<AdminCard>(`/api/v1/admin/card/${cardId}/image`, {
+    method: "POST",
+    accessToken,
+    body,
+  });
+}

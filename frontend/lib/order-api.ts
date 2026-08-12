@@ -5,6 +5,7 @@ export interface CartItemData {
   userId: number;
   productId: number;
   productName: string;
+  imageUrl: string | null;
   unitPrice: number;
   quantity: number;
   availableStock: number;
@@ -96,6 +97,7 @@ export interface OrderItemData {
   orderId: number;
   productId: number;
   productName: string;
+  imageUrl: string | null;
   quantity: number;
   unitPoint: number;
 }
