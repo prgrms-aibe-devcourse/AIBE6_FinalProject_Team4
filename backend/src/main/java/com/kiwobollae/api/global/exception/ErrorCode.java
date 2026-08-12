@@ -78,6 +78,7 @@ public enum ErrorCode {
 	GACHA_COSMETIC_NOT_FOUND(HttpStatus.NOT_FOUND, "칭호 또는 테두리를 찾을 수 없습니다."),
 	GACHA_COSMETIC_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 해금한 칭호 또는 테두리입니다."),
 	GACHA_COSMETIC_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "해금하지 않은 칭호 또는 테두리입니다."),
+	GACHA_PRODUCT_PRICE_CHANGED(HttpStatus.CONFLICT, "가챠 팩 가격이 변경되었습니다. 최신 가격을 확인해 주세요."),
 
 	EXCHANGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 상품을 찾을 수 없습니다."),
 	EXCHANGE_PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "교환 상품의 재고가 부족합니다."),
