@@ -9,6 +9,13 @@ const mocks = vi.hoisted(() => ({
   getExchanges: vi.fn(),
   showToast: vi.fn(),
   askConfirm: vi.fn(),
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/admin",
+  useRouter: () => ({ replace: mocks.replace }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 vi.mock("@/lib/store", () => ({
@@ -73,6 +80,7 @@ vi.mock("@/features/point/AdminPointAdjustmentPanel", () => ({
 describe("Admin product management", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, "", "/admin");
     mocks.getSpecies.mockResolvedValue([]);
     mocks.getExchanges.mockResolvedValue({ content: [] });
     mocks.getProducts.mockResolvedValue([
@@ -150,5 +158,25 @@ describe("Admin product management", () => {
     expect(
       screen.getByTestId("admin-point-adjustment-panel"),
     ).toHaveTextContent("admin-token:1");
+  });
+
+  it("포인트 관리 탭을 URL에 저장해 새로고침 후에도 복원할 수 있다", () => {
+    render(<Admin />);
+
+    fireEvent.click(screen.getByRole("button", { name: "포인트 관리" }));
+
+    expect(mocks.replace).toHaveBeenCalledWith("/admin?tab=points", {
+      scroll: false,
+    });
+  });
+
+  it("URL의 충전 상품 관리 탭을 초기 화면에 복원한다", () => {
+    window.history.replaceState({}, "", "/admin?tab=charge-products");
+
+    render(<Admin />);
+
+    expect(screen.getByTestId("admin-charge-product-panel")).toHaveTextContent(
+      "admin-token:1",
+    );
   });
 });

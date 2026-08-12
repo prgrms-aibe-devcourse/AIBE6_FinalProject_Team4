@@ -43,6 +43,7 @@ import { couponName } from "@/lib/coupon-label";
 import { ProductCategory } from "@/lib/product-api";
 import { useUI } from "@/lib/ui";
 import { validateCommerceAssetKey } from "@/lib/commerce-asset";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const CANCEL_REASON_OPTIONS = [
@@ -101,9 +102,33 @@ const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   GACHA_PACK: "가챠 팩",
 };
 
+const ADMIN_TABS = [
+  ["orders", "주문 관리"],
+  ["exchanges", "교환 관리"],
+  ["products", "상품 관리"],
+  ["coupons", "쿠폰 관리"],
+  ["gacha-operations", "가챠 장애 관리"],
+  ["points", "포인트 관리"],
+  ["charge-products", "충전 상품 관리"],
+  ["reports", "신고 관리"],
+  ["species", "종 관리"],
+] as const;
+
+type AdminTab = (typeof ADMIN_TABS)[number][0];
+
+function getAdminTab(value: string | null): AdminTab {
+  return ADMIN_TABS.some(([key]) => key === value)
+    ? (value as AdminTab)
+    : "orders";
+}
+
 export default function Admin() {
   const { showToast, askConfirm } = useUI();
-  const [tab, setTab] = useState("orders");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedTab = getAdminTab(searchParams.get("tab"));
+  const [tab, setTab] = useState<AdminTab>(selectedTab);
   const { state, hydrated } = useStore();
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [orderItemsById, setOrderItemsById] = useState<
@@ -111,6 +136,10 @@ export default function Admin() {
   >({});
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState("");
+
+  useEffect(() => {
+    setTab(selectedTab);
+  }, [selectedTab]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -699,17 +728,16 @@ export default function Admin() {
     showToast(msg);
   };
 
-  const TABS = [
-    ["orders", "주문 관리"],
-    ["exchanges", "교환 관리"],
-    ["products", "상품 관리"],
-    ["coupons", "쿠폰 관리"],
-    ["gacha-operations", "가챠 장애 관리"],
-    ["points", "포인트 관리"],
-    ["charge-products", "충전 상품 관리"],
-    ["reports", "신고 관리"],
-    ["species", "종 관리"],
-  ];
+  const changeTab = (nextTab: AdminTab) => {
+    setTab(nextTab);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextTab === "orders") nextParams.delete("tab");
+    else nextParams.set("tab", nextTab);
+    const query = nextParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  };
 
   return (
     <div className="container">
@@ -734,11 +762,11 @@ export default function Admin() {
       </div>
 
       <div className="mb-[22px] flex w-fit flex-wrap gap-1.5 rounded-[14px] bg-[#F0F2E8] p-[5px]">
-        {TABS.map(([k, label]) => (
+        {ADMIN_TABS.map(([k, label]) => (
           <button
             key={k}
             type="button"
-            onClick={() => setTab(k)}
+            onClick={() => changeTab(k)}
             className={`cursor-pointer rounded-[11px] px-[18px] py-[9px] text-sm font-bold transition-colors duration-150 ${
               tab === k
                 ? "bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,.06)]"
