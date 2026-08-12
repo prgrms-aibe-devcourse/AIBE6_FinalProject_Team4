@@ -45,6 +45,8 @@ function createIdempotencyKey(): string {
 }
 
 const CREATE_ATTEMPT_STORAGE_PREFIX = "kwb:admin-charge-product-create:";
+const MIN_POINT_RATE = 1;
+const MAX_POINT_RATE = 1.5;
 
 function createAttemptStorageKey(
   adminUserId: number,
@@ -187,6 +189,12 @@ export default function AdminChargeProductPanel({
       nextErrors.price = "결제 금액은 1 이상의 정수로 입력해 주세요.";
     if (!Number.isSafeInteger(pointAmount) || pointAmount < 1)
       nextErrors.pointAmount = "지급 포인트는 1 이상의 정수로 입력해 주세요.";
+    else if (
+      Number.isSafeInteger(price) &&
+      price >= 1 &&
+      (pointAmount < price || pointAmount / price > MAX_POINT_RATE)
+    )
+      nextErrors.pointAmount = `지급 포인트는 결제 금액의 ${MIN_POINT_RATE * 100}% 이상 ${MAX_POINT_RATE * 100}% 이하로 입력해 주세요.`;
 
     setFormErrors(nextErrors);
     const firstError = Object.values(nextErrors)[0];
@@ -346,7 +354,8 @@ export default function AdminChargeProductPanel({
             : `충전 상품 #${editingId} 수정`}
         </h2>
         <p className="mt-1 text-sm text-sub">
-          판매 중인 상품만 사용자 충전 페이지에 표시됩니다.
+          판매 중인 상품만 사용자 충전 페이지에 표시됩니다. 지급 포인트는 결제
+          금액의 100~150%만 설정할 수 있습니다.
         </p>
 
         <form

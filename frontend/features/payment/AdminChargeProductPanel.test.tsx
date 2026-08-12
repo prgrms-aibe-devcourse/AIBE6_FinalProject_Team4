@@ -249,6 +249,29 @@ describe("AdminChargeProductPanel", () => {
     );
   });
 
+  it("결제 금액 대비 지급 포인트 비율이 150%를 넘으면 API로 전송하지 않는다", async () => {
+    render(<AdminChargeProductPanel accessToken="admin-token" />);
+    await screen.findByText("새싹 1,000P");
+
+    fireEvent.change(screen.getByLabelText("상품명"), {
+      target: { value: "과다 지급 상품" },
+    });
+    fireEvent.change(screen.getByLabelText("결제 금액(원)"), {
+      target: { value: "1000" },
+    });
+    fireEvent.change(screen.getByLabelText("지급 포인트(P)"), {
+      target: { value: "1501" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "충전 상품 추가" }));
+
+    expect(mocks.createAdminChargeProduct).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(
+        "지급 포인트는 결제 금액의 100% 이상 150% 이하로 입력해 주세요.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("판매 중지 전 확인하고 전체 필드로 수정 요청한다", async () => {
     render(<AdminChargeProductPanel accessToken="admin-token" />);
     await screen.findByText("새싹 1,000P");

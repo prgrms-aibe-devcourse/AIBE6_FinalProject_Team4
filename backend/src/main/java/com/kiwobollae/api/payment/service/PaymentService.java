@@ -26,6 +26,7 @@ import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.PointCreditService;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -52,6 +53,8 @@ public class PaymentService {
 	private static final String ADMIN_CHARGE_PRODUCT_CREATE_API_TYPE =
 			"ADMIN_CHARGE_PRODUCT_CREATE";
 	private static final String USER_CANCELED_CODE = "PAY_PROCESS_CANCELED";
+	private static final long CHARGE_PRODUCT_MIN_POINT_RATE_PERCENT = 100L;
+	private static final long CHARGE_PRODUCT_MAX_POINT_RATE_PERCENT = 150L;
 
 	private final ChargeProductRepository chargeProductRepository;
 	private final PaymentRepository paymentRepository;
@@ -213,6 +216,7 @@ public class PaymentService {
 			ChargeProductCreateRequest request
 	) {
 		validateIdempotencyKey(idempotencyKey);
+		validateChargeProductPointRate(request.price(), request.pointAmount());
 		String normalizedName = request.name().strip();
 		IdempotencyExecution idempotency = idempotencyService.start(
 				adminUserId,
@@ -245,6 +249,7 @@ public class PaymentService {
 
 	@Transactional
 	public ChargeProductResponse updateChargeProduct(Long productId, ChargeProductUpdateRequest request) {
+		validateChargeProductPointRate(request.price(), request.pointAmount());
 		ChargeProduct chargeProduct = getChargeProduct(productId);
 		if (!Objects.equals(chargeProduct.getVersion(), request.version())) {
 			throw new ObjectOptimisticLockingFailureException(ChargeProduct.class, productId);
@@ -338,6 +343,20 @@ public class PaymentService {
 	private void validateIdempotencyKey(String idempotencyKey) {
 		if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 64) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+	}
+
+	private void validateChargeProductPointRate(Long price, Long pointAmount) {
+		if (price == null || price < 1 || pointAmount == null || pointAmount < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+
+		BigInteger scaledPointAmount = BigInteger.valueOf(pointAmount).multiply(
+				BigInteger.valueOf(CHARGE_PRODUCT_MIN_POINT_RATE_PERCENT));
+		BigInteger scaledPrice = BigInteger.valueOf(price).multiply(
+				BigInteger.valueOf(CHARGE_PRODUCT_MAX_POINT_RATE_PERCENT));
+		if (pointAmount < price || scaledPointAmount.compareTo(scaledPrice) > 0) {
+			throw new BusinessException(ErrorCode.PAYMENT_CHARGE_PRODUCT_POINT_RATE_INVALID);
 		}
 	}
 

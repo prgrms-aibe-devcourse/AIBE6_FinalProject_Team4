@@ -203,6 +203,35 @@ class AdminPaymentControllerAuthorizationTest {
 	}
 
 	@Test
+	void createAndUpdateRejectPointAmountOutsideAllowedRate() throws Exception {
+		String adminToken = jwtTokenProvider.generateAccessToken(adminUserId, "ADMIN");
+
+		mockMvc.perform(post(ADMIN_PRODUCTS_PATH)
+						.header("Authorization", "Bearer " + adminToken)
+						.header("Idempotency-Key", "invalid-point-rate-create")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"name":"과다 지급 상품","price":1000,"pointAmount":1501,"isActive":true}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("PAYMENT_CHARGE_PRODUCT_POINT_RATE_INVALID"));
+
+		ChargeProduct product = saveChargeProduct("정상 상품", 1_000L, 1_100L, true);
+		mockMvc.perform(patch(ADMIN_PRODUCTS_PATH + "/" + product.getId())
+						.header("Authorization", "Bearer " + adminToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(updateBody("저지급 상품", 1_000L, 999L, true, product.getVersion())))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("PAYMENT_CHARGE_PRODUCT_POINT_RATE_INVALID"));
+
+		ChargeProduct unchanged = chargeProductRepository.findById(product.getId()).orElseThrow();
+		assertThat(chargeProductRepository.count()).isEqualTo(1L);
+		assertThat(unchanged.getName()).isEqualTo("정상 상품");
+		assertThat(unchanged.getPrice()).isEqualTo(1_000L);
+		assertThat(unchanged.getPointAmount()).isEqualTo(1_100L);
+	}
+
+	@Test
 	void createDoesNotSuppressForeignKeyViolationForMissingAdmin() throws Exception {
 		String staleAdminToken = jwtTokenProvider.generateAccessToken(Long.MAX_VALUE, "ADMIN");
 

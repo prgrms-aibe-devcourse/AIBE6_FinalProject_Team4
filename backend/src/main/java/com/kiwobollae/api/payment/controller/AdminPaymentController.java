@@ -41,7 +41,10 @@ public class AdminPaymentController {
 		return ResponseEntity.ok(ApiResponse.success(paymentService.getAdminChargeProducts()));
 	}
 
-	@Operation(summary = "충전 상품 등록", description = "정액 충전 상품을 등록합니다. [PAY-06]")
+	@Operation(
+			summary = "충전 상품 등록",
+			description = "결제 금액의 100~150% 지급 포인트로 정액 충전 상품을 등록합니다. [PAY-06]"
+	)
 	@PostMapping
 	public ResponseEntity<ApiResponse<ChargeProductResponse>> createChargeProduct(
 			@AuthenticationPrincipal Long adminUserId,
@@ -58,7 +61,7 @@ public class AdminPaymentController {
 
 	@Operation(
 			summary = "충전 상품 수정",
-			description = "조회한 version과 함께 상품명·가격·지급 포인트·판매 여부를 수정합니다. [PAY-07]"
+			description = "결제 금액의 100~150% 지급 포인트와 조회한 version을 함께 전송해 상품을 수정합니다. [PAY-07]"
 	)
 	@PatchMapping("/{productId}")
 	public ResponseEntity<ApiResponse<ChargeProductResponse>> updateChargeProduct(
