@@ -73,6 +73,9 @@ public class AdminPointAdjustmentService {
 				|| request.currencyType() == null || request.amount() == null || request.amount() == 0) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+		if (adminUserId.equals(request.userId())) {
+			throw new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN);
+		}
 	}
 
 	private void validateAdjustmentReason(AdminPointAdjustmentRequest request) {

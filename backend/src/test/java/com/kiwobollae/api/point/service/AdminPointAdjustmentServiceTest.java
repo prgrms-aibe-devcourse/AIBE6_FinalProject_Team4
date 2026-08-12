@@ -107,6 +107,19 @@ class AdminPointAdjustmentServiceTest {
 	}
 
 	@Test
+	void selfAdjustmentIsRejectedBeforeIdempotencyStarts() {
+		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
+				1L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT);
+
+		assertThatThrownBy(() -> adminPointAdjustmentService.adjust(1L, "adjust-key", request))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN));
+
+		verifyNoInteractions(idempotencyService, walletService);
+	}
+
+	@Test
 	void missingReasonWithoutLegacyKeyIsRejectedWithoutStartingNewExecution() {
 		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
 				7L, CurrencyType.FREE, 100L, null);

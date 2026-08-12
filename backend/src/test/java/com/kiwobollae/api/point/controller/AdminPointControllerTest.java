@@ -169,6 +169,23 @@ class AdminPointControllerTest {
 	}
 
 	@Test
+	void adjustPointRejectsSelfAdjustment() throws Exception {
+		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
+				1L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT);
+		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
+				.willThrow(new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN));
+
+		mockMvc.perform(post("/api/v1/admin/point/adjust")
+						.header("Idempotency-Key", "adjust-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("POINT_SELF_ADJUSTMENT_FORBIDDEN"));
+
+		verify(adminPointAdjustmentService).adjust(1L, "adjust-key", request);
+	}
+
+	@Test
 	void adjustPointRejectsUnsupportedAdjustmentReason() throws Exception {
 		mockMvc.perform(post("/api/v1/admin/point/adjust")
 						.header("Idempotency-Key", "adjust-key")

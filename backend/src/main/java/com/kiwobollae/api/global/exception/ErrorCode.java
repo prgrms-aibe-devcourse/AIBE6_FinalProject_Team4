@@ -103,6 +103,7 @@ public enum ErrorCode {
 	POINT_INSUFFICIENT_BALANCE(HttpStatus.UNPROCESSABLE_CONTENT, "사용 가능한 포인트가 부족합니다."),
 	POINT_WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "포인트 지갑을 찾을 수 없습니다."),
 	POINT_DUPLICATE_TRANSACTION(HttpStatus.CONFLICT, "이미 처리된 포인트 거래입니다."),
+	POINT_SELF_ADJUSTMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "관리자는 자신의 포인트를 조정할 수 없습니다."),
 
 	PAYMENT_CHARGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "충전 상품을 찾을 수 없습니다."),
 	PAYMENT_CHARGE_PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 충전 상품입니다."),

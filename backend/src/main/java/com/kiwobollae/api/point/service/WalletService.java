@@ -64,6 +64,9 @@ public class WalletService {
 				|| adjustmentReason == null || !adjustmentReason.supports(amount)) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+		if (adminUserId.equals(userId)) {
+			throw new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN);
+		}
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
 		PointTransaction transaction = applyDeltaToWallet(

@@ -659,6 +659,18 @@ class WalletServiceTest {
 	}
 
 	@Test
+	void adminAdjustmentRejectsSelfAdjustmentBeforeLockingWallet() {
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 1L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
 	void adminAdjustmentRejectsMissingAndDirectionMismatchedReasonsBeforeLockingWallet() {
 		assertThatThrownBy(() -> walletService.adjustByAdmin(
 				1L, 7L, CurrencyType.FREE, 100L, null))
