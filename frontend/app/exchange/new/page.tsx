@@ -134,13 +134,17 @@ function ExchangeNewInner() {
             >
               {!card.imageUrl && '🃏'}
             </div>
-            <div className="text-[26px] text-[#c2c9b8]">→</div>
-            <div
-              className="flex h-[66px] w-[66px] items-center justify-center rounded-[14px] bg-brand-soft bg-cover bg-center text-[34px]"
-              style={card.exchangeProductImageUrl ? { backgroundImage: `url("${card.exchangeProductImageUrl}")` } : undefined}
-            >
-              {!card.exchangeProductImageUrl && '🎁'}
-            </div>
+            {card.exchangeProductImageUrl ? (
+              <>
+                <div className="text-[26px] text-[#c2c9b8]">→</div>
+                <div
+                  role="img"
+                  aria-label={card.exchangeProductName}
+                  className="h-[66px] w-[66px] rounded-[14px] bg-brand-soft bg-cover bg-center"
+                  style={{ backgroundImage: `url("${card.exchangeProductImageUrl}")` }}
+                />
+              </>
+            ) : null}
             <div className="flex-1">
               <div className="font-extrabold">{card.exchangeProductName}</div>
               <div className="text-[13px] text-sub">쿠폰 {card.requiredCountForExchange}장을 사용해요</div>
