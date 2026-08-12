@@ -45,17 +45,30 @@ public class GachaPackPurchaseService {
   public GachaPackPurchaseResponse purchase(
       Long userId, String idempotencyKey, GachaPackPurchaseRequest request) {
     validate(userId, idempotencyKey, request);
+    String legacyRequestHash = sha256(request.productId() + ":" + request.quantity());
     IdempotencyExecution execution =
-        idempotencyService.start(
-            userId,
-            API_TYPE,
-            idempotencyKey,
-            sha256(request.productId() + ":" + request.quantity()));
+        request.expectedUnitPoint() == null
+            ? idempotencyService.start(userId, API_TYPE, idempotencyKey, legacyRequestHash)
+            : idempotencyService.startWithCompatibleHash(
+                userId,
+                API_TYPE,
+                idempotencyKey,
+                sha256(
+                    request.productId()
+                        + ":"
+                        + request.quantity()
+                        + ":"
+                        + request.expectedUnitPoint()),
+                legacyRequestHash);
     if (execution.replay()) {
       return deserialize(execution.key().getResponseSnapshot());
     }
 
     GachaPackProductQuote product = productService.getActiveGachaPack(request.productId());
+    if (request.expectedUnitPoint() != null
+        && !request.expectedUnitPoint().equals(product.unitPoint())) {
+      throw new BusinessException(ErrorCode.GACHA_PRODUCT_PRICE_CHANGED);
+    }
     if (request.quantity() > product.maxQuantity()) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }
@@ -112,6 +125,7 @@ public class GachaPackPurchaseService {
     if (request == null
         || request.productId() == null
         || request.quantity() == null
+        || (request.expectedUnitPoint() != null && request.expectedUnitPoint() < 0)
         || request.quantity() != GachaPackProductQuote.MAX_PURCHASE_QUANTITY) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
     }

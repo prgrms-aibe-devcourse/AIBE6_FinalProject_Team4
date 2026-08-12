@@ -268,6 +268,7 @@ export function markGachaDrawViewed(
 export function purchaseGachaPacks(
   productId: number,
   quantity: number,
+  expectedUnitPoint: number,
   accessToken: string,
   idempotencyKey: string,
 ): Promise<GachaPackPurchaseData> {
@@ -277,6 +278,6 @@ export function purchaseGachaPacks(
     headers: {
       "Idempotency-Key": idempotencyKey,
     },
-    body: JSON.stringify({ productId, quantity }),
+    body: JSON.stringify({ productId, quantity, expectedUnitPoint }),
   });
 }
