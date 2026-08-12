@@ -9,7 +9,7 @@ import {
   InquiryStatus,
 } from "@/lib/inquiry-api";
 import { useUI } from "@/lib/ui";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const CAT: Record<InquiryCategory, string> = {
   PAYMENT: "결제",
@@ -48,74 +48,68 @@ export default function AdminInquiryPanel({
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-  const [answering, setAnswering] = useState<InquiryData | null>(null);
+  const [selected, setSelected] = useState<InquiryData | null>(null);
   const [answerContent, setAnswerContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const load = useCallback(
+    (signal?: AbortSignal) => {
+      setLoading(true);
+      setErrorMessage("");
+
+      return getInquiriesForAdmin(accessToken, status || undefined, page, 20, signal)
+        .then((result) => {
+          setInquiries(result.content);
+          setTotalPages(result.totalPages);
+          setTotalElements(result.totalElements);
+        })
+        .catch((requestError) => {
+          if (
+            requestError instanceof DOMException &&
+            requestError.name === "AbortError"
+          )
+            return;
+          setInquiries([]);
+          setErrorMessage(
+            requestError instanceof ApiError
+              ? requestError.message
+              : "문의 목록을 불러오지 못했어요.",
+          );
+        })
+        .finally(() => {
+          if (!signal?.aborted) setLoading(false);
+        });
+    },
+    [accessToken, page, status],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setErrorMessage("");
-
-    getInquiriesForAdmin(
-      status || undefined,
-      page,
-      20,
-      accessToken,
-      controller.signal,
-    )
-      .then((result) => {
-        setInquiries(result.content);
-        setTotalPages(result.totalPages);
-        setTotalElements(result.totalElements);
-      })
-      .catch((requestError) => {
-        if (
-          requestError instanceof DOMException &&
-          requestError.name === "AbortError"
-        )
-          return;
-        setInquiries([]);
-        setErrorMessage(
-          requestError instanceof ApiError
-            ? requestError.message
-            : "문의 목록을 불러오지 못했어요.",
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
+    void load(controller.signal);
     return () => controller.abort();
-  }, [accessToken, page, status]);
+  }, [load]);
 
   const changeStatus = (next: InquiryStatus | "") => {
     setStatus(next);
     setPage(0);
   };
 
-  const openAnswer = (inquiry: InquiryData) => {
-    setAnswering(inquiry);
+  const openInquiry = (inquiry: InquiryData) => {
+    setSelected(inquiry);
     setAnswerContent("");
   };
 
   const submitAnswer = async () => {
-    if (!answering || submitting) return;
+    if (!selected || submitting) return;
     if (!answerContent.trim())
       return showToast("답변 내용을 입력해 주세요.", "err");
 
     setSubmitting(true);
     try {
-      const updated = await answerInquiry(
-        answering.id,
-        answerContent.trim(),
-        accessToken,
-      );
-      setInquiries((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      await answerInquiry(selected.id, answerContent.trim(), accessToken);
       showToast("답변을 등록했어요.");
-      setAnswering(null);
+      setSelected(null);
+      void load();
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError
@@ -220,13 +214,10 @@ export default function AdminInquiryPanel({
                     <td className="px-5 py-3.5 text-right">
                       <button
                         type="button"
-                        onClick={() => openAnswer(inquiry)}
-                        disabled={inquiry.status === "ANSWERED"}
-                        className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() => openInquiry(inquiry)}
+                        className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-bold"
                       >
-                        {inquiry.status === "ANSWERED"
-                          ? "답변완료"
-                          : "답변하기"}
+                        {inquiry.status === "ANSWERED" ? "답변 보기" : "답변하기"}
                       </button>
                     </td>
                   </tr>
@@ -262,46 +253,70 @@ export default function AdminInquiryPanel({
         </div>
       </div>
 
-      {answering && (
+      {selected && (
         <div
-          onClick={() => !submitting && setAnswering(null)}
+          onClick={() => !submitting && setSelected(null)}
           className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5"
         >
           <div
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-[480px] animate-pop rounded-[20px] bg-white p-6"
           >
-            <h3 className="mb-1 text-[19px] font-extrabold">
-              {answering.title}
-            </h3>
+            <h3 className="mb-1 text-[19px] font-extrabold">{selected.title}</h3>
             <p className="mb-4 whitespace-pre-wrap text-[13.5px] leading-[1.6] text-sub">
-              {answering.content}
+              {selected.content}
             </p>
-            <textarea
-              value={answerContent}
-              onChange={(e) => setAnswerContent(e.target.value)}
-              maxLength={1000}
-              placeholder="답변 내용을 입력해 주세요."
-              className="mb-4 min-h-[140px] w-full resize-y rounded-xl border-[1.5px] border-line p-3.5 text-sm leading-[1.6] outline-none"
-            />
-            <div className="flex gap-2.5">
-              <button
-                type="button"
-                onClick={() => void submitAnswer()}
-                disabled={submitting}
-                className="flex-1 rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitting ? "등록 중..." : "답변 등록"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAnswering(null)}
-                disabled={submitting}
-                className="rounded-xl border-[1.5px] border-line bg-white px-5 py-[13px] font-bold text-sub disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                닫기
-              </button>
-            </div>
+
+            {selected.status === "ANSWERED" ? (
+              <>
+                <div className="mb-4 rounded-2xl border-[1.5px] border-[#dcebc7] bg-[#F6F9EF] p-4">
+                  <div className="mb-1.5 text-xs font-bold text-sub">
+                    {selected.answerAdminName ?? "관리자"}
+                    {selected.answeredAt
+                      ? ` · ${formatDateTime(selected.answeredAt)}`
+                      : ""}
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm leading-[1.6]">
+                    {selected.answerContent}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="w-full rounded-xl border-[1.5px] border-line bg-white p-[13px] font-bold text-sub"
+                >
+                  닫기
+                </button>
+              </>
+            ) : (
+              <>
+                <textarea
+                  value={answerContent}
+                  onChange={(e) => setAnswerContent(e.target.value)}
+                  maxLength={1000}
+                  placeholder="답변 내용을 입력해 주세요."
+                  className="mb-4 min-h-[140px] w-full resize-y rounded-xl border-[1.5px] border-line p-3.5 text-sm leading-[1.6] outline-none"
+                />
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => void submitAnswer()}
+                    disabled={submitting}
+                    className="flex-1 rounded-xl bg-brand p-[13px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submitting ? "등록 중..." : "답변 등록"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    disabled={submitting}
+                    className="rounded-xl border-[1.5px] border-line bg-white px-5 py-[13px] font-bold text-sub disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

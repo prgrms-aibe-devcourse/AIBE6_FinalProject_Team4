@@ -61,10 +61,10 @@ export function createInquiry(
 // ---- Admin ----
 
 export function getInquiriesForAdmin(
+  accessToken: string,
   status: InquiryStatus | undefined,
   page = 0,
   size = 20,
-  accessToken: string,
   signal?: AbortSignal,
 ): Promise<SpringPage<InquiryData>> {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
