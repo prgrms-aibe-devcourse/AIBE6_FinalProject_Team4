@@ -51,7 +51,9 @@ export default function Home() {
     const today = kstToday();
     const [year, month] = today.split('-').map(Number);
 
-    getMyPlants({ accessToken, signal: controller.signal })
+    // 미리보기는 "오늘 돌봐야 할 식물"을 보여주는 게 목적이라 재배중인 것만 노출한다 —
+    // 수확완료/실패 개수는 위 "내 식물 현황" 카드에서 이미 따로 보여준다.
+    getMyPlants({ accessToken, status: 'GROWING', signal: controller.signal })
       .then((plantPage) => {
         setPlants(plantPage.content.slice(0, 4));
       })
@@ -187,13 +189,17 @@ export default function Home() {
       </div>
 
       <div className="mb-3.5 flex items-center justify-between">
-        <h2 className="text-xl font-extrabold">내 식물 미리보기</h2>
+        <h2 className="text-xl font-extrabold">재배중인 식물</h2>
         <Link href="/plants" className="text-sm font-bold text-brand-dark">전체보기 →</Link>
       </div>
       {plants.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[50px] text-center shadow-card">
           <div className="animate-floaty text-[56px]">🌱</div>
-          <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">아직 함께하는 식물이 없네요.<br />첫 반려식물을 등록해 볼까요?</p>
+          {state.plantCount > 0 ? (
+            <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">지금 재배중인 식물이 없어요.<br />새로운 식물을 시작해 볼까요?</p>
+          ) : (
+            <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">아직 함께하는 식물이 없네요.<br />첫 반려식물을 등록해 볼까요?</p>
+          )}
           <Link href="/plants" className="inline-block rounded-xl bg-brand px-[22px] py-[11px] font-bold text-white hover:text-white">+ 새 식물 등록</Link>
         </div>
       ) : (
