@@ -48,6 +48,7 @@ export interface StoreState {
   wallet: Wallet;
   growingCount: number;
   plantCount: number;
+  harvestedCount: number;
   failedCount: number;
   readyCards: number;
   cartCount: number;
@@ -90,6 +91,7 @@ const DEFAULTS: StoreState = {
   wallet: EMPTY_WALLET,
   growingCount: 3,
   plantCount: 5,
+  harvestedCount: 1,
   failedCount: 1,
   readyCards: 2,
   cartCount: 0,
@@ -257,12 +259,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshPlantStats = useCallback(async () => {
     const requestId = ++plantStatsRequestId.current;
     if (!state.authed || !state.accessToken) {
-      setState((s) => ({ ...s, growingCount: 0, plantCount: 0, failedCount: 0 }));
+      setState((s) => ({ ...s, growingCount: 0, plantCount: 0, harvestedCount: 0, failedCount: 0 }));
       return;
     }
     try {
-      const [growingPage, failedPage, allPage] = await Promise.all([
+      // 수확완료 개수는 "전체 - 재배중 - 실패"로 역산하지 않는다 — 네 요청이 서로 다른 시점의
+      // 스냅샷이라 그 사이 상태가 바뀌면 역산값이 실제 수확완료 개수와 어긋날 수 있다. 상태별로
+      // 직접 조회해 항상 정확한 값을 쓴다.
+      const [growingPage, harvestedPage, failedPage, allPage] = await Promise.all([
         getMyPlants({ accessToken: state.accessToken, status: 'GROWING', size: 1 }),
+        getMyPlants({ accessToken: state.accessToken, status: 'HARVESTED', size: 1 }),
         getMyPlants({ accessToken: state.accessToken, status: 'FAILED', size: 1 }),
         getMyPlants({ accessToken: state.accessToken, size: 1 }),
       ]);
@@ -270,6 +276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         growingCount: growingPage.totalElements,
+        harvestedCount: harvestedPage.totalElements,
         failedCount: failedPage.totalElements,
         plantCount: allPage.totalElements,
       }));

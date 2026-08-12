@@ -130,9 +130,6 @@ export default function Home() {
     );
   }
 
-  // plantCount는 상태 무관 전체 개수라, 재배중/실패를 뺀 나머지가 수확완료다.
-  const harvestedCount = Math.max(0, state.plantCount - state.growingCount - state.failedCount);
-
   return (
     <div className="container animate-upIn">
       <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, {state.user?.nickname}님! 오늘도 푸릇한 하루예요 ☀️</h1>
@@ -183,7 +180,7 @@ export default function Home() {
         <div className="rounded-[18px] bg-white p-[22px] shadow-card">
           <div className="text-[13px] font-bold text-sub">내 식물 현황</div>
           <div className="mb-0.5 mt-2 text-[31px] font-extrabold">
-            {state.growingCount} / {harvestedCount} / {state.failedCount}
+            {state.growingCount} / {state.harvestedCount} / {state.failedCount}
           </div>
           <div className="mb-1.5 text-[11.5px] text-faint">재배중 · 수확완료 · 실패</div>
           <Link href="/plants" className="mt-1 inline-block rounded-[10px] bg-brand-soft px-4 py-[9px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white">내 식물 보기</Link>
