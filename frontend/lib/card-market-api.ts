@@ -1,4 +1,5 @@
-import { ApiError, request } from "@/lib/api";
+import { runIdempotentMutation } from "@/features/commerce/idempotent-mutation";
+import { request } from "@/lib/api";
 import type { GachaRarity } from "@/lib/gacha-api";
 
 export type MarketAssetType = "HYPER_RARE" | "GOLDEN_RARE";
@@ -107,54 +108,10 @@ export interface MarketSellableCard {
   goldenInstances: { id: number; originRank: number | null; listed: boolean }[];
 }
 
-const MARKET_IDEMPOTENCY_PREFIX = "kwb:card-market:idempotency:";
-const pendingIdempotencyKeys = new Map<string, string>();
-
-function getPendingIdempotencyKey(operation: string) {
-  const cached = pendingIdempotencyKeys.get(operation);
-  if (cached) return cached;
-
-  const storageKey = MARKET_IDEMPOTENCY_PREFIX + operation;
-  const stored =
-    typeof window === "undefined"
-      ? null
-      : window.sessionStorage.getItem(storageKey);
-  const key = stored ?? crypto.randomUUID();
-  pendingIdempotencyKeys.set(operation, key);
-  if (typeof window !== "undefined") {
-    window.sessionStorage.setItem(storageKey, key);
-  }
-  return key;
-}
-
-function clearPendingIdempotencyKey(operation: string) {
-  pendingIdempotencyKeys.delete(operation);
-  if (typeof window !== "undefined") {
-    window.sessionStorage.removeItem(MARKET_IDEMPOTENCY_PREFIX + operation);
-  }
-}
-
-async function marketMutation<T>(
+const marketMutation = <T>(
   operation: string,
   execute: (idempotencyKey: string) => Promise<T>,
-) {
-  const key = getPendingIdempotencyKey(operation);
-  try {
-    const response = await execute(key);
-    clearPendingIdempotencyKey(operation);
-    return response;
-  } catch (error) {
-    // 응답 유실·서버 오류·처리 중 응답은 결과가 불명확하므로 같은 키로 재시도한다.
-    if (
-      error instanceof ApiError &&
-      error.status < 500 &&
-      error.code !== "COMMON_IDEMPOTENCY_IN_PROGRESS"
-    ) {
-      clearPendingIdempotencyKey(operation);
-    }
-    throw error;
-  }
-}
+) => runIdempotentMutation("card-market", operation, execute);
 
 export function getMarketListings(
   options: {
