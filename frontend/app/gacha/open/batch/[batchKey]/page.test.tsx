@@ -124,7 +124,13 @@ describe("GachaBatchOpenPage", () => {
     ).toEqual(["골든 카드", "커먼 카드"]);
     expect(screen.getAllByText("+5")).toHaveLength(2);
     expect(
-      screen.getByRole("link", { name: "상점으로 가기" }),
-    ).toHaveAttribute("href", "/shop");
+      screen.getByRole("link", { name: "카드팩 구매하기" }),
+    ).toHaveAttribute("href", "/shop?category=GACHA_PACK&sort=new&page=1");
+    expect(
+      screen.getByRole("link", { name: "일지 보러 가기" }),
+    ).toHaveAttribute("href", "/journals");
+    expect(
+      screen.getByRole("link", { name: "다른 개봉 내역 보기" }),
+    ).toHaveAttribute("href", "/gacha?tab=history");
   });
 });

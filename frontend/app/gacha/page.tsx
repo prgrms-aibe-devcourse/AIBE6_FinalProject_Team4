@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import GachaTitleBadge from "@/components/gacha/GachaTitleBadge";
 import ProfileCosmeticFrame from "@/components/gacha/ProfileCosmeticFrame";
@@ -58,6 +59,7 @@ type Tab = "catalog" | "mine" | "workshop" | "history";
 type GachaSearchParams = {
   tab?: string | string[];
   section?: string | string[];
+  page?: string | string[];
 };
 
 function firstQueryValue(value?: string | string[]) {
@@ -107,7 +109,14 @@ export default function GachaPage({
   searchParams?: GachaSearchParams;
 }) {
   const { state, hydrated } = useStore();
-  const [tab, setTab] = useState<Tab>(() => initialTab(searchParams));
+  const router = useRouter();
+  const urlTab = initialTab(searchParams);
+  const urlHistoryPageValue = Number(firstQueryValue(searchParams?.page));
+  const urlHistoryPage =
+    Number.isInteger(urlHistoryPageValue) && urlHistoryPageValue > 0
+      ? urlHistoryPageValue - 1
+      : 0;
+  const [tab, setTab] = useState<Tab>(urlTab);
   const initialWorkshopSection =
     firstQueryValue(searchParams?.section) === "cosmetics"
       ? "cosmetics"
@@ -115,6 +124,7 @@ export default function GachaPage({
   const [catalog, setCatalog] = useState<GachaCard[]>([]);
   const [collection, setCollection] = useState<GachaCollectionCard[]>([]);
   const [history, setHistory] = useState<GachaDrawPage | null>(null);
+  const [historyPage, setHistoryPage] = useState(urlHistoryPage);
   const [rates, setRates] = useState<GachaRateData | null>(null);
   const [expandedRarities, setExpandedRarities] = useState<Set<GachaRarity>>(
     () => new Set(),
@@ -138,11 +148,16 @@ export default function GachaPage({
     if (!state.accessToken) return;
     const [nextCollection, nextHistory] = await Promise.all([
       getMyGachaCollection(state.accessToken),
-      getGachaDraws(state.accessToken),
+      getGachaDraws(state.accessToken, undefined, historyPage),
     ]);
     setCollection(nextCollection);
     setHistory(nextHistory);
-  }, [state.accessToken]);
+  }, [historyPage, state.accessToken]);
+
+  useEffect(() => {
+    setTab(urlTab);
+    setHistoryPage(urlHistoryPage);
+  }, [urlHistoryPage, urlTab]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -154,7 +169,12 @@ export default function GachaPage({
     const privateRequests = state.accessToken
       ? [
           getMyGachaCollection(state.accessToken, controller.signal),
-          getGachaDraws(state.accessToken, undefined, 0, controller.signal),
+          getGachaDraws(
+            state.accessToken,
+            undefined,
+            historyPage,
+            controller.signal,
+          ),
         ]
       : [Promise.resolve([]), Promise.resolve(EMPTY_HISTORY)];
 
@@ -191,7 +211,7 @@ export default function GachaPage({
       active = false;
       controller.abort();
     };
-  }, [hydrated, state.accessToken]);
+  }, [historyPage, hydrated, state.accessToken]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -301,6 +321,21 @@ export default function GachaPage({
     if (next !== "catalog" && !state.accessToken) return;
     setTab(next);
     setMineRarity("ALL");
+    const params = new URLSearchParams();
+    if (next !== "catalog") params.set("tab", next);
+    if (next === "history" && historyPage > 0) {
+      params.set("page", String(historyPage + 1));
+    }
+    router.replace(params.size ? `/gacha?${params}` : "/gacha", {
+      scroll: false,
+    });
+  };
+
+  const changeHistoryPage = (nextPage: number) => {
+    setHistoryPage(nextPage);
+    router.replace(`/gacha?tab=history&page=${nextPage + 1}`, {
+      scroll: false,
+    });
   };
 
   const toggleRarity = (rarity: GachaRarity) => {
@@ -593,7 +628,7 @@ export default function GachaPage({
 
           <button
             type="button"
-            onClick={() => setTab("workshop")}
+            onClick={() => selectTab("workshop")}
             className="group relative mb-6 flex w-full items-center justify-between gap-4 overflow-hidden rounded-[24px] border border-[#b59a48]/35 bg-gradient-to-r from-[#18251d] via-[#2d4632] to-[#675523] px-5 py-5 text-left text-white shadow-[0_18px_44px_-28px_rgba(26,56,34,.9)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_50px_-25px_rgba(26,56,34,.95)] sm:px-6"
           >
             <span className="absolute -right-8 -top-12 h-36 w-36 rounded-full bg-[#e4c052]/20 blur-2xl transition group-hover:bg-[#e4c052]/30" />
@@ -696,7 +731,7 @@ export default function GachaPage({
           accessToken={state.accessToken}
           collection={collection}
           onCollectionRefresh={refreshCollection}
-          onBack={() => setTab("mine")}
+          onBack={() => selectTab("mine")}
           initialSection={initialWorkshopSection}
         />
       ) : null}
@@ -751,6 +786,29 @@ export default function GachaPage({
                   </Link>
                 );
               })}
+              {history.totalPages > 1 ? (
+                <div className="flex items-center justify-center gap-3 pt-4">
+                  <button
+                    type="button"
+                    disabled={historyPage <= 0}
+                    onClick={() => changeHistoryPage(historyPage - 1)}
+                    className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40"
+                  >
+                    이전
+                  </button>
+                  <span className="text-sm font-bold text-sub">
+                    {historyPage + 1} / {history.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={historyPage + 1 >= history.totalPages}
+                    onClick={() => changeHistoryPage(historyPage + 1)}
+                    className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40"
+                  >
+                    다음
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="rounded-2xl bg-white p-12 text-center text-sub">

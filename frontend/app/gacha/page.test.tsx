@@ -16,6 +16,10 @@ import {
 
 const mockAuth = vi.hoisted(() => ({ accessToken: null as string | null }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
 vi.mock("next/image", () => ({
   default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} />,
 }));
