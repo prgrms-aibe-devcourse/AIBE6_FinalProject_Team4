@@ -26,6 +26,7 @@ const NOTIF_ICON: Record<NotificationType, string> = {
   INQUIRY: '💬',
   NOTICE: '📢',
   TIMELAPSE: '🎬',
+  CARD_MARKET: '🤝',
 };
 
 const NAV = [

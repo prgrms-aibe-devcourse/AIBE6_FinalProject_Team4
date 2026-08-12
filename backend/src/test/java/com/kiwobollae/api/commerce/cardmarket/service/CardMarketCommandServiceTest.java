@@ -70,6 +70,7 @@ class CardMarketCommandServiceTest {
   @Mock private GoldenCardInstanceRepository goldenInstanceRepository;
   @Mock private UserRepository userRepository;
   @Mock private CardMarketPointPort pointPort;
+  @Mock private CardMarketNotificationService notificationService;
   @Mock private IdempotencyService idempotencyService;
 
   private CardMarketCommandService service;
@@ -89,6 +90,7 @@ class CardMarketCommandServiceTest {
             goldenInstanceRepository,
             userRepository,
             pointPort,
+            notificationService,
             idempotencyService,
             new ObjectMapper(),
             Clock.fixed(Instant.parse("2026-08-06T00:00:00Z"), ZoneOffset.UTC));

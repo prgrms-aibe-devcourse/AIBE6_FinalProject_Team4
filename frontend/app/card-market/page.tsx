@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import {
@@ -29,6 +30,7 @@ import { useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 
 type Tab = "market" | "sell" | "sent" | "received" | "trades";
+type MarketSort = "createdAt,desc" | "askingPrice,asc" | "askingPrice,desc";
 
 const WON = new Intl.NumberFormat("ko-KR");
 const STATUS_LABEL: Record<string, string> = {
@@ -94,7 +96,15 @@ function CardMarketPageContent() {
   const searchParams = useSearchParams();
   const { askConfirm } = useUI();
   const { state, hydrated, refreshWallet } = useStore();
-  const [tab, setTab] = useState<Tab>("market");
+  const requestedView = searchParams.get("view");
+  const [tab, setTab] = useState<Tab>(() =>
+    requestedView === "sell" ||
+    requestedView === "sent" ||
+    requestedView === "received" ||
+    requestedView === "trades"
+      ? requestedView
+      : "market",
+  );
   const requestedAssetType = searchParams.get("rarity");
   const requestedPage = Number(searchParams.get("page"));
   const [assetType, setAssetType] = useState<MarketAssetType | undefined>(() =>
@@ -108,6 +118,23 @@ function CardMarketPageContent() {
       : 0,
   );
   const [marketTotalPages, setMarketTotalPages] = useState(0);
+  const requestedSort = searchParams.get("sort");
+  const [sort, setSort] = useState<MarketSort>(() =>
+    requestedSort === "askingPrice,asc" || requestedSort === "askingPrice,desc"
+      ? requestedSort
+      : "createdAt,desc",
+  );
+  const [keyword, setKeyword] = useState(searchParams.get("keyword") ?? "");
+  const [keywordInput, setKeywordInput] = useState(
+    searchParams.get("keyword") ?? "",
+  );
+  const requestedPrivatePage = Number(searchParams.get("myPage"));
+  const [privatePage, setPrivatePage] = useState(() =>
+    Number.isInteger(requestedPrivatePage) && requestedPrivatePage > 0
+      ? requestedPrivatePage - 1
+      : 0,
+  );
+  const [privateTotalPages, setPrivateTotalPages] = useState(0);
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [myListings, setMyListings] = useState<MarketListing[]>([]);
   const [sent, setSent] = useState<MarketNegotiation[]>([]);
@@ -115,7 +142,8 @@ function CardMarketPageContent() {
   const [trades, setTrades] = useState<MarketTrade[]>([]);
   const [sellable, setSellable] = useState<MarketSellableCard[]>([]);
   const [wallet, setWallet] = useState<MarketWallet | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [privateLoading, setPrivateLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -134,37 +162,72 @@ function CardMarketPageContent() {
   const token = state.accessToken;
   const userId = state.user?.id;
 
-  const load = useCallback(
+  const loadMarket = useCallback(
     async (signal?: AbortSignal) => {
-      setLoading(true);
+      setMarketLoading(true);
       setError("");
       try {
-        const market = await getMarketListings(assetType, marketPage, signal);
+        const market = await getMarketListings({
+          assetType,
+          keyword,
+          sort,
+          page: marketPage,
+          signal,
+        });
         setListings(market.content);
         setMarketTotalPages(market.totalPages);
-        if (token) {
-          const [walletData, cards, mine, sentData, receivedData, tradeData] =
-            await Promise.all([
-              getMarketWallet(token, signal),
-              getMarketSellableCards(token, signal),
-              getMyMarketListings(token, signal),
-              getMyMarketNegotiations("sent", token, signal),
-              getMyMarketNegotiations("received", token, signal),
-              getMyMarketTrades(token, signal),
-            ]);
-          setWallet(walletData);
+      } catch (loadError) {
+        if (!(
+          loadError instanceof DOMException && loadError.name === "AbortError"
+        )) {
+          setError(errorMessage(loadError));
+        }
+      } finally {
+        setMarketLoading(false);
+      }
+    },
+    [assetType, keyword, marketPage, sort],
+  );
+
+  const loadWallet = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!token) {
+        setWallet(null);
+        return;
+      }
+      setWallet(await getMarketWallet(token, signal));
+    },
+    [token],
+  );
+
+  const loadPrivate = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!token || tab === "market") return;
+      setPrivateLoading(true);
+      setError("");
+      try {
+        if (tab === "sell") {
+          const [cards, mine] = await Promise.all([
+            getMarketSellableCards(token, signal),
+            getMyMarketListings(token, privatePage, signal),
+          ]);
           setSellable(cards);
-          setMyListings(mine);
-          setSent(sentData);
-          setReceived(receivedData);
-          setTrades(tradeData);
+          setMyListings(mine.content);
+          setPrivateTotalPages(mine.totalPages);
+        } else if (tab === "sent" || tab === "received") {
+          const page = await getMyMarketNegotiations(
+            tab,
+            token,
+            privatePage,
+            signal,
+          );
+          if (tab === "sent") setSent(page.content);
+          else setReceived(page.content);
+          setPrivateTotalPages(page.totalPages);
         } else {
-          setWallet(null);
-          setSellable([]);
-          setMyListings([]);
-          setSent([]);
-          setReceived([]);
-          setTrades([]);
+          const page = await getMyMarketTrades(token, privatePage, signal);
+          setTrades(page.content);
+          setPrivateTotalPages(page.totalPages);
         }
       } catch (loadError) {
         if (!(
@@ -173,10 +236,10 @@ function CardMarketPageContent() {
           setError(errorMessage(loadError));
         }
       } finally {
-        setLoading(false);
+        setPrivateLoading(false);
       }
     },
-    [assetType, marketPage, token],
+    [privatePage, tab, token],
   );
 
   useEffect(() => {
@@ -190,14 +253,58 @@ function CardMarketPageContent() {
     setMarketPage(
       Number.isInteger(nextPage) && nextPage > 0 ? nextPage - 1 : 0,
     );
+    const nextSort = searchParams.get("sort");
+    setSort(
+      nextSort === "askingPrice,asc" || nextSort === "askingPrice,desc"
+        ? nextSort
+        : "createdAt,desc",
+    );
+    const nextKeyword = searchParams.get("keyword") ?? "";
+    setKeyword(nextKeyword);
+    setKeywordInput(nextKeyword);
+    const nextView = searchParams.get("view");
+    setTab(
+      nextView === "sell" ||
+        nextView === "sent" ||
+        nextView === "received" ||
+        nextView === "trades"
+        ? nextView
+        : "market",
+    );
+    const nextPrivatePage = Number(searchParams.get("myPage"));
+    setPrivatePage(
+      Number.isInteger(nextPrivatePage) && nextPrivatePage > 0
+        ? nextPrivatePage - 1
+        : 0,
+    );
   }, [searchParams]);
 
   useEffect(() => {
     if (!hydrated) return;
     const controller = new AbortController();
-    void load(controller.signal);
+    void loadMarket(controller.signal);
     return () => controller.abort();
-  }, [hydrated, load]);
+  }, [hydrated, loadMarket]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const controller = new AbortController();
+    void loadWallet(controller.signal).catch((loadError) => {
+      if (!(
+        loadError instanceof DOMException && loadError.name === "AbortError"
+      )) {
+        setError(errorMessage(loadError));
+      }
+    });
+    return () => controller.abort();
+  }, [hydrated, loadWallet]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const controller = new AbortController();
+    void loadPrivate(controller.signal);
+    return () => controller.abort();
+  }, [hydrated, loadPrivate]);
 
   const runAction = async (action: () => Promise<unknown>, success: string) => {
     setActionLoading(true);
@@ -208,7 +315,12 @@ function CardMarketPageContent() {
       setSelectedListing(null);
       setOfferPrice("");
       setNotice(success);
-      await Promise.all([load(), refreshWallet()]);
+      await Promise.all([
+        loadMarket(),
+        loadWallet(),
+        loadPrivate(),
+        refreshWallet(),
+      ]);
     } catch (actionError) {
       setError(errorMessage(actionError));
     } finally {
@@ -221,24 +333,48 @@ function CardMarketPageContent() {
       setNotice("로그인하면 카드 판매와 가격 협상을 이용할 수 있어요.");
       return;
     }
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "market") params.delete("view");
+    else params.set("view", next);
+    params.delete("myPage");
     setTab(next);
+    setPrivatePage(0);
+    router.replace(params.size ? `/card-market?${params}` : "/card-market", {
+      scroll: false,
+    });
   };
 
   const changeMarketQuery = (
     nextAssetType: MarketAssetType | undefined,
     nextPage: number,
+    nextSort: MarketSort = sort,
+    nextKeyword: string = keyword,
   ) => {
     const params = new URLSearchParams(searchParams.toString());
     if (nextAssetType) params.set("rarity", nextAssetType);
     else params.delete("rarity");
     if (nextPage > 0) params.set("page", String(nextPage + 1));
     else params.delete("page");
+    if (nextSort !== "createdAt,desc") params.set("sort", nextSort);
+    else params.delete("sort");
+    if (nextKeyword.trim()) params.set("keyword", nextKeyword.trim());
+    else params.delete("keyword");
     setAssetType(nextAssetType);
     setMarketPage(nextPage);
+    setSort(nextSort);
+    setKeyword(nextKeyword.trim());
     const query = params.toString();
     router.replace(query ? `/card-market?${query}` : "/card-market", {
       scroll: false,
     });
+  };
+
+  const changePrivatePage = (nextPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage > 0) params.set("myPage", String(nextPage + 1));
+    else params.delete("myPage");
+    setPrivatePage(nextPage);
+    router.replace(`/card-market?${params}`, { scroll: false });
   };
 
   const activeListings = useMemo(
@@ -370,22 +506,22 @@ function CardMarketPageContent() {
           </div>
         ) : null}
 
-        {loading ? (
+        {(tab === "market" ? marketLoading : privateLoading) ? (
           <div className="rounded-3xl bg-white p-16 text-center font-bold text-[#7a8476]">
             거래소를 불러오는 중...
           </div>
         ) : null}
 
-        {!loading && tab === "market" ? (
+        {!marketLoading && tab === "market" ? (
           <section className="rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8">
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8b947f]">
                   Open listings
                 </p>
                 <h2 className="mt-1 text-2xl font-black">판매 중인 카드</h2>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {([undefined, "HYPER_RARE", "GOLDEN_RARE"] as const).map(
                   (type) => (
                     <button
@@ -404,6 +540,48 @@ function CardMarketPageContent() {
                 )}
               </div>
             </div>
+            <form
+              className="mb-6 grid gap-3 rounded-2xl border border-[#dce4d7] bg-white p-3 sm:grid-cols-[1fr_180px_auto]"
+              onSubmit={(event) => {
+                event.preventDefault();
+                changeMarketQuery(assetType, 0, sort, keywordInput);
+              }}
+            >
+              <label className="flex items-center gap-2 rounded-xl bg-[#f4f6f1] px-4">
+                <span className="material-symbols-outlined text-xl text-[#76816f]">
+                  search
+                </span>
+                <input
+                  value={keywordInput}
+                  maxLength={50}
+                  onChange={(event) => setKeywordInput(event.target.value)}
+                  placeholder="카드 이름 검색"
+                  className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold outline-none"
+                />
+              </label>
+              <select
+                value={sort}
+                onChange={(event) =>
+                  changeMarketQuery(
+                    assetType,
+                    0,
+                    event.target.value as MarketSort,
+                    keyword,
+                  )
+                }
+                className="rounded-xl border border-[#d8e0d3] bg-white px-4 py-3 text-sm font-black outline-none"
+              >
+                <option value="createdAt,desc">최신 등록순</option>
+                <option value="askingPrice,asc">가격 낮은순</option>
+                <option value="askingPrice,desc">가격 높은순</option>
+              </select>
+              <button
+                type="submit"
+                className="rounded-xl bg-[#344b32] px-6 py-3 text-sm font-black text-white"
+              >
+                검색
+              </button>
+            </form>
             {listings.length ? (
               <>
                 <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -455,7 +633,7 @@ function CardMarketPageContent() {
           </section>
         ) : null}
 
-        {!loading && tab === "sell" && token ? (
+        {!privateLoading && tab === "sell" && token ? (
           <section className="grid gap-12 rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
               <SectionTitle eyebrow="Sell a card" title="판매할 카드 선택" />
@@ -579,11 +757,16 @@ function CardMarketPageContent() {
                   <Empty text="판매 중인 카드가 없어요." />
                 ) : null}
               </div>
+              <PrivatePager
+                page={privatePage}
+                totalPages={privateTotalPages}
+                onChange={changePrivatePage}
+              />
             </div>
           </section>
         ) : null}
 
-        {!loading && (tab === "sent" || tab === "received") && token ? (
+        {!privateLoading && (tab === "sent" || tab === "received") && token ? (
           <section className="rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8">
             <SectionTitle
               eyebrow={tab === "sent" ? "Sent offers" : "Received offers"}
@@ -648,10 +831,15 @@ function CardMarketPageContent() {
             {!(tab === "sent" ? sent : received).length ? (
               <Empty text="가격 제안 내역이 없어요." />
             ) : null}
+            <PrivatePager
+              page={privatePage}
+              totalPages={privateTotalPages}
+              onChange={changePrivatePage}
+            />
           </section>
         ) : null}
 
-        {!loading && tab === "trades" && token ? (
+        {!privateLoading && tab === "trades" && token ? (
           <section className="rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8">
             <SectionTitle eyebrow="Trade history" title="완료된 거래" />
             <div className="space-y-3">
@@ -687,6 +875,11 @@ function CardMarketPageContent() {
               ))}
               {!trades.length ? <Empty text="완료된 거래가 없어요." /> : null}
             </div>
+            <PrivatePager
+              page={privatePage}
+              totalPages={privateTotalPages}
+              onChange={changePrivatePage}
+            />
           </section>
         ) : null}
       </div>
@@ -833,6 +1026,41 @@ function Empty({ text }: { text: string }) {
   );
 }
 
+function PrivatePager({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-6 flex items-center justify-center gap-3 border-t border-[#dfe5da] pt-5">
+      <button
+        type="button"
+        disabled={page <= 0}
+        onClick={() => onChange(page - 1)}
+        className="rounded-xl border border-[#cad5c5] bg-white px-4 py-2 text-sm font-black disabled:opacity-35"
+      >
+        이전
+      </button>
+      <span className="text-sm font-black text-[#667260]">
+        {page + 1} / {totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={page + 1 >= totalPages}
+        onClick={() => onChange(page + 1)}
+        className="rounded-xl border border-[#cad5c5] bg-white px-4 py-2 text-sm font-black disabled:opacity-35"
+      >
+        다음
+      </button>
+    </div>
+  );
+}
+
 function ListingCard({
   listing,
   mine,
@@ -876,6 +1104,12 @@ function ListingCard({
         <p className="mt-4 text-[11px] text-[#929a8f]">
           {dateTime(listing.expiresAt)}까지
         </p>
+        <Link
+          href={`/card-market/listings/${listing.id}`}
+          className="mt-3 block text-center text-xs font-black text-[#52694d] underline-offset-4 hover:underline"
+        >
+          매물 상세 보기
+        </Link>
       </div>
     </article>
   );

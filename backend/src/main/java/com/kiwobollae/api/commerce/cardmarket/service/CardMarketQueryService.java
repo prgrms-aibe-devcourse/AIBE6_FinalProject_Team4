@@ -51,10 +51,16 @@ public class CardMarketQueryService {
   private String assetBaseUrl;
 
   public CardMarketPageResponse<CardMarketListingResponse> getListings(
-      CardMarketAssetType assetType, Long cardId, Pageable pageable) {
+      CardMarketAssetType assetType, Long cardId, String keyword, Pageable pageable) {
+    String normalizedKeyword = normalizeKeyword(keyword);
     Page<CardMarketListingResponse> page =
         listingRepository
-            .search(CardMarketListingStatus.OPEN, assetType, cardId, pageable)
+            .search(
+                CardMarketListingStatus.OPEN,
+                assetType,
+                cardId,
+                normalizedKeyword,
+                pageable)
             .map(this::listingResponse);
     return CardMarketPageResponse.from(page);
   }
@@ -68,33 +74,51 @@ public class CardMarketQueryService {
     return listingResponse(listing);
   }
 
-  public List<CardMarketListingResponse> getMyListings(Long userId) {
+  public CardMarketPageResponse<CardMarketListingResponse> getMyListings(
+      Long userId, Pageable pageable) {
     requireUser(userId);
-    return listingRepository.findAllBySeller_IdOrderByCreatedAtDesc(userId).stream()
-        .map(this::listingResponse)
-        .toList();
+    return CardMarketPageResponse.from(
+        listingRepository
+            .findAllBySeller_IdAndStatus(userId, CardMarketListingStatus.OPEN, pageable)
+            .map(this::listingResponse));
   }
 
-  public List<CardMarketNegotiationResponse> getMySentNegotiations(Long userId) {
+  public CardMarketPageResponse<CardMarketNegotiationResponse> getMySentNegotiations(
+      Long userId, Pageable pageable) {
     requireUser(userId);
-    return negotiationRepository.findAllByBuyer_IdOrderByUpdatedAtDesc(userId).stream()
-        .map(this::negotiationResponse)
-        .toList();
+    return CardMarketPageResponse.from(
+        negotiationRepository.findAllByBuyer_Id(userId, pageable).map(this::negotiationResponse));
   }
 
-  public List<CardMarketNegotiationResponse> getMyReceivedNegotiations(Long userId) {
+  public CardMarketPageResponse<CardMarketNegotiationResponse> getMyReceivedNegotiations(
+      Long userId, Pageable pageable) {
     requireUser(userId);
-    return negotiationRepository
-        .findAllByListing_Seller_IdOrderByUpdatedAtDesc(userId).stream()
-        .map(this::negotiationResponse)
-        .toList();
+    return CardMarketPageResponse.from(
+        negotiationRepository
+            .findAllByListing_Seller_Id(userId, pageable)
+            .map(this::negotiationResponse));
   }
 
-  public List<CardMarketTradeResponse> getMyTrades(Long userId) {
+  public CardMarketPageResponse<CardMarketTradeResponse> getMyTrades(
+      Long userId, Pageable pageable) {
     requireUser(userId);
-    return tradeRepository.findAllByBuyer_IdOrSeller_IdOrderByCompletedAtDesc(userId, userId).stream()
-        .map(trade -> CardMarketTradeResponse.from(trade, imageUrl(trade.getImageKeySnapshot())))
-        .toList();
+    return CardMarketPageResponse.from(
+        tradeRepository
+            .findAllByBuyer_IdOrSeller_Id(userId, userId, pageable)
+            .map(
+                trade ->
+                    CardMarketTradeResponse.from(
+                        trade, imageUrl(trade.getImageKeySnapshot()))));
+  }
+
+  public CardMarketNegotiationResponse getMyNegotiation(Long userId, Long negotiationId) {
+    requireUser(userId);
+    CardMarketNegotiation negotiation =
+        negotiationRepository
+            .findOwnedDetailsById(negotiationId, userId)
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.CARD_MARKET_NEGOTIATION_NOT_FOUND));
+    return negotiationResponse(negotiation);
   }
 
   public CardMarketWalletResponse getMyWallet(Long userId) {
@@ -194,5 +218,16 @@ public class CardMarketQueryService {
     if (userId == null || userId < 1) {
       throw new BusinessException(ErrorCode.AUTH_AUTHENTICATION_REQUIRED);
     }
+  }
+
+  private String normalizeKeyword(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return null;
+    }
+    String normalized = keyword.trim();
+    if (normalized.length() > 50) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+    }
+    return normalized;
   }
 }

@@ -44,6 +44,7 @@ class CardMarketExpiryProcessorTest {
   @Mock private CardMarketNegotiationRepository negotiationRepository;
   @Mock private UserCardCollectionRepository collectionRepository;
   @Mock private CardMarketPointPort pointPort;
+  @Mock private CardMarketNotificationService notificationService;
 
   private CardMarketExpiryProcessor processor;
 
@@ -55,6 +56,7 @@ class CardMarketExpiryProcessorTest {
             negotiationRepository,
             collectionRepository,
             pointPort,
+            notificationService,
             Clock.fixed(Instant.parse("2026-08-06T00:00:00Z"), ZoneOffset.UTC));
   }
 

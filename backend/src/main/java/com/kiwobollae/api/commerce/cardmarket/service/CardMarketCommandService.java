@@ -66,6 +66,7 @@ public class CardMarketCommandService {
   private final GoldenCardInstanceRepository goldenInstanceRepository;
   private final UserRepository userRepository;
   private final CardMarketPointPort pointPort;
+  private final CardMarketNotificationService notificationService;
   private final IdempotencyService idempotencyService;
   private final ObjectMapper objectMapper;
   private final Clock seoulClock;
@@ -292,6 +293,8 @@ public class CardMarketCommandService {
         releases);
     transferCard(listing, buyer, now);
     listing.markSold("BUY_NOW", now);
+    notificationService.tradeCompleted(
+        listing, buyer.getId(), trade.getId(), trade.getTradePrice());
     return tradeResponse(trade);
   }
 
@@ -337,6 +340,7 @@ public class CardMarketCommandService {
             .messageCode(request.messageCode())
             .createdAt(now)
             .build());
+    notificationService.offerCreated(negotiation);
     return negotiationResponse(negotiation);
   }
 
@@ -376,6 +380,7 @@ public class CardMarketCommandService {
             .messageCode(request.messageCode())
             .createdAt(now)
             .build());
+    notificationService.counterProposed(negotiation, userId);
     return negotiationResponse(negotiation);
   }
 
@@ -416,6 +421,8 @@ public class CardMarketCommandService {
     negotiation.accept(now);
     transferCard(listing, negotiation.getBuyer(), now);
     listing.markSold("NEGOTIATED", now);
+    notificationService.tradeCompleted(
+        listing, negotiation.getBuyer().getId(), trade.getId(), trade.getTradePrice());
     return tradeResponse(trade);
   }
 
@@ -433,6 +440,7 @@ public class CardMarketCommandService {
         negotiation.closeAndRelease(CardMarketNegotiationStatus.REJECTED, "REJECTED", now);
     pointPort.releaseOffer(
         negotiation.getBuyer().getId(), release, negotiation.getId());
+    notificationService.negotiationRejected(negotiation, userId);
     return negotiationResponse(negotiation);
   }
 
@@ -449,6 +457,7 @@ public class CardMarketCommandService {
         negotiation.closeAndRelease(
             CardMarketNegotiationStatus.CANCELLED, "BUYER_CANCELLED", now);
     pointPort.releaseOffer(userId, release, negotiationId);
+    notificationService.negotiationCancelled(negotiation);
     return negotiationResponse(negotiation);
   }
 
@@ -523,6 +532,7 @@ public class CardMarketCommandService {
                     new CardMarketPointPort.OfferRelease(
                         negotiation.getBuyer().getId(), amount, negotiation.getId()));
               }
+              notificationService.negotiationClosed(negotiation, reason);
             });
     return releases;
   }

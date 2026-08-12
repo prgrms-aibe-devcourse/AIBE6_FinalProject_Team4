@@ -29,6 +29,7 @@ public class CardMarketExpiryProcessor {
   private final CardMarketNegotiationRepository negotiationRepository;
   private final UserCardCollectionRepository collectionRepository;
   private final CardMarketPointPort pointPort;
+  private final CardMarketNotificationService notificationService;
   private final Clock seoulClock;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -58,6 +59,7 @@ public class CardMarketExpiryProcessor {
                     new CardMarketPointPort.OfferRelease(
                         negotiation.getBuyer().getId(), amount, negotiation.getId()));
               }
+              notificationService.negotiationClosed(negotiation, "LISTING_EXPIRED");
             });
     pointPort.releaseOffers(releases);
     if (listing.getAssetType() == CardMarketAssetType.HYPER_RARE) {
@@ -65,6 +67,7 @@ public class CardMarketExpiryProcessor {
           listing.getSeller().getId(), listing.getCard().getId(), now);
     }
     listing.expire(now);
+    notificationService.listingExpired(listing);
   }
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -92,6 +95,7 @@ public class CardMarketExpiryProcessor {
                     new CardMarketPointPort.OfferRelease(
                         negotiation.getBuyer().getId(), amount, negotiation.getId()));
               }
+              notificationService.negotiationClosed(negotiation, "CARD_HIDDEN");
             });
     pointPort.releaseOffers(releases);
     if (listing.getAssetType() == CardMarketAssetType.HYPER_RARE) {
@@ -122,5 +126,6 @@ public class CardMarketExpiryProcessor {
       pointPort.releaseOffer(
           negotiation.getBuyer().getId(), amount, negotiation.getId());
     }
+    notificationService.negotiationExpired(negotiation);
   }
 }

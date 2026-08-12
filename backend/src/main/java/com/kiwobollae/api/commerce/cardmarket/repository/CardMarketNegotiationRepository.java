@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -28,10 +29,16 @@ public interface CardMarketNegotiationRepository
       @Param("status") CardMarketNegotiationStatus status);
 
   @EntityGraph(attributePaths = {"listing", "listing.card", "listing.seller"})
-  List<CardMarketNegotiation> findAllByBuyer_IdOrderByUpdatedAtDesc(Long buyerId);
+  Page<CardMarketNegotiation> findAllByBuyer_Id(Long buyerId, Pageable pageable);
 
   @EntityGraph(attributePaths = {"listing", "listing.card", "buyer"})
-  List<CardMarketNegotiation> findAllByListing_Seller_IdOrderByUpdatedAtDesc(Long sellerId);
+  Page<CardMarketNegotiation> findAllByListing_Seller_Id(Long sellerId, Pageable pageable);
+
+  @EntityGraph(attributePaths = {"listing", "listing.card", "listing.seller", "buyer"})
+  @Query(
+      "select n from CardMarketNegotiation n where n.id = :id and (n.buyer.id = :userId or n.listing.seller.id = :userId)")
+  Optional<CardMarketNegotiation> findOwnedDetailsById(
+      @Param("id") Long id, @Param("userId") Long userId);
 
   boolean existsByListing_IdAndBuyer_IdAndStatus(
       Long listingId, Long buyerId, CardMarketNegotiationStatus status);

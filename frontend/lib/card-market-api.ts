@@ -110,20 +110,31 @@ export interface MarketSellableCard {
 export const marketIdempotencyKey = () => crypto.randomUUID();
 
 export function getMarketListings(
-  assetType?: MarketAssetType,
-  page = 0,
-  signal?: AbortSignal,
+  options: {
+    assetType?: MarketAssetType;
+    keyword?: string;
+    sort?: "createdAt,desc" | "askingPrice,asc" | "askingPrice,desc";
+    page?: number;
+    signal?: AbortSignal;
+  } = {},
 ) {
   const params = new URLSearchParams({
-    page: String(page),
+    page: String(options.page ?? 0),
     size: "20",
-    sort: "createdAt,desc",
+    sort: options.sort ?? "createdAt,desc",
   });
-  if (assetType) params.set("assetType", assetType);
+  if (options.assetType) params.set("assetType", options.assetType);
+  if (options.keyword?.trim()) params.set("keyword", options.keyword.trim());
   return request<MarketPage<MarketListing>>(
     `/api/v1/card/market/listings?${params}`,
-    { signal },
+    { signal: options.signal },
   );
+}
+
+export function getMarketListing(listingId: number, signal?: AbortSignal) {
+  return request<MarketListing>(`/api/v1/card/market/listings/${listingId}`, {
+    signal,
+  });
 }
 
 export function getMarketWallet(accessToken: string, signal?: AbortSignal) {
@@ -143,20 +154,25 @@ export function getMarketSellableCards(
   );
 }
 
-export function getMyMarketListings(accessToken: string, signal?: AbortSignal) {
-  return request<MarketListing[]>("/api/v1/card/market/me/listings", {
-    accessToken,
-    signal,
-  });
+export function getMyMarketListings(
+  accessToken: string,
+  page = 0,
+  signal?: AbortSignal,
+) {
+  return request<MarketPage<MarketListing>>(
+    `/api/v1/card/market/me/listings?page=${page}&size=20`,
+    { accessToken, signal },
+  );
 }
 
 export function getMyMarketNegotiations(
   direction: "sent" | "received",
   accessToken: string,
+  page = 0,
   signal?: AbortSignal,
 ) {
-  return request<MarketNegotiation[]>(
-    `/api/v1/card/market/me/negotiations/${direction}`,
+  return request<MarketPage<MarketNegotiation>>(
+    `/api/v1/card/market/me/negotiations/${direction}?page=${page}&size=20`,
     {
       accessToken,
       signal,
@@ -164,11 +180,26 @@ export function getMyMarketNegotiations(
   );
 }
 
-export function getMyMarketTrades(accessToken: string, signal?: AbortSignal) {
-  return request<MarketTrade[]>("/api/v1/card/market/me/trades", {
-    accessToken,
-    signal,
-  });
+export function getMyMarketNegotiation(
+  negotiationId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+) {
+  return request<MarketNegotiation>(
+    `/api/v1/card/market/me/negotiations/${negotiationId}`,
+    { accessToken, signal },
+  );
+}
+
+export function getMyMarketTrades(
+  accessToken: string,
+  page = 0,
+  signal?: AbortSignal,
+) {
+  return request<MarketPage<MarketTrade>>(
+    `/api/v1/card/market/me/trades?page=${page}&size=20`,
+    { accessToken, signal },
+  );
 }
 
 export function createMarketListing(

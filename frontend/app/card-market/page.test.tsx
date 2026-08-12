@@ -115,9 +115,27 @@ describe("CardMarketPage", () => {
       freePointGuide: "무상 포인트 사용 불가",
     });
     mockedSellable.mockResolvedValue([]);
-    mockedMyListings.mockResolvedValue([]);
-    mockedNegotiations.mockResolvedValue([]);
-    mockedTrades.mockResolvedValue([]);
+    mockedMyListings.mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+    });
+    mockedNegotiations.mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+    });
+    mockedTrades.mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+    });
     mockedCreateOffer.mockResolvedValue({} as never);
     mockedCreateListing.mockResolvedValue({} as never);
     mockedBuy.mockResolvedValue({} as never);
@@ -248,7 +266,7 @@ describe("CardMarketPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: /내 판매/ }));
 
     expect(
-      screen.getByRole("option", { name: "황금 옥수수 · 개체 #731" }),
+      await screen.findByRole("option", { name: "황금 옥수수 · 개체 #731" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("골든 #12")).not.toBeInTheDocument();
   });
@@ -271,7 +289,7 @@ describe("CardMarketPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /내 판매/ }));
     expect(
-      screen.getByText(/판매 가능 가격 100P ~ 99,999,999P/),
+      await screen.findByText(/판매 가능 가격 100P ~ 99,999,999P/),
     ).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText("판매 가격 100P 이상"), {
       target: { value: "1000" },
@@ -307,7 +325,7 @@ describe("CardMarketPage", () => {
     render(<CardMarketPage />);
 
     fireEvent.click(await screen.findByRole("button", { name: /내 판매/ }));
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(await screen.findByRole("combobox"), {
       target: { value: "731" },
     });
     fireEvent.change(screen.getByPlaceholderText("판매 가격 100P 이상"), {

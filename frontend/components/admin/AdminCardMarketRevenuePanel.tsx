@@ -2,7 +2,9 @@
 
 import { ApiError } from "@/lib/api";
 import {
+  AdminCardMarketFilters,
   AdminCardMarketRevenue,
+  downloadAdminCardMarketRevenueCsv,
   getAdminCardMarketRevenue,
 } from "@/lib/admin-card-market-api";
 import { useCallback, useEffect, useState } from "react";
@@ -26,12 +28,21 @@ export default function AdminCardMarketRevenuePanel({
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filters, setFilters] = useState<AdminCardMarketFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<AdminCardMarketFilters>(
+    {},
+  );
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(
     (signal?: AbortSignal) => {
       setLoading(true);
       setError("");
-      return getAdminCardMarketRevenue(accessToken, { page, signal })
+      return getAdminCardMarketRevenue(accessToken, {
+        page,
+        signal,
+        filters: appliedFilters,
+      })
         .then(setRevenue)
         .catch((requestError) => {
           if (
@@ -49,8 +60,52 @@ export default function AdminCardMarketRevenuePanel({
           if (!signal?.aborted) setLoading(false);
         });
     },
-    [accessToken, page],
+    [accessToken, appliedFilters, page],
   );
+
+  const setPeriod = (days?: number) => {
+    if (!days) {
+      setFilters((current) => ({ ...current, from: "", to: "" }));
+      return;
+    }
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - days + 1);
+    const localDate = (value: Date) => {
+      const offset = value.getTimezoneOffset() * 60_000;
+      return new Date(value.getTime() - offset).toISOString().slice(0, 10);
+    };
+    setFilters((current) => ({
+      ...current,
+      from: localDate(from),
+      to: localDate(to),
+    }));
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      const blob = await downloadAdminCardMarketRevenueCsv(
+        accessToken,
+        appliedFilters,
+      );
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `card-market-revenue-${new Date().toISOString().slice(0, 10)}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (requestError) {
+      setError(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "CSV 파일을 만들지 못했어요.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,6 +136,133 @@ export default function AdminCardMarketRevenuePanel({
           완료된 거래에서 차감된 20% 수수료를 플랫폼 수익으로 집계합니다. 거래
           원장은 변경하지 않고 조회만 제공합니다.
         </p>
+      </section>
+
+      <section className="rounded-[18px] border border-line bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-extrabold">거래 내역 필터</h3>
+            <p className="mt-1 text-xs text-sub">
+              선택한 조건 기준으로 요약 금액과 거래 목록을 함께 집계합니다.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([1, 7, 30] as const).map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => setPeriod(days)}
+                className="rounded-xl border border-line px-3 py-2 text-xs font-bold"
+              >
+                {days === 1 ? "오늘" : `최근 ${days}일`}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPeriod()}
+              className="rounded-xl border border-line px-3 py-2 text-xs font-bold"
+            >
+              전체 기간
+            </button>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <input
+            type="date"
+            value={filters.from ?? ""}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                from: event.target.value,
+              }))
+            }
+            className="rounded-xl border border-line px-3 py-2.5 text-sm"
+            aria-label="조회 시작일"
+          />
+          <input
+            type="date"
+            value={filters.to ?? ""}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, to: event.target.value }))
+            }
+            className="rounded-xl border border-line px-3 py-2.5 text-sm"
+            aria-label="조회 종료일"
+          />
+          <input
+            type="number"
+            min={1}
+            value={filters.userId ?? ""}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                userId: event.target.value,
+              }))
+            }
+            placeholder="사용자 ID"
+            className="rounded-xl border border-line px-3 py-2.5 text-sm"
+          />
+          <input
+            type="number"
+            min={1}
+            value={filters.cardId ?? ""}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                cardId: event.target.value,
+              }))
+            }
+            placeholder="카드 ID"
+            className="rounded-xl border border-line px-3 py-2.5 text-sm"
+          />
+          <input
+            value={filters.keyword ?? ""}
+            maxLength={50}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                keyword: event.target.value,
+              }))
+            }
+            placeholder="카드 이름"
+            className="rounded-xl border border-line px-3 py-2.5 text-sm md:col-span-2"
+          />
+          <select
+            value={filters.tradeType ?? ""}
+            onChange={(event) =>
+              setFilters((current) => ({
+                ...current,
+                tradeType: event.target
+                  .value as AdminCardMarketFilters["tradeType"],
+              }))
+            }
+            className="rounded-xl border border-line px-3 py-2.5 text-sm"
+          >
+            <option value="">전체 거래 유형</option>
+            <option value="BUY_NOW">바로 구매</option>
+            <option value="NEGOTIATED">가격 협상</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setPage(0);
+              setAppliedFilters({ ...filters });
+            }}
+            className="rounded-xl bg-brand px-4 py-2.5 text-sm font-extrabold text-white"
+          >
+            조건 적용
+          </button>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => void exportCsv()}
+            className="inline-flex items-center gap-2 rounded-xl border border-brand px-4 py-2.5 text-sm font-extrabold text-brand-dark disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-lg">download</span>
+            {exporting ? "파일 생성 중..." : "조회 결과 CSV"}
+          </button>
+        </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

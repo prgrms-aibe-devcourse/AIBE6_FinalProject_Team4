@@ -27,7 +27,7 @@ describe("card market api", () => {
     );
   });
 
-  it("공개 판매 목록에 등급과 페이지 조건을 전달한다", async () => {
+  it("공개 판매 목록에 검색·정렬·등급·페이지 조건을 전달한다", async () => {
     mockedRequest.mockResolvedValueOnce({
       content: [],
       page: 2,
@@ -36,10 +36,15 @@ describe("card market api", () => {
       totalPages: 0,
     });
 
-    await getMarketListings("GOLDEN_RARE", 2);
+    await getMarketListings({
+      assetType: "GOLDEN_RARE",
+      keyword: "옥수수",
+      sort: "askingPrice,asc",
+      page: 2,
+    });
 
     expect(mockedRequest).toHaveBeenCalledWith(
-      "/api/v1/card/market/listings?page=2&size=20&sort=createdAt%2Cdesc&assetType=GOLDEN_RARE",
+      "/api/v1/card/market/listings?page=2&size=20&sort=askingPrice%2Casc&assetType=GOLDEN_RARE&keyword=%EC%98%A5%EC%88%98%EC%88%98",
       { signal: undefined },
     );
   });

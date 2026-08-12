@@ -17,11 +17,12 @@ public record AdminCardMarketRevenueResponse(
 
   public static AdminCardMarketRevenueResponse from(
       Page<CardMarketTrade> trades,
+      long totalTradeCount,
       long totalTradePoint,
       long totalFeePoint,
       long totalSellerReceivedPoint) {
     return new AdminCardMarketRevenueResponse(
-        trades.getTotalElements(),
+        totalTradeCount,
         totalTradePoint,
         totalFeePoint,
         totalSellerReceivedPoint,

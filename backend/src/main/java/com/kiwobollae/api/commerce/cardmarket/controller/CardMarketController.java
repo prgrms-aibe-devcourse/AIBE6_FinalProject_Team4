@@ -18,6 +18,8 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,6 +39,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class CardMarketController {
 
+  private static final int MAX_PAGE_SIZE = 100;
+
   private final CardMarketQueryService queryService;
   private final CardMarketCommandService commandService;
 
@@ -45,8 +49,12 @@ public class CardMarketController {
   public ResponseEntity<ApiResponse<CardMarketPageResponse<CardMarketListingResponse>>> listings(
       @RequestParam(required = false) CardMarketAssetType assetType,
       @RequestParam(required = false) Long cardId,
-      @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
-    return ResponseEntity.ok(ApiResponse.success(queryService.getListings(assetType, cardId, pageable)));
+      @RequestParam(required = false) String keyword,
+      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            queryService.getListings(assetType, cardId, keyword, boundMarketPageable(pageable))));
   }
 
   @Operation(summary = "카드 거래소 판매글 상세")
@@ -72,30 +80,57 @@ public class CardMarketController {
 
   @Operation(summary = "내 판매글")
   @GetMapping("/me/listings")
-  public ResponseEntity<ApiResponse<List<CardMarketListingResponse>>> myListings(
-      @AuthenticationPrincipal Long userId) {
-    return ResponseEntity.ok(ApiResponse.success(queryService.getMyListings(userId)));
+  public ResponseEntity<ApiResponse<CardMarketPageResponse<CardMarketListingResponse>>> myListings(
+      @AuthenticationPrincipal Long userId,
+      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(queryService.getMyListings(userId, boundPrivatePageable(pageable, "createdAt"))));
   }
 
   @Operation(summary = "내가 보낸 가격 제안")
   @GetMapping("/me/negotiations/sent")
-  public ResponseEntity<ApiResponse<List<CardMarketNegotiationResponse>>> sentNegotiations(
-      @AuthenticationPrincipal Long userId) {
-    return ResponseEntity.ok(ApiResponse.success(queryService.getMySentNegotiations(userId)));
+  public ResponseEntity<ApiResponse<CardMarketPageResponse<CardMarketNegotiationResponse>>>
+      sentNegotiations(
+          @AuthenticationPrincipal Long userId,
+          @PageableDefault(size = 20, sort = "updatedAt", direction = Sort.Direction.DESC)
+              Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            queryService.getMySentNegotiations(
+                userId, boundPrivatePageable(pageable, "updatedAt"))));
   }
 
   @Operation(summary = "내가 받은 가격 제안")
   @GetMapping("/me/negotiations/received")
-  public ResponseEntity<ApiResponse<List<CardMarketNegotiationResponse>>> receivedNegotiations(
-      @AuthenticationPrincipal Long userId) {
-    return ResponseEntity.ok(ApiResponse.success(queryService.getMyReceivedNegotiations(userId)));
+  public ResponseEntity<ApiResponse<CardMarketPageResponse<CardMarketNegotiationResponse>>>
+      receivedNegotiations(
+          @AuthenticationPrincipal Long userId,
+          @PageableDefault(size = 20, sort = "updatedAt", direction = Sort.Direction.DESC)
+              Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            queryService.getMyReceivedNegotiations(
+                userId, boundPrivatePageable(pageable, "updatedAt"))));
+  }
+
+  @Operation(summary = "내 가격 협상 상세")
+  @GetMapping("/me/negotiations/{negotiationId}")
+  public ResponseEntity<ApiResponse<CardMarketNegotiationResponse>> negotiation(
+      @AuthenticationPrincipal Long userId, @PathVariable Long negotiationId) {
+    return ResponseEntity.ok(
+        ApiResponse.success(queryService.getMyNegotiation(userId, negotiationId)));
   }
 
   @Operation(summary = "내 카드 거래 내역")
   @GetMapping("/me/trades")
-  public ResponseEntity<ApiResponse<List<CardMarketTradeResponse>>> trades(
-      @AuthenticationPrincipal Long userId) {
-    return ResponseEntity.ok(ApiResponse.success(queryService.getMyTrades(userId)));
+  public ResponseEntity<ApiResponse<CardMarketPageResponse<CardMarketTradeResponse>>> trades(
+      @AuthenticationPrincipal Long userId,
+      @PageableDefault(size = 20, sort = "completedAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ResponseEntity.ok(
+        ApiResponse.success(
+            queryService.getMyTrades(userId, boundPrivatePageable(pageable, "completedAt"))));
   }
 
   @Operation(summary = "카드 판매 등록")
@@ -180,5 +215,26 @@ public class CardMarketController {
     return ResponseEntity.ok(
         ApiResponse.success(
             commandService.cancelNegotiation(userId, negotiationId, idempotencyKey)));
+  }
+
+  private Pageable boundMarketPageable(Pageable pageable) {
+    int size = Math.min(pageable.getPageSize(), MAX_PAGE_SIZE);
+    Sort.Order requested = pageable.getSort().stream().findFirst().orElse(null);
+    String property = requested == null ? "createdAt" : requested.getProperty();
+    Sort.Direction direction =
+        requested == null ? Sort.Direction.DESC : requested.getDirection();
+    if (!property.equals("createdAt") && !property.equals("askingPrice")) {
+      property = "createdAt";
+      direction = Sort.Direction.DESC;
+    }
+    Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.DESC, "id"));
+    return PageRequest.of(pageable.getPageNumber(), size, sort);
+  }
+
+  private Pageable boundPrivatePageable(Pageable pageable, String property) {
+    int size = Math.min(pageable.getPageSize(), MAX_PAGE_SIZE);
+    Sort sort =
+        Sort.by(Sort.Direction.DESC, property).and(Sort.by(Sort.Direction.DESC, "id"));
+    return PageRequest.of(pageable.getPageNumber(), size, sort);
   }
 }

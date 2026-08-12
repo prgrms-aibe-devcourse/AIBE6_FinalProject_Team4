@@ -56,7 +56,7 @@ class CardMarketControllerAuthorizationTest {
 
   @Test
   void anonymousUserCanBrowseOpenListings() throws Exception {
-    given(queryService.getListings(any(), any(), any()))
+    given(queryService.getListings(any(), any(), any(), any()))
         .willReturn(new CardMarketPageResponse<>(List.of(), 0, 20, 0, 0));
 
     mockMvc
@@ -144,7 +144,7 @@ class CardMarketControllerAuthorizationTest {
   void onlyAdminCanReadMarketRevenue() throws Exception {
     String userToken = jwtTokenProvider.generateAccessToken(7L, "USER");
     String adminToken = jwtTokenProvider.generateAccessToken(1L, "ADMIN");
-    given(revenueService.getRevenue(0, 20))
+    given(revenueService.getRevenue(0, 20, null, null, null, null, null, null))
         .willReturn(new AdminCardMarketRevenueResponse(0, 0, 0, 0, List.of(), 0, 20, 0, 0));
 
     mockMvc
