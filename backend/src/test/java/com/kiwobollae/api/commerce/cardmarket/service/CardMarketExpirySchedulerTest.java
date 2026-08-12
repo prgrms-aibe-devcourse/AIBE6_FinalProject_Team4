@@ -37,7 +37,7 @@ class CardMarketExpirySchedulerTest {
             listingRepository,
             negotiationRepository,
             processor,
-            Clock.fixed(Instant.parse("2026-08-12T00:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-08-11T15:00:00Z"), ZoneOffset.UTC));
     ReflectionTestUtils.setField(scheduler, "batchSize", 25);
     CardMarketNegotiation negotiation = mock(CardMarketNegotiation.class);
     CardMarketListing expiredListing = mock(CardMarketListing.class);

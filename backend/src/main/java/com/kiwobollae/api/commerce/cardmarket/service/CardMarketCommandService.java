@@ -38,7 +38,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
@@ -56,6 +56,8 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class CardMarketCommandService {
+
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final CardMarketListingRepository listingRepository;
   private final CardMarketNegotiationRepository negotiationRepository;
@@ -668,7 +670,7 @@ public class CardMarketCommandService {
   }
 
   private LocalDateTime now() {
-    return LocalDateTime.ofInstant(seoulClock.instant(), ZoneOffset.UTC);
+    return LocalDateTime.ofInstant(seoulClock.instant(), KST);
   }
 
   private void requireUserAndKey(Long userId, String idempotencyKey) {

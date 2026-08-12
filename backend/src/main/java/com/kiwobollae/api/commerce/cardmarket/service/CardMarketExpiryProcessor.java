@@ -12,7 +12,7 @@ import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository
 import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardStatus;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CardMarketExpiryProcessor {
 
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
   private final CardMarketListingRepository listingRepository;
   private final CardMarketNegotiationRepository negotiationRepository;
   private final UserCardCollectionRepository collectionRepository;
@@ -35,7 +37,7 @@ public class CardMarketExpiryProcessor {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void expireListing(Long listingId) {
     CardMarketListing listing = listingRepository.findByIdForUpdate(listingId).orElse(null);
-    LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), KST);
     if (listing == null
         || listing.getStatus() != CardMarketListingStatus.OPEN
         || listing.getExpiresAt().isAfter(now)) {
@@ -73,7 +75,7 @@ public class CardMarketExpiryProcessor {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void closeHiddenCardListing(Long listingId) {
     CardMarketListing listing = listingRepository.findByIdForUpdate(listingId).orElse(null);
-    LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), KST);
     if (listing == null
         || listing.getStatus() != CardMarketListingStatus.OPEN
         || listing.getCard().getStatus() == TradingCardStatus.ACTIVE) {
@@ -114,7 +116,7 @@ public class CardMarketExpiryProcessor {
     listingRepository.findByIdForUpdate(snapshot.getListing().getId()).orElse(null);
     CardMarketNegotiation negotiation =
         negotiationRepository.findByIdForUpdate(negotiationId).orElse(null);
-    LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.ofInstant(seoulClock.instant(), KST);
     if (negotiation == null
         || negotiation.getStatus() != CardMarketNegotiationStatus.NEGOTIATING
         || negotiation.getExpiresAt().isAfter(now)) {

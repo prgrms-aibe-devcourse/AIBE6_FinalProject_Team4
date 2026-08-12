@@ -93,7 +93,7 @@ class CardMarketCommandServiceTest {
             notificationService,
             idempotencyService,
             new ObjectMapper(),
-            Clock.fixed(Instant.parse("2026-08-06T00:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-08-05T15:00:00Z"), ZoneOffset.UTC));
     seller = user(1L, "판매자");
     buyer = user(2L, "구매자");
     IdempotencyKey key = mock(IdempotencyKey.class);

@@ -37,7 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(
     properties = {
       "spring.datasource.url=jdbc:mysql://localhost:3306/kiwobollae_card_market_auth_test"
-          + "?createDatabaseIfNotExist=true&serverTimezone=UTC&characterEncoding=UTF-8",
+          + "?createDatabaseIfNotExist=true&serverTimezone=Asia%2FSeoul&characterEncoding=UTF-8",
       "spring.jpa.hibernate.ddl-auto=create-drop",
       "app.seed.gacha.enabled=false",
       "app.seed.charge-product.enabled=false",

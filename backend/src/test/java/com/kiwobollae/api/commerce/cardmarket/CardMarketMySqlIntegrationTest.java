@@ -49,7 +49,7 @@ import org.springframework.transaction.support.TransactionTemplate;
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = {
       "spring.datasource.url=jdbc:mysql://localhost:3306/kiwobollae_card_market_test"
-          + "?createDatabaseIfNotExist=true&serverTimezone=UTC&characterEncoding=UTF-8",
+          + "?createDatabaseIfNotExist=true&serverTimezone=Asia%2FSeoul&characterEncoding=UTF-8",
       "spring.jpa.hibernate.ddl-auto=create-drop",
       "app.seed.gacha.enabled=true",
       "app.seed.charge-product.enabled=false",

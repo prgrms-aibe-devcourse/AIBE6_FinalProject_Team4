@@ -57,7 +57,7 @@ class CardMarketExpiryProcessorTest {
             collectionRepository,
             pointPort,
             notificationService,
-            Clock.fixed(Instant.parse("2026-08-06T00:00:00Z"), ZoneOffset.UTC));
+            Clock.fixed(Instant.parse("2026-08-05T15:00:00Z"), ZoneOffset.UTC));
   }
 
   @Test
