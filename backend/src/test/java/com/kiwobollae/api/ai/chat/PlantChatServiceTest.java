@@ -11,10 +11,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.kiwobollae.api.ai.chat.dto.PlantChatMessage;
 import com.kiwobollae.api.ai.chat.dto.PlantChatRequest;
 import com.kiwobollae.api.ai.chat.dto.PlantChatResponse;
-import com.kiwobollae.api.ai.chat.dto.PlantChatRole;
 import com.kiwobollae.api.ai.client.AiClient;
 import com.kiwobollae.api.ai.client.AiModelRole;
 import com.kiwobollae.api.ai.client.AiRequest;
@@ -32,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,29 +51,31 @@ class PlantChatServiceTest {
   @Mock private AiRequestGuard requestGuard;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+  private PlantChatConversationStore conversationStore;
   private PlantChatService plantChatService;
 
   @BeforeEach
   void setUp() {
+    conversationStore = new PlantChatConversationStore(FIXED_KST_CLOCK);
     plantChatService =
         new PlantChatService(
-            growthContextQuery, aiClient, requestGuard, objectMapper, FIXED_KST_CLOCK);
+            growthContextQuery,
+            aiClient,
+            requestGuard,
+            conversationStore,
+            objectMapper,
+            FIXED_KST_CLOCK);
   }
 
   @Test
   void answersFromOwnedPlantContextWithExactlyOneAiCall() throws Exception {
     given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class))).willReturn(validAiResponse());
-    PlantChatRequest request =
-        new PlantChatRequest(
-            "  잎 끝이 갈색인데 어떻게 해야 하나요?  ",
-            "오늘 흙 표면은 말라 있었고 물을 조금 줬어요.",
-            List.of(
-                new PlantChatMessage(PlantChatRole.USER, "지난주에도 잎 끝이 말랐어요."),
-                new PlantChatMessage(PlantChatRole.ASSISTANT, "물주기 간격을 확인해 보세요.")));
+    PlantChatRequest request = new PlantChatRequest("  잎 끝이 갈색인데 어떻게 해야 하나요?  ", null);
 
     PlantChatResponse response = plantChatService.chat(7L, 21L, request);
 
+    assertThat(response.conversationId()).isNotNull();
     assertThat(response.answer()).isEqualTo("과습과 건조가 반복됐을 가능성이 있어요.");
     assertThat(response.recommendedActions()).containsExactly("겉흙 2cm가 마른 뒤 충분히 물을 주세요.");
     assertThat(response.additionalChecks()).containsExactly("화분 배수구가 막히지 않았는지 확인하세요.");
@@ -92,9 +93,8 @@ class PlantChatServiceTest {
         .contains("바질은 겉흙이 마르면 물을 줍니다.")
         .contains("2026-08-08")
         .contains("새 잎이 조금 말렸어요.")
-        .contains("오늘 흙 표면은 말라 있었고")
-        .contains("지난주에도 잎 끝이 말랐어요.")
         .contains("잎 끝이 갈색인데 어떻게 해야 하나요?")
+        .contains("\"recentConversation\":[]")
         .doesNotContain("\"profileId\"")
         .doesNotContain("\"speciesId\"")
         .doesNotContain("\"journalId\"");
@@ -107,7 +107,7 @@ class PlantChatServiceTest {
   }
 
   @Test
-  void supportsQuestionWithoutDraftOrRecentConversation() throws Exception {
+  void startsNewConversationWithoutClientProvidedHistory() throws Exception {
     given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -124,19 +124,42 @@ class PlantChatServiceTest {
                     """)));
 
     PlantChatResponse response =
-        plantChatService.chat(7L, 21L, new PlantChatRequest("물을 언제 줄까요?", null, null));
+        plantChatService.chat(7L, 21L, new PlantChatRequest("물을 언제 줄까요?", null));
 
+    assertThat(response.conversationId()).isNotNull();
     assertThat(response.additionalChecks()).isEmpty();
     ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
     verify(aiClient).generate(captor.capture());
-    assertThat(captor.getValue().userPrompt())
-        .contains("\"currentJournalContent\":null")
-        .contains("\"recentMessages\":[]");
+    assertThat(captor.getValue().userPrompt()).contains("\"recentConversation\":[]");
+  }
+
+  @Test
+  void continuesWithServerStoredUserAndAssistantMessages() throws Exception {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(validAiResponse(), secondValidAiResponse());
+
+    PlantChatResponse first =
+        plantChatService.chat(7L, 21L, new PlantChatRequest("잎 끝이 왜 갈색인가요?", null));
+    PlantChatResponse second =
+        plantChatService.chat(
+            7L, 21L, new PlantChatRequest("말씀하신 첫 번째 행동을 더 설명해 주세요.", first.conversationId()));
+
+    assertThat(second.conversationId()).isEqualTo(first.conversationId());
+    ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
+    verify(aiClient, times(2)).generate(captor.capture());
+    assertThat(captor.getAllValues().get(1).userPrompt())
+        .contains("\"role\":\"USER\"")
+        .contains("잎 끝이 왜 갈색인가요?")
+        .contains("\"role\":\"ASSISTANT\"")
+        .contains("과습과 건조가 반복됐을 가능성이 있어요.")
+        .contains("권장 행동: 겉흙 2cm가 마른 뒤 충분히 물을 주세요.")
+        .contains("말씀하신 첫 번째 행동을 더 설명해 주세요.");
   }
 
   @Test
   void rejectsQuestionBeforeLoadingPlantContextWhenInputGuardFails() {
-    PlantChatRequest request = new PlantChatRequest(" ", null, null);
+    PlantChatRequest request = new PlantChatRequest(" ", null);
     doThrow(new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED))
         .when(requestGuard)
         .validateUserInput(request.question());
@@ -153,42 +176,34 @@ class PlantChatServiceTest {
   }
 
   @Test
-  void rejectsMoreThanSixRecentMessages() {
-    List<PlantChatMessage> messages =
-        java.util.stream.IntStream.range(0, 7)
-            .mapToObj(index -> new PlantChatMessage(PlantChatRole.USER, "질문 " + index))
-            .toList();
-
-    assertValidationFailure(new PlantChatRequest("질문입니다.", null, messages), "최근 대화는 최대 6개");
-  }
-
-  @Test
-  void rejectsRecentMessagesOverTotalLengthLimit() {
-    List<PlantChatMessage> messages =
-        java.util.stream.IntStream.range(0, 6)
-            .mapToObj(index -> new PlantChatMessage(PlantChatRole.USER, "가".repeat(700)))
-            .toList();
-
-    assertValidationFailure(new PlantChatRequest("질문입니다.", null, messages), "합계 4000자 이하");
-  }
-
-  @Test
-  void rejectsCurrentJournalOverLengthLimit() {
-    assertValidationFailure(
-        new PlantChatRequest("질문입니다.", "가".repeat(2001), null), "작성 중인 일지는 2000자 이하");
-  }
-
-  @Test
   void doesNotConsumeRateLimitWhenProfileIsNotOwned() {
     given(growthContextQuery.getGrowthContext(7L, 99L, 5))
         .willThrow(new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 
     assertThatThrownBy(
-            () -> plantChatService.chat(7L, 99L, new PlantChatRequest("이 식물은 괜찮나요?", null, null)))
+            () -> plantChatService.chat(7L, 99L, new PlantChatRequest("이 식물은 괜찮나요?", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
+
+    verify(requestGuard, never()).checkRateLimit(any(), any());
+    verifyNoInteractions(aiClient);
+  }
+
+  @Test
+  void rejectsUnknownConversationBeforeConsumingRateLimit() {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+
+    assertThatThrownBy(
+            () ->
+                plantChatService.chat(
+                    7L, 21L, new PlantChatRequest("이어서 알려주세요.", UUID.randomUUID())))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.AI_CHAT_CONVERSATION_INVALID));
 
     verify(requestGuard, never()).checkRateLimit(any(), any());
     verifyNoInteractions(aiClient);
@@ -202,7 +217,7 @@ class PlantChatServiceTest {
         .checkRateLimit(7L, AiFeature.PLANT_CHAT);
 
     assertThatThrownBy(
-            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("물을 언제 줄까요?", null, null)))
+            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("물을 언제 줄까요?", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -228,8 +243,7 @@ class PlantChatServiceTest {
                     }
                     """)));
 
-    assertThatThrownBy(
-            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("질문입니다.", null, null)))
+    assertThatThrownBy(() -> plantChatService.chat(7L, 21L, new PlantChatRequest("질문입니다.", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -242,27 +256,13 @@ class PlantChatServiceTest {
     given(aiClient.generate(any(AiRequest.class)))
         .willThrow(new BusinessException(ErrorCode.AI_PROVIDER_UNAVAILABLE));
 
-    assertThatThrownBy(
-            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("질문입니다.", null, null)))
+    assertThatThrownBy(() -> plantChatService.chat(7L, 21L, new PlantChatRequest("질문입니다.", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_PROVIDER_UNAVAILABLE));
 
     verify(aiClient, times(1)).generate(any(AiRequest.class));
-  }
-
-  private void assertValidationFailure(PlantChatRequest request, String message) {
-    assertThatThrownBy(() -> plantChatService.chat(7L, 21L, request))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            exception -> {
-              assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
-              assertThat(exception.getMessage()).contains(message);
-            });
-    verifyNoInteractions(growthContextQuery);
-    verify(aiClient, never()).generate(any());
-    verify(requestGuard, never()).checkRateLimit(any(), any());
   }
 
   private PlantGrowthContextResponse growthContext() {
@@ -290,6 +290,20 @@ class PlantChatServiceTest {
               "answer": " 과습과 건조가 반복됐을 가능성이 있어요. ",
               "recommendedActions": [" 겉흙 2cm가 마른 뒤 충분히 물을 주세요. "],
               "additionalChecks": [" 화분 배수구가 막히지 않았는지 확인하세요. "]
+            }
+            """));
+  }
+
+  private AiResponse secondValidAiResponse() throws Exception {
+    return new AiResponse(
+        "resp-2",
+        "text-model",
+        objectMapper.readTree(
+            """
+            {
+              "answer": "첫 번째 행동을 더 자세히 설명해 드릴게요.",
+              "recommendedActions": ["손가락으로 겉흙 아래까지 확인해 주세요."],
+              "additionalChecks": []
             }
             """));
   }

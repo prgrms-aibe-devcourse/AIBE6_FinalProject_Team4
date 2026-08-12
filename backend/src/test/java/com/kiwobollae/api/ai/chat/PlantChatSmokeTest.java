@@ -4,10 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
-import com.kiwobollae.api.ai.chat.dto.PlantChatMessage;
 import com.kiwobollae.api.ai.chat.dto.PlantChatRequest;
 import com.kiwobollae.api.ai.chat.dto.PlantChatResponse;
-import com.kiwobollae.api.ai.chat.dto.PlantChatRole;
 import com.kiwobollae.api.ai.client.AiClient;
 import com.kiwobollae.api.ai.client.OpenAiClient;
 import com.kiwobollae.api.ai.client.RealOpenAiClients;
@@ -50,12 +48,7 @@ class PlantChatSmokeTest {
     AtomicInteger actualCalls = new AtomicInteger();
     PlantChatService service = serviceBackedByRealOpenAi(properties, actualCalls);
     PlantChatRequest request =
-        new PlantChatRequest(
-            "최근 잎 끝이 조금 갈색으로 변했습니다. 물주기와 빛 환경에서 무엇을 확인해야 하나요?",
-            "오늘 겉흙은 말라 있었고 창가에서 네 시간 정도 햇빛을 받았습니다.",
-            List.of(
-                new PlantChatMessage(PlantChatRole.USER, "지난주에도 새 잎 끝이 조금 말랐습니다."),
-                new PlantChatMessage(PlantChatRole.ASSISTANT, "겉흙 상태와 직사광선 노출 시간을 함께 기록해 주세요.")));
+        new PlantChatRequest("최근 잎 끝이 조금 갈색으로 변했습니다. 물주기와 빛 환경에서 무엇을 확인해야 하나요?", null);
 
     Instant startedAt = Instant.now();
     PlantChatResponse response;
@@ -75,6 +68,7 @@ class PlantChatSmokeTest {
         response.additionalChecks().size());
 
     assertThat(actualCalls.get()).isEqualTo(1);
+    assertThat(response.conversationId()).isNotNull();
     assertThat(response.answer()).isNotBlank().hasSizeLessThanOrEqualTo(2000);
     assertThat(response.recommendedActions()).hasSizeBetween(1, 3);
     assertThat(response.recommendedActions())
@@ -100,6 +94,7 @@ class PlantChatSmokeTest {
         growthContextQuery,
         countingClient,
         mock(AiRequestGuard.class),
+        new PlantChatConversationStore(FIXED_KST_CLOCK),
         new ObjectMapper(),
         FIXED_KST_CLOCK);
   }

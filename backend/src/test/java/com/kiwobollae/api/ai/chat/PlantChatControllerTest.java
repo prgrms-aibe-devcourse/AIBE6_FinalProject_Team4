@@ -17,6 +17,7 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,10 +55,14 @@ class PlantChatControllerTest {
 
   @Test
   void returnsChatAnswerForAuthenticatedProfileOwner() throws Exception {
+    UUID conversationId = UUID.fromString("30a508b8-bffc-43c3-8dd0-539a2068500a");
     given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
         .willReturn(
             new PlantChatResponse(
-                "물을 주기 전에 흙을 확인해 주세요.", List.of("겉흙 2cm를 확인하세요."), List.of("배수구를 확인하세요.")));
+                conversationId,
+                "물을 주기 전에 흙을 확인해 주세요.",
+                List.of("겉흙 2cm를 확인하세요."),
+                List.of("배수구를 확인하세요.")));
 
     mockMvc
         .perform(
@@ -66,16 +71,12 @@ class PlantChatControllerTest {
                 .content(
                     """
                     {
-                      "question": "물을 언제 줄까요?",
-                      "currentJournalContent": "오늘 잎은 괜찮아 보여요.",
-                      "recentMessages": [
-                        {"role": "USER", "content": "어제 물을 줬어요."},
-                        {"role": "ASSISTANT", "content": "흙을 확인해 주세요."}
-                      ]
+                      "question": "물을 언제 줄까요?"
                     }
                     """))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.conversationId").value(conversationId.toString()))
         .andExpect(jsonPath("$.data.answer").value("물을 주기 전에 흙을 확인해 주세요."))
         .andExpect(jsonPath("$.data.recommendedActions[0]").value("겉흙 2cm를 확인하세요."))
         .andExpect(jsonPath("$.data.additionalChecks[0]").value("배수구를 확인하세요."));
@@ -83,7 +84,7 @@ class PlantChatControllerTest {
     ArgumentCaptor<PlantChatRequest> requestCaptor =
         ArgumentCaptor.forClass(PlantChatRequest.class);
     verify(plantChatService).chat(eq(7L), eq(21L), requestCaptor.capture());
-    assertThat(requestCaptor.getValue().recentMessages()).hasSize(2);
+    assertThat(requestCaptor.getValue().conversationId()).isNull();
   }
 
   @Test
@@ -101,19 +102,46 @@ class PlantChatControllerTest {
   }
 
   @Test
-  void rejectsMoreThanSixRecentMessagesAtHttpBoundary() throws Exception {
-    String messages =
-        java.util.stream.IntStream.range(0, 7)
-            .mapToObj(index -> "{\"role\":\"USER\",\"content\":\"질문\"}")
-            .collect(java.util.stream.Collectors.joining(","));
-
+  void passesConversationIdToService() throws Exception {
+    UUID conversationId = UUID.fromString("30a508b8-bffc-43c3-8dd0-539a2068500a");
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willReturn(
+            new PlantChatResponse(conversationId, "이어진 답변입니다.", List.of("관찰하세요."), List.of()));
     mockMvc
         .perform(
             post("/api/v1/ai/plant-profiles/21/chat")
                 .contentType(APPLICATION_JSON)
-                .content("{\"question\":\"질문\",\"recentMessages\":[" + messages + "]}"))
+                .content(
+                    """
+                    {
+                      "question": "조금 더 설명해 주세요.",
+                      "conversationId": "%s"
+                    }
+                    """
+                        .formatted(conversationId)))
+        .andExpect(status().isOk());
+
+    ArgumentCaptor<PlantChatRequest> requestCaptor =
+        ArgumentCaptor.forClass(PlantChatRequest.class);
+    verify(plantChatService).chat(eq(7L), eq(21L), requestCaptor.capture());
+    assertThat(requestCaptor.getValue().conversationId()).isEqualTo(conversationId);
+  }
+
+  @Test
+  void rejectsMalformedConversationIdAtHttpBoundary() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "question": "이전 답변을 이어서 설명해 주세요.",
+                      "conversationId": "위조된-대화-ID"
+                    }
+                    """))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
+        .andExpect(jsonPath("$.code").value("COMMON_MALFORMED_JSON"));
 
     verifyNoInteractions(plantChatService);
   }

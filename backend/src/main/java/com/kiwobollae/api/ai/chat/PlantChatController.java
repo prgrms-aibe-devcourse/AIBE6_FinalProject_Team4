@@ -26,7 +26,7 @@ public class PlantChatController {
 
   @Operation(
       summary = "식물 프로필별 AI 질문 답변",
-      description = "식물 종·프로필·최근 일지와 클라이언트가 전달한 최근 대화를 근거로 답변합니다. " + "대화 및 작성 중인 일지는 저장하지 않습니다.")
+      description = "식물 종·프로필·최근 일지와 서버의 임시 대화 세션을 근거로 답변합니다. 대화 세션은 DB에 저장하지 않으며 30분 후 만료됩니다.")
   @PostMapping("/{profileId}/chat")
   public ResponseEntity<ApiResponse<PlantChatResponse>> chat(
       @AuthenticationPrincipal Long userId,
