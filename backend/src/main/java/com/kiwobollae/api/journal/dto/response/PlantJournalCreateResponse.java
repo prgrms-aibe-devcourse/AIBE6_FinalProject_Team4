@@ -18,7 +18,11 @@ public record PlantJournalCreateResponse(
 			GachaRewardReservation gachaReservation
 	) {
 		return new PlantJournalCreateResponse(
-				PlantJournalResponse.from(journal, images, GachaRewardResponse.from(gachaReservation)),
+				PlantJournalResponse.from(
+						journal,
+						images,
+						GachaRewardResponse.from(gachaReservation, rewardGranted)
+				),
 				rewardGranted,
 				rewardAmount
 		);

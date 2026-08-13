@@ -4,6 +4,7 @@ import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.journal.dto.request.PlantJournalUpdateRequest;
 import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
+import com.kiwobollae.api.journal.dto.response.DailyJournalRewardStatusResponse;
 import com.kiwobollae.api.journal.service.PlantJournalService;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
@@ -76,6 +77,13 @@ public class JournalController {
 	@GetMapping("/written-today")
 	public ResponseEntity<ApiResponse<List<Long>>> getProfileIdsWrittenToday(@AuthenticationPrincipal Long userId) {
 		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getProfileIdsWrittenToday(userId)));
+	}
+
+	@Operation(summary = "오늘 일지 보상 상태", description = "계정이 오늘(KST) 일지 작성 보상을 받았는지 반환합니다.")
+	@GetMapping("/reward-status")
+	public ResponseEntity<ApiResponse<DailyJournalRewardStatusResponse>> getDailyRewardStatus(
+			@AuthenticationPrincipal Long userId) {
+		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getDailyRewardStatus(userId)));
 	}
 
 	@Operation(summary = "성장 일지 상세 조회", description = "본인 소유의 성장 일지 단건을 조회합니다.")

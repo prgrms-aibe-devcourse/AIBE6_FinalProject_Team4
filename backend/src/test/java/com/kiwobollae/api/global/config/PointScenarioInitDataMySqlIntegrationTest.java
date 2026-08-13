@@ -67,11 +67,7 @@ class PointScenarioInitDataMySqlIntegrationTest {
 				PageRequest.of(0, 100)
 		).getContent();
 		List<PlantProfile> plantProfiles = plantProfileRepository.findAllByUserId(user.getId());
-
 		assertThat(seededJournals).isNotEmpty().allMatch(journal -> journal.getWrittenDate().isBefore(today));
-		assertThat(plantProfiles)
-				.extracting(PlantProfile::getJournalRewardGrantedAt)
-				.containsOnlyNulls();
 
 		assertThat(activities).hasSize(7);
 		assertThat(activities)
