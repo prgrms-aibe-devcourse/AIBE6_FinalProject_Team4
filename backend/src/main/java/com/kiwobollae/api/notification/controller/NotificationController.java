@@ -15,7 +15,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -36,9 +35,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(ApiVersion.V1 + "/notifications")
 public class NotificationController {
 
-	// 클라이언트가 ?size=로 과도한 값을 보내 대량 조회를 유발하지 않도록 이 엔드포인트에서만 상한을 둔다.
-	private static final int MAX_PAGE_SIZE = 100;
-
 	private final NotificationService notificationService;
 
 	@Operation(summary = "알림 목록 조회", description = "최신순 페이지네이션. type으로 배송/커뮤니티/재화/공지 등을 필터링할 수 있고, 보관 기간이 지난 알림은 제외됩니다.")
@@ -50,15 +46,8 @@ public class NotificationController {
 			Pageable pageable
 	) {
 		return ResponseEntity.ok(ApiResponse.success(
-				notificationService.getNotifications(userId, type, boundPageSize(pageable))
+				notificationService.getNotifications(userId, type, pageable)
 		));
-	}
-
-	private Pageable boundPageSize(Pageable pageable) {
-		if (pageable.getPageSize() <= MAX_PAGE_SIZE) {
-			return pageable;
-		}
-		return PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort());
 	}
 
 	@Operation(summary = "미읽음 알림 수 조회", description = "헤더 배지 표시용으로 isRead=false 알림 개수를 반환합니다.")
