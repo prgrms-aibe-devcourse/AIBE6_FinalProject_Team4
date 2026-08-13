@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
-import { BoardCategory, BoardPostData, getBoardPosts } from '@/lib/board-api';
+import { BOARD_LIST_URL_KEY, BoardCategory, BoardPostData, getBoardPosts } from '@/lib/board-api';
 import { useStore } from '@/lib/store';
 
 const CATEGORY_LABEL: Record<BoardCategory, string> = {
@@ -88,7 +88,9 @@ function BoardPageContent() {
     if (tab !== 'ALL') params.set('category', tab);
     if (page > 0) params.set('page', String(page + 1));
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    const url = query ? `${pathname}?${query}` : pathname;
+    router.replace(url, { scroll: false });
+    if (typeof window !== 'undefined') window.sessionStorage.setItem(BOARD_LIST_URL_KEY, url);
   }, [tab, page, pathname, router]);
 
   useEffect(() => {

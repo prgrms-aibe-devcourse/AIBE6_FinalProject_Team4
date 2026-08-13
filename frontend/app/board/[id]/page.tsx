@@ -9,6 +9,7 @@ import { useUI } from '@/lib/ui';
 import { PlantJournalData } from '@/lib/journal-api';
 import { createReport } from '@/lib/report-api';
 import {
+  BOARD_LIST_URL_KEY,
   BoardCategory,
   BoardCommentData,
   BoardPostData,
@@ -47,6 +48,13 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
   const { state, hydrated } = useStore();
   const { showToast, askConfirm } = useUI();
   const postId = Number(params.id);
+
+  // 목록에서 보던 탭/페이지가 있으면 그대로 복귀하고, 새로고침 등으로 히스토리가 없으면
+  // 기본 목록으로 보낸다 — router.back()은 직접 진입 시 엉뚱한 페이지로 갈 수 있어 쓰지 않는다.
+  const goToBoardList = () => {
+    const lastListUrl = typeof window !== 'undefined' ? window.sessionStorage.getItem(BOARD_LIST_URL_KEY) : null;
+    router.push(lastListUrl || '/board');
+  };
 
   const [post, setPost] = useState<BoardPostData | null>(null);
   const [comments, setComments] = useState<BoardCommentData[]>([]);
@@ -464,7 +472,7 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
       <div className="container">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={() => goToBoardList()}
           className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark"
         >
           ← 목록으로
@@ -481,7 +489,7 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
     <div className="container">
       <button
         type="button"
-        onClick={() => router.back()}
+        onClick={() => goToBoardList()}
         className="cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-sm font-semibold text-sub hover:bg-brand-soft hover:text-brand-dark"
       >
         ← 목록으로

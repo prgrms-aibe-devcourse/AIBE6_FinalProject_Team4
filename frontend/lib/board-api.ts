@@ -1,6 +1,10 @@
 import { request, SpringPage } from '@/lib/api';
 import { PlantJournalData } from '@/lib/journal-api';
 
+// 게시글 상세의 "목록으로"가 router.back() 대신 이 값으로 돌아가, 새로고침/직접 진입으로
+// 히스토리가 없는 경우에도 방금 보던 탭·페이지 그대로 목록에 복귀할 수 있게 한다.
+export const BOARD_LIST_URL_KEY = 'kwb_board_list_url';
+
 export type BoardCategory = 'NOTICE' | 'FREE' | 'PLANT_QNA';
 export type BoardStatus = 'ACTIVE' | 'HIDDEN';
 
