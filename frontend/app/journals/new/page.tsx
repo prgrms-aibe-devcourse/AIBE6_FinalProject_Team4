@@ -186,7 +186,7 @@ function NewJournalInner() {
         <div className="max-w-[640px] rounded-[18px] bg-brand-soft p-6">
           <div className="text-[34px]">🌿</div>
           <div className="mt-2 text-lg font-extrabold text-ink">일지가 저장됐어요!</div>
-          <div className="mt-2 font-bold text-sub">오늘 보상은 이미 받았다면, 일지는 계속 기록할 수 있어요.</div>
+          <div className="mt-2 font-bold text-sub">오늘 보상을 이미 받았다면, 보너스 포인트는 추가 지급되지 않아요.</div>
           <div className="mt-[18px] flex flex-wrap gap-2.5">
             <Link href="/journals" className="rounded-[11px] bg-ink px-5 py-[11px] font-bold text-white hover:text-white">
               일지 목록으로
