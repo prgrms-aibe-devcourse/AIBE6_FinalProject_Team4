@@ -10,6 +10,7 @@ import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -62,13 +63,25 @@ public class BoardController {
 		return ResponseEntity.ok(ApiResponse.success(boardPostService.getPosts(category, pageable, userId)));
 	}
 
-	@Operation(summary = "게시글 상세 조회", description = "게시글 본문과 작성자 정보를 반환합니다.")
+	@Operation(summary = "게시글 상세 조회", description = "게시글 본문과 작성자 정보를 반환합니다. 조회수는 같은 IP당 1회만 증가합니다.")
 	@GetMapping("/{id}")
 	public ResponseEntity<ApiResponse<BoardPostResponse>> getPost(
 			@AuthenticationPrincipal Long userId,
-			@PathVariable Long id
+			@PathVariable Long id,
+			HttpServletRequest request
 	) {
-		return ResponseEntity.ok(ApiResponse.success(boardPostService.getPost(id, userId)));
+		return ResponseEntity.ok(ApiResponse.success(boardPostService.getPost(id, userId, resolveClientIp(request))));
+	}
+
+	// 프록시/로드밸런서를 거치면 X-Forwarded-For의 첫 번째 주소가 실제 클라이언트 IP다.
+	// RateLimitFilter의 동일 로직과 중복이지만, 필터는 컨트롤러에서 재사용할 수 있는 형태가
+	// 아니라 이 한 곳에서만 쓰는 지금은 그대로 각자 두고 필요해지면 공용 유틸로 뺀다.
+	private String resolveClientIp(HttpServletRequest request) {
+		String forwardedFor = request.getHeader("X-Forwarded-For");
+		if (forwardedFor != null && !forwardedFor.isBlank()) {
+			return forwardedFor.split(",")[0].trim();
+		}
+		return request.getRemoteAddr();
 	}
 
 	@Operation(

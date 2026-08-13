@@ -8,11 +8,13 @@ import com.kiwobollae.api.board.dto.request.BoardPostUpdateRequest;
 import com.kiwobollae.api.board.dto.response.BoardPostResponse;
 import com.kiwobollae.api.board.entity.BoardPost;
 import com.kiwobollae.api.board.entity.BoardPostLike;
+import com.kiwobollae.api.board.entity.BoardPostView;
 import com.kiwobollae.api.board.entity.enums.BoardCategory;
 import com.kiwobollae.api.board.entity.enums.BoardHiddenBy;
 import com.kiwobollae.api.board.entity.enums.BoardStatus;
 import com.kiwobollae.api.board.repository.BoardPostLikeRepository;
 import com.kiwobollae.api.board.repository.BoardPostRepository;
+import com.kiwobollae.api.board.repository.BoardPostViewRepository;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
 import com.kiwobollae.api.content.service.PlantJournalService;
@@ -38,6 +40,7 @@ public class BoardPostService {
 
 	private final BoardPostRepository boardPostRepository;
 	private final BoardPostLikeRepository boardPostLikeRepository;
+	private final BoardPostViewRepository boardPostViewRepository;
 	private final UserRepository userRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final PlantJournalService plantJournalService;
@@ -78,11 +81,28 @@ public class BoardPostService {
 	}
 
 	@Transactional
-	public BoardPostResponse getPost(Long id, Long userId) {
+	public BoardPostResponse getPost(Long id, Long userId, String viewerIp) {
 		BoardPost post = findActivePost(id);
-		post.incrementViewCount();
+		if (viewerIp != null && !viewerIp.isBlank()) {
+			recordViewOnce(post, viewerIp);
+		}
 		boolean likedByMe = userId != null && boardPostLikeRepository.existsByPostIdAndUserId(id, userId);
 		return BoardPostResponse.from(post, likedByMe);
+	}
+
+	// 같은 IP의 재조회는 조회수를 올리지 않는다. existsBy 사전 체크와 저장 사이의 동시성 경쟁으로
+	// 유니크 제약이 위반돼도(동시에 첫 조회가 들어온 경우) 조용히 무시하고 넘어간다 — 좋아요와
+	// 달리 실패를 사용자에게 보여줄 필요가 없는 부가 지표다.
+	private void recordViewOnce(BoardPost post, String viewerIp) {
+		if (boardPostViewRepository.existsByPostIdAndIpAddress(post.getId(), viewerIp)) {
+			return;
+		}
+		try {
+			boardPostViewRepository.saveAndFlush(BoardPostView.create(post, viewerIp, LocalDateTime.now(KST)));
+		} catch (DataIntegrityViolationException e) {
+			return;
+		}
+		post.incrementViewCount();
 	}
 
 	public Page<BoardPostResponse> getMyPosts(Long userId, Pageable pageable) {

@@ -24,6 +24,7 @@ import com.kiwobollae.api.board.entity.enums.BoardHiddenBy;
 import com.kiwobollae.api.board.entity.enums.BoardStatus;
 import com.kiwobollae.api.board.repository.BoardPostLikeRepository;
 import com.kiwobollae.api.board.repository.BoardPostRepository;
+import com.kiwobollae.api.board.repository.BoardPostViewRepository;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.content.entity.PlantJournal;
 import com.kiwobollae.api.content.repository.PlantJournalRepository;
@@ -47,6 +48,7 @@ class BoardPostServiceTest {
 
 	@Mock private BoardPostRepository boardPostRepository;
 	@Mock private BoardPostLikeRepository boardPostLikeRepository;
+	@Mock private BoardPostViewRepository boardPostViewRepository;
 	@Mock private UserRepository userRepository;
 	@Mock private PlantJournalRepository plantJournalRepository;
 	@Mock private PlantJournalService plantJournalService;
@@ -186,12 +188,25 @@ class BoardPostServiceTest {
 		User user = mockUser(1L, UserRole.USER);
 		BoardPost post = mockPost(10L, user, BoardStatus.ACTIVE);
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
+		given(boardPostViewRepository.existsByPostIdAndIpAddress(10L, "1.2.3.4")).willReturn(false);
 
-		BoardPostResponse response = boardPostService.getPost(10L, null);
+		BoardPostResponse response = boardPostService.getPost(10L, null, "1.2.3.4");
 
 		assertThat(response.id()).isEqualTo(10L);
 		assertThat(response.likedByMe()).isFalse();
 		verify(post).incrementViewCount();
+	}
+
+	@Test
+	void getPostDoesNotIncrementViewCountForRepeatIp() {
+		User user = mockUser(1L, UserRole.USER);
+		BoardPost post = mockPost(10L, user, BoardStatus.ACTIVE);
+		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
+		given(boardPostViewRepository.existsByPostIdAndIpAddress(10L, "1.2.3.4")).willReturn(true);
+
+		boardPostService.getPost(10L, null, "1.2.3.4");
+
+		verify(post, never()).incrementViewCount();
 	}
 
 	@Test
@@ -200,8 +215,9 @@ class BoardPostServiceTest {
 		BoardPost post = mockPost(10L, user, BoardStatus.ACTIVE);
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
 		given(boardPostLikeRepository.existsByPostIdAndUserId(10L, 2L)).willReturn(true);
+		given(boardPostViewRepository.existsByPostIdAndIpAddress(10L, "1.2.3.4")).willReturn(false);
 
-		BoardPostResponse response = boardPostService.getPost(10L, 2L);
+		BoardPostResponse response = boardPostService.getPost(10L, 2L, "1.2.3.4");
 
 		assertThat(response.likedByMe()).isTrue();
 	}
@@ -212,7 +228,7 @@ class BoardPostServiceTest {
 		BoardPost post = mockPost(10L, user, BoardStatus.HIDDEN);
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
 
-		assertThatThrownBy(() -> boardPostService.getPost(10L, null))
+		assertThatThrownBy(() -> boardPostService.getPost(10L, null, "1.2.3.4"))
 				.isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_POST_NOT_FOUND);
@@ -223,7 +239,7 @@ class BoardPostServiceTest {
 	void getPostFailsWhenNotFound() {
 		given(boardPostRepository.findByIdWithUser(404L)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> boardPostService.getPost(404L, null))
+		assertThatThrownBy(() -> boardPostService.getPost(404L, null, "1.2.3.4"))
 				.isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_POST_NOT_FOUND);
