@@ -31,6 +31,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	private final ObjectMapper objectMapper;
 	private final int maxRequestsPerWindow;
 	private final Predicate<HttpServletRequest> requestMatcher;
+	// null이면 기존처럼 요청 URI 그대로를 버킷 키로 쓴다. 경로 변수가 있는 엔드포인트
+	// (예: /board/posts/{id}/comments)는 URI 그대로 쓰면 id별로 버킷이 갈라져 여러 글에
+	// 나눠 스팸을 뿌리면 각각 새 예산으로 통과해버린다 — 그런 엔드포인트는 고정된 이름을
+	// 줘서 같은 사용자의 모든 요청이 하나의 버킷을 공유하게 한다.
+	private final String bucketName;
 	private final ConcurrentHashMap<String, Window> windowsByClient = new ConcurrentHashMap<>();
 
 	public RateLimitFilter(ObjectMapper objectMapper, int maxRequestsPerWindow) {
@@ -41,9 +46,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
 	// 지원하지 않는다. 이런 엔드포인트는 넓은 prefix 패턴으로 등록하고, 실제로 제한을 적용할
 	// 요청인지는 이 predicate로 걸러낸다(그 외 요청은 그대로 통과).
 	public RateLimitFilter(ObjectMapper objectMapper, int maxRequestsPerWindow, Predicate<HttpServletRequest> requestMatcher) {
+		this(objectMapper, maxRequestsPerWindow, requestMatcher, null);
+	}
+
+	public RateLimitFilter(
+			ObjectMapper objectMapper, int maxRequestsPerWindow,
+			Predicate<HttpServletRequest> requestMatcher, String bucketName) {
 		this.objectMapper = objectMapper;
 		this.maxRequestsPerWindow = maxRequestsPerWindow;
 		this.requestMatcher = requestMatcher;
+		this.bucketName = bucketName;
 	}
 
 	@Override
@@ -54,7 +66,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 			return;
 		}
 
-		String clientKey = resolveClientKey(request) + "|" + request.getRequestURI();
+		String clientKey = resolveClientKey(request) + "|" + (bucketName != null ? bucketName : request.getRequestURI());
 		Window window = windowsByClient.computeIfAbsent(clientKey, key -> new Window());
 
 		if (window.tryConsume(maxRequestsPerWindow)) {
