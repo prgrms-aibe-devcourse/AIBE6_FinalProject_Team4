@@ -125,6 +125,14 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(cardPurchase.paidAmount()).isEqualTo(-160L);
 		assertThat(journalRewards).allSatisfy(reward ->
 				assertThat(reward.createdAt()).isAfter(cardPurchase.createdAt()));
+		PointActivityResponse finalBonusGrant = activities.stream()
+				.filter(activity -> activity.type() == PointTxType.ADMIN_ADJUST
+						&& activity.amount() == 200L
+						&& activity.freeAmount() == 200L)
+				.findFirst()
+				.orElseThrow();
+		assertThat(journalRewards).allSatisfy(reward ->
+				assertThat(reward.createdAt()).isAfter(finalBonusGrant.createdAt()));
 
 		OrderResponse cancelledOrder = orderService.getOrders(user.getId(), PageRequest.of(0, 20)).stream()
 				.filter(order -> order.status() == OrderStatus.CANCELLED)
