@@ -1,34 +1,17 @@
 package com.kiwobollae.api.journal.service;
 
+import com.kiwobollae.api.global.common.ApiVersion;
+import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.global.storage.AbstractS3ImageUploadService;
 import com.kiwobollae.api.journal.controller.JournalImageUploadController;
 import com.kiwobollae.api.journal.dto.response.JournalImageUploadResponse;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.global.common.ApiVersion;
-import com.kiwobollae.api.global.exception.BusinessException;
-import com.kiwobollae.api.global.exception.ErrorCode;
-import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.Set;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import software.amazon.awssdk.core.ResponseInputStream;
-import software.amazon.awssdk.core.exception.SdkException;
-import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
  * 버킷은 private이라 이미지를 raw S3 URL로 직접 서빙하지 않는다. 업로드 시 객체를 S3에
@@ -40,54 +23,33 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
  * 요청 scheme/host/port를 그대로 박아넣으면 JournalImage row에 영구히 저장돼버려서, 한 환경에서는
  * 문제없지만 앱이 다른 호스트로 옮겨가는 순간(로컬 개발 → 실제 배포 등) 깨지고 데이터 마이그레이션이
  * 필요해진다. 호출부(프론트엔드)가 렌더링 시점에 자신의 환경에 맞는 base URL을 앞에 붙인다.
+ *
+ * <p>업로드/서빙/삭제의 S3 공통 로직은 {@link AbstractS3ImageUploadService}에 있고, 이 클래스는
+ * "journals" 접두사와 일지 도메인 고유의 삭제 참조 규칙만 담당한다.
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class JournalImageUploadService {
+public class JournalImageUploadService extends AbstractS3ImageUploadService {
 
-	private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
-	private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".webp");
 	// upload()이 만드는 서빙 URL의 경로 부분 — 저장된 imageUrl에서 S3 key(journals/{userId}/{filename})를
 	// 되짚어내는 데 쓴다.
 	private static final String SERVE_PATH_MARKER = ApiVersion.V1 + "/journals/images/";
 
-	private final S3Client s3Client;
 	private final JournalImageRepository journalImageRepository;
 	private final PlantProfileRepository plantProfileRepository;
 
-	@Value("${aws.s3.bucket}")
-	private String bucket;
+	public JournalImageUploadService(
+			S3Client s3Client,
+			JournalImageRepository journalImageRepository,
+			PlantProfileRepository plantProfileRepository) {
+		super(s3Client, "journals", SERVE_PATH_MARKER, ErrorCode.JOURNAL_IMAGE_INVALID_TYPE, ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
+		this.journalImageRepository = journalImageRepository;
+		this.plantProfileRepository = plantProfileRepository;
+	}
 
 	public JournalImageUploadResponse upload(MultipartFile file, Long userId) {
-		if (file.isEmpty() || !ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_INVALID_TYPE);
-		}
-
-		byte[] content = readBytes(file);
-		String extension = extensionOf(file);
-		if (!ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_INVALID_TYPE);
-		}
-
-		String hash = sha256Hex(content);
-		String filename = UUID.randomUUID() + extension;
-		String key = objectKey(userId, filename);
-
-		try {
-			s3Client.putObject(
-					PutObjectRequest.builder()
-							.bucket(bucket)
-							.key(key)
-							.contentType(file.getContentType())
-							.build(),
-					RequestBody.fromBytes(content));
-		} catch (SdkException e) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
-		}
-
-		String url = SERVE_PATH_MARKER + userId + "/" + filename;
-		return new JournalImageUploadResponse(url, hash);
+		UploadResult result = doUpload(file, userId);
+		return new JournalImageUploadResponse(result.url(), result.hash());
 	}
 
 	/**
@@ -123,89 +85,16 @@ public class JournalImageUploadService {
 			log.warn("Refused to delete journal image still referenced as a plant thumbnail: {}", key);
 			return;
 		}
-		try {
-			s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
-		} catch (SdkException e) {
-			log.warn("Failed to delete orphaned journal image from S3: {}", key, e);
-		}
-	}
-
-	private String keyFromUrl(String imageUrl) {
-		int idx = imageUrl.indexOf(SERVE_PATH_MARKER);
-		if (idx < 0) {
-			return null;
-		}
-		return "journals/" + imageUrl.substring(idx + SERVE_PATH_MARKER.length());
-	}
-
-	// key 형태는 항상 "journals/{userId}/{filename}" — 두 번째 세그먼트가 소유자다.
-	private boolean isOwnedBy(String key, Long ownerUserId) {
-		String[] parts = key.split("/");
-		return parts.length == 3 && parts[1].equals(String.valueOf(ownerUserId));
+		deleteObject(key);
 	}
 
 	public ResponseEntity<byte[]> download(Long userId, String filename) {
-		String key = objectKey(userId, filename);
-		try (ResponseInputStream<GetObjectResponse> object = s3Client.getObject(
-				GetObjectRequest.builder().bucket(bucket).key(key).build())) {
-			byte[] bytes = object.readAllBytes();
-			String contentType = object.response().contentType();
-			// 파일명은 upload()가 부여한 UUID라 객체 내용이 불변이므로 무기한 캐시해도 안전하다.
-			// nosniff + inline은 API와 같은 오리진에서 서빙되는 사용자 업로드 바이트의 콘텐츠 스니핑 경로를 막는다.
-			return ResponseEntity.ok()
-					.contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
-					.header("X-Content-Type-Options", "nosniff")
-					.header("Content-Disposition", "inline")
-					.header("Cache-Control", "private, max-age=31536000, immutable")
-					.body(bytes);
-		} catch (NoSuchKeyException e) {
-			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
-		} catch (SdkException | IOException e) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
-		}
+		return super.download(userId, filename);
 	}
 
 	// 타임랩스 워커가 대표이미지를 인코딩용으로 내려받을 때 쓰는 내부 전용 메서드.
 	// download(userId, filename)과 달리 HTTP 응답 형태가 아니라 순수 바이트만 반환한다.
 	public byte[] downloadBytes(String imageUrl) {
-		String key = keyFromUrl(imageUrl);
-		if (key == null) {
-			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
-		}
-		try (ResponseInputStream<GetObjectResponse> object = s3Client.getObject(
-				GetObjectRequest.builder().bucket(bucket).key(key).build())) {
-			return object.readAllBytes();
-		} catch (NoSuchKeyException e) {
-			throw new BusinessException(ErrorCode.COMMON_RESOURCE_NOT_FOUND);
-		} catch (SdkException | IOException e) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
-		}
-	}
-
-	private String objectKey(Long userId, String filename) {
-		return "journals/" + userId + "/" + filename;
-	}
-
-	private byte[] readBytes(MultipartFile file) {
-		try {
-			return file.getBytes();
-		} catch (IOException e) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
-		}
-	}
-
-	private String extensionOf(MultipartFile file) {
-		String original = file.getOriginalFilename();
-		int dot = original == null ? -1 : original.lastIndexOf('.');
-		return dot >= 0 ? original.substring(dot) : "";
-	}
-
-	private String sha256Hex(byte[] content) {
-		try {
-			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			return HexFormat.of().formatHex(digest.digest(content));
-		} catch (NoSuchAlgorithmException e) {
-			throw new BusinessException(ErrorCode.JOURNAL_IMAGE_UPLOAD_FAILED);
-		}
+		return super.downloadBytes(imageUrl);
 	}
 }
