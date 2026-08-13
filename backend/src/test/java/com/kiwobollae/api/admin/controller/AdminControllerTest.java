@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kiwobollae.api.admin.service.ExchangeManagementService;
 import com.kiwobollae.api.admin.service.OrderManagementService;
 import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
+import com.kiwobollae.api.board.service.BoardCommentService;
+import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
@@ -41,6 +43,8 @@ class AdminControllerTest {
 	@Mock private ExchangeManagementService exchangeManagementService;
 	@Mock private OrderManagementService orderManagementService;
 	@Mock private PlantSpeciesManagementService plantSpeciesManagementService;
+	@Mock private BoardPostService boardPostService;
+	@Mock private BoardCommentService boardCommentService;
 
 	private MockMvc mockMvc;
 	private final ObjectMapper objectMapper = new ObjectMapper();
@@ -48,7 +52,8 @@ class AdminControllerTest {
 	@BeforeEach
 	void setUp() {
 		AdminController adminController = new AdminController(
-				exchangeManagementService, orderManagementService, plantSpeciesManagementService);
+				exchangeManagementService, orderManagementService, plantSpeciesManagementService,
+				boardPostService, boardCommentService);
 		mockMvc = MockMvcBuilders.standaloneSetup(adminController)
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())

@@ -22,6 +22,7 @@ import {
   likeBoardPost,
   unlikeBoardComment,
   unlikeBoardPost,
+  updateBoardComment,
 } from '@/lib/board-api';
 
 const CATEGORY_LABEL: Record<BoardCategory, string> = {
@@ -62,6 +63,8 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
   const [commentDraft, setCommentDraft] = useState('');
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
+  const [editingComment, setEditingComment] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState('');
   const [reportingComment, setReportingComment] = useState<number | null>(null);
   const [reportingPost, setReportingPost] = useState(false);
 
@@ -209,6 +212,31 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
     }
   };
 
+  const startEdit = (comment: BoardCommentData) => {
+    setEditingComment(comment.id);
+    setEditDraft(comment.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingComment(null);
+    setEditDraft('');
+  };
+
+  const submitEdit = async (commentId: number) => {
+    if (!editDraft.trim()) return;
+    if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
+    try {
+      const updated = await updateBoardComment(commentId, editDraft.trim(), state.accessToken);
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+      cancelEdit();
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '댓글 수정에 실패했어요.',
+        'err',
+      );
+    }
+  };
+
   const removeComment = (comment: BoardCommentData) => {
     if (!state.accessToken) return;
     const accessToken = state.accessToken;
@@ -311,7 +339,33 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
               )}
               <span className="text-xs text-faint">{formatDate(comment.createdAt)}</span>
             </div>
-            <p className="mt-1 whitespace-pre-wrap text-[14.5px] leading-[1.6] text-ink">{comment.content}</p>
+            {editingComment === comment.id ? (
+              <div className="mt-2 flex gap-2">
+                <input
+                  autoFocus
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitEdit(comment.id)}
+                  className="flex-1 rounded-[10px] border-[1.5px] border-line px-3 py-2 text-[13.5px] outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => submitEdit(comment.id)}
+                  className="shrink-0 cursor-pointer rounded-[10px] bg-brand px-4 py-2 text-[13px] font-bold text-white"
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="shrink-0 cursor-pointer rounded-[10px] border-[1.5px] border-line bg-white px-3 py-2 text-[13px] font-bold text-sub"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <p className="mt-1 whitespace-pre-wrap text-[14.5px] leading-[1.6] text-ink">{comment.content}</p>
+            )}
             <div className="mt-1.5 flex items-center gap-3">
               <button
                 type="button"
@@ -324,13 +378,22 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
                 답글 달기
               </button>
               {isMine ? (
-                <button
-                  type="button"
-                  onClick={() => removeComment(comment)}
-                  className="cursor-pointer text-xs font-bold text-faint hover:text-[#b5502f]"
-                >
-                  삭제
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(comment)}
+                    className="cursor-pointer text-xs font-bold text-faint hover:text-brand-dark"
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeComment(comment)}
+                    className="cursor-pointer text-xs font-bold text-faint hover:text-[#b5502f]"
+                  >
+                    삭제
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"

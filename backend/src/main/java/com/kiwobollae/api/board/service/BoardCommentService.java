@@ -3,6 +3,7 @@ package com.kiwobollae.api.board.service;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.board.dto.request.BoardCommentCreateRequest;
+import com.kiwobollae.api.board.dto.request.BoardCommentUpdateRequest;
 import com.kiwobollae.api.board.dto.response.BoardCommentResponse;
 import com.kiwobollae.api.board.entity.BoardComment;
 import com.kiwobollae.api.board.entity.BoardCommentLike;
@@ -112,11 +113,15 @@ public class BoardCommentService {
 	}
 
 	@Transactional
+	public BoardCommentResponse updateComment(Long userId, Long commentId, BoardCommentUpdateRequest request) {
+		BoardComment comment = findOwnedActiveComment(userId, commentId);
+		comment.updateContent(request.content());
+		return BoardCommentResponse.from(comment);
+	}
+
+	@Transactional
 	public void deleteComment(Long userId, Long commentId) {
-		BoardComment comment = findActiveComment(commentId);
-		if (!comment.getUser().getId().equals(userId)) {
-			throw new BusinessException(ErrorCode.BOARD_COMMENT_NOT_OWNED);
-		}
+		BoardComment comment = findOwnedActiveComment(userId, commentId);
 		comment.hide(BoardHiddenBy.AUTHOR, LocalDateTime.now(KST));
 		comment.getPost().decrementCommentCount();
 	}
@@ -151,6 +156,14 @@ public class BoardCommentService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.BOARD_LIKE_NOT_FOUND));
 		boardCommentLikeRepository.delete(like);
 		boardCommentRepository.getReferenceById(commentId).decrementLikeCount();
+	}
+
+	private BoardComment findOwnedActiveComment(Long userId, Long commentId) {
+		BoardComment comment = findActiveComment(commentId);
+		if (!comment.getUser().getId().equals(userId)) {
+			throw new BusinessException(ErrorCode.BOARD_COMMENT_NOT_OWNED);
+		}
+		return comment;
 	}
 
 	private BoardComment findActiveComment(Long commentId) {

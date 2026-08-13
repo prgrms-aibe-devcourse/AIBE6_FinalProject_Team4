@@ -73,6 +73,10 @@ public class BoardComment extends BaseTimeEntity {
 				.build();
 	}
 
+	public void updateContent(String content) {
+		this.content = content;
+	}
+
 	public void hide(BoardHiddenBy hiddenBy, LocalDateTime hiddenAt) {
 		this.status = BoardStatus.HIDDEN;
 		this.hiddenBy = hiddenBy;

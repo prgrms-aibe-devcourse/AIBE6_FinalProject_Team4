@@ -137,6 +137,18 @@ export function createBoardComment(
   });
 }
 
+export function updateBoardComment(
+  id: number,
+  content: string,
+  accessToken: string,
+): Promise<BoardCommentData> {
+  return request<BoardCommentData>(`/api/v1/board/comments/${id}`, {
+    method: 'PATCH',
+    accessToken,
+    body: JSON.stringify({ content }),
+  });
+}
+
 export function deleteBoardComment(id: number, accessToken: string): Promise<void> {
   return request<void>(`/api/v1/board/comments/${id}`, { method: 'DELETE', accessToken });
 }
