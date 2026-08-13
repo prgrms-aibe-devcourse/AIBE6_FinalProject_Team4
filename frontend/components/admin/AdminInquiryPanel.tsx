@@ -9,7 +9,7 @@ import {
   InquiryStatus,
 } from "@/lib/inquiry-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const CAT: Record<InquiryCategory, string> = {
   PAYMENT: "결제",
@@ -52,13 +52,21 @@ export default function AdminInquiryPanel({
   const [answerContent, setAnswerContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // load()는 useEffect(page 변경 시 자동 취소)뿐 아니라 submitAnswer 성공 후에도 signal 없이
+  // 직접 호출된다 — 그 사이 사용자가 페이지를 옮기면 먼저 보낸 요청이 나중에 응답할 수 있다.
+  // requestId로 "가장 최근에 보낸 요청의 응답인지"를 확인해, 뒤처진 응답이 최신 state를 덮어쓰거나
+  // (예: 이미 정상인 다른 페이지에서) totalPages 보정을 잘못 트리거하지 않도록 막는다.
+  const requestIdRef = useRef(0);
+
   const load = useCallback(
     (signal?: AbortSignal) => {
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setErrorMessage("");
 
       return getInquiriesForAdmin(accessToken, status || undefined, page, 20, signal)
         .then((result) => {
+          if (requestIdRef.current !== requestId) return;
           // 답변 등록으로 필터 조건을 벗어난 항목이 빠지면서 마지막 페이지가 사라질 수 있다 —
           // 그 경우 빈 결과를 그대로 보여주는 대신 이전 페이지로 물러나 다시 불러온다.
           if (result.content.length === 0 && page > 0 && result.totalElements > 0) {
@@ -75,6 +83,7 @@ export default function AdminInquiryPanel({
             requestError.name === "AbortError"
           )
             return;
+          if (requestIdRef.current !== requestId) return;
           setInquiries([]);
           setErrorMessage(
             requestError instanceof ApiError
@@ -83,7 +92,7 @@ export default function AdminInquiryPanel({
           );
         })
         .finally(() => {
-          if (!signal?.aborted) setLoading(false);
+          if (requestIdRef.current === requestId) setLoading(false);
         });
     },
     [accessToken, page, status],
