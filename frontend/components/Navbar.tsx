@@ -56,6 +56,15 @@ const BOTTOM_MORE = [
   { key: 'account', label: '마이페이지', icon: 'person', href: '/my' },
 ];
 
+// 이 페이지들은 비로그인 상태로 들어가면 빈 화면/깨진 마이페이지가 그냥 보인다(각 페이지가
+// 자체 로그인 안내를 렌더링하지 않음). router.push로 조용히 /auth로 보내는 대신, 클릭한
+// 시점에 모달로 먼저 안내해서 왜 로그인해야 하는지 알려준다.
+const AUTH_REQUIRED_KEYS = new Set(['plants', 'account']);
+const AUTH_GATE_MESSAGE: Record<string, string> = {
+  plants: '내 식물 관리는 로그인 후 이용할 수 있어요.',
+  account: '마이페이지는 로그인 후 이용할 수 있어요.',
+};
+
 function activeKey(pathname: string) {
   if (pathname === '/') return 'home';
   if (pathname.startsWith('/plants')) return 'plants';
@@ -87,6 +96,7 @@ export default function Navbar() {
   >(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [authGateKey, setAuthGateKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bellOpen && !profileOpen) return;
@@ -102,6 +112,20 @@ export default function Navbar() {
     setBellOpen(false);
     void markNotifRead(n.id);
     if (n.linkUrl) router.push(n.linkUrl);
+  };
+
+  // 로그인이 필요한 링크를 비로그인 상태에서 클릭하면 바로 이동시키지 않고 안내 모달을 띄운다.
+  // 로그인 상태거나 보호 대상이 아닌 링크는 그대로 통과시켜 일반 <Link> 내비게이션을 유지한다.
+  const guardNavClick = (e: React.MouseEvent, key: string) => {
+    if (state.authed || !AUTH_REQUIRED_KEYS.has(key)) return;
+    e.preventDefault();
+    setMoreOpen(false);
+    setAuthGateKey(key);
+  };
+
+  const goToLoginFromGate = () => {
+    setAuthGateKey(null);
+    router.push('/auth');
   };
 
   const doLogout = () => {
@@ -148,6 +172,7 @@ export default function Navbar() {
               <Link
                 key={n.key}
                 href={n.href}
+                onClick={(e) => guardNavClick(e, n.key)}
                 className={`whitespace-nowrap rounded-[10px] px-3 py-2 text-[15px] font-bold transition-colors duration-150 ${
                   active === n.key
                     ? 'bg-brand text-white hover:bg-brand-dark hover:text-white'
@@ -349,7 +374,10 @@ export default function Navbar() {
               <Link
                 key={b.key}
                 href={b.href}
-                onClick={() => setMoreOpen(false)}
+                onClick={(e) => {
+                  guardNavClick(e, b.key);
+                  setMoreOpen(false);
+                }}
                 className={`flex flex-1 flex-col items-center justify-center gap-[3px] ${
                   mobileActive === b.key ? 'text-brand hover:text-brand' : 'text-[#9aa691] hover:text-[#9aa691]'
                 }`}
@@ -390,22 +418,53 @@ export default function Navbar() {
               </button>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {BOTTOM_MORE.map((b) => {
-                const href = b.key === 'account' && !state.authed ? '/auth' : b.href;
-                return (
-                  <Link
-                    key={b.key}
-                    href={href}
-                    onClick={() => setMoreOpen(false)}
-                    className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F8FAF3] py-4 ${
-                      active === b.key ? 'text-brand' : 'text-[#5b6a54]'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-2xl">{b.icon}</span>
-                    <span className="text-[12px] font-bold">{b.label}</span>
-                  </Link>
-                );
-              })}
+              {BOTTOM_MORE.map((b) => (
+                <Link
+                  key={b.key}
+                  href={b.href}
+                  onClick={(e) => {
+                    guardNavClick(e, b.key);
+                    setMoreOpen(false);
+                  }}
+                  className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F8FAF3] py-4 ${
+                    active === b.key ? 'text-brand' : 'text-[#5b6a54]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-2xl">{b.icon}</span>
+                  <span className="text-[12px] font-bold">{b.label}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {authGateKey && (
+        <div
+          onClick={() => setAuthGateKey(null)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[360px] animate-pop rounded-[20px] bg-white p-6 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand-dark">
+              <span className="material-symbols-outlined text-2xl">lock</span>
+            </div>
+            <h3 className="mb-1.5 text-[17px] font-extrabold">로그인이 필요한 페이지예요</h3>
+            <p className="mb-5 text-[13.5px] text-sub">{AUTH_GATE_MESSAGE[authGateKey]}</p>
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setAuthGateKey(null)}
+                className="flex-1 cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white py-[11px] font-bold text-sub"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={goToLoginFromGate}
+                className="flex-1 cursor-pointer rounded-[11px] bg-brand py-[11px] font-bold text-white"
+              >
+                로그인하러 가기
+              </button>
             </div>
           </div>
         </div>
