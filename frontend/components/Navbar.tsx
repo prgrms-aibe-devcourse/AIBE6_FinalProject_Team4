@@ -405,7 +405,7 @@ export default function Navbar() {
       {moreOpen && (
         <div
           onClick={() => setMoreOpen(false)}
-          className="fixed inset-0 z-[46] bg-[rgba(46,54,42,.4)] md:hidden"
+          className="fixed inset-0 z-[46] md:hidden"
         >
           <div
             onClick={(e) => e.stopPropagation()}
