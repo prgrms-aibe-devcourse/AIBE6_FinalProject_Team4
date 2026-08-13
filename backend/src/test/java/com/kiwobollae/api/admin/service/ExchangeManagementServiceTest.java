@@ -3,7 +3,6 @@ package com.kiwobollae.api.admin.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
@@ -19,8 +18,7 @@ import com.kiwobollae.api.commerce.entity.ExchangeProduct;
 import com.kiwobollae.api.commerce.entity.enums.CancelledBy;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.commerce.repository.ExchangeOrderRepository;
-import com.kiwobollae.api.commerce.repository.ExchangeProductRepository;
-import com.kiwobollae.api.commerce.repository.UserCardRepository;
+import com.kiwobollae.api.commerce.service.ExchangeRefundService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -40,8 +38,7 @@ import org.springframework.data.domain.Pageable;
 class ExchangeManagementServiceTest {
 
 	@Mock private ExchangeOrderRepository exchangeOrderRepository;
-	@Mock private ExchangeProductRepository exchangeProductRepository;
-	@Mock private UserCardRepository userCardRepository;
+	@Mock private ExchangeRefundService exchangeRefundService;
 	@InjectMocks private ExchangeManagementService exchangeManagementService;
 
 	private ExchangeOrder mockOrder(Long id, ExchangeStatus status, Long userId, Long cardId,
@@ -163,8 +160,7 @@ class ExchangeManagementServiceTest {
 		ExchangeOrderResponse response = exchangeManagementService.adminCancelExchange(50L, "품절");
 
 		assertThat(response.status()).isEqualTo(ExchangeStatus.CANCELLED);
-		verify(userCardRepository).incrementCount(7L, 1L, 3);
-		verify(exchangeProductRepository).incrementStock(10L);
+		verify(exchangeRefundService).refund(refreshed);
 	}
 
 	@Test
@@ -177,6 +173,6 @@ class ExchangeManagementServiceTest {
 		assertThatThrownBy(() -> exchangeManagementService.adminCancelExchange(50L, "품절"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_NOT_FOUND));
-		verify(userCardRepository, never()).incrementCount(anyLong(), anyLong(), any());
+		verify(exchangeRefundService, never()).refund(any());
 	}
 }

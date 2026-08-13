@@ -5,8 +5,7 @@ import com.kiwobollae.api.commerce.entity.ExchangeOrder;
 import com.kiwobollae.api.commerce.entity.enums.CancelledBy;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.commerce.repository.ExchangeOrderRepository;
-import com.kiwobollae.api.commerce.repository.ExchangeProductRepository;
-import com.kiwobollae.api.commerce.repository.UserCardRepository;
+import com.kiwobollae.api.commerce.service.ExchangeRefundService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -24,8 +23,7 @@ public class ExchangeManagementService {
 	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
 	private final ExchangeOrderRepository exchangeOrderRepository;
-	private final ExchangeProductRepository exchangeProductRepository;
-	private final UserCardRepository userCardRepository;
+	private final ExchangeRefundService exchangeRefundService;
 
 	@Transactional(readOnly = true)
 	public Page<ExchangeOrderResponse> getExchangesForAdmin(ExchangeStatus status, Pageable pageable) {
@@ -70,7 +68,7 @@ public class ExchangeManagementService {
 
 		ExchangeOrder exchangeOrder = findExchangeForAdmin(id);
 		ExchangeOrderResponse response = ExchangeOrderResponse.from(exchangeOrder);
-		refund(exchangeOrder);
+		exchangeRefundService.refund(exchangeOrder);
 		return response;
 	}
 
@@ -92,15 +90,5 @@ public class ExchangeManagementService {
 			throw new BusinessException(ErrorCode.EXCHANGE_NOT_FOUND);
 		}
 		throw new BusinessException(ErrorCode.EXCHANGE_INVALID_STATE);
-	}
-
-	private void refund(ExchangeOrder exchangeOrder) {
-		Long userId = exchangeOrder.getUser().getId();
-		Long cardId = exchangeOrder.getCard().getId();
-		Long exchangeProductId = exchangeOrder.getExchangeProduct().getId();
-		Integer usedCardCount = exchangeOrder.getUsedCardCount();
-
-		userCardRepository.incrementCount(userId, cardId, usedCardCount);
-		exchangeProductRepository.incrementStock(exchangeProductId);
 	}
 }

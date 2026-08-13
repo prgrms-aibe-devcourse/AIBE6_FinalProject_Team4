@@ -47,6 +47,7 @@ class ExchangeServiceTest {
 	@Mock private CardRepository cardRepository;
 	@Mock private UserCardRepository userCardRepository;
 	@Mock private UserRepository userRepository;
+	@Mock private ExchangeRefundService exchangeRefundService;
 	@InjectMocks private ExchangeService exchangeService;
 
 	private static final ExchangeOrderRequest REQUEST =
@@ -226,8 +227,7 @@ class ExchangeServiceTest {
 
 		exchangeService.cancelExchange(7L, 50L, "단순 변심");
 
-		verify(userCardRepository).incrementCount(7L, 1L, 3);
-		verify(exchangeProductRepository).incrementStock(10L);
+		verify(exchangeRefundService).refund(order);
 	}
 
 	@Test
@@ -251,7 +251,7 @@ class ExchangeServiceTest {
 		assertThatThrownBy(() -> exchangeService.cancelExchange(7L, 50L, "단순 변심"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_INVALID_STATE));
-		verify(userCardRepository, never()).incrementCount(anyLong(), anyLong(), any());
+		verify(exchangeRefundService, never()).refund(any());
 	}
 
 }

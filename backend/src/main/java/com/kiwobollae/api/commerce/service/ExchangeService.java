@@ -35,6 +35,7 @@ public class ExchangeService {
 	private final CardRepository cardRepository;
 	private final UserCardRepository userCardRepository;
 	private final UserRepository userRepository;
+	private final ExchangeRefundService exchangeRefundService;
 
 	@Transactional(isolation = Isolation.REPEATABLE_READ)
 	public ExchangeOrderResponse requestExchange(Long userId, ExchangeOrderRequest request) {
@@ -106,16 +107,6 @@ public class ExchangeService {
 			throw new BusinessException(ErrorCode.EXCHANGE_INVALID_STATE);
 		}
 
-		refund(exchangeOrder);
-	}
-
-	private void refund(ExchangeOrder exchangeOrder) {
-		Long userId = exchangeOrder.getUser().getId();
-		Long cardId = exchangeOrder.getCard().getId();
-		Long exchangeProductId = exchangeOrder.getExchangeProduct().getId();
-		Integer usedCardCount = exchangeOrder.getUsedCardCount();
-
-		userCardRepository.incrementCount(userId, cardId, usedCardCount);
-		exchangeProductRepository.incrementStock(exchangeProductId);
+		exchangeRefundService.refund(exchangeOrder);
 	}
 }
