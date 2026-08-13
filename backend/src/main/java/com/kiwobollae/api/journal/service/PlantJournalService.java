@@ -90,7 +90,7 @@ public class PlantJournalService {
 		LocalDateTime now = LocalDateTime.now(seoulClock);
 		GachaRewardReservation gachaReservation = GachaRewardReservation.none();
 		dailyJournalRewardRepository.claim(userId, today, journal.getId(), JOURNAL_REWARD_AMOUNT, now);
-		DailyJournalReward dailyReward = dailyJournalRewardRepository.findByUser_IdAndRewardDate(userId, today)
+		DailyJournalReward dailyReward = dailyJournalRewardRepository.findForUserAndRewardDate(userId, today)
 				.orElseThrow(() -> new IllegalStateException("선점한 일일 일지 보상 기록을 찾을 수 없습니다."));
 		// MySQL JDBC의 영향 행 수 설정은 ON DUPLICATE KEY UPDATE의 최초 삽입 여부를 보장하지 않는다.
 		// 따라서 유일 키로 확정된 기록이 현재 일지를 가리킬 때만 실제 보상을 지급한다.
@@ -137,7 +137,7 @@ public class PlantJournalService {
 
 	public DailyJournalRewardStatusResponse getDailyRewardStatus(Long userId) {
 		return new DailyJournalRewardStatusResponse(
-				dailyJournalRewardRepository.existsByUser_IdAndRewardDate(userId, LocalDate.now(seoulClock))
+				dailyJournalRewardRepository.existsForUserAndRewardDate(userId, LocalDate.now(seoulClock))
 		);
 	}
 

@@ -70,7 +70,7 @@ class PlantJournalServiceTest {
 	void setUp() {
 		lenient().when(seoulClock.instant()).thenReturn(Instant.parse("2026-08-13T03:00:00Z"));
 		lenient().when(seoulClock.getZone()).thenReturn(KST);
-		lenient().when(dailyJournalRewardRepository.findByUser_IdAndRewardDate(eq(7L), any(LocalDate.class)))
+		lenient().when(dailyJournalRewardRepository.findForUserAndRewardDate(eq(7L), any(LocalDate.class)))
 				.thenReturn(Optional.of(DailyJournalReward.builder().journalId(-1L).build()));
 	}
 
@@ -98,7 +98,7 @@ class PlantJournalServiceTest {
 		});
 		DailyJournalReward dailyReward = DailyJournalReward.builder().journalId(31L).build();
 		ReflectionTestUtils.setField(dailyReward, "id", 41L);
-		given(dailyJournalRewardRepository.findByUser_IdAndRewardDate(eq(7L), any(LocalDate.class)))
+		given(dailyJournalRewardRepository.findForUserAndRewardDate(eq(7L), any(LocalDate.class)))
 				.willReturn(Optional.of(dailyReward));
 		given(walletService.rewardJournal(7L, 31L))
 				.willReturn(new JournalRewardResult(100L));
@@ -159,7 +159,7 @@ class PlantJournalServiceTest {
 
 	@Test
 	void dailyRewardStatusUsesAccountAndKstDate() {
-		given(dailyJournalRewardRepository.existsByUser_IdAndRewardDate(7L, LocalDate.of(2026, 8, 13)))
+		given(dailyJournalRewardRepository.existsForUserAndRewardDate(7L, LocalDate.of(2026, 8, 13)))
 				.willReturn(true);
 
 		DailyJournalRewardStatusResponse response = plantJournalService.getDailyRewardStatus(7L);
@@ -173,9 +173,9 @@ class PlantJournalServiceTest {
 				Instant.parse("2026-08-12T14:59:59Z"),
 				Instant.parse("2026-08-12T15:00:00Z")
 		);
-		given(dailyJournalRewardRepository.existsByUser_IdAndRewardDate(7L, LocalDate.of(2026, 8, 12)))
+		given(dailyJournalRewardRepository.existsForUserAndRewardDate(7L, LocalDate.of(2026, 8, 12)))
 				.willReturn(true);
-		given(dailyJournalRewardRepository.existsByUser_IdAndRewardDate(7L, LocalDate.of(2026, 8, 13)))
+		given(dailyJournalRewardRepository.existsForUserAndRewardDate(7L, LocalDate.of(2026, 8, 13)))
 				.willReturn(false);
 
 		assertThat(plantJournalService.getDailyRewardStatus(7L).rewardGrantedToday()).isTrue();

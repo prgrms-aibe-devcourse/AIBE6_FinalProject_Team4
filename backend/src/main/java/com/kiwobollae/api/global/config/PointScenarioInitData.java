@@ -239,7 +239,7 @@ public class PointScenarioInitData implements ApplicationRunner {
 				pointTransactionTimeProvider.runAt(
 						rewardedAt, () -> walletService.rewardJournal(user.getId(), journal.getId()));
 			}
-			if (!dailyJournalRewardRepository.existsByUser_IdAndRewardDate(user.getId(), rewardDate)) {
+			if (!dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), rewardDate)) {
 				dailyJournalRewardRepository.save(DailyJournalReward.builder()
 						.user(user)
 						.rewardDate(rewardDate)

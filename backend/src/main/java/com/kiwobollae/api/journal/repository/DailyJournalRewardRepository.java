@@ -27,7 +27,26 @@ public interface DailyJournalRewardRepository extends JpaRepository<DailyJournal
 			@Param("rewardedAt") LocalDateTime rewardedAt
 	);
 
-	boolean existsByUser_IdAndRewardDate(Long userId, LocalDate rewardDate);
+	/** 관계 필드 경로 파싱 대신 JPQL로 회원·보상일 조회 조건을 명시한다. */
+	@Query("""
+			select case when count(reward) > 0 then true else false end
+			from DailyJournalReward reward
+			where reward.user.id = :userId
+			  and reward.rewardDate = :rewardDate
+			""")
+	boolean existsForUserAndRewardDate(
+			@Param("userId") Long userId,
+			@Param("rewardDate") LocalDate rewardDate
+	);
 
-	Optional<DailyJournalReward> findByUser_IdAndRewardDate(Long userId, LocalDate rewardDate);
+	@Query("""
+			select reward
+			from DailyJournalReward reward
+			where reward.user.id = :userId
+			  and reward.rewardDate = :rewardDate
+			""")
+	Optional<DailyJournalReward> findForUserAndRewardDate(
+			@Param("userId") Long userId,
+			@Param("rewardDate") LocalDate rewardDate
+	);
 }

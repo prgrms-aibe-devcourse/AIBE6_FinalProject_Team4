@@ -98,9 +98,9 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(journalRewards)
 				.extracting(reward -> reward.createdAt().toLocalDate())
 				.containsExactlyInAnyOrder(today.minusDays(2), today.minusDays(1));
-		assertThat(dailyJournalRewardRepository.existsByUser_IdAndRewardDate(user.getId(), today.minusDays(2)))
+		assertThat(dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), today.minusDays(2)))
 				.isTrue();
-		assertThat(dailyJournalRewardRepository.existsByUser_IdAndRewardDate(user.getId(), today.minusDays(1)))
+		assertThat(dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), today.minusDays(1)))
 				.isTrue();
 		assertThat(notificationRepository.findAll())
 				.noneMatch(notification -> notification.getUser().getId().equals(user.getId())
