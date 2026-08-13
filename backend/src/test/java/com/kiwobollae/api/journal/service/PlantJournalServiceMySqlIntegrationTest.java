@@ -13,6 +13,7 @@ import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
+import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
@@ -49,6 +50,9 @@ class PlantJournalServiceMySqlIntegrationTest {
 
 	@Autowired
 	private JournalImageRepository journalImageRepository;
+
+	@Autowired
+	private DailyJournalRewardRepository dailyJournalRewardRepository;
 
 	@Autowired
 	private PlantProfileRepository plantProfileRepository;
@@ -130,12 +134,12 @@ class PlantJournalServiceMySqlIntegrationTest {
 		assertThat(journalImageRepository.count()).isZero();
 		assertThat(pointTransactionRepository.count()).isZero();
 		assertThat(walletRepository.count()).isZero();
-		assertThat(plantProfileRepository.findById(plantProfileId).orElseThrow()
-				.getJournalRewardGrantedAt()).isNull();
+		assertThat(dailyJournalRewardRepository.count()).isZero();
 	}
 
 	private void clearData() {
 		pointTransactionRepository.deleteAllInBatch();
+		dailyJournalRewardRepository.deleteAllInBatch();
 		journalImageRepository.deleteAllInBatch();
 		plantJournalRepository.deleteAllInBatch();
 		plantProfileRepository.deleteAllInBatch();

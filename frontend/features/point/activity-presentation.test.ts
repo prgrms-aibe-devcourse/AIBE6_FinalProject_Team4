@@ -114,5 +114,21 @@ describe("point activity presentation", () => {
       href: "/gacha?tab=history",
       label: "가챠 개봉 내역 보기",
     });
+    expect(
+      getPointActivityLink(
+        activity({ refType: "JOURNAL_COMPLETION", refId: 11 }),
+      ),
+    ).toEqual({
+      href: "/journals/11",
+      label: "성장일지 보기",
+    });
+    expect(
+      getPointActivityLink(
+        activity({ refType: "JOURNAL_COMPLETION", refId: null }),
+      ),
+    ).toEqual({
+      href: "/journals",
+      label: "성장일지 보기",
+    });
   });
 });

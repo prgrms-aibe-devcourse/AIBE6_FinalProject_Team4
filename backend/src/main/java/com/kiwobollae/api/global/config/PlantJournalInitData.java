@@ -8,8 +8,9 @@ import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
@@ -43,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlantJournalInitData implements ApplicationRunner {
 
 	private static final String IMAGE_BASE_URL = "https://placehold.co/800x800/E8F3D8/4B7A1E?text=";
-	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
 	private static final List<String> SAMPLE_CONTENTS = List.of(
 			"오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.",
@@ -55,6 +55,7 @@ public class PlantJournalInitData implements ApplicationRunner {
 	private final PlantProfileRepository plantProfileRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
+	private final Clock seoulClock;
 
 	@Override
 	@Transactional
@@ -73,22 +74,25 @@ public class PlantJournalInitData implements ApplicationRunner {
 			return;
 		}
 
-		LocalDate yesterday = LocalDate.now(KST).minusDays(1);
+		LocalDate yesterday = LocalDate.now(seoulClock).minusDays(1);
 		int seedIndex = 0;
 		for (PlantProfile profile : profiles) {
 			for (int entry = 0; entry < 2; entry++) {
 				LocalDate writtenDate = yesterday.minusDays(entry);
 				String content = SAMPLE_CONTENTS.get(seedIndex % SAMPLE_CONTENTS.size());
+				// MySQL DATETIME에는 UTC instant가 아닌 KST 기준 화면 표시용 벽시각을 저장한다.
+				LocalDateTime createdAt = writtenDate.atTime(8 + seedIndex % 10, 0);
 
 				PlantJournal journal = plantJournalRepository.save(
-						PlantJournal.create(testUser, profile, content, writtenDate));
+						PlantJournal.create(testUser, profile, content, writtenDate, createdAt));
 
 				JournalImage image = JournalImage.create(
 						journal, testUser,
 						IMAGE_BASE_URL + profile.getPlantName(),
 						"seed-" + seedIndex,
 						true,
-						writtenDate);
+						writtenDate,
+						createdAt);
 				journalImageRepository.save(image);
 
 				seedIndex++;

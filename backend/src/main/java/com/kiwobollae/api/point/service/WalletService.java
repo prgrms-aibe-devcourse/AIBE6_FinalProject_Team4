@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -31,6 +32,7 @@ public class WalletService {
 
 	private final WalletRepository walletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
+	private final PointTransactionTimeProvider pointTransactionTimeProvider;
 
 	/** POINT-10: 일반·소셜 회원가입 트랜잭션에서 지갑 자동 생성(paid=0, free=0). auth 도메인이 호출. */
 	@Transactional
@@ -81,8 +83,13 @@ public class WalletService {
 		return AdminPointAdjustmentResponse.from(userId, transaction, wallet);
 	}
 
-	/** 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다. */
-	@Transactional
+	/**
+	 * 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다.
+	 *
+	 * <p>호출 중인 트랜잭션이 있으면 반드시 참여한다. 일지 보상 판정·카드팩·알림과 함께 처리하는 흐름에서
+	 * 포인트 원장만 별도로 커밋되지 않게 하기 위함이다.
+	 */
+	@Transactional(propagation = Propagation.REQUIRED)
 	public JournalRewardResult rewardJournal(Long userId, Long journalId) {
 		validateJournalRewardRequest(userId, journalId);
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
@@ -377,6 +384,7 @@ public class WalletService {
 				.refType(refType)
 				.refId(refId)
 				.adjustmentReason(adjustmentReason)
+				.createdAt(pointTransactionTimeProvider.now())
 				.build();
 		return pointTransactionRepository.save(tx);
 	}
@@ -398,6 +406,7 @@ public class WalletService {
 				.balanceAfter(balanceAfter)
 				.refType(refType)
 				.refId(refId)
+				.createdAt(pointTransactionTimeProvider.now())
 				.build());
 	}
 

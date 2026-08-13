@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from "react";
 import GachaBatchResultGrid from "@/components/gacha/GachaBatchResultGrid";
 import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
@@ -51,12 +57,18 @@ export default function GachaBatchOpenPage({
   params: { batchKey: string };
 }) {
   const router = useRouter();
-  const { state, hydrated } = useStore();
+  const { state, hydrated, refreshNotifications } = useStore();
   const [drawIds, setDrawIds] = useState<number[] | null>(null);
   const [details, setDetails] = useState<GachaDrawDetail[]>([]);
   const [stage, setStage] = useState<Stage>("loading");
   const [error, setError] = useState("");
   const [muted, setMuted] = useState(false);
+
+  const moveToJournals = async (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    await refreshNotifications();
+    router.push("/journals");
+  };
 
   useEffect(() => {
     if (!hydrated) return;
@@ -318,6 +330,7 @@ export default function GachaBatchOpenPage({
               <div className="mt-10 flex flex-wrap justify-center gap-3">
                 <Link
                   href="/journals"
+                  onClick={moveToJournals}
                   className="rounded-full border border-white/20 px-8 py-3.5 font-black text-white/80 transition hover:-translate-y-0.5 hover:bg-white/10"
                 >
                   일지 보러 가기
