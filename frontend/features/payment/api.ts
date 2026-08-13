@@ -2,6 +2,7 @@ import { request } from "@/lib/api";
 
 export interface ChargeProduct {
   id: number;
+  version: number;
   name: string;
   price: number;
   pointAmount: number;

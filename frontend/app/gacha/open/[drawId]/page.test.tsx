@@ -10,6 +10,7 @@ import GachaOpenPage from "./page";
 import { getGachaDraw, markGachaDrawViewed } from "@/lib/gacha-api";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const store = vi.hoisted(() => ({ refreshNotifications: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation,
@@ -25,6 +26,7 @@ vi.mock("@/lib/store", () => ({
   useStore: () => ({
     state: { accessToken: "access-token" },
     hydrated: true,
+    refreshNotifications: store.refreshNotifications,
   }),
 }));
 
@@ -42,7 +44,10 @@ const mockedMarkViewed = vi.mocked(markGachaDrawViewed);
 
 describe("GachaOpenPage", () => {
   afterEach(cleanup);
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.refreshNotifications.mockResolvedValue(undefined);
+  });
 
   it("실제 카드 비율을 유지하고 원본 전체를 잘리지 않게 표시한다", async () => {
     mockedGetDraw.mockResolvedValue({
@@ -102,8 +107,20 @@ describe("GachaOpenPage", () => {
     }
     fireEvent.click(screen.getByRole("button", { name: "전체 결과 보기" }));
     expect(
-      await screen.findByRole("link", { name: "상점으로 가기" }),
-    ).toHaveAttribute("href", "/shop");
+      await screen.findByRole("link", { name: "카드팩 구매하기" }),
+    ).toHaveAttribute("href", "/shop?category=GACHA_PACK&sort=new&page=1");
+    expect(
+      screen.getByRole("link", { name: "일지 보러 가기" }),
+    ).toHaveAttribute("href", "/journals");
+    expect(
+      screen.getByRole("link", { name: "다른 개봉 내역 보기" }),
+    ).toHaveAttribute("href", "/gacha?tab=history");
+
+    fireEvent.click(screen.getByRole("link", { name: "일지 보러 가기" }));
+    await waitFor(() =>
+      expect(store.refreshNotifications).toHaveBeenCalledTimes(1),
+    );
+    expect(navigation.push).toHaveBeenCalledWith("/journals");
   });
 
   it("환불된 팩은 포인트 반환 안내 후 대기를 종료한다", async () => {

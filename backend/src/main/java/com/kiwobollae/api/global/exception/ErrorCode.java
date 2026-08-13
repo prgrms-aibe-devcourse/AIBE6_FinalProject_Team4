@@ -3,7 +3,7 @@ package com.kiwobollae.api.global.exception;
 import org.springframework.http.HttpStatus;
 
 /**
- * Error codes and HTTP status mapping. Source of truth: docs/error-codes.md.
+ * Error codes and HTTP status mapping. Source of truth: error-codes.md.
  * Naming convention: {@code {DOMAIN}_{REASON}} upper snake case; {@code COMMON_} is
  * reserved for cross-cutting infra errors, everything else uses its owning domain's
  * prefix. A code's meaning never changes once shipped — add a new code instead of
@@ -11,7 +11,7 @@ import org.springframework.http.HttpStatus;
  */
 public enum ErrorCode {
 
-	// --- Common / infra (docs/error-codes.md §4) ---
+	// --- Common / infra (error-codes.md §4) ---
 	COMMON_MALFORMED_JSON(HttpStatus.BAD_REQUEST, "요청 본문의 JSON 형식이 올바르지 않습니다."),
 	COMMON_VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
 	COMMON_RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
@@ -24,13 +24,13 @@ public enum ErrorCode {
 	COMMON_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
 	COMMON_FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "파일 용량이 너무 큽니다. 5MB 이하로 업로드해 주세요."),
 
-	// --- Auth / session (docs/error-codes.md §4) ---
+	// --- Auth / session (error-codes.md §4) ---
 	AUTH_AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다. 로그인 후 다시 시도해 주세요."),
 	AUTH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "토큰이 유효하지 않습니다."),
 	AUTH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "액세스 토큰이 만료되었습니다. 다시 로그인해 주세요."),
 	AUTH_ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 작업을 수행할 권한이 없습니다."),
 
-	// --- Auth domain business errors — not yet in docs/error-codes.md's table, added
+	// --- Auth domain business errors — not yet in error-codes.md's table, added
 	// following the same {DOMAIN}_{REASON} convention as the AUTH_* session codes above. ---
 	AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호를 다시 확인해 주세요."),
 	AUTH_ACCOUNT_NOT_ACTIVE(HttpStatus.FORBIDDEN, "계정이 활성 상태가 아닙니다."),
@@ -50,8 +50,10 @@ public enum ErrorCode {
 	AUTH_OAUTH_EMAIL_REQUIRED(HttpStatus.CONFLICT, "이메일 제공에 동의해야 소셜 로그인을 사용할 수 있습니다."),
 	AUTH_RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증이 유효하지 않습니다. 인증을 다시 진행해 주세요."),
 
-	// --- Domain codes (docs/error-codes.md §5) ---
+	// --- Domain codes (error-codes.md §5) ---
 	PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+	COMMERCE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "5MB 이하의 jpg, png, webp 이미지만 업로드할 수 있습니다."),
+	COMMERCE_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "상품 이미지를 업로드하지 못했습니다. 잠시 후 다시 시도해 주세요."),
 	PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 상품입니다."),
 	PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "재고가 부족합니다."),
 
@@ -78,6 +80,20 @@ public enum ErrorCode {
 	GACHA_COSMETIC_NOT_FOUND(HttpStatus.NOT_FOUND, "칭호 또는 테두리를 찾을 수 없습니다."),
 	GACHA_COSMETIC_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 해금한 칭호 또는 테두리입니다."),
 	GACHA_COSMETIC_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "해금하지 않은 칭호 또는 테두리입니다."),
+	GACHA_PRODUCT_PRICE_CHANGED(HttpStatus.CONFLICT, "가챠 팩 가격이 변경되었습니다. 최신 가격을 확인해 주세요."),
+	CARD_MARKET_LISTING_NOT_FOUND(HttpStatus.NOT_FOUND, "판매글을 찾을 수 없습니다."),
+	CARD_MARKET_LISTING_NOT_OPEN(HttpStatus.CONFLICT, "이미 종료된 판매글입니다."),
+	CARD_MARKET_CARD_NOT_TRADABLE(HttpStatus.UNPROCESSABLE_CONTENT, "거래할 수 없는 등급의 카드입니다."),
+	CARD_MARKET_CARD_KEEP_ONE_REQUIRED(HttpStatus.CONFLICT, "하이퍼 카드는 최소 1장을 보유해야 합니다."),
+	CARD_MARKET_GOLDEN_NOT_OWNED(HttpStatus.UNPROCESSABLE_CONTENT, "보유하지 않은 골든 카드입니다."),
+	CARD_MARKET_GOLDEN_ALREADY_LISTED(HttpStatus.CONFLICT, "이미 판매 중인 골든 카드입니다."),
+	CARD_MARKET_PRICE_INVALID(HttpStatus.BAD_REQUEST, "거래 가격은 100P 이상 99,999,999P 이하여야 합니다."),
+	CARD_MARKET_SELF_TRADE(HttpStatus.BAD_REQUEST, "자신의 판매글은 구매하거나 가격을 제안할 수 없습니다."),
+	CARD_MARKET_NEGOTIATION_NOT_FOUND(HttpStatus.NOT_FOUND, "가격 협상을 찾을 수 없습니다."),
+	CARD_MARKET_NEGOTIATION_DUPLICATE(HttpStatus.CONFLICT, "이미 진행 중인 가격 협상이 있습니다."),
+	CARD_MARKET_NEGOTIATION_INVALID_STATE(HttpStatus.CONFLICT, "이미 종료된 가격 협상입니다."),
+	CARD_MARKET_NEGOTIATION_TURN_CONFLICT(HttpStatus.CONFLICT, "현재 가격을 제안하거나 응답할 차례가 아닙니다."),
+	CARD_MARKET_PROPOSAL_PRICE_INVALID(HttpStatus.BAD_REQUEST, "현재 협상 범위에서 제안할 수 없는 가격입니다."),
 
 	EXCHANGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "교환 상품을 찾을 수 없습니다."),
 	EXCHANGE_PRODUCT_OUT_OF_STOCK(HttpStatus.UNPROCESSABLE_CONTENT, "교환 상품의 재고가 부족합니다."),
@@ -87,9 +103,11 @@ public enum ErrorCode {
 	POINT_INSUFFICIENT_BALANCE(HttpStatus.UNPROCESSABLE_CONTENT, "사용 가능한 포인트가 부족합니다."),
 	POINT_WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "포인트 지갑을 찾을 수 없습니다."),
 	POINT_DUPLICATE_TRANSACTION(HttpStatus.CONFLICT, "이미 처리된 포인트 거래입니다."),
+	POINT_SELF_ADJUSTMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "관리자는 자신의 포인트를 조정할 수 없습니다."),
 
 	PAYMENT_CHARGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "충전 상품을 찾을 수 없습니다."),
 	PAYMENT_CHARGE_PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 충전 상품입니다."),
+	PAYMENT_CHARGE_PRODUCT_POINT_RATE_INVALID(HttpStatus.BAD_REQUEST, "지급 포인트는 결제 금액의 100% 이상 150% 이하여야 합니다."),
 	PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 건을 찾을 수 없습니다."),
 	PAYMENT_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 결제를 처리할 수 없습니다."),
 	PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "승인 금액이 결제 요청 금액과 일치하지 않습니다."),
@@ -102,6 +120,7 @@ public enum ErrorCode {
 	AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스를 일시적으로 사용할 수 없습니다."),
 	AI_REQUEST_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."),
 	AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI 서비스로부터 올바르지 않은 응답을 받았습니다."),
+	AI_CHAT_CONVERSATION_INVALID(HttpStatus.CONFLICT, "AI 대화가 만료되었어요. 새 대화를 시작해 주세요."),
 
 	// --- Content 도메인: 식물 프로필 / 성장 일지 (팀 컨벤션에 따라 메시지 구분 대신 전용 코드 사용) ---
 	PLANT_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "식물 프로필을 찾을 수 없습니다."),

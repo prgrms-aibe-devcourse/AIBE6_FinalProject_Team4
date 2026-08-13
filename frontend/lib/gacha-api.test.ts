@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { request } from "@/lib/api";
-import { markGachaDrawViewed, purchaseGachaPacks } from "@/lib/gacha-api";
+import {
+  grantLocalTestGachaCard,
+  markGachaDrawViewed,
+  purchaseGachaPacks,
+} from "@/lib/gacha-api";
 
 vi.mock("@/lib/api", () => ({
   request: vi.fn(),
@@ -30,6 +34,7 @@ describe("gacha api", () => {
     const response = await purchaseGachaPacks(
       9,
       1,
+      100,
       "access-token",
       "purchase-key",
     );
@@ -40,7 +45,11 @@ describe("gacha api", () => {
       headers: {
         "Idempotency-Key": "purchase-key",
       },
-      body: JSON.stringify({ productId: 9, quantity: 1 }),
+      body: JSON.stringify({
+        productId: 9,
+        quantity: 1,
+        expectedUnitPoint: 100,
+      }),
     });
     expect(response.drawIds).toEqual([701]);
   });
@@ -56,6 +65,27 @@ describe("gacha api", () => {
         method: "PATCH",
         accessToken: "access-token",
         keepalive: true,
+      },
+    );
+  });
+
+  it("로컬 테스트용 등급과 수량으로 카드를 지급한다", async () => {
+    mockedRequest.mockResolvedValueOnce({
+      cardId: 21,
+      cardName: "황금 옥수수",
+      rarity: "GOLDEN_RARE",
+      grantedQuantity: 1,
+      ownedCountAfter: 1,
+    });
+
+    await grantLocalTestGachaCard("GOLDEN_RARE", 1, "access-token");
+
+    expect(mockedRequest).toHaveBeenCalledWith(
+      "/api/v1/card/gacha/me/test-cards",
+      {
+        method: "POST",
+        accessToken: "access-token",
+        body: JSON.stringify({ rarity: "GOLDEN_RARE", quantity: 1 }),
       },
     );
   });

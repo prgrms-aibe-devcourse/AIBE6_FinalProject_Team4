@@ -2,7 +2,7 @@ package com.kiwobollae.api.commerce.dto.response;
 
 import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
-import com.kiwobollae.api.content.entity.PlantSpecies;
+import com.kiwobollae.api.species.entity.PlantSpecies;
 import java.time.LocalDateTime;
 
 public record ProductDetailResponse(

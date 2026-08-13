@@ -33,6 +33,7 @@ const activityPage = {
       type: "PURCHASE" as const,
       refType: "ORDER" as const,
       refId: 10,
+      adjustmentReason: null,
       amount: -1000,
       paidAmount: -700,
       freeAmount: -300,
@@ -49,6 +50,38 @@ const activityPage = {
   first: true,
   last: true,
   empty: false,
+};
+
+const gachaPurchaseActivityPage = {
+  ...activityPage,
+  content: [
+    {
+      ...activityPage.content[0],
+      id: 13,
+      refType: "GACHA_PURCHASE" as const,
+      refId: 501,
+      amount: -100,
+      paidAmount: 0,
+      freeAmount: -100,
+    },
+  ],
+};
+
+const adminAdjustmentActivityPage = {
+  ...activityPage,
+  content: [
+    {
+      ...activityPage.content[0],
+      id: 14,
+      type: "ADMIN_ADJUST" as const,
+      refType: "ADMIN" as const,
+      refId: 1,
+      adjustmentReason: "OUTSTANDING_MEMBER" as const,
+      amount: 1000,
+      paidAmount: 0,
+      freeAmount: 1000,
+    },
+  ],
 };
 
 describe("PointsHome", () => {
@@ -88,5 +121,48 @@ describe("PointsHome", () => {
         }),
       );
     });
+  });
+
+  it("가챠 카드팩 구매 내역과 관련 개봉 내역 링크를 표시한다", async () => {
+    mocks.getPointActivities.mockResolvedValue(gachaPurchaseActivityPage);
+
+    render(<PointsHome />);
+
+    expect(await screen.findByText("가챠 카드팩 구매")).toBeInTheDocument();
+    expect(
+      screen.getByText("가챠 카드팩을 구매하는 데 포인트를 사용했어요."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "가챠 개봉 내역 보기 →" }),
+    ).toHaveAttribute("href", "/gacha?tab=history");
+  });
+
+  it("가챠 카드팩 구매 필터를 거래 출처 조건으로 요청한다", async () => {
+    render(<PointsHome />);
+    await screen.findByText("상품 주문 결제");
+
+    fireEvent.click(screen.getByRole("button", { name: "가챠 카드팩 구매" }));
+
+    await waitFor(() => {
+      expect(mocks.getPointActivities).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          accessToken: "user-token",
+          refType: "GACHA_PURCHASE",
+          type: undefined,
+          page: 0,
+        }),
+      );
+    });
+  });
+
+  it("관리자 조정 사유를 사용자 거래내역에 표시한다", async () => {
+    mocks.getPointActivities.mockResolvedValue(adminAdjustmentActivityPage);
+
+    render(<PointsHome />);
+
+    expect(await screen.findByText("운영팀 포인트 지급")).toBeInTheDocument();
+    expect(
+      screen.getByText("운영팀에서 우수 회원 선정 사유로 포인트를 지급했어요."),
+    ).toBeInTheDocument();
   });
 });

@@ -92,6 +92,11 @@ payment:
     base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
     secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
 
+card-market:
+  expiry:
+    fixed-delay-ms: ${CARD_MARKET_EXPIRY_FIXED_DELAY_MS:60000}
+    batch-size: ${CARD_MARKET_EXPIRY_BATCH_SIZE:100}
+
 ai:
   image:
     # DB에는 host-relative 경로를 저장하고, OpenAI 호출 직전에 이 공개 주소를 붙인다.

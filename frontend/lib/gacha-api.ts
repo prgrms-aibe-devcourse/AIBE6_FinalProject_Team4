@@ -133,6 +133,16 @@ export interface GachaPackPurchaseData {
   drawIds: number[];
 }
 
+export interface GachaTestCardGrantData {
+  cardId: number;
+  cardName: string;
+  rarity: "HYPER_RARE" | "GOLDEN_RARE";
+  grantedQuantity: number;
+  ownedCountAfter: number;
+}
+
+export const GACHA_COLLECTION_CHANGED_EVENT = "kwb:gacha-collection-changed";
+
 export function getGachaCatalog(
   rarity?: GachaRarity,
   signal?: AbortSignal,
@@ -268,6 +278,7 @@ export function markGachaDrawViewed(
 export function purchaseGachaPacks(
   productId: number,
   quantity: number,
+  expectedUnitPoint: number,
   accessToken: string,
   idempotencyKey: string,
 ): Promise<GachaPackPurchaseData> {
@@ -277,6 +288,18 @@ export function purchaseGachaPacks(
     headers: {
       "Idempotency-Key": idempotencyKey,
     },
-    body: JSON.stringify({ productId, quantity }),
+    body: JSON.stringify({ productId, quantity, expectedUnitPoint }),
+  });
+}
+
+export function grantLocalTestGachaCard(
+  rarity: "HYPER_RARE" | "GOLDEN_RARE",
+  quantity: 1 | 2,
+  accessToken: string,
+): Promise<GachaTestCardGrantData> {
+  return request<GachaTestCardGrantData>("/api/v1/card/gacha/me/test-cards", {
+    method: "POST",
+    accessToken,
+    body: JSON.stringify({ rarity, quantity }),
   });
 }

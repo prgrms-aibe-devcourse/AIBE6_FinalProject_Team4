@@ -6,6 +6,7 @@ import {
   createAdminProduct,
   hideAdminProduct,
   updateAdminProduct,
+  uploadAdminProductImage,
 } from "@/lib/admin-product-api";
 
 vi.mock("@/lib/api", () => ({ request: vi.fn() }));
@@ -73,5 +74,21 @@ describe("admin product api", () => {
         accessToken: "token",
       },
     );
+  });
+
+  it("상품 이미지를 multipart로 업로드한다", async () => {
+    mockedRequest.mockResolvedValue({});
+    const file = new File(["image"], "kit.png", { type: "image/png" });
+
+    await uploadAdminProductImage(7, file, "token");
+
+    const options = mockedRequest.mock.calls[0][1];
+    expect(mockedRequest.mock.calls[0][0]).toBe(
+      "/api/v1/admin/product/7/image",
+    );
+    expect(options?.method).toBe("POST");
+    expect(options?.accessToken).toBe("token");
+    expect(options?.body).toBeInstanceOf(FormData);
+    expect((options?.body as FormData).get("file")).toBe(file);
   });
 });

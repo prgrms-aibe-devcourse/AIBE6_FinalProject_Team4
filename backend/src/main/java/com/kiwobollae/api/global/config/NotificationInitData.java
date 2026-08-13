@@ -18,9 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Local-only sample alerts so the notification bell/목록/설정 화면 isn't empty for the
- * InitData test users. One notification per {@link NotificationType} per user, spread
- * across today/yesterday with a mix of read/unread so date grouping and the unread
- * badge both have something to show.
+ * InitData test users. Representative sample notifications are spread across
+ * today/yesterday with a mix of read/unread so date grouping and the unread badge
+ * both have something to show. POINT notifications are not seeded because completed
+ * point features create their own real notifications.
  *
  * <p>Depends on InitData (users, @Order(1)) having already run; skips silently if a
  * seed user is missing. Disable without changing code by setting
@@ -38,7 +39,6 @@ public class NotificationInitData implements ApplicationRunner {
 
 	private static final List<Sample> SAMPLES = List.of(
 			new Sample(NotificationType.DELIVERY, "주문하신 상품이 배송을 시작했어요 📦", "ORD-20260709-0022 · 방울토마토 모종", "/my/orders", false, 0),
-			new Sample(NotificationType.POINT, "일지 보상 30P가 지급됐어요 ☀️", "토실이의 오늘 기록", "/my/points", false, 0),
 			new Sample(NotificationType.JOURNAL_REMINDER, "오늘 쌈싸리의 모습을 남겨볼까요? 🌱", "아직 오늘의 일지를 쓰지 않으셨어요", "/journals", true, 0),
 			new Sample(NotificationType.COMMUNITY, "내 게시글에 댓글이 달렸어요 💬", "\"저도 이 방법으로 키우고 있어요!\"", null, false, 1),
 			new Sample(NotificationType.INQUIRY, "문의하신 내용에 답변이 도착했어요 💬", "배송 관련 문의", "/my/inquiries", true, 1),

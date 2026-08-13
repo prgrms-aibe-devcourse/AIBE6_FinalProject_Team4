@@ -18,6 +18,7 @@ import com.kiwobollae.api.commerce.repository.CartItemRepository;
 import com.kiwobollae.api.commerce.repository.OrderItemRepository;
 import com.kiwobollae.api.commerce.repository.OrderRepository;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.service.IdempotencyExecution;
@@ -58,6 +59,7 @@ public class OrderService {
 	private final WalletService walletService;
 	private final IdempotencyService idempotencyService;
 	private final ObjectMapper objectMapper;
+	private final AssetUrlResolver assetUrlResolver;
 
 	@Transactional(isolation = Isolation.REPEATABLE_READ)
 	public OrderDetailResponse createOrder(Long userId, String idempotencyKey, OrderCreateRequest request) {
@@ -134,7 +136,7 @@ public class OrderService {
 
 		OrderDetailResponse response = new OrderDetailResponse(
 				OrderResponse.from(order),
-				orderItems.stream().map(OrderItemResponse::from).toList()
+				orderItems.stream().map(this::itemResponse).toList()
 		);
 		String responseSnapshot = serialize(response);
 		idempotencyService.succeed(execution.key(), 201, responseSnapshot, "ORDER", order.getId());
@@ -151,7 +153,7 @@ public class OrderService {
 		Order order = orderRepository.findByIdAndUserId(orderId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 		List<OrderItemResponse> items = orderItemRepository.findAllByOrderId(order.getId()).stream()
-				.map(OrderItemResponse::from)
+				.map(this::itemResponse)
 				.toList();
 		return new OrderDetailResponse(OrderResponse.from(order), items);
 	}
@@ -241,6 +243,13 @@ public class OrderService {
 		} catch (Exception exception) {
 			throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR);
 		}
+	}
+
+	private OrderItemResponse itemResponse(OrderItem orderItem) {
+		return OrderItemResponse.from(
+				orderItem,
+				assetUrlResolver.resolve(orderItem.getProduct().getImageUrl())
+		);
 	}
 
 	private OrderDetailResponse deserialize(String snapshot) {

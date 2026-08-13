@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
@@ -9,28 +9,32 @@ import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStat
 import { getProfileIdsWrittenToday } from '@/lib/journal-api';
 import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import { nickValid } from '@/lib/plant-validation';
+import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const BULK_STATUS_OPTIONS: [PlantStatus, string][] = [['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PAGE_SIZE = 8;
+// "오늘 일지 안 쓴 것만 보기"는 서버 페이징 결과를 클라이언트에서 한 번 더 걸러내므로, 서버
+// 페이지 단위로는 totalPages를 정확히 셀 수 없다 — 대신 GROWING 전체를 한 번에 받아와 클라이언트
+// 에서 걸러내고 다시 페이징한다. 이 한도(백엔드 MAX_PAGE_SIZE와 동일)면 사실상 전체를 커버한다.
+const RAW_FETCH_SIZE = 100;
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
 
-function nickValid(v: string) {
-  if (!v) return { ok: false, msg: '별명을 입력해 주세요.' };
-  if (v.length > 50) return { ok: false, msg: '50자 이내로 지어주세요.' };
-  if (/[^가-힣a-zA-Z0-9 ]/.test(v)) return { ok: false, msg: '특수문자 없이 예쁜 이름으로 지어주세요 🌱' };
-  return { ok: true, msg: '좋은 이름이에요! 🌿' };
-}
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function PlantsPage() {
-  const { state, hydrated, set } = useStore();
+  const { state, hydrated, refreshPlantStats } = useStore();
   const { showToast, askConfirm } = useUI();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
+  // "오늘 일지 안 쓴 것만 보기"일 때만 쓰는, 필터링 전 GROWING 전체 목록.
+  const [rawGrowing, setRawGrowing] = useState<PlantProfileData[]>([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
@@ -53,18 +57,48 @@ export default function PlantsPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!hydrated || !state.accessToken) return;
+  const writtenTodayFilterActive = writtenTodayOnly && !todayWrittenError;
+
+  const loadPlants = useCallback(() => {
+    if (!hydrated || !state.accessToken) return () => {};
     const accessToken = state.accessToken;
     const controller = new AbortController();
     setLoading(true);
     setError('');
 
-    getMyPlants(accessToken, controller.signal)
-      .then((data) => setPlants(data))
+    if (writtenTodayFilterActive) {
+      // 서버 페이지 단위로 받으면 그 안에서 클라이언트 필터링을 한 번 더 하게 되어 totalPages가
+      // 실제로 보이는 개수와 어긋난다 — GROWING 전체를 한 번에 받아 아래 effect에서 걸러내고
+      // 다시 페이징한다(plants/totalPages는 그 effect가 채운다).
+      getMyPlants({ accessToken, status: 'GROWING', page: 0, size: RAW_FETCH_SIZE, signal: controller.signal })
+        .then((data) => setRawGrowing(data.content))
+        .catch((requestError) => {
+          if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+          setRawGrowing([]);
+          setError(
+            requestError instanceof ApiError
+              ? requestError.message
+              : '식물 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          );
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+
+      return () => controller.abort();
+    }
+
+    const status = filter === 'all' ? undefined : (filter as PlantStatus);
+
+    getMyPlants({ accessToken, status, page, size: PAGE_SIZE, signal: controller.signal })
+      .then((data) => {
+        setPlants(data.content);
+        setTotalPages(data.totalPages);
+      })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
         setPlants([]);
+        setTotalPages(0);
         setError(
           requestError instanceof ApiError
             ? requestError.message
@@ -76,7 +110,18 @@ export default function PlantsPage() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+  }, [hydrated, state.accessToken, filter, writtenTodayFilterActive, page]);
+
+  useEffect(() => loadPlants(), [loadPlants]);
+
+  // "오늘 일지 안 쓴 것만 보기"일 때는 네트워크 재조회 없이 rawGrowing을 다시 걸러/페이징한다 —
+  // totalPages도 여기서 실제 필터링된 개수 기준으로 계산해야 화면과 어긋나지 않는다.
+  useEffect(() => {
+    if (!writtenTodayFilterActive) return;
+    const filtered = rawGrowing.filter((p) => !todayWrittenIds.has(p.id));
+    setTotalPages(Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+    setPlants(filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
+  }, [writtenTodayFilterActive, rawGrowing, todayWrittenIds, page]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -121,26 +166,22 @@ export default function PlantsPage() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
-  const writtenTodayFilterActive = writtenTodayOnly && !todayWrittenError;
-  const list = writtenTodayFilterActive
-    ? plants.filter((p) => p.status === 'GROWING' && !todayWrittenIds.has(p.id))
-    : plants.filter((p) => filter === 'all' || p.status === filter);
+  // plants는 (필터 모드와 무관하게) 이미 화면에 보일 현재 페이지 결과 그 자체다 — 서버 페이징
+  // 결과이거나, 위 effect가 rawGrowing을 걸러/페이징해 채운 결과이거나 둘 중 하나.
+  const list = plants;
 
   // 필터로 화면에서 사라진 식물이 선택 상태로 계속 남아, 안 보이는 항목까지 일괄 변경 대상이
-  // 되는 걸 막는다 — 보이는 목록(list)이 바뀌면 선택도 그 목록 기준으로 다시 걸러준다.
+  // 되는 걸 막는다 — 보이는 목록(plants)이 바뀌면 선택도 그 목록 기준으로 다시 걸러준다.
   useEffect(() => {
-    const visibleIds = new Set(
-      plants
-        .filter((p) => (writtenTodayFilterActive ? p.status === 'GROWING' && !todayWrittenIds.has(p.id) : filter === 'all' || p.status === filter))
-        .map((p) => p.id),
-    );
+    const visibleIds = new Set(plants.map((p) => p.id));
     setSelectedIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIds.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [filter, writtenTodayFilterActive, plants, todayWrittenIds]);
+  }, [plants]);
   const regV = nickValid(reg.nick);
   const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
+  const selectedSpecies = speciesList.find((sp) => sp.id === reg.speciesId) || null;
 
   const handleSpeciesQueryChange = (value: string) => {
     setQuery(value);
@@ -178,8 +219,16 @@ export default function PlantsPage() {
           if (result.status === 'fulfilled') succeededIds.add(targetIds[i]);
           else failCount += 1;
         });
+        // 상태 필터가 서버 쪽으로 넘어갔으므로, 현재 필터에 더 이상 맞지 않는 항목은
+        // 재조회해야 화면에서 사라진다 — 로컬 상태만 바꿔서는 부정확하다. 이 변경으로 현재
+        // 페이지의 항목이 전부 필터에서 빠지면 totalPages가 줄어 지금 page가 범위 밖이
+        // 될 수 있으므로, 항상 0페이지로 돌아가 안전한 상태에서 다시 불러온다.
         if (succeededIds.size > 0) {
-          setPlants((prev) => prev.map((p) => (succeededIds.has(p.id) ? { ...p, status } : p)));
+          if (page === 0) loadPlants();
+          else setPage(0);
+          // 대시보드의 "내 식물 현황" 등은 이 store 값을 쓰는데, 상태 변경으로 재배중/실패
+          // 구성이 바뀌었으니 다시 채워야 한다 — 낙관적 +1/-1로는 3개 카운트를 다 못 맞춘다.
+          void refreshPlantStats();
         }
         showToast(
           failCount === 0
@@ -271,8 +320,18 @@ export default function PlantsPage() {
         }
         throw createError;
       }
-      setPlants([created, ...plants]);
-      set((s) => ({ growingCount: s.growingCount + 1, plantCount: s.plantCount + 1 }));
+      // 새 식물은 항상 GROWING으로 생성되므로, 다른 상태 필터를 보고 있었다면 새로 생긴
+      // 식물이 안 보일 수 있다 — 전체 필터·첫 페이지로 돌아가 방금 등록한 걸 바로 보여준다.
+      // writtenTodayOnly가 아니라 writtenTodayFilterActive를 봐야 한다: 에러로 이미 무력화된
+      // 상태(writtenTodayOnly=true, todayWrittenError=true)에서는 이 값이 이미 false라
+      // setWrittenTodayOnly(false)를 호출해도 loadPlants의 deps가 안 바뀌어 effect가 재실행되지
+      // 않는다 — 원시 상태로 판단하면 이 경우를 "이미 기본 화면"으로 놓쳐 재조회가 누락된다.
+      const alreadyAtDefaultView = filter === 'all' && !writtenTodayFilterActive && page === 0;
+      setFilter('all');
+      setWrittenTodayOnly(false);
+      setPage(0);
+      if (alreadyAtDefaultView) loadPlants();
+      void refreshPlantStats();
       setOpen(false);
       resetRegisterForm();
       showToast(`'${created.nickname}'와의 여정이 시작됐어요! 🌿`);
@@ -288,7 +347,18 @@ export default function PlantsPage() {
 
   return (
     <div className="container">
-      <h1 className="mb-1 text-[27px] font-extrabold">내 식물</h1>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[27px] font-extrabold">내 식물</h1>
+        {!selectMode && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="cursor-pointer rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white"
+          >
+            + 새 식물 등록
+          </button>
+        )}
+      </div>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-[9px]">
@@ -303,6 +373,7 @@ export default function PlantsPage() {
                 // 필터는 해제한다.
                 setFilter(k);
                 setWrittenTodayOnly(false);
+                setPage(0);
               }}
               className={`cursor-pointer rounded-full border-[1.5px] px-4 py-2 text-sm font-bold ${
                 filter === k ? 'border-brand bg-brand text-white' : 'border-line bg-white text-[#6d7a68]'
@@ -342,6 +413,7 @@ export default function PlantsPage() {
               // 실제로 뭘 보고 있는지 헷갈린다 — 필터를 켜는 순간 상태 pill도 '전체'로 맞춘다.
               setWrittenTodayOnly(e.target.checked);
               if (e.target.checked) setFilter('all');
+              setPage(0);
             }}
             className="h-4 w-4 accent-brand"
           />
@@ -361,7 +433,21 @@ export default function PlantsPage() {
       ) : list.length === 0 && writtenTodayFilterActive ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
           <div className="animate-floaty text-[70px]">🌿</div>
-          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">오늘 일지 안 쓴 식물이 없어요 🌿</p>
+          {/* totalPages는 이제 필터링된 실제 개수 기준이라 정확하지만, 필터를 켠 채로 다른 곳에서
+              오늘 일지를 써서 목록이 줄어들면 머무르고 있던 page가 범위를 벗어날 수 있다 —
+              그 경우엔 "안 쓴 식물이 없다"가 전체가 아니라 이 페이지 한정이라는 걸 명시한다. */}
+          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
+            {totalPages > 1 ? '이 페이지에는 오늘 일지 안 쓴 식물이 없어요 🌿' : '오늘 일지 안 쓴 식물이 없어요 🌿'}
+          </p>
+        </div>
+      ) : list.length === 0 && filter !== 'all' ? (
+        // 진짜로 식물이 하나도 없는 것과, 상태 필터에 맞는 게 지금 없는 것은 다른 상황이다 —
+        // 후자는 "등록하기" 유도가 아니라 필터에 걸린 것뿐이라는 걸 알려줘야 한다.
+        <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
+          <div className="animate-floaty text-[70px]">🌱</div>
+          <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
+            {FILTERS.find(([key]) => key === filter)?.[1]} 상태의 식물이 없어요.
+          </p>
         </div>
       ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
@@ -417,14 +503,30 @@ export default function PlantsPage() {
         </div>
       )}
 
-      {!selectMode && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="fixed bottom-[84px] right-6 z-30 cursor-pointer rounded-full bg-brand px-[22px] py-[15px] font-extrabold text-white shadow-[0_10px_26px_rgba(124,179,66,.45)]"
-        >
-          + 새 식물 등록
-        </button>
+      {/* "오늘 일지 안 쓴 것만 보기"도 서버가 status=GROWING으로 페이징해 주므로, 이 모드에서도
+          페이저를 그대로 노출해야 뒤 페이지의 미작성 항목에 닿을 수 있다. */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="mt-7 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            className="cursor-pointer rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            이전
+          </button>
+          <span className="text-sm font-bold text-sub">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page + 1 >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+            className="cursor-pointer rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            다음
+          </button>
+        </div>
       )}
 
       {selectMode && selectedIds.size > 0 && (
@@ -507,6 +609,19 @@ export default function PlantsPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* 등록 전에 "이 종을 내가 키울 수 있나"를 확인할 수 있는 자리 — 가이드 요청은 AI 호출이라
+                자동으로 부르지 않고, 종을 고른 뒤 사용자가 버튼을 눌렀을 때만 나간다. */}
+            {selectedSpecies && (
+              <div className="mb-[18px]">
+                <PlantCareGuidePanel
+                  speciesId={selectedSpecies.id}
+                  speciesName={selectedSpecies.name}
+                  accessToken={state.accessToken}
+                  variant="inline"
+                />
               </div>
             )}
 

@@ -11,11 +11,23 @@ import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
 
-export default function ProductDetail({ params }: { params: { id: string } }) {
+export default function ProductDetail({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { returnTo?: string | string[] };
+}) {
   const router = useRouter();
   const { state, hydrated, refreshWallet, walletLoaded, walletLoading, refreshCartCount } = useStore();
   const { showToast, askConfirm } = useUI();
   const productId = Number(params.id);
+  const requestedReturnTo = Array.isArray(searchParams?.returnTo)
+    ? searchParams?.returnTo[0]
+    : searchParams?.returnTo;
+  const returnTo = requestedReturnTo?.startsWith('/shop')
+    ? requestedReturnTo
+    : '/shop';
   const [product, setProduct] = useState<ProductDetailData | null>(null);
   const [qty, setQty] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -97,7 +109,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
           <p>{error || '상품을 찾을 수 없어요.'}</p>
           <Link
-            href="/shop"
+            href={returnTo}
             className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white"
           >
             상점으로 돌아가기
@@ -171,7 +183,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
       onOk: async () => {
         setPurchasing(true);
         try {
-          const signature = `${product.id}:${gachaPackQuantity}`;
+          const signature = `${product.id}:${gachaPackQuantity}:${gachaTotalPoint}`;
           const idempotencyKey =
             purchaseAttempt.current?.signature === signature
               ? purchaseAttempt.current.key
@@ -180,6 +192,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           const response = await purchaseGachaPacks(
             product.id,
             gachaPackQuantity,
+            gachaTotalPoint,
             state.accessToken!,
             idempotencyKey,
           );
@@ -188,6 +201,17 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           showToast(`${response.quantity}팩 구매가 완료됐어요!`);
           router.push(`/gacha/open/${response.drawIds[0]}`);
         } catch (purchaseError) {
+          if (
+            purchaseError instanceof ApiError &&
+            purchaseError.code === 'GACHA_PRODUCT_PRICE_CHANGED'
+          ) {
+            purchaseAttempt.current = null;
+            try {
+              setProduct(await getProduct(product.id));
+            } catch {
+              // 다음 화면 진입 또는 새로고침에서도 서버가 현재 가격을 다시 검증한다.
+            }
+          }
           showToast(
             purchaseError instanceof ApiError
               ? purchaseError.message
@@ -203,7 +227,7 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
 
   return (
     <div className="container">
-      <Link href="/shop" className="text-sm font-semibold text-sub">
+      <Link href={returnTo} className="text-sm font-semibold text-sub">
         ← 상점
       </Link>
       <div className="mt-4 grid items-start gap-7 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
@@ -234,6 +258,11 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
           <p className="mb-[18px] text-[14.5px] leading-[1.7] text-[#6d7a68]">
             {product.description || '상품 설명을 준비하고 있어요.'}
           </p>
+          {isGachaPack && (
+            <p className="mb-[18px] rounded-[14px] border border-[#ddd4f3] bg-[#f7f4ff] px-4 py-3 text-[13px] font-semibold leading-6 text-[#5f527d]">
+              보너스 포인트가 먼저 차감됩니다. 잔액 부족 시 충전포인트로 결제됩니다.
+            </p>
+          )}
           <div className={`mb-[18px] text-[13px] font-bold ${product.soldOut ? 'text-danger' : 'text-brand'}`}>
             {product.soldOut
               ? '품절 · 곧 다시 채워둘게요'
@@ -241,6 +270,12 @@ export default function ProductDetail({ params }: { params: { id: string } }) {
                 ? '팩은 한 번에 1개씩 구매할 수 있어요'
                 : `재고 ${product.stock}개 남았어요`}
           </div>
+
+          {isGachaPack && (
+            <div className="mb-5 rounded-2xl border border-[#e5d899] bg-[#fff9df] px-4 py-3 text-sm leading-6 text-[#725a0b]">
+              카드팩은 무상 포인트를 먼저 사용하고, 부족한 금액만 유상 포인트에서 자동으로 차감해요.
+            </div>
+          )}
 
           {product.category === 'SEEDLING' && product.plantGuide && (
             <div className="mb-5 rounded-2xl bg-[#F6F9EF] px-[18px] py-4">

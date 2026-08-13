@@ -1,6 +1,7 @@
 package com.kiwobollae.api.point.dto.response;
 
 import com.kiwobollae.api.point.entity.PointTransaction;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -15,6 +16,7 @@ public record PointTransactionResponse(
 		Long balanceAfter,
 		PointRefType refType,
 		Long refId,
+		AdminPointAdjustmentReason adjustmentReason,
 		LocalDateTime createdAt
 ) {
 	public static PointTransactionResponse from(PointTransaction pointTransaction) {
@@ -27,6 +29,7 @@ public record PointTransactionResponse(
 				pointTransaction.getBalanceAfter(),
 				pointTransaction.getRefType(),
 				pointTransaction.getRefId(),
+				pointTransaction.getAdjustmentReason(),
 				pointTransaction.getCreatedAt()
 		);
 	}

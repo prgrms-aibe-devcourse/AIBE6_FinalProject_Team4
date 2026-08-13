@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import FilterBar from '@/components/FilterBar';
 import PointPrice from '@/components/PointPrice';
 import { ApiError } from '@/lib/api';
@@ -35,14 +36,48 @@ const SORT_QUERY: Record<string, ProductSort> = {
   high: 'PRICE_DESC',
 };
 
-export default function Shop() {
-  const [cat, setCat] = useState('all');
-  const [sort, setSort] = useState('new');
-  const [page, setPage] = useState(0);
+type ShopSearchParams = {
+  category?: string | string[];
+  sort?: string | string[];
+  page?: string | string[];
+};
+
+const queryValue = (value?: string | string[]) =>
+  Array.isArray(value) ? value[0] : value;
+
+const initialCategory = (params?: ShopSearchParams) => {
+  const value = queryValue(params?.category);
+  return TABS.some((tab) => tab.key === value) ? value! : 'all';
+};
+
+const initialSort = (params?: ShopSearchParams) => {
+  const value = queryValue(params?.sort);
+  return SORTS.some((sort) => sort.key === value) ? value! : 'new';
+};
+
+const initialPage = (params?: ShopSearchParams) => {
+  const value = Number(queryValue(params?.page));
+  return Number.isInteger(value) && value > 0 ? value - 1 : 0;
+};
+
+export default function Shop({ searchParams }: { searchParams?: ShopSearchParams }) {
+  const router = useRouter();
+  const urlCategory = initialCategory(searchParams);
+  const urlSort = initialSort(searchParams);
+  const urlPage = initialPage(searchParams);
+  const [cat, setCat] = useState(urlCategory);
+  const [sort, setSort] = useState(urlSort);
+  const [page, setPage] = useState(urlPage);
   const [products, setProducts] = useState<ProductListItem[]>([]);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setCat(urlCategory);
+    setSort(urlSort);
+    setPage(urlPage);
+  }, [urlCategory, urlPage, urlSort]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -75,15 +110,46 @@ export default function Shop() {
     return () => controller.abort();
   }, [cat, page, sort]);
 
+  const navigate = useCallback(
+    (nextCategory: string, nextSort: string, nextPage: number) => {
+      const params = new URLSearchParams();
+      if (nextCategory !== 'all') params.set('category', nextCategory);
+      if (nextSort !== 'new') params.set('sort', nextSort);
+      params.set('page', String(nextPage + 1));
+      router.replace(`/shop?${params}`, { scroll: false });
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    if (totalPages > 0 && page >= totalPages) {
+      setPage(totalPages - 1);
+      navigate(cat, sort, totalPages - 1);
+    }
+  }, [cat, navigate, page, sort, totalPages]);
+
   const changeCategory = (nextCategory: string) => {
     setCat(nextCategory);
     setPage(0);
+    navigate(nextCategory, sort, 0);
   };
 
   const changeSort = (nextSort: string) => {
     setSort(nextSort);
     setPage(0);
+    navigate(cat, nextSort, 0);
   };
+
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    navigate(cat, sort, nextPage);
+  };
+
+  const returnTo = `/shop?${new URLSearchParams({
+    ...(cat === 'all' ? {} : { category: cat }),
+    ...(sort === 'new' ? {} : { sort }),
+    page: String(page + 1),
+  })}`;
 
   return (
     <div className="container animate-upIn">
@@ -97,6 +163,12 @@ export default function Shop() {
         activeSort={sort}
         onSort={changeSort}
       />
+
+      {cat === 'GACHA_PACK' ? (
+        <div className="mb-5 rounded-2xl border border-[#e5d899] bg-[#fff9df] px-4 py-3 text-sm leading-6 text-[#725a0b]">
+          카드팩은 구매 시 무상 포인트를 먼저 사용하고, 부족한 금액만 유상 포인트에서 자동으로 차감됩니다.
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
@@ -116,7 +188,7 @@ export default function Shop() {
             {products.map((product) => (
               <Link
                 key={product.id}
-                href={`/shop/${product.id}`}
+                href={`/shop/${product.id}?returnTo=${encodeURIComponent(returnTo)}`}
                 className="block overflow-hidden rounded-[20px] bg-white text-ink shadow-card hover:text-ink"
               >
                 <div
@@ -156,7 +228,7 @@ export default function Shop() {
               <button
                 type="button"
                 disabled={page === 0}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
+                onClick={() => changePage(Math.max(0, page - 1))}
                 className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40"
               >
                 이전
@@ -167,7 +239,7 @@ export default function Shop() {
               <button
                 type="button"
                 disabled={page + 1 >= totalPages}
-                onClick={() => setPage((current) => current + 1)}
+                onClick={() => changePage(page + 1)}
                 className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40"
               >
                 다음

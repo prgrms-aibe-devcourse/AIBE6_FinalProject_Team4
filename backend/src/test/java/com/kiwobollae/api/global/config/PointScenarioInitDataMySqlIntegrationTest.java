@@ -7,14 +7,17 @@ import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.commerce.dto.response.OrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
 import com.kiwobollae.api.commerce.service.OrderService;
-import com.kiwobollae.api.content.dto.request.JournalImageRequest;
-import com.kiwobollae.api.content.dto.request.PlantJournalRequest;
-import com.kiwobollae.api.content.dto.response.PlantJournalCreateResponse;
-import com.kiwobollae.api.content.entity.PlantJournal;
-import com.kiwobollae.api.content.entity.PlantProfile;
-import com.kiwobollae.api.content.repository.PlantJournalRepository;
-import com.kiwobollae.api.content.repository.PlantProfileRepository;
-import com.kiwobollae.api.content.service.PlantJournalService;
+import com.kiwobollae.api.journal.dto.request.JournalImageRequest;
+import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
+import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
+import com.kiwobollae.api.journal.entity.PlantJournal;
+import com.kiwobollae.api.plantProfile.entity.PlantProfile;
+import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
+import com.kiwobollae.api.journal.repository.PlantJournalRepository;
+import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
+import com.kiwobollae.api.journal.service.PlantJournalService;
+import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.repository.NotificationRepository;
 import com.kiwobollae.api.point.dto.response.PointActivityResponse;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
@@ -47,11 +50,13 @@ class PointScenarioInitDataMySqlIntegrationTest {
 
 	@Autowired private UserRepository userRepository;
 	@Autowired private PlantJournalRepository plantJournalRepository;
+	@Autowired private DailyJournalRewardRepository dailyJournalRewardRepository;
 	@Autowired private PlantProfileRepository plantProfileRepository;
 	@Autowired private PlantJournalService plantJournalService;
 	@Autowired private PointTransactionService pointTransactionService;
 	@Autowired private WalletService walletService;
 	@Autowired private OrderService orderService;
+	@Autowired private NotificationRepository notificationRepository;
 	@Autowired private PointScenarioInitData pointScenarioInitData;
 
 	@Test
@@ -67,13 +72,12 @@ class PointScenarioInitDataMySqlIntegrationTest {
 				PageRequest.of(0, 100)
 		).getContent();
 		List<PlantProfile> plantProfiles = plantProfileRepository.findAllByUserId(user.getId());
+		assertThat(seededJournals).isNotEmpty().allSatisfy(journal -> {
+			assertThat(journal.getWrittenDate()).isBefore(today);
+			assertThat(journal.getCreatedAt().toLocalDate()).isEqualTo(journal.getWrittenDate());
+		});
 
-		assertThat(seededJournals).isNotEmpty().allMatch(journal -> journal.getWrittenDate().isBefore(today));
-		assertThat(plantProfiles)
-				.extracting(PlantProfile::getJournalRewardGrantedAt)
-				.containsOnlyNulls();
-
-		assertThat(activities).hasSize(7);
+		assertThat(activities).hasSize(9);
 		assertThat(activities)
 				.extracting(PointActivityResponse::type)
 				.contains(
@@ -83,11 +87,24 @@ class PointScenarioInitDataMySqlIntegrationTest {
 						PointTxType.JOURNAL_REWARD
 				);
 
-		PointActivityResponse journalReward = find(
-				activities,
-				PointTxType.JOURNAL_REWARD,
-				PointRefType.JOURNAL_COMPLETION
-		);
+		List<PointActivityResponse> journalRewards = activities.stream()
+				.filter(activity -> activity.type() == PointTxType.JOURNAL_REWARD)
+				.toList();
+		assertThat(journalRewards).hasSize(2).allSatisfy(reward -> {
+			assertThat(reward.amount()).isEqualTo(100L);
+			PlantJournal rewardedJournal = plantJournalRepository.findById(reward.refId()).orElseThrow();
+			assertThat(reward.createdAt()).isEqualTo(rewardedJournal.getCreatedAt());
+		});
+		assertThat(journalRewards)
+				.extracting(reward -> reward.createdAt().toLocalDate())
+				.containsExactlyInAnyOrder(today.minusDays(2), today.minusDays(1));
+		assertThat(dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), today.minusDays(2)))
+				.isTrue();
+		assertThat(dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), today.minusDays(1)))
+				.isTrue();
+		assertThat(notificationRepository.findAll())
+				.noneMatch(notification -> notification.getUser().getId().equals(user.getId())
+						&& notification.getType() == NotificationType.POINT);
 
 		PointActivityResponse orderPurchase = find(
 				activities,
@@ -106,7 +123,16 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(cardPurchase.amount()).isEqualTo(-2_100L);
 		assertThat(cardPurchase.freeAmount()).isEqualTo(-1_940L);
 		assertThat(cardPurchase.paidAmount()).isEqualTo(-160L);
-		assertThat(journalReward.createdAt()).isAfter(cardPurchase.createdAt());
+		assertThat(journalRewards).allSatisfy(reward ->
+				assertThat(reward.createdAt()).isAfter(cardPurchase.createdAt()));
+		PointActivityResponse finalBonusGrant = activities.stream()
+				.filter(activity -> activity.type() == PointTxType.ADMIN_ADJUST
+						&& activity.amount() == 200L
+						&& activity.freeAmount() == 200L)
+				.findFirst()
+				.orElseThrow();
+		assertThat(journalRewards).allSatisfy(reward ->
+				assertThat(reward.createdAt()).isAfter(finalBonusGrant.createdAt()));
 
 		OrderResponse cancelledOrder = orderService.getOrders(user.getId(), PageRequest.of(0, 20)).stream()
 				.filter(order -> order.status() == OrderStatus.CANCELLED)
@@ -116,14 +142,14 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(cancelledOrder.usedPaidPoint()).isEqualTo(900L);
 
 		WalletResponse wallet = walletService.getWallet(user.getId());
-		assertThat(wallet.freePoint()).isEqualTo(100L);
+		assertThat(wallet.freePoint()).isEqualTo(400L);
 		assertThat(wallet.paidPoint()).isEqualTo(7_840L);
 		assertThat(activities.getFirst().freeBalanceAfter()).isEqualTo(wallet.freePoint());
 
 		pointScenarioInitData.run(new DefaultApplicationArguments(new String[0]));
 
-		assertThat(activities(user.getId())).hasSize(7);
-		assertThat(walletService.getWallet(user.getId()).freePoint()).isEqualTo(100L);
+		assertThat(activities(user.getId())).hasSize(9);
+		assertThat(walletService.getWallet(user.getId()).freePoint()).isEqualTo(400L);
 		assertThat(walletService.getWallet(user.getId()).paidPoint()).isEqualTo(7_840L);
 
 		PlantJournalCreateResponse todayJournal = plantJournalService.createJournal(
@@ -142,8 +168,8 @@ class PointScenarioInitDataMySqlIntegrationTest {
 		assertThat(todayJournal.journal().writtenDate()).isEqualTo(today);
 		assertThat(todayJournal.rewardGranted()).isTrue();
 		assertThat(todayJournal.rewardAmount()).isEqualTo(100L);
-		assertThat(activities(user.getId())).hasSize(8);
-		assertThat(walletService.getWallet(user.getId()).freePoint()).isEqualTo(200L);
+		assertThat(activities(user.getId())).hasSize(10);
+		assertThat(walletService.getWallet(user.getId()).freePoint()).isEqualTo(500L);
 	}
 
 	private List<PointActivityResponse> activities(Long userId) {

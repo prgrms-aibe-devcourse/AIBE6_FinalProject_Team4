@@ -96,3 +96,17 @@ export function hideAdminProduct(
     accessToken,
   });
 }
+
+export function uploadAdminProductImage(
+  productId: number,
+  file: File,
+  accessToken: string,
+): Promise<AdminProduct> {
+  const body = new FormData();
+  body.append("file", file);
+  return request<AdminProduct>(`/api/v1/admin/product/${productId}/image`, {
+    method: "POST",
+    accessToken,
+    body,
+  });
+}

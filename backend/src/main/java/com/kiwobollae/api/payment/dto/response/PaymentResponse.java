@@ -29,7 +29,7 @@ public record PaymentResponse(
 				payment.getId(),
 				payment.getUser().getId(),
 				payment.getChargeProduct().getId(),
-				payment.getChargeProduct().getName(),
+				payment.getChargeProductName(),
 				payment.getCashAmount(),
 				payment.getPointAmount(),
 				payment.getStatus(),

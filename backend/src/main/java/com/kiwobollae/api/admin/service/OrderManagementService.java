@@ -11,6 +11,7 @@ import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
 import com.kiwobollae.api.commerce.repository.OrderItemRepository;
 import com.kiwobollae.api.commerce.repository.OrderRepository;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
+import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.notification.entity.enums.NotificationType;
@@ -38,6 +39,7 @@ public class OrderManagementService {
 	private final OrderRepository orderRepository;
 	private final OrderItemRepository orderItemRepository;
 	private final ProductRepository productRepository;
+	private final AssetUrlResolver assetUrlResolver;
 	private final WalletService walletService;
 	private final NotificationService notificationService;
 
@@ -55,7 +57,7 @@ public class OrderManagementService {
 		Map<Long, List<OrderItemResponse>> itemsByOrderId = orderItemRepository.findAllByOrderIdIn(orderIds).stream()
 				.collect(Collectors.groupingBy(
 						item -> item.getOrder().getId(),
-						Collectors.mapping(OrderItemResponse::from, Collectors.toList())
+						Collectors.mapping(this::orderItemResponse, Collectors.toList())
 				));
 		return orders.map(order -> new OrderDetailResponse(
 				OrderResponse.from(order),
@@ -67,9 +69,13 @@ public class OrderManagementService {
 	public OrderDetailResponse getOrderForAdmin(Long id) {
 		Order order = findOrderForAdmin(id);
 		List<OrderItemResponse> items = orderItemRepository.findAllByOrderId(id).stream()
-				.map(OrderItemResponse::from)
+				.map(this::orderItemResponse)
 				.toList();
 		return new OrderDetailResponse(OrderResponse.from(order), items);
+	}
+
+	private OrderItemResponse orderItemResponse(OrderItem item) {
+		return OrderItemResponse.from(item, assetUrlResolver.resolve(item.getProduct().getImageUrl()));
 	}
 
 	@Transactional

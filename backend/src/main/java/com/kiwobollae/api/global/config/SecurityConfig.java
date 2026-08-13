@@ -48,6 +48,7 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/card").permitAll()
 						.requestMatchers(ApiVersion.V1 + "/card/gacha/me/**").authenticated()
 						.requestMatchers(ApiVersion.V1 + "/card/gacha/draws/**").authenticated()
+						.requestMatchers(ApiVersion.V1 + "/card/market/me/**").authenticated()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/card/**").permitAll()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/board/**").permitAll()
 						// <img> 태그는 Authorization 헤더를 못 보내므로, private S3 버킷을 대신 서빙하는

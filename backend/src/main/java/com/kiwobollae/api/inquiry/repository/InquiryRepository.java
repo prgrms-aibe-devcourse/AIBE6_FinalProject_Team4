@@ -24,8 +24,10 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
 	@Query("select i from Inquiry i left join fetch i.answerAdmin where i.id = :id")
 	Optional<Inquiry> findByIdWithAnswerAdmin(@Param("id") Long id);
 
-	// 관리자 전체 목록 조회, status는 null이면 전체
-	@Query(value = "select i from Inquiry i left join fetch i.answerAdmin "
+	// 관리자 전체 목록 조회, status는 null이면 전체. 응답에 작성자 이름(userName)이 매 항목마다
+	// 필요해 i.user도 함께 join fetch한다 — 여러 사용자의 문의가 섞여 있어 findAllByUserId와
+	// 달리 첫 번째 레벨 캐시로는 안 걸러지는 진짜 N+1이 생긴다.
+	@Query(value = "select i from Inquiry i left join fetch i.answerAdmin join fetch i.user "
 			+ "where (:status is null or i.status = :status)",
 			countQuery = "select count(i) from Inquiry i where (:status is null or i.status = :status)")
 	Page<Inquiry> search(@Param("status") InquiryStatus status, Pageable pageable);

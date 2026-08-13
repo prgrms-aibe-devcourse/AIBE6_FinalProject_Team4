@@ -15,11 +15,14 @@ import com.kiwobollae.api.point.entity.Wallet;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentDirection;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentHistoryResponse;
 import com.kiwobollae.api.point.dto.response.PointActivityResponse;
+import com.kiwobollae.api.point.dto.response.PointTransactionResponse;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -252,8 +255,10 @@ class WalletServiceMySqlIntegrationTest {
 
 	@Test
 	void adminAdjustmentHistoryReturnsTargetAndActorWithFilters() {
-		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, 100L);
-		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, -50L);
+		walletService.adjustByAdmin(
+				99L, userId, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT);
+		walletService.adjustByAdmin(
+				99L, userId, CurrencyType.FREE, -50L, AdminPointAdjustmentReason.FRAUD_PENALTY);
 
 		Page<AdminPointAdjustmentHistoryResponse> history =
 				adminPointAdjustmentHistoryService.getAdjustments(
@@ -276,6 +281,8 @@ class WalletServiceMySqlIntegrationTest {
 				.isEqualTo("wallet-integration");
 		assertThat(history.getContent().getFirst().balanceAfter()).isEqualTo(550L);
 		assertThat(history.getContent().getFirst().adminUserId()).isEqualTo(99L);
+		assertThat(history.getContent().getFirst().adjustmentReason())
+				.isEqualTo(AdminPointAdjustmentReason.FRAUD_PENALTY);
 
 		Page<AdminPointAdjustmentHistoryResponse> grants =
 				adminPointAdjustmentHistoryService.getAdjustments(
@@ -352,8 +359,10 @@ class WalletServiceMySqlIntegrationTest {
 
 	@Test
 	void pointActivitiesKeepAdminAdjustmentsAsSeparateEvents() {
-		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, 100L);
-		walletService.adjustByAdmin(99L, userId, CurrencyType.FREE, 200L);
+		walletService.adjustByAdmin(
+				99L, userId, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT);
+		walletService.adjustByAdmin(
+				99L, userId, CurrencyType.FREE, 200L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER);
 
 		Page<PointActivityResponse> activities = pointTransactionService.getActivities(
 				userId,
@@ -368,6 +377,46 @@ class WalletServiceMySqlIntegrationTest {
 		assertThat(activities.getContent())
 				.extracting(PointActivityResponse::amount)
 				.containsExactly(200L, 100L);
+		assertThat(activities.getContent())
+				.extracting(PointActivityResponse::adjustmentReason)
+				.containsExactly(
+						AdminPointAdjustmentReason.OUTSTANDING_MEMBER,
+						AdminPointAdjustmentReason.SPECIAL_EVENT);
+
+		Page<PointTransactionResponse> transactions = pointTransactionService.getTransactions(
+				userId, PointTxType.ADMIN_ADJUST, null, null, PageRequest.of(0, 20));
+		assertThat(transactions.getContent())
+				.extracting(PointTransactionResponse::adjustmentReason)
+				.containsExactlyInAnyOrder(
+						AdminPointAdjustmentReason.OUTSTANDING_MEMBER,
+						AdminPointAdjustmentReason.SPECIAL_EVENT);
+	}
+
+	@Test
+	void legacyAdminAdjustmentWithoutReasonRemainsReadableFromAllHistoryApis() {
+		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
+		pointTransactionRepository.saveAndFlush(PointTransaction.builder()
+				.wallet(wallet)
+				.type(PointTxType.ADMIN_ADJUST)
+				.currencyType(CurrencyType.FREE)
+				.amount(100L)
+				.balanceAfter(600L)
+				.refType(PointRefType.ADMIN)
+				.refId(99L)
+				.createdAt(LocalDateTime.of(2026, 8, 1, 10, 0))
+				.build());
+
+		Page<PointActivityResponse> activities = pointTransactionService.getActivities(
+				userId, PointTxType.ADMIN_ADJUST, null, null, null, PageRequest.of(0, 20));
+		Page<PointTransactionResponse> transactions = pointTransactionService.getTransactions(
+				userId, PointTxType.ADMIN_ADJUST, null, null, PageRequest.of(0, 20));
+		Page<AdminPointAdjustmentHistoryResponse> history =
+				adminPointAdjustmentHistoryService.getAdjustments(
+						userId, null, null, null, null, PageRequest.of(0, 20));
+
+		assertThat(activities.getContent().getFirst().adjustmentReason()).isNull();
+		assertThat(transactions.getContent().getFirst().adjustmentReason()).isNull();
+		assertThat(history.getContent().getFirst().adjustmentReason()).isNull();
 	}
 
 	private Callable<AttemptResult> orderDeductionAttempt(
@@ -459,7 +508,9 @@ class WalletServiceMySqlIntegrationTest {
 		return () -> {
 			awaitStart(ready, start);
 			try {
-				walletService.adjustByAdmin(99L, userId, CurrencyType.PAID, -800L);
+				walletService.adjustByAdmin(
+						99L, userId, CurrencyType.PAID, -800L,
+						AdminPointAdjustmentReason.FRAUD_PENALTY);
 				return AttemptResult.SUCCESS;
 			} catch (BusinessException exception) {
 				if (exception.getErrorCode() == ErrorCode.POINT_INSUFFICIENT_BALANCE) {

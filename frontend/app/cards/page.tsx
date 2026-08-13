@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import FilterBar from '@/components/FilterBar';
 import PointPrice from '@/components/PointPrice';
 import { ApiError } from '@/lib/api';
@@ -24,14 +25,38 @@ const SORTS = [
 const progress = (card: CardData) =>
   (card.ownedCount ?? 0) / card.requiredCountForExchange;
 
-export default function Cards() {
+const PAGE_SIZE = 12;
+type CardSearchParams = {
+  tab?: string | string[];
+  sort?: string | string[];
+  page?: string | string[];
+};
+
+const queryValue = (value?: string | string[]) =>
+  Array.isArray(value) ? value[0] : value;
+
+export default function Cards({ searchParams }: { searchParams?: CardSearchParams }) {
+  const router = useRouter();
   const { state, hydrated } = useStore();
-  const [filter, setFilter] = useState('all');
-  const [sort, setSort] = useState('new');
+  const requestedFilter = queryValue(searchParams?.tab);
+  const requestedSort = queryValue(searchParams?.sort);
+  const requestedPage = Number(queryValue(searchParams?.page));
+  const urlFilter = TABS.some((tab) => tab.key === requestedFilter) ? requestedFilter! : 'all';
+  const urlSort = SORTS.some((item) => item.key === requestedSort) ? requestedSort! : 'new';
+  const urlPage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage - 1 : 0;
+  const [filter, setFilter] = useState(urlFilter);
+  const [sort, setSort] = useState(urlSort);
+  const [page, setPage] = useState(urlPage);
   const [cards, setCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const personalized = cards.some((card) => card.ownedCount !== null);
+
+  useEffect(() => {
+    setFilter(urlFilter);
+    setSort(urlSort);
+    setPage(urlPage);
+  }, [urlFilter, urlPage, urlSort]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -87,6 +112,50 @@ export default function Cards() {
     );
   }
 
+  const totalPages = Math.ceil(list.length / PAGE_SIZE);
+  const visibleCards = list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const navigate = useCallback(
+    (nextFilter: string, nextSort: string, nextPage: number) => {
+      const params = new URLSearchParams();
+      if (nextFilter !== 'all') params.set('tab', nextFilter);
+      if (nextSort !== 'new') params.set('sort', nextSort);
+      params.set('page', String(nextPage + 1));
+      router.replace(`/cards?${params}`, { scroll: false });
+    },
+    [router],
+  );
+
+  const changeFilter = (nextFilter: string) => {
+    setFilter(nextFilter);
+    setPage(0);
+    navigate(nextFilter, sort, 0);
+  };
+
+  const changeSort = (nextSort: string) => {
+    setSort(nextSort);
+    setPage(0);
+    navigate(filter, nextSort, 0);
+  };
+
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    navigate(filter, sort, nextPage);
+  };
+
+  useEffect(() => {
+    if (totalPages > 0 && page >= totalPages) {
+      setPage(totalPages - 1);
+      navigate(filter, sort, totalPages - 1);
+    }
+  }, [filter, navigate, page, sort, totalPages]);
+
+  const returnTo = `/cards?${new URLSearchParams({
+    ...(filter === 'all' ? {} : { tab: filter }),
+    ...(sort === 'new' ? {} : { sort }),
+    page: String(page + 1),
+  })}`;
+
   return (
     <div className="container animate-upIn">
       <h1 className="mb-4 text-2xl font-extrabold">쿠폰</h1>
@@ -94,10 +163,10 @@ export default function Cards() {
       <FilterBar
         tabs={personalized ? TABS : TABS.slice(0, 1)}
         activeTab={filter}
-        onTab={setFilter}
+        onTab={changeFilter}
         sorts={personalized ? SORTS : SORTS.filter((item) => item.key !== 'progress')}
         activeSort={sort}
-        onSort={setSort}
+        onSort={changeSort}
       />
 
       {loading ? (
@@ -114,21 +183,26 @@ export default function Cards() {
         </div>
       ) : (
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-          {list.map((card) => {
+          {visibleCards.map((card) => {
             const ready =
               card.ownedCount !== null &&
               card.ownedCount >= card.requiredCountForExchange;
+            const outOfStock = card.exchangeProductStock <= 0;
             const pct = Math.min(100, Math.round(progress(card) * 100));
             return (
-              <Link
+              <article
                 key={card.id}
-                href={`/cards/${card.id}`}
-                className={`block overflow-hidden rounded-[20px] border-[2.5px] bg-white text-ink shadow-card hover:text-ink ${
+                className={`relative block overflow-hidden rounded-[20px] border-[2.5px] bg-white text-ink shadow-card ${
                   ready ? 'animate-glowPulse border-gold' : 'border-transparent'
                 }`}
               >
+                <Link
+                  href={`/cards/${card.id}?returnTo=${encodeURIComponent(returnTo)}`}
+                  aria-label={`${couponName(card.name)} 상세 보기`}
+                  className="absolute inset-0 z-10"
+                />
                 <div
-                  className="relative grid h-[170px] place-items-center bg-brand-soft bg-cover bg-center text-[78px]"
+                  className="pointer-events-none relative z-0 grid h-[170px] place-items-center bg-brand-soft bg-cover bg-center text-[78px]"
                   style={
                     card.imageUrl
                       ? { backgroundImage: `url("${card.imageUrl}")` }
@@ -137,20 +211,25 @@ export default function Cards() {
                 >
                   {!card.imageUrl && '🃏'}
                   {ready && (
-                    <span className="absolute right-3 top-3 rounded-full bg-gold px-[11px] py-[5px] text-xs font-extrabold text-gold-text">
-                      교환 가능 🎉
+                    <span className={`absolute right-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold ${outOfStock ? 'bg-[#eceee8] text-sub' : 'bg-gold text-gold-text'}`}>
+                      {outOfStock ? '교환 상품 품절' : '교환 가능 🎉'}
                     </span>
                   )}
                 </div>
-                <div className="p-4">
+                <div className="pointer-events-none relative z-10 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-base font-extrabold">{couponName(card.name)}</div>
                     <span className="shrink-0 rounded-full bg-brand-soft px-2 py-1 text-[10.5px] font-extrabold text-brand-dark">
-                      무상 포인트 우선
+                      보너스 포인트 우선
                     </span>
                   </div>
                   <div className="mb-3 mt-[3px] text-[13px] text-sub">
                     모으면 {card.exchangeProductName}(으)로 교환할 수 있어요!
+                  </div>
+                  <div className={`mb-3 text-xs font-bold ${outOfStock ? 'text-danger' : 'text-brand'}`}>
+                    {outOfStock
+                      ? '현재 교환 상품 재고가 없어요'
+                      : `교환 상품 재고 ${card.exchangeProductStock}개`}
                   </div>
                   <div className="flex items-center justify-between">
                     {card.ownedCount === null ? (
@@ -175,12 +254,50 @@ export default function Cards() {
                       />
                     </div>
                   )}
+                  {ready ? (
+                    outOfStock ? (
+                      <div className="pointer-events-auto relative z-20 mt-3 rounded-xl bg-[#eceee8] px-4 py-2.5 text-center text-sm font-extrabold text-sub">
+                        재입고 대기 중
+                      </div>
+                    ) : (
+                      <Link
+                        href={`/exchange/new?cardId=${card.id}`}
+                        className="pointer-events-auto relative z-20 mt-3 block rounded-xl bg-brand px-4 py-2.5 text-center text-sm font-extrabold text-white hover:text-white"
+                      >
+                        바로 교환하기
+                      </Link>
+                    )
+                  ) : null}
                 </div>
-              </Link>
+              </article>
             );
           })}
         </div>
       )}
+
+      {!loading && !error && totalPages > 1 ? (
+        <div className="mt-7 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => changePage(Math.max(0, page - 1))}
+            className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40"
+          >
+            이전
+          </button>
+          <span className="text-sm font-bold text-sub">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page + 1 >= totalPages}
+            onClick={() => changePage(page + 1)}
+            className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40"
+          >
+            다음
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

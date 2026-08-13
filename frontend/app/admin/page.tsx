@@ -3,6 +3,9 @@ import { ApiError } from "@/lib/api";
 import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
 import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
 import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
+import AdminInquiryPanel from "@/components/admin/AdminInquiryPanel";
+import AdminCardMarketRevenuePanel from "@/components/admin/AdminCardMarketRevenuePanel";
+import AdminChargeProductPanel from "@/features/payment/AdminChargeProductPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
 import { formatPhone } from "@/components/AddressForm";
 import {
@@ -14,6 +17,7 @@ import {
   getAdminProducts,
   hideAdminProduct,
   updateAdminProduct,
+  uploadAdminProductImage,
 } from "@/lib/admin-product-api";
 import {
   adminCancelExchange,
@@ -41,8 +45,8 @@ import { fmt, useStore } from "@/lib/store";
 import { couponName } from "@/lib/coupon-label";
 import { ProductCategory } from "@/lib/product-api";
 import { useUI } from "@/lib/ui";
-import { validateCommerceAssetKey } from "@/lib/commerce-asset";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const CANCEL_REASON_OPTIONS = [
   "품절",
@@ -94,15 +98,94 @@ const ROW = "items-center border-t border-[#f2f3ec] px-[18px] py-3.5 text-sm";
 const CHIP = "rounded-full px-2.5 py-1 text-xs font-extrabold";
 const BTN_SOFT =
   "cursor-pointer rounded-[9px] bg-brand-soft px-[13px] py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white";
+const ADMIN_PAGE_SIZE = 10;
+
+function AdminPagination({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-3 border-t border-line px-4 py-4">
+      <button
+        type="button"
+        disabled={page <= 0}
+        onClick={() => onChange(page - 1)}
+        className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
+      >
+        이전
+      </button>
+      <span className="text-sm font-bold text-sub">
+        {page + 1} / {totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={page + 1 >= totalPages}
+        onClick={() => onChange(page + 1)}
+        className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
+      >
+        다음
+      </button>
+    </div>
+  );
+}
 const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   KIT: "재배 키트",
   SEEDLING: "모종",
   GACHA_PACK: "가챠 팩",
 };
 
-export default function Admin() {
+const ADMIN_TABS = [
+  ["orders", "주문 관리"],
+  ["exchanges", "교환 관리"],
+  ["products", "상품 관리"],
+  ["coupons", "쿠폰 관리"],
+  ["gacha-operations", "가챠 장애 관리"],
+  ["card-market-revenue", "거래소 수익"],
+  ["points", "포인트 관리"],
+  ["inquiries", "문의 관리"],
+  ["charge-products", "충전 상품 관리"],
+  ["reports", "신고 관리"],
+  ["species", "종 관리"],
+] as const;
+
+export default function Admin({
+  searchParams,
+}: {
+  searchParams?: { tab?: string | string[]; page?: string | string[] };
+}) {
+  const router = useRouter();
   const { showToast, askConfirm } = useUI();
-  const [tab, setTab] = useState("orders");
+  const requestedTab = Array.isArray(searchParams?.tab)
+    ? searchParams?.tab[0]
+    : searchParams?.tab;
+  const requestedPage = Number(
+    Array.isArray(searchParams?.page)
+      ? searchParams?.page[0]
+      : searchParams?.page,
+  );
+  const urlPage =
+    Number.isInteger(requestedPage) && requestedPage > 0
+      ? requestedPage - 1
+      : 0;
+  const [adminPage, setAdminPage] = useState(urlPage);
+  const [tab, setTab] = useState(() =>
+    ADMIN_TABS.some(([key]) => key === requestedTab) ? requestedTab! : "orders",
+  );
+
+  useEffect(() => {
+    setTab(
+      ADMIN_TABS.some(([key]) => key === requestedTab)
+        ? requestedTab!
+        : "orders",
+    );
+  }, [requestedTab]);
+  useEffect(() => setAdminPage(urlPage), [urlPage]);
   const { state, hydrated } = useStore();
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [orderItemsById, setOrderItemsById] = useState<
@@ -110,6 +193,7 @@ export default function Admin() {
   >({});
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState("");
+  const [ordersTotalPages, setOrdersTotalPages] = useState(0);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -119,9 +203,16 @@ export default function Admin() {
     setOrdersLoading(true);
     setOrdersError("");
 
-    getOrdersForAdmin(accessToken, undefined, 0, 50, controller.signal)
+    getOrdersForAdmin(
+      accessToken,
+      undefined,
+      adminPage,
+      ADMIN_PAGE_SIZE,
+      controller.signal,
+    )
       .then((page) => {
         setOrders(page.content.map((detail) => detail.order));
+        setOrdersTotalPages(page.totalPages);
         const map: Record<number, OrderItemData[]> = {};
         page.content.forEach((detail) => {
           map[detail.order.id] = detail.items;
@@ -146,10 +237,11 @@ export default function Admin() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+  }, [adminPage, hydrated, state.accessToken]);
   const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(true);
   const [exchangesError, setExchangesError] = useState("");
+  const [exchangesTotalPages, setExchangesTotalPages] = useState(0);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -159,8 +251,17 @@ export default function Admin() {
     setExchangesLoading(true);
     setExchangesError("");
 
-    getExchangesForAdmin(accessToken, undefined, 0, 50, controller.signal)
-      .then((page) => setExchanges(page.content))
+    getExchangesForAdmin(
+      accessToken,
+      undefined,
+      adminPage,
+      ADMIN_PAGE_SIZE,
+      controller.signal,
+    )
+      .then((page) => {
+        setExchanges(page.content);
+        setExchangesTotalPages(page.totalPages);
+      })
       .catch((requestError) => {
         if (
           requestError instanceof DOMException &&
@@ -179,7 +280,7 @@ export default function Admin() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+  }, [adminPage, hydrated, state.accessToken]);
 
   const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
   const [speciesLoading, setSpeciesLoading] = useState(true);
@@ -236,6 +337,7 @@ export default function Admin() {
   const [productBusyId, setProductBusyId] = useState<number | null>(null);
   const [stockDeltas, setStockDeltas] = useState<Record<number, string>>({});
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productForm, setProductForm] = useState({
     name: "",
     category: "KIT" as ProductCategory,
@@ -243,7 +345,6 @@ export default function Admin() {
     stock: "0",
     plantId: "",
     description: "",
-    imageUrl: "",
   });
 
   useEffect(() => {
@@ -504,8 +605,8 @@ export default function Admin() {
       stock: "0",
       plantId: "",
       description: "",
-      imageUrl: "",
     });
+    setProductImageFile(null);
   };
 
   const replaceProduct = (next: AdminProduct) => {
@@ -535,15 +636,10 @@ export default function Admin() {
       showToast("재고는 0 이상의 정수로 입력해 주세요.", "err");
       return null;
     }
-    const imageError = validateCommerceAssetKey(
-      productForm.imageUrl,
-      "products",
-      editingProductId,
-    );
-    if (imageError) {
-      showToast(imageError, "err");
-      return null;
-    }
+    const existingImageKey = editingProductId
+      ? (products.find((product) => product.id === editingProductId)
+          ?.imageKey ?? null)
+      : null;
     const plantId = productForm.plantId ? Number(productForm.plantId) : null;
     return {
       name: productForm.name.trim(),
@@ -555,7 +651,7 @@ export default function Admin() {
           ? plantId
           : null,
       description: productForm.description.trim() || null,
-      imageUrl: productForm.imageUrl.trim() || null,
+      imageUrl: existingImageKey,
     };
   };
 
@@ -565,9 +661,16 @@ export default function Admin() {
     if (!input) return;
     setProductSubmitting(true);
     try {
-      const saved = editingProductId
+      let saved = editingProductId
         ? await updateAdminProduct(editingProductId, input, state.accessToken)
         : await createAdminProduct(input, state.accessToken);
+      if (productImageFile) {
+        saved = await uploadAdminProductImage(
+          saved.id,
+          productImageFile,
+          state.accessToken,
+        );
+      }
       replaceProduct(saved);
       showToast(
         editingProductId ? "상품 정보를 수정했어요." : "새 상품을 등록했어요.",
@@ -594,8 +697,8 @@ export default function Admin() {
       stock: String(product.stock),
       plantId: product.plantId ? String(product.plantId) : "",
       description: product.description ?? "",
-      imageUrl: product.imageKey ?? "",
     });
+    setProductImageFile(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -698,16 +801,21 @@ export default function Admin() {
     showToast(msg);
   };
 
-  const TABS = [
-    ["orders", "주문 관리"],
-    ["exchanges", "교환 관리"],
-    ["products", "상품 관리"],
-    ["coupons", "쿠폰 관리"],
-    ["gacha-operations", "가챠 장애 관리"],
-    ["points", "포인트 관리"],
-    ["reports", "신고 관리"],
-    ["species", "종 관리"],
-  ];
+  const changeTab = (nextTab: string) => {
+    setTab(nextTab);
+    setAdminPage(0);
+    router.replace(nextTab === "orders" ? "/admin" : `/admin?tab=${nextTab}`, {
+      scroll: false,
+    });
+  };
+
+  const changeAdminPage = (nextPage: number) => {
+    setAdminPage(nextPage);
+    const params = new URLSearchParams();
+    if (tab !== "orders") params.set("tab", tab);
+    params.set("page", String(nextPage + 1));
+    router.replace(`/admin?${params}`, { scroll: false });
+  };
 
   return (
     <div className="container">
@@ -732,11 +840,11 @@ export default function Admin() {
       </div>
 
       <div className="mb-[22px] flex w-fit flex-wrap gap-1.5 rounded-[14px] bg-[#F0F2E8] p-[5px]">
-        {TABS.map(([k, label]) => (
+        {ADMIN_TABS.map(([k, label]) => (
           <button
             key={k}
             type="button"
-            onClick={() => setTab(k)}
+            onClick={() => changeTab(k)}
             className={`cursor-pointer rounded-[11px] px-[18px] py-[9px] text-sm font-bold transition-colors duration-150 ${
               tab === k
                 ? "bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,.06)]"
@@ -824,7 +932,9 @@ export default function Admin() {
                     {o.address} {o.addressDetail}
                     {cancelled && (o.cancelReason || o.cancelledBy) && (
                       <span className="ml-2 font-semibold text-[#b5502f]">
-                        {o.cancelledBy === "ADMIN" ? "관리자 취소" : "본인 취소"}
+                        {o.cancelledBy === "ADMIN"
+                          ? "관리자 취소"
+                          : "본인 취소"}
                         {o.cancelReason && ` · 사유: ${o.cancelReason}`}
                       </span>
                     )}
@@ -836,7 +946,8 @@ export default function Admin() {
                         ? "표시할 상품 정보가 없어요."
                         : orderItemsById[o.id]
                             .map(
-                              (item) => `${item.productName} × ${item.quantity}`,
+                              (item) =>
+                                `${item.productName} × ${item.quantity}`,
                             )
                             .join(", ")}
                   </div>
@@ -844,6 +955,11 @@ export default function Admin() {
               );
             })
           )}
+          <AdminPagination
+            page={adminPage}
+            totalPages={ordersTotalPages}
+            onChange={changeAdminPage}
+          />
         </div>
       )}
 
@@ -910,6 +1026,11 @@ export default function Admin() {
               );
             })
           )}
+          <AdminPagination
+            page={adminPage}
+            totalPages={exchangesTotalPages}
+            onChange={changeAdminPage}
+          />
         </div>
       )}
 
@@ -1054,12 +1175,16 @@ export default function Admin() {
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <AdminAssetKeyField
-                value={productForm.imageUrl}
-                onChange={(imageUrl) =>
-                  setProductForm({ ...productForm, imageUrl })
+                file={productImageFile}
+                onFileChange={setProductImageFile}
+                previewUrl={
+                  editingProductId
+                    ? products.find(
+                        (product) => product.id === editingProductId,
+                      )?.imageUrl
+                    : null
                 }
-                prefix="products"
-                resourceId={editingProductId}
+                disabled={productSubmitting}
               />
               <label className="text-xs font-bold text-sub">
                 설명
@@ -1117,164 +1242,198 @@ export default function Admin() {
                   등록된 상점 상품이 없어요.
                 </div>
               ) : (
-                products.map((product) => {
-                  const busy = productBusyId === product.id;
-                  return (
-                    <div
-                      key={product.id}
-                      className={`grid grid-cols-[1.7fr_.8fr_.8fr_2.3fr_.7fr_1.4fr] ${ROW}`}
-                    >
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        {product.imageUrl ? (
-                          <div
-                            className="h-10 w-10 flex-none rounded-lg bg-brand-soft bg-cover bg-center"
-                            style={{
-                              backgroundImage: `url("${product.imageUrl}")`,
-                            }}
-                          />
-                        ) : (
-                          <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-brand-soft text-xl">
-                            {product.category === "GACHA_PACK" ? "🎴" : "🌱"}
-                          </span>
-                        )}
-                        <div className="min-w-0">
-                          <div className="truncate font-bold">
-                            {product.name}
-                          </div>
-                          <div className="truncate text-xs text-sub">
-                            {product.description || "설명 없음"}
+                products
+                  .slice(
+                    adminPage * ADMIN_PAGE_SIZE,
+                    (adminPage + 1) * ADMIN_PAGE_SIZE,
+                  )
+                  .map((product) => {
+                    const busy = productBusyId === product.id;
+                    return (
+                      <div
+                        key={product.id}
+                        className={`grid grid-cols-[1.7fr_.8fr_.8fr_2.3fr_.7fr_1.4fr] ${ROW}`}
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          {product.imageUrl ? (
+                            <div
+                              className="h-10 w-10 flex-none rounded-lg bg-brand-soft bg-cover bg-center"
+                              style={{
+                                backgroundImage: `url("${product.imageUrl}")`,
+                              }}
+                            />
+                          ) : (
+                            <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-brand-soft text-xl">
+                              {product.category === "GACHA_PACK" ? "🎴" : "🌱"}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <div className="truncate font-bold">
+                              {product.name}
+                            </div>
+                            <div className="truncate text-xs text-sub">
+                              {product.description || "설명 없음"}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-xs font-bold text-sub">
-                        {PRODUCT_CATEGORY_LABEL[product.category]}
-                      </div>
-                      <div className="font-bold text-gold-text">
-                        {fmt(product.pointPrice)}P
-                      </div>
-                      <div>
-                        {product.unlimitedStock ? (
-                          <span className="font-extrabold text-brand-text">
-                            무제한 재고 · 1회 1팩 구매
-                          </span>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              disabled={busy || product.stock < 1}
-                              onClick={() =>
-                                void adjustProductStock(product, -1)
-                              }
-                              className="h-7 w-7 rounded-lg bg-[#f0f1ea] font-black disabled:opacity-35"
-                            >
-                              −
-                            </button>
-                            <span
-                              className={`min-w-12 text-center font-extrabold ${product.soldOut ? "text-danger" : "text-brand-text"}`}
-                            >
-                              {product.soldOut ? "품절" : `${product.stock}개`}
+                        <div className="text-xs font-bold text-sub">
+                          {PRODUCT_CATEGORY_LABEL[product.category]}
+                        </div>
+                        <div className="font-bold text-gold-text">
+                          {fmt(product.pointPrice)}P
+                        </div>
+                        <div>
+                          {product.unlimitedStock ? (
+                            <span className="font-extrabold text-brand-text">
+                              무제한 재고 · 1회 1팩 구매
                             </span>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void adjustProductStock(product, 1)
-                              }
-                              className="h-7 w-7 rounded-lg bg-brand-soft font-black text-brand-dark disabled:opacity-35"
-                            >
-                              +
-                            </button>
-                            <input
-                              type="number"
-                              step={1}
-                              value={stockDeltas[product.id] ?? ""}
-                              onChange={(event) =>
-                                setStockDeltas((current) => ({
-                                  ...current,
-                                  [product.id]: event.target.value,
-                                }))
-                              }
-                              aria-label={`${product.name} 재고 증감량`}
-                              placeholder="±수량"
-                              className="ml-1 w-16 rounded-lg border border-line px-2 py-1 text-xs outline-none"
-                            />
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => applyStockDelta(product)}
-                              className="rounded-lg bg-[#f0f1ea] px-2 py-1 text-[11px] font-bold disabled:opacity-35"
-                            >
-                              적용
-                            </button>
-                            {product.stock > 0 && (
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={busy || product.stock < 1}
+                                onClick={() =>
+                                  void adjustProductStock(product, -1)
+                                }
+                                className="h-7 w-7 rounded-lg bg-[#f0f1ea] font-black disabled:opacity-35"
+                              >
+                                −
+                              </button>
+                              <span
+                                className={`min-w-12 text-center font-extrabold ${product.soldOut ? "text-danger" : "text-brand-text"}`}
+                              >
+                                {product.soldOut
+                                  ? "품절"
+                                  : `${product.stock}개`}
+                              </span>
                               <button
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
-                                  void adjustProductStock(
-                                    product,
-                                    -product.stock,
-                                  )
+                                  void adjustProductStock(product, 1)
                                 }
-                                className="ml-1 rounded-lg border border-danger/30 px-2 py-1 text-[11px] font-bold text-danger disabled:opacity-35"
+                                className="h-7 w-7 rounded-lg bg-brand-soft font-black text-brand-dark disabled:opacity-35"
                               >
-                                품절 처리
+                                +
                               </button>
-                            )}
-                          </div>
-                        )}
+                              <input
+                                type="number"
+                                step={1}
+                                value={stockDeltas[product.id] ?? ""}
+                                onChange={(event) =>
+                                  setStockDeltas((current) => ({
+                                    ...current,
+                                    [product.id]: event.target.value,
+                                  }))
+                                }
+                                aria-label={`${product.name} 재고 증감량`}
+                                placeholder="±수량"
+                                className="ml-1 w-16 rounded-lg border border-line px-2 py-1 text-xs outline-none"
+                              />
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => applyStockDelta(product)}
+                                className="rounded-lg bg-[#f0f1ea] px-2 py-1 text-[11px] font-bold disabled:opacity-35"
+                              >
+                                적용
+                              </button>
+                              {product.stock > 0 && (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void adjustProductStock(
+                                      product,
+                                      -product.stock,
+                                    )
+                                  }
+                                  className="ml-1 rounded-lg border border-danger/30 px-2 py-1 text-[11px] font-bold text-danger disabled:opacity-35"
+                                >
+                                  품절 처리
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void toggleProduct(product)}
+                            aria-pressed={product.status === "ACTIVE"}
+                            aria-label={`${product.name} ${product.status === "ACTIVE" ? "숨기기" : "노출하기"}`}
+                            className={`relative inline-block h-[26px] w-[46px] cursor-pointer rounded-full transition-colors disabled:opacity-40 ${product.status === "ACTIVE" ? "bg-brand" : "bg-[#d7dccd]"}`}
+                          >
+                            <span
+                              className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-[left] ${product.status === "ACTIVE" ? "left-[23px]" : "left-[3px]"}`}
+                            />
+                          </button>
+                        </div>
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => editProduct(product)}
+                            className={BTN_SOFT}
+                          >
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy || product.status === "HIDDEN"}
+                            onClick={() => confirmHideProduct(product)}
+                            className="cursor-pointer rounded-[9px] bg-danger-soft px-3 py-[7px] text-[12px] font-bold text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </div>
-                      <div>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void toggleProduct(product)}
-                          aria-pressed={product.status === "ACTIVE"}
-                          aria-label={`${product.name} ${product.status === "ACTIVE" ? "숨기기" : "노출하기"}`}
-                          className={`relative inline-block h-[26px] w-[46px] cursor-pointer rounded-full transition-colors disabled:opacity-40 ${product.status === "ACTIVE" ? "bg-brand" : "bg-[#d7dccd]"}`}
-                        >
-                          <span
-                            className={`absolute top-[3px] h-5 w-5 rounded-full bg-white transition-[left] ${product.status === "ACTIVE" ? "left-[23px]" : "left-[3px]"}`}
-                          />
-                        </button>
-                      </div>
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => editProduct(product)}
-                          className={BTN_SOFT}
-                        >
-                          수정
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy || product.status === "HIDDEN"}
-                          onClick={() => confirmHideProduct(product)}
-                          className="cursor-pointer rounded-[9px] bg-danger-soft px-3 py-[7px] text-[12px] font-bold text-danger disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
               )}
+              <AdminPagination
+                page={adminPage}
+                totalPages={Math.ceil(products.length / ADMIN_PAGE_SIZE)}
+                onChange={changeAdminPage}
+              />
             </div>
           </div>
         </div>
       )}
 
-      {tab === "points" && (
-        <AdminPointAdjustmentPanel accessToken={state.accessToken} />
+      {tab === "points" && state.accessToken && state.user && (
+        <AdminPointAdjustmentPanel
+          accessToken={state.accessToken}
+          adminUserId={state.user.id}
+        />
+      )}
+
+      {tab === "charge-products" && state.accessToken && state.user && (
+        <AdminChargeProductPanel
+          accessToken={state.accessToken}
+          adminUserId={state.user.id}
+        />
       )}
 
       {tab === "coupons" && state.accessToken && (
-        <AdminCouponPanel accessToken={state.accessToken} />
+        <AdminCouponPanel
+          accessToken={state.accessToken}
+          page={adminPage}
+          onPageChange={changeAdminPage}
+        />
       )}
 
       {tab === "gacha-operations" && state.accessToken && (
         <AdminGachaOperationsPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "inquiries" && state.accessToken && (
+        <AdminInquiryPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "card-market-revenue" && state.accessToken && (
+        <AdminCardMarketRevenuePanel accessToken={state.accessToken} />
       )}
 
       {tab === "species" && (

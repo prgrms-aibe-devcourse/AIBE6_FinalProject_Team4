@@ -1,5 +1,6 @@
 package com.kiwobollae.api.point.dto.response;
 
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.projection.PointActivityProjection;
@@ -10,6 +11,7 @@ public record PointActivityResponse(
 		PointTxType type,
 		PointRefType refType,
 		Long refId,
+		AdminPointAdjustmentReason adjustmentReason,
 		Long amount,
 		Long paidAmount,
 		Long freeAmount,
@@ -25,6 +27,9 @@ public record PointActivityResponse(
 						? null
 						: PointRefType.valueOf(projection.getRefType()),
 				projection.getRefId(),
+				projection.getAdjustmentReason() == null
+						? null
+						: AdminPointAdjustmentReason.valueOf(projection.getAdjustmentReason()),
 				projection.getAmount(),
 				projection.getPaidAmount(),
 				projection.getFreeAmount(),

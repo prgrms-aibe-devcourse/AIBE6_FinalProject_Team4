@@ -1,9 +1,10 @@
 'use client';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { formatDate } from '@/lib/format';
-import { getJournals, PlantJournalData } from '@/lib/journal-api';
+import { getDailyJournalRewardStatus, getJournals, PlantJournalData } from '@/lib/journal-api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { useStore } from '@/lib/store';
+import PlantJournalAssistant from '@/features/journal/PlantJournalAssistant';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
@@ -18,9 +19,11 @@ export default function JournalsPage() {
   const { state, hydrated } = useStore();
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
+  const [dailyRewardGranted, setDailyRewardGranted] = useState(false);
   const [selectedProfileIds, setSelectedProfileIds] = useState<number[]>([]); // [] = 전체
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [monthFilter, setMonthFilter] = useState(currentMonth); // "" = 전체, else "YYYY-MM"
+  const [chatPlantId, setChatPlantId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const monthInputRef = useRef<HTMLInputElement>(null);
@@ -35,12 +38,14 @@ export default function JournalsPage() {
     const [year, month] = monthFilter ? monthFilter.split('-').map(Number) : [undefined, undefined];
 
     Promise.all([
-      getMyPlants(accessToken, controller.signal),
+      getMyPlants({ accessToken, size: 100, signal: controller.signal }),
       getJournals({ year, month, size: 100 }, accessToken, controller.signal),
+      getDailyJournalRewardStatus(accessToken, controller.signal),
     ])
-      .then(([plantList, journalPage]) => {
-        setPlants(plantList);
+      .then(([plantPage, journalPage, rewardStatus]) => {
+        setPlants(plantPage.content);
         setJournals(journalPage.content);
+        setDailyRewardGranted(rewardStatus.rewardGrantedToday);
       })
       .catch((requestError) => {
         if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
@@ -70,15 +75,13 @@ export default function JournalsPage() {
 
   // 실패한 식물은 더 이상 새 일지를 못 쓰므로(journals/new의 selectPlant 참고) 오늘 포인트 요약 대상에서 뺀다.
   const eligiblePlants = plants.filter((p) => p.status !== 'FAILED');
-  const rewardedTodayCount = eligiblePlants.filter((p) => p.journalRewardGrantedToday).length;
+  const chatPlant = eligiblePlants.find((plant) => plant.id === chatPlantId) ?? eligiblePlants[0] ?? null;
   const todayRewardSummary =
     eligiblePlants.length === 0
       ? null
-      : rewardedTodayCount === eligiblePlants.length
-        ? '오늘 모든 식물의 포인트를 다 받았어요! 🎉'
-        : rewardedTodayCount > 0
-          ? `오늘 ${eligiblePlants.length}개 중 ${rewardedTodayCount}개 식물에서 포인트를 받았어요 ☀️`
-          : '아직 오늘 포인트를 받은 식물이 없어요. 일지를 남겨보세요 🌱';
+      : dailyRewardGranted
+        ? '오늘의 일지 보상을 받았어요! 🎉'
+        : '아직 오늘 일지 보상을 받지 않았어요. 일지를 남겨보세요 🌱';
 
   return (
     <div className="container">
@@ -204,6 +207,26 @@ export default function JournalsPage() {
           </div>
         </div>
       )}
+
+      <PlantJournalAssistant
+        plant={
+          chatPlant
+            ? {
+                id: chatPlant.id,
+                nickname: chatPlant.nickname,
+                speciesName: chatPlant.speciesName,
+              }
+            : null
+        }
+        plantOptions={eligiblePlants.map((plant) => ({
+          id: plant.id,
+          nickname: plant.nickname,
+          speciesName: plant.speciesName,
+        }))}
+        plantOptionsLoading={loading}
+        onPlantChange={setChatPlantId}
+        accessToken={state.accessToken}
+      />
     </div>
   );
 }

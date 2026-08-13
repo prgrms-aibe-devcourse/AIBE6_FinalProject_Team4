@@ -11,8 +11,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -49,6 +51,19 @@ public class GlobalExceptionHandler {
 				.map(fe -> new ErrorResponse.FieldError(fe.getField(), fe.getDefaultMessage()))
 				.toList();
 		return respond(ErrorCode.COMMON_VALIDATION_FAILED, null, null, fieldErrors, request);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+		return respond(ErrorCode.COMMON_VALIDATION_FAILED, null, null, null, request);
+	}
+
+	@ExceptionHandler(MissingRequestHeaderException.class)
+	public ResponseEntity<ErrorResponse> handleMissingRequestHeader(
+			MissingRequestHeaderException e,
+			HttpServletRequest request
+	) {
+		return respond(ErrorCode.COMMON_VALIDATION_FAILED, null, null, null, request);
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)

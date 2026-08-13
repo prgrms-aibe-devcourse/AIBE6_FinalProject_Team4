@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { reportPaymentFailure } from "@/features/payment/api";
 import { TOSS_PENDING_ORDER_STORAGE_KEY } from "@/features/payment/toss-payment";
 import { ApiError } from "@/lib/api";
@@ -15,43 +15,64 @@ function TossPaymentFailContent() {
   const canceled = code === "PAY_PROCESS_CANCELED";
   const { state, hydrated } = useStore();
   const started = useRef(false);
+  const syncing = useRef(false);
   const [syncStatus, setSyncStatus] = useState<
     "idle" | "syncing" | "completed" | "failed"
   >("idle");
   const [syncError, setSyncError] = useState("");
+  const [canRetrySync, setCanRetrySync] = useState(false);
 
-  useEffect(() => {
-    if (!hydrated || started.current || !code) return;
+  const syncPaymentFailure = useCallback(async () => {
+    if (!hydrated || !code || syncing.current) return;
     const providerOrderId = sessionStorage.getItem(
       TOSS_PENDING_ORDER_STORAGE_KEY,
     );
     if (!providerOrderId || !state.accessToken) {
       setSyncStatus("failed");
       setSyncError("결제 내역을 자동으로 정리하지 못했어요.");
+      setCanRetrySync(false);
       return;
     }
 
-    started.current = true;
+    syncing.current = true;
     setSyncStatus("syncing");
-    reportPaymentFailure(
-      state.accessToken,
-      providerOrderId,
-      code,
-      `failure-${providerOrderId}`,
-    )
-      .then(() => {
-        sessionStorage.removeItem(TOSS_PENDING_ORDER_STORAGE_KEY);
-        setSyncStatus("completed");
-      })
-      .catch((requestError) => {
-        setSyncStatus("failed");
-        setSyncError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : "결제 내역을 자동으로 정리하지 못했어요.",
-        );
-      });
+    setSyncError("");
+    setCanRetrySync(false);
+    try {
+      await reportPaymentFailure(
+        state.accessToken,
+        providerOrderId,
+        code,
+        `failure-${providerOrderId}`,
+      );
+      sessionStorage.removeItem(TOSS_PENDING_ORDER_STORAGE_KEY);
+      setSyncStatus("completed");
+    } catch (requestError) {
+      setSyncStatus("failed");
+      setSyncError(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "결제 내역을 자동으로 정리하지 못했어요.",
+      );
+      setCanRetrySync(true);
+    } finally {
+      syncing.current = false;
+    }
   }, [code, hydrated, state.accessToken]);
+
+  useEffect(() => {
+    if (!hydrated || started.current || !code) return;
+    if (!state.accessToken) {
+      setSyncStatus("failed");
+      setSyncError(
+        "로그인 정보를 확인할 수 없어 결제 내역을 정리하지 못했어요.",
+      );
+      setCanRetrySync(false);
+      return;
+    }
+    started.current = true;
+    void syncPaymentFailure();
+  }, [code, hydrated, state.accessToken, syncPaymentFailure]);
 
   return (
     <div className="container max-w-[560px] py-16 text-center">
@@ -80,7 +101,18 @@ function TossPaymentFailContent() {
           </p>
         )}
         {syncStatus === "failed" && (
-          <p className="mt-3 text-xs font-bold text-danger">{syncError}</p>
+          <div className="mt-3">
+            <p className="text-xs font-bold text-danger">{syncError}</p>
+            {canRetrySync && (
+              <button
+                type="button"
+                onClick={() => void syncPaymentFailure()}
+                className="mt-3 cursor-pointer rounded-xl border border-danger px-4 py-2 text-xs font-extrabold text-danger"
+              >
+                결제 내역 다시 정리
+              </button>
+            )}
+          </div>
         )}
         <div className="mt-7 flex justify-center gap-2">
           <Link

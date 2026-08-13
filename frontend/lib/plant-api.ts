@@ -12,7 +12,6 @@ export interface PlantProfileData {
   thumbnailUrl: string | null;
   status: PlantStatus;
   createdAt: string;
-  journalRewardGrantedToday: boolean;
 }
 
 export interface PlantProfileRequest {
@@ -39,11 +38,37 @@ export function createPlant(
   });
 }
 
-export function getMyPlants(
-  accessToken: string,
-  signal?: AbortSignal,
-): Promise<PlantProfileData[]> {
-  return request<PlantProfileData[]>('/api/v1/plants', {
+export interface PlantProfilePage {
+  content: PlantProfileData[];
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  numberOfElements: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+export interface GetMyPlantsParams {
+  accessToken: string;
+  status?: PlantStatus;
+  page?: number;
+  size?: number;
+  signal?: AbortSignal;
+}
+
+export function getMyPlants({
+  accessToken,
+  status,
+  page = 0,
+  size = 20,
+  signal,
+}: GetMyPlantsParams): Promise<PlantProfilePage> {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  if (status) query.set('status', status);
+
+  return request<PlantProfilePage>(`/api/v1/plants?${query.toString()}`, {
     accessToken,
     signal,
   });

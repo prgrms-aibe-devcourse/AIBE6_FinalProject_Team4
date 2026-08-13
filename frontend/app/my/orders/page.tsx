@@ -4,6 +4,7 @@ import { ApiError } from '@/lib/api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import { useRouter } from 'next/navigation';
 import { formatPhone } from '@/components/AddressForm';
 import {
   cancelOrder,
@@ -29,7 +30,12 @@ const CHIP = 'rounded-full px-[11px] py-1 text-xs font-extrabold';
 
 const formatDate = (iso: string) => iso.slice(0, 10).replaceAll('-', '.');
 
-export default function Orders() {
+export default function Orders({
+  searchParams,
+}: {
+  searchParams?: { page?: string | string[] };
+}) {
+  const router = useRouter();
   const { state, hydrated, refreshWallet } = useStore();
   const { showToast, askConfirm } = useUI();
   const [orders, setOrders] = useState<OrderData[]>([]);
@@ -37,16 +43,31 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyIds, setBusyIds] = useState<Record<number, boolean>>({});
+  const requestedPage = Number(
+    Array.isArray(searchParams?.page) ? searchParams?.page[0] : searchParams?.page,
+  );
+  const [page, setPage] = useState(
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage - 1 : 0,
+  );
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    const nextPage = Number(
+      Array.isArray(searchParams?.page) ? searchParams?.page[0] : searchParams?.page,
+    );
+    setPage(Number.isInteger(nextPage) && nextPage > 0 ? nextPage - 1 : 0);
+  }, [searchParams?.page]);
 
   const load = useCallback(async () => {
     if (!state.accessToken) return;
     setLoading(true);
     setError('');
     try {
-      const page = await getOrders(state.accessToken);
-      setOrders(page.content);
+      const response = await getOrders(state.accessToken, page, 10);
+      setOrders(response.content);
+      setTotalPages(response.totalPages);
       const details = await Promise.all(
-        page.content.map((order) => getOrder(order.id, state.accessToken)),
+        response.content.map((order) => getOrder(order.id, state.accessToken)),
       );
       const map: Record<number, OrderItemData[]> = {};
       details.forEach((detail) => { map[detail.order.id] = detail.items; });
@@ -60,7 +81,12 @@ export default function Orders() {
     } finally {
       setLoading(false);
     }
-  }, [state.accessToken]);
+  }, [page, state.accessToken]);
+
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    router.replace(`/my/orders?page=${nextPage + 1}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (!hydrated) return;
@@ -173,7 +199,18 @@ export default function Orders() {
                 <div className="mb-3.5 flex flex-col gap-2">
                   {items.map((item) => (
                     <div key={item.id} className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand-soft text-[22px]">🌱</div>
+                      <div
+                        className="flex h-11 w-11 items-center justify-center rounded-[11px] bg-brand-soft bg-cover bg-center text-[22px]"
+                        style={
+                          item.imageUrl
+                            ? { backgroundImage: `url("${item.imageUrl}")` }
+                            : undefined
+                        }
+                        role={item.imageUrl ? "img" : undefined}
+                        aria-label={item.imageUrl ? item.productName : undefined}
+                      >
+                        {!item.imageUrl && "🌱"}
+                      </div>
                       <div className="flex-1 text-sm font-semibold">{item.productName} <span className="text-faint">× {item.quantity}</span></div>
                     </div>
                   ))}
@@ -239,6 +276,13 @@ export default function Orders() {
           })}
         </div>
       )}
+      {!loading && !error && totalPages > 1 ? (
+        <div className="mt-7 flex items-center justify-center gap-3">
+          <button type="button" disabled={page === 0} onClick={() => changePage(page - 1)} className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40">이전</button>
+          <span className="text-sm font-bold text-sub">{page + 1} / {totalPages}</span>
+          <button type="button" disabled={page + 1 >= totalPages} onClick={() => changePage(page + 1)} className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40">다음</button>
+        </div>
+      ) : null}
     </div>
   );
 }

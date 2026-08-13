@@ -13,6 +13,8 @@ public interface PointActivityProjection {
 
 	Long getRefId();
 
+	String getAdjustmentReason();
+
 	Long getAmount();
 
 	Long getPaidAmount();

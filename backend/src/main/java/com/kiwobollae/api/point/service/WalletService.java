@@ -9,6 +9,7 @@ import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -30,6 +32,7 @@ public class WalletService {
 
 	private final WalletRepository walletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
+	private final PointTransactionTimeProvider pointTransactionTimeProvider;
 
 	/** POINT-10: 일반·소셜 회원가입 트랜잭션에서 지갑 자동 생성(paid=0, free=0). auth 도메인이 호출. */
 	@Transactional
@@ -55,11 +58,16 @@ public class WalletService {
 			Long adminUserId,
 			Long userId,
 			CurrencyType currency,
-			long amount
+			long amount,
+			AdminPointAdjustmentReason adjustmentReason
 	) {
 		if (adminUserId == null || adminUserId < 1
-				|| userId == null || userId < 1 || currency == null || amount == 0) {
+				|| userId == null || userId < 1 || currency == null || amount == 0
+				|| adjustmentReason == null || !adjustmentReason.supports(amount)) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+		if (adminUserId.equals(userId)) {
+			throw new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN);
 		}
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
@@ -69,13 +77,19 @@ public class WalletService {
 				currency,
 				amount,
 				PointRefType.ADMIN,
-				adminUserId
+				adminUserId,
+				adjustmentReason
 		);
 		return AdminPointAdjustmentResponse.from(userId, transaction, wallet);
 	}
 
-	/** 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다. */
-	@Transactional
+	/**
+	 * 성장 일지 작성 보상으로 무상 포인트 100P를 한 번만 지급한다.
+	 *
+	 * <p>호출 중인 트랜잭션이 있으면 반드시 참여한다. 일지 보상 판정·카드팩·알림과 함께 처리하는 흐름에서
+	 * 포인트 원장만 별도로 커밋되지 않게 하기 위함이다.
+	 */
+	@Transactional(propagation = Propagation.REQUIRED)
 	public JournalRewardResult rewardJournal(Long userId, Long journalId) {
 		validateJournalRewardRequest(userId, journalId);
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
@@ -316,6 +330,7 @@ public class WalletService {
 	 * 포인트 증감 공통 프리미티브: 지갑 행을 비관적 락으로 잠근 뒤 한 통화(currency)의 잔액에
 	 * 부호 있는 delta를 적용하고, 불변 원장(balance_after 스냅샷)을 같은 트랜잭션에 기록한다.
 	 * deduct/credit/reward 등 상위 흐름이 이 메서드를 조합해 사용한다.
+	 * 관리자 조정은 사유 검증과 저장을 보장하는 {@link #adjustByAdmin}만 사용한다.
 	 *
 	 * <p>정책: paid_point와 free_point 모두 음수가 될 수 없다. 하한 위반 시
 	 * {@code POINT_INSUFFICIENT_BALANCE}를 반환한다.
@@ -323,12 +338,13 @@ public class WalletService {
 	@Transactional
 	public PointTransaction applyDelta(Long userId, PointTxType type, CurrencyType currency,
 			long amount, PointRefType refType, Long refId) {
-		if (userId == null || userId < 1 || type == null || currency == null || amount == 0) {
+		if (userId == null || userId < 1 || type == null || type == PointTxType.ADMIN_ADJUST
+				|| currency == null || amount == 0) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
-		return applyDeltaToWallet(wallet, type, currency, amount, refType, refId);
+		return applyDeltaToWallet(wallet, type, currency, amount, refType, refId, null);
 	}
 
 	private PointTransaction applyDeltaToWallet(
@@ -337,7 +353,8 @@ public class WalletService {
 			CurrencyType currency,
 			long amount,
 			PointRefType refType,
-			Long refId
+			Long refId,
+			AdminPointAdjustmentReason adjustmentReason
 	) {
 		long currentBalance = currency == CurrencyType.PAID
 				? wallet.getPaidPoint()
@@ -366,6 +383,8 @@ public class WalletService {
 				.balanceAfter(balanceAfter)
 				.refType(refType)
 				.refId(refId)
+				.adjustmentReason(adjustmentReason)
+				.createdAt(pointTransactionTimeProvider.now())
 				.build();
 		return pointTransactionRepository.save(tx);
 	}
@@ -387,6 +406,7 @@ public class WalletService {
 				.balanceAfter(balanceAfter)
 				.refType(refType)
 				.refId(refId)
+				.createdAt(pointTransactionTimeProvider.now())
 				.build());
 	}
 
