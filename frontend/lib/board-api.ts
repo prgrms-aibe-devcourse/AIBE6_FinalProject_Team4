@@ -12,6 +12,7 @@ export interface BoardPostData {
   title: string;
   content: string;
   journalId: number | null;
+  imageUrls: string[];
   viewCount: number;
   likeCount: number;
   commentCount: number;
@@ -39,11 +40,36 @@ export interface BoardPostCreatePayload {
   title: string;
   content: string;
   journalId?: number | null;
+  imageUrls?: string[];
 }
 
 export interface BoardPostUpdatePayload {
   title: string;
   content: string;
+  imageUrls?: string[];
+}
+
+export interface BoardImageUploadData {
+  imageUrl: string;
+}
+
+export function uploadBoardImage(file: File, accessToken: string): Promise<BoardImageUploadData> {
+  const formData = new FormData();
+  formData.append('file', file);
+  return request<BoardImageUploadData>('/api/v1/board/images', {
+    method: 'POST',
+    accessToken,
+    body: formData,
+  });
+}
+
+// 업로드는 성공했지만 뒤이은 작성/수정이 실패해 게시글에 연결되지 못한 이미지를 정리한다.
+// best-effort 정리이므로 실패해도 호출부의 에러 처리를 방해하지 않도록 별도로 호출한다.
+export function deleteBoardImage(imageUrl: string, accessToken: string): Promise<void> {
+  return request<void>(`/api/v1/board/images?imageUrl=${encodeURIComponent(imageUrl)}`, {
+    method: 'DELETE',
+    accessToken,
+  });
 }
 
 export interface BoardCommentCreatePayload {

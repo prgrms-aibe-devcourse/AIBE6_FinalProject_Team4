@@ -22,6 +22,7 @@ import com.kiwobollae.api.board.entity.BoardPostLike;
 import com.kiwobollae.api.board.entity.enums.BoardCategory;
 import com.kiwobollae.api.board.entity.enums.BoardHiddenBy;
 import com.kiwobollae.api.board.entity.enums.BoardStatus;
+import com.kiwobollae.api.board.repository.BoardPostImageRepository;
 import com.kiwobollae.api.board.repository.BoardPostLikeRepository;
 import com.kiwobollae.api.board.repository.BoardPostRepository;
 import com.kiwobollae.api.board.repository.BoardPostViewRepository;
@@ -49,9 +50,11 @@ class BoardPostServiceTest {
 	@Mock private BoardPostRepository boardPostRepository;
 	@Mock private BoardPostLikeRepository boardPostLikeRepository;
 	@Mock private BoardPostViewRepository boardPostViewRepository;
+	@Mock private BoardPostImageRepository boardPostImageRepository;
 	@Mock private UserRepository userRepository;
 	@Mock private PlantJournalRepository plantJournalRepository;
 	@Mock private PlantJournalService plantJournalService;
+	@Mock private BoardImageUploadService boardImageUploadService;
 	@InjectMocks private BoardPostService boardPostService;
 
 	private User mockUser(Long id, UserRole role) {
@@ -84,7 +87,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.save(any(BoardPost.class))).willReturn(saved);
 
 		BoardPostResponse response = boardPostService.createPost(
-				1L, new BoardPostCreateRequest(BoardCategory.FREE, "제목", "내용", null)
+				1L, new BoardPostCreateRequest(BoardCategory.FREE, "제목", "내용", null, null)
 		);
 
 		assertThat(response.id()).isEqualTo(10L);
@@ -97,7 +100,7 @@ class BoardPostServiceTest {
 		given(userRepository.getReferenceById(1L)).willReturn(user);
 
 		assertThatThrownBy(() -> boardPostService.createPost(
-				1L, new BoardPostCreateRequest(BoardCategory.NOTICE, "제목", "내용", null)
+				1L, new BoardPostCreateRequest(BoardCategory.NOTICE, "제목", "내용", null, null)
 		)).isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_NOTICE_FORBIDDEN);
@@ -111,7 +114,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.save(any(BoardPost.class))).willReturn(saved);
 
 		BoardPostResponse response = boardPostService.createPost(
-				1L, new BoardPostCreateRequest(BoardCategory.NOTICE, "공지", "내용", null)
+				1L, new BoardPostCreateRequest(BoardCategory.NOTICE, "공지", "내용", null, null)
 		);
 
 		assertThat(response.id()).isEqualTo(10L);
@@ -123,7 +126,7 @@ class BoardPostServiceTest {
 		given(userRepository.getReferenceById(1L)).willReturn(user);
 
 		assertThatThrownBy(() -> boardPostService.createPost(
-				1L, new BoardPostCreateRequest(BoardCategory.PLANT_QNA, "제목", "내용", null)
+				1L, new BoardPostCreateRequest(BoardCategory.PLANT_QNA, "제목", "내용", null, null)
 		)).isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_JOURNAL_REQUIRED);
@@ -136,7 +139,7 @@ class BoardPostServiceTest {
 		given(plantJournalRepository.findOwnedActive(99L, 1L)).willReturn(Optional.empty());
 
 		assertThatThrownBy(() -> boardPostService.createPost(
-				1L, new BoardPostCreateRequest(BoardCategory.PLANT_QNA, "제목", "내용", 99L)
+				1L, new BoardPostCreateRequest(BoardCategory.PLANT_QNA, "제목", "내용", 99L, null)
 		)).isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_JOURNAL_NOT_OWNED);
@@ -151,7 +154,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.save(any(BoardPost.class))).willReturn(saved);
 
 		BoardPostResponse response = boardPostService.createPost(
-				1L, new BoardPostCreateRequest(BoardCategory.PLANT_QNA, "제목", "내용", 99L)
+				1L, new BoardPostCreateRequest(BoardCategory.PLANT_QNA, "제목", "내용", 99L, null)
 		);
 
 		assertThat(response.id()).isEqualTo(10L);
@@ -288,7 +291,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
 
 		BoardPostResponse response =
-				boardPostService.updatePost(1L, 10L, new BoardPostUpdateRequest("새 제목", "새 내용"));
+				boardPostService.updatePost(1L, 10L, new BoardPostUpdateRequest("새 제목", "새 내용", null));
 
 		verify(post).update("새 제목", "새 내용");
 		assertThat(response.id()).isEqualTo(10L);
@@ -300,7 +303,7 @@ class BoardPostServiceTest {
 		BoardPost post = mockPost(10L, owner, BoardStatus.ACTIVE);
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
 
-		assertThatThrownBy(() -> boardPostService.updatePost(2L, 10L, new BoardPostUpdateRequest("새 제목", "새 내용")))
+		assertThatThrownBy(() -> boardPostService.updatePost(2L, 10L, new BoardPostUpdateRequest("새 제목", "새 내용", null)))
 				.isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_POST_NOT_OWNED);

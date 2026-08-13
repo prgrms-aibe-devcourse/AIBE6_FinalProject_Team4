@@ -142,7 +142,10 @@ public enum ErrorCode {
 	BOARD_COMMENT_NOT_OWNED(HttpStatus.FORBIDDEN, "본인이 작성한 댓글만 수정·삭제할 수 있습니다."),
 	BOARD_ALREADY_LIKED(HttpStatus.CONFLICT, "이미 좋아요를 눌렀습니다."),
 	BOARD_LIKE_NOT_FOUND(HttpStatus.NOT_FOUND, "좋아요를 누르지 않았습니다."),
-	BOARD_JOURNAL_NOT_LINKED(HttpStatus.NOT_FOUND, "연동된 성장 일지가 없습니다.");
+	BOARD_JOURNAL_NOT_LINKED(HttpStatus.NOT_FOUND, "연동된 성장 일지가 없습니다."),
+	BOARD_IMAGE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "jpg, png, webp 형식의 이미지만 업로드할 수 있습니다."),
+	BOARD_IMAGE_UPLOAD_FAILED(HttpStatus.BAD_GATEWAY, "이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요."),
+	BOARD_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "이미지는 1장까지 첨부할 수 있습니다.");
 
 	private final HttpStatus httpStatus;
 	private final String defaultMessage;

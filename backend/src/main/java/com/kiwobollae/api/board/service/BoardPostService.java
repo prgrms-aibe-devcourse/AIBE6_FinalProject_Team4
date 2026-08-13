@@ -7,11 +7,13 @@ import com.kiwobollae.api.board.dto.request.BoardPostCreateRequest;
 import com.kiwobollae.api.board.dto.request.BoardPostUpdateRequest;
 import com.kiwobollae.api.board.dto.response.BoardPostResponse;
 import com.kiwobollae.api.board.entity.BoardPost;
+import com.kiwobollae.api.board.entity.BoardPostImage;
 import com.kiwobollae.api.board.entity.BoardPostLike;
 import com.kiwobollae.api.board.entity.BoardPostView;
 import com.kiwobollae.api.board.entity.enums.BoardCategory;
 import com.kiwobollae.api.board.entity.enums.BoardHiddenBy;
 import com.kiwobollae.api.board.entity.enums.BoardStatus;
+import com.kiwobollae.api.board.repository.BoardPostImageRepository;
 import com.kiwobollae.api.board.repository.BoardPostLikeRepository;
 import com.kiwobollae.api.board.repository.BoardPostRepository;
 import com.kiwobollae.api.board.repository.BoardPostViewRepository;
@@ -22,8 +24,11 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -41,9 +46,11 @@ public class BoardPostService {
 	private final BoardPostRepository boardPostRepository;
 	private final BoardPostLikeRepository boardPostLikeRepository;
 	private final BoardPostViewRepository boardPostViewRepository;
+	private final BoardPostImageRepository boardPostImageRepository;
 	private final UserRepository userRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final PlantJournalService plantJournalService;
+	private final BoardImageUploadService boardImageUploadService;
 
 	@Transactional
 	public BoardPostResponse createPost(Long userId, BoardPostCreateRequest request) {
@@ -67,17 +74,22 @@ public class BoardPostService {
 		BoardPost post = boardPostRepository.save(
 				BoardPost.create(user, request.category(), request.title(), request.content(), journalId)
 		);
-		return BoardPostResponse.from(post);
+		List<BoardPostImage> images = saveImages(post, request.imageUrls());
+		return BoardPostResponse.from(post, images);
 	}
 
 	public Page<BoardPostResponse> getPosts(BoardCategory category, Pageable pageable, Long userId) {
 		Page<BoardPost> posts = boardPostRepository.search(BoardStatus.ACTIVE, category, pageable);
-		if (userId == null || posts.isEmpty()) {
-			return posts.map(BoardPostResponse::from);
+		if (posts.isEmpty()) {
+			return posts.map(post -> BoardPostResponse.from(post, List.of()));
 		}
 		List<Long> postIds = posts.map(BoardPost::getId).toList();
-		Set<Long> likedPostIds = Set.copyOf(boardPostLikeRepository.findLikedPostIds(userId, postIds));
-		return posts.map(post -> BoardPostResponse.from(post, likedPostIds.contains(post.getId())));
+		Map<Long, List<BoardPostImage>> imagesByPost = loadImagesByPost(postIds);
+		Set<Long> likedPostIds = userId == null
+				? Set.of()
+				: Set.copyOf(boardPostLikeRepository.findLikedPostIds(userId, postIds));
+		return posts.map(post -> BoardPostResponse.from(
+				post, imagesByPost.getOrDefault(post.getId(), List.of()), likedPostIds.contains(post.getId())));
 	}
 
 	@Transactional
@@ -87,7 +99,8 @@ public class BoardPostService {
 			recordViewOnce(post, viewerIp);
 		}
 		boolean likedByMe = userId != null && boardPostLikeRepository.existsByPostIdAndUserId(id, userId);
-		return BoardPostResponse.from(post, likedByMe);
+		List<BoardPostImage> images = boardPostImageRepository.findByPostIdOrderBySortOrderAsc(id);
+		return BoardPostResponse.from(post, images, likedByMe);
 	}
 
 	// 같은 IP의 재조회는 조회수를 올리지 않는다. existsBy 사전 체크와 저장 사이의 동시성 경쟁으로
@@ -131,19 +144,57 @@ public class BoardPostService {
 	public BoardPostResponse updatePost(Long userId, Long id, BoardPostUpdateRequest request) {
 		BoardPost post = findOwnedActivePost(userId, id);
 		post.update(request.title(), request.content());
-		return BoardPostResponse.from(post);
+
+		// 이미지 전체 교체: 기존 이미지를 먼저 지우고 새 목록을 저장한다. 그대로 남은(교체 안 한)
+		// 이미지의 S3 객체까지 지우면 안 되므로, 새 목록에서 실제로 빠진 것만 골라 정리한다.
+		List<BoardPostImage> oldImages = boardPostImageRepository.findByPostIdOrderBySortOrderAsc(id);
+		boardPostImageRepository.deleteByPostId(id);
+		List<BoardPostImage> images = saveImages(post, request.imageUrls());
+
+		Set<String> keptUrls = Set.copyOf(request.imageUrls());
+		oldImages.stream()
+				.map(BoardPostImage::getImageUrl)
+				.filter(url -> !keptUrls.contains(url))
+				.forEach(url -> boardImageUploadService.delete(url, userId));
+
+		return BoardPostResponse.from(post, images);
 	}
 
 	@Transactional
 	public void deletePost(Long userId, Long id) {
 		BoardPost post = findOwnedActivePost(userId, id);
-		post.hide(BoardHiddenBy.AUTHOR, LocalDateTime.now(KST));
+		hidePostAndCleanImages(post, BoardHiddenBy.AUTHOR, userId);
 	}
 
 	@Transactional
 	public void adminHidePost(Long id) {
 		BoardPost post = findActivePost(id);
-		post.hide(BoardHiddenBy.ADMIN, LocalDateTime.now(KST));
+		hidePostAndCleanImages(post, BoardHiddenBy.ADMIN, post.getUser().getId());
+	}
+
+	// 숨김 처리는 복구 API가 없어 사실상 영구 삭제와 같으므로, 더 이상 어떤 게시글도 참조하지
+	// 않는 S3 객체를 이 시점에 정리한다(성장 일지의 deleteJournal과 동일한 컨벤션).
+	private void hidePostAndCleanImages(BoardPost post, BoardHiddenBy hiddenBy, Long ownerUserId) {
+		List<BoardPostImage> images = boardPostImageRepository.findByPostIdOrderBySortOrderAsc(post.getId());
+		post.hide(hiddenBy, LocalDateTime.now(KST));
+		images.forEach(image -> boardImageUploadService.delete(image.getImageUrl(), ownerUserId));
+	}
+
+	private List<BoardPostImage> saveImages(BoardPost post, List<String> imageUrls) {
+		if (imageUrls.size() > 1) {
+			throw new BusinessException(ErrorCode.BOARD_IMAGE_LIMIT_EXCEEDED);
+		}
+		List<BoardPostImage> images = new ArrayList<>();
+		for (int i = 0; i < imageUrls.size(); i++) {
+			images.add(BoardPostImage.create(post, imageUrls.get(i), i, LocalDateTime.now(KST)));
+		}
+		return boardPostImageRepository.saveAll(images);
+	}
+
+	// 페이지에 담긴 게시글들의 이미지를 한 번에 로딩해 postId로 묶는다 (개별 조회로 인한 N+1 방지).
+	private Map<Long, List<BoardPostImage>> loadImagesByPost(List<Long> postIds) {
+		return boardPostImageRepository.findByPostIdIn(postIds).stream()
+				.collect(Collectors.groupingBy(image -> image.getPost().getId()));
 	}
 
 	@Transactional

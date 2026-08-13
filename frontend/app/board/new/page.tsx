@@ -1,14 +1,17 @@
 'use client';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
-import { ApiError } from '@/lib/api';
-import { BoardCategory, createBoardPost } from '@/lib/board-api';
+import { ApiError, resolveImageUrl } from '@/lib/api';
+import { BoardCategory, createBoardPost, deleteBoardImage, uploadBoardImage } from '@/lib/board-api';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 
 const TITLE_MAX = 100;
 const CONTENT_MAX = 2000;
+const MAX_IMAGES = 1;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const BASE_CATEGORIES: { key: BoardCategory; label: string }[] = [
   { key: 'FREE', label: '자유게시판' },
@@ -21,6 +24,7 @@ function NewBoardPostInner() {
   const preselectJournalId = params.get('journalId');
   const { state, hydrated } = useStore();
   const { showToast } = useUI();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = state.user?.role === 'ADMIN';
   const categories = isAdmin ? [{ key: 'NOTICE' as BoardCategory, label: '공지사항' }, ...BASE_CATEGORIES] : BASE_CATEGORIES;
@@ -32,6 +36,8 @@ function NewBoardPostInner() {
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
   const [journalsLoading, setJournalsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken || category !== 'PLANT_QNA') return;
@@ -57,6 +63,43 @@ function NewBoardPostInner() {
     if (next !== 'PLANT_QNA') setJournalId(null);
   };
 
+  const pickImages = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !state.accessToken) return;
+    const accessToken = state.accessToken;
+    const remaining = MAX_IMAGES - imageUrls.length;
+    if (remaining <= 0) return showToast(`이미지는 최대 ${MAX_IMAGES}장까지 첨부할 수 있어요.`, 'err');
+
+    const files_ = Array.from(files).slice(0, remaining);
+    setUploadingImage(true);
+    try {
+      for (const file of files_) {
+        if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+          showToast('jpg, png, webp 형식만 가능해요.', 'err');
+          continue;
+        }
+        if (file.size > MAX_IMAGE_SIZE) {
+          showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+          continue;
+        }
+        const uploaded = await uploadBoardImage(file, accessToken);
+        setImageUrls((prev) => [...prev, uploaded.imageUrl]);
+      }
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError ? requestError.message : '이미지 업로드에 실패했어요.',
+        'err',
+      );
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (url: string) => {
+    setImageUrls((prev) => prev.filter((u) => u !== url));
+    if (state.accessToken) deleteBoardImage(url, state.accessToken).catch(() => {});
+  };
+
   const submit = async () => {
     if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
     if (!title.trim()) return showToast('제목을 입력해 주세요.', 'err');
@@ -73,6 +116,7 @@ function NewBoardPostInner() {
           title: title.trim(),
           content: content.trim(),
           journalId: category === 'PLANT_QNA' ? journalId : null,
+          imageUrls,
         },
         state.accessToken,
       );
@@ -154,6 +198,41 @@ function NewBoardPostInner() {
             )}
           </>
         )}
+
+        <div className="mb-[5px] font-extrabold">사진 (선택, 최대 {MAX_IMAGES}장)</div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(e) => pickImages(e.target.files)}
+          className="hidden"
+        />
+        <div className="mb-[22px] flex flex-wrap gap-2.5">
+          {imageUrls.map((url) => (
+            <div key={url} className="relative h-20 w-20 overflow-hidden rounded-[12px] border-[1.5px] border-line">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={resolveImageUrl(url)} alt="" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => removeImage(url)}
+                className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-black/60 text-xs text-white"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {imageUrls.length < MAX_IMAGES && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingImage}
+              className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-[12px] border-[1.5px] border-dashed border-line bg-[#f9faf6] text-[#a9b3a0] disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-2xl">add_photo_alternate</span>
+              <span className="text-[11px] font-bold">{uploadingImage ? '업로드 중...' : '사진 추가'}</span>
+            </button>
+          )}
+        </div>
 
         <div className="mb-2.5 font-extrabold">제목</div>
         <input

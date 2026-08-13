@@ -538,6 +538,21 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
           </Link>
         )}
 
+        {post.imageUrls.length > 0 && (
+          <div className="mb-5 flex flex-wrap gap-2.5">
+            {post.imageUrls.map((url) => (
+              <a key={url} href={resolveImageUrl(url)} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={resolveImageUrl(url)}
+                  alt=""
+                  className="max-h-[480px] max-w-full cursor-pointer rounded-[16px]"
+                />
+              </a>
+            ))}
+          </div>
+        )}
+
         <p className="mb-6 whitespace-pre-wrap text-[15px] leading-[1.75] text-ink">{post.content}</p>
 
         <div className="flex flex-wrap items-center gap-2.5">
