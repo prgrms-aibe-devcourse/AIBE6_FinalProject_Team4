@@ -105,7 +105,7 @@ public class PlantJournalService {
 					userId,
 					NotificationType.POINT,
 					"일지 작성 보너스 포인트가 지급됐어요",
-					"오늘의 성장 일지 작성 보상으로 보너스 포인트 100P가 지급됐어요.",
+					"일지 작성 보상 100P 지급",
 					"/my/points",
 					"DAILY_JOURNAL_REWARD",
 					dailyReward.getId()
