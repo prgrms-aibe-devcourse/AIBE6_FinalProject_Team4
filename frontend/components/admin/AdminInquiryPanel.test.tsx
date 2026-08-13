@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminInquiryPanel from "@/components/admin/AdminInquiryPanel";
+import { ApiError } from "@/lib/api";
 
 const mocks = vi.hoisted(() => ({
   getInquiriesForAdmin: vi.fn(),
@@ -82,6 +83,62 @@ describe("AdminInquiryPanel", () => {
     expect(mocks.answerInquiry).toHaveBeenCalledWith(1, "확인해 보겠습니다.", "token");
     expect(mocks.getInquiriesForAdmin).toHaveBeenCalledTimes(2);
     expect(mocks.showToast).toHaveBeenCalledWith("답변을 등록했어요.");
+  });
+
+  it("다른 관리자가 먼저 답변해 409가 나면 목록을 새로고침하고 모달을 닫는다", async () => {
+    mocks.getInquiriesForAdmin
+      .mockResolvedValueOnce({ content: [openInquiry], totalElements: 1, totalPages: 1 })
+      .mockResolvedValueOnce({
+        content: [{ ...openInquiry, status: "ANSWERED", answerContent: "다른 관리자가 먼저 답변함" }],
+        totalElements: 1,
+        totalPages: 1,
+      });
+    mocks.answerInquiry.mockRejectedValue(
+      new ApiError("INQUIRY_INVALID_STATE", "이미 답변이 완료된 문의입니다.", 409),
+    );
+
+    render(<AdminInquiryPanel accessToken="token" />);
+    fireEvent.click(await screen.findByRole("button", { name: "답변하기" }));
+    fireEvent.change(screen.getByPlaceholderText("답변 내용을 입력해 주세요."), {
+      target: { value: "확인하겠습니다." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "답변 등록" }));
+
+    expect(await screen.findByRole("button", { name: "답변 보기" })).toBeInTheDocument();
+    expect(mocks.showToast).toHaveBeenCalledWith("이미 답변이 완료된 문의입니다.", "err");
+    expect(mocks.getInquiriesForAdmin).toHaveBeenCalledTimes(2);
+    expect(
+      screen.queryByPlaceholderText("답변 내용을 입력해 주세요."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("마지막 페이지의 마지막 항목에 답변하면 이전 페이지로 물러난다", async () => {
+    const firstPageItem = { ...openInquiry, id: 1, title: "결제가 안 돼요" };
+    const secondPageItem = { ...openInquiry, id: 3, title: "환불 문의" };
+
+    mocks.getInquiriesForAdmin
+      .mockResolvedValueOnce({ content: [firstPageItem], totalElements: 2, totalPages: 2 })
+      .mockResolvedValueOnce({ content: [secondPageItem], totalElements: 2, totalPages: 2 })
+      .mockResolvedValueOnce({ content: [], totalElements: 1, totalPages: 1 })
+      .mockResolvedValueOnce({ content: [firstPageItem], totalElements: 1, totalPages: 1 });
+    mocks.answerInquiry.mockResolvedValue({ ...secondPageItem, status: "ANSWERED" });
+
+    render(<AdminInquiryPanel accessToken="token" />);
+    await screen.findByText("결제가 안 돼요");
+
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await screen.findByText("환불 문의");
+
+    fireEvent.click(screen.getByRole("button", { name: "답변하기" }));
+    fireEvent.change(screen.getByPlaceholderText("답변 내용을 입력해 주세요."), {
+      target: { value: "환불 처리했습니다." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "답변 등록" }));
+
+    expect(await screen.findByText("결제가 안 돼요")).toBeInTheDocument();
+    expect(screen.queryByText("조건에 맞는 문의가 없어요")).not.toBeInTheDocument();
+    expect(mocks.getInquiriesForAdmin).toHaveBeenCalledTimes(4);
+    expect(mocks.getInquiriesForAdmin).toHaveBeenLastCalledWith("token", undefined, 0, 20, expect.anything());
   });
 
   it("답변완료 항목은 답변 내용을 읽기 전용으로 보여준다", async () => {

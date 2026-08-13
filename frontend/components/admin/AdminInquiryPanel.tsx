@@ -59,6 +59,12 @@ export default function AdminInquiryPanel({
 
       return getInquiriesForAdmin(accessToken, status || undefined, page, 20, signal)
         .then((result) => {
+          // 답변 등록으로 필터 조건을 벗어난 항목이 빠지면서 마지막 페이지가 사라질 수 있다 —
+          // 그 경우 빈 결과를 그대로 보여주는 대신 이전 페이지로 물러나 다시 불러온다.
+          if (result.content.length === 0 && page > 0 && result.totalElements > 0) {
+            setPage((current) => Math.max(0, current - 1));
+            return;
+          }
           setInquiries(result.content);
           setTotalPages(result.totalPages);
           setTotalElements(result.totalElements);
@@ -117,6 +123,12 @@ export default function AdminInquiryPanel({
           : "답변 등록에 실패했어요.",
         "err",
       );
+      // 다른 관리자가 먼저 답변해 백엔드가 409로 거부한 경우, 이 행은 이미 답변완료 상태다 —
+      // 목록을 새로고침하지 않으면 버튼이 계속 "답변하기"로 남아 재시도를 유도하게 된다.
+      if (requestError instanceof ApiError && requestError.status === 409) {
+        setSelected(null);
+        void load();
+      }
     } finally {
       setSubmitting(false);
     }
