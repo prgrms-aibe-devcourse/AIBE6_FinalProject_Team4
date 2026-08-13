@@ -52,6 +52,7 @@ const BOTTOM = [
 
 const BOTTOM_MORE = [
   { key: 'cards', label: '쿠폰', icon: 'style', href: '/cards' },
+  { key: 'market', label: '거래소', icon: 'playing_cards', href: '/card-market' },
   { key: 'account', label: '마이페이지', icon: 'person', href: '/my' },
 ];
 
