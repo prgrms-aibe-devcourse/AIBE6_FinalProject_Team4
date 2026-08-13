@@ -6,10 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.commerce.entity.Card;
@@ -43,13 +43,13 @@ class ExchangeRefundServiceTest {
 		User user = mock(User.class);
 		Card card = mock(Card.class);
 		ExchangeProduct product = mock(ExchangeProduct.class);
-		lenient().when(user.getId()).thenReturn(7L);
-		lenient().when(card.getId()).thenReturn(1L);
-		lenient().when(product.getId()).thenReturn(10L);
-		lenient().when(order.getUser()).thenReturn(user);
-		lenient().when(order.getCard()).thenReturn(card);
-		lenient().when(order.getExchangeProduct()).thenReturn(product);
-		lenient().when(order.getUsedCardCount()).thenReturn(3);
+		when(user.getId()).thenReturn(7L);
+		when(card.getId()).thenReturn(1L);
+		when(product.getId()).thenReturn(10L);
+		when(order.getUser()).thenReturn(user);
+		when(order.getCard()).thenReturn(card);
+		when(order.getExchangeProduct()).thenReturn(product);
+		when(order.getUsedCardCount()).thenReturn(3);
 		return order;
 	}
 
