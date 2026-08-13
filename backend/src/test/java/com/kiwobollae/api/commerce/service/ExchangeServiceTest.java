@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -218,40 +217,33 @@ class ExchangeServiceTest {
 	// ---- cancelExchange ----
 
 	@Test
-	void cancelExchangeRefundsCardAndStockOnSuccess() {
-		ExchangeOrder order = mockOrder(50L, ExchangeStatus.REQUESTED, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findByIdAndUserId(50L, 7L)).willReturn(Optional.of(order));
-		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.USER), eq("단순 변심"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
-		)).willReturn(1);
+	void cancelExchangeDelegatesToRefundServiceOnSuccess() {
+		given(exchangeOrderRepository.existsByIdAndUserId(50L, 7L)).willReturn(true);
 
 		exchangeService.cancelExchange(7L, 50L, "단순 변심");
 
-		verify(exchangeRefundService).refund(order);
+		verify(exchangeRefundService).cancelAndRefund(50L, CancelledBy.USER, "단순 변심");
 	}
 
 	@Test
 	void cancelExchangeFailsWhenNotOwned() {
-		given(exchangeOrderRepository.findByIdAndUserId(50L, 7L)).willReturn(Optional.empty());
+		given(exchangeOrderRepository.existsByIdAndUserId(50L, 7L)).willReturn(false);
 
 		assertThatThrownBy(() -> exchangeService.cancelExchange(7L, 50L, "단순 변심"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_NOT_FOUND));
-		verify(exchangeOrderRepository, never()).cancelIfMatches(any(), any(), any(), any(), any());
+		verify(exchangeRefundService, never()).cancelAndRefund(any(), any(), any());
 	}
 
 	@Test
-	void cancelExchangeFailsWhenStatusAlreadyChanged() {
-		ExchangeOrder order = mockOrder(50L, ExchangeStatus.REQUESTED, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findByIdAndUserId(50L, 7L)).willReturn(Optional.of(order));
-		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.USER), eq("단순 변심"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
-		)).willReturn(0);
+	void cancelExchangePropagatesInvalidStateFromRefundService() {
+		given(exchangeOrderRepository.existsByIdAndUserId(50L, 7L)).willReturn(true);
+		given(exchangeRefundService.cancelAndRefund(50L, CancelledBy.USER, "단순 변심"))
+				.willThrow(new BusinessException(ErrorCode.EXCHANGE_INVALID_STATE));
 
 		assertThatThrownBy(() -> exchangeService.cancelExchange(7L, 50L, "단순 변심"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_INVALID_STATE));
-		verify(exchangeRefundService, never()).refund(any());
 	}
 
 }

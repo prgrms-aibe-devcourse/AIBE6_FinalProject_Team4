@@ -55,21 +55,8 @@ public class ExchangeManagementService {
 
 	@Transactional
 	public ExchangeOrderResponse adminCancelExchange(Long id, String reason) {
-		int cancelled = exchangeOrderRepository.cancelIfMatches(
-				id,
-				CancelledBy.ADMIN,
-				reason,
-				LocalDateTime.now(KST),
-				ExchangeStatus.REQUESTED
-		);
-		if (cancelled == 0) {
-			throwNotFoundOrInvalidState(id);
-		}
-
-		ExchangeOrder exchangeOrder = findExchangeForAdmin(id);
-		ExchangeOrderResponse response = ExchangeOrderResponse.from(exchangeOrder);
-		exchangeRefundService.refund(exchangeOrder);
-		return response;
+		ExchangeOrder exchangeOrder = exchangeRefundService.cancelAndRefund(id, CancelledBy.ADMIN, reason);
+		return ExchangeOrderResponse.from(exchangeOrder);
 	}
 
 	private ExchangeOrderResponse transitionStatus(Long id, ExchangeStatus newStatus, ExchangeStatus expectedStatus) {

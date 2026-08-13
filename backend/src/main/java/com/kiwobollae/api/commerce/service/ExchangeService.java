@@ -8,7 +8,6 @@ import com.kiwobollae.api.commerce.entity.ExchangeOrder;
 import com.kiwobollae.api.commerce.entity.ExchangeProduct;
 import com.kiwobollae.api.commerce.entity.enums.ActiveStatus;
 import com.kiwobollae.api.commerce.entity.enums.CancelledBy;
-import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.commerce.repository.CardRepository;
 import com.kiwobollae.api.commerce.repository.ExchangeOrderRepository;
 import com.kiwobollae.api.commerce.repository.ExchangeProductRepository;
@@ -93,20 +92,10 @@ public class ExchangeService {
 
 	@Transactional
 	public void cancelExchange(Long userId, Long id, String reason) {
-		ExchangeOrder exchangeOrder = exchangeOrderRepository.findByIdAndUserId(id, userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.EXCHANGE_NOT_FOUND));
-
-		int cancelled = exchangeOrderRepository.cancelIfMatches(
-				id,
-				CancelledBy.USER,
-				reason,
-				LocalDateTime.now(KST),
-				ExchangeStatus.REQUESTED
-		);
-		if (cancelled == 0) {
-			throw new BusinessException(ErrorCode.EXCHANGE_INVALID_STATE);
+		if (!exchangeOrderRepository.existsByIdAndUserId(id, userId)) {
+			throw new BusinessException(ErrorCode.EXCHANGE_NOT_FOUND);
 		}
 
-		exchangeRefundService.refund(exchangeOrder);
+		exchangeRefundService.cancelAndRefund(id, CancelledBy.USER, reason);
 	}
 }
