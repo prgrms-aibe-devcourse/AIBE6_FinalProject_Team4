@@ -66,14 +66,15 @@ public class PlantJournalService {
 		validateRepresentative(request.images());
 
 		LocalDate today = LocalDate.now(seoulClock);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		checkDuplicateImages(userId, request.images(), today);
 
 		User user = userRepository.getReferenceById(userId);
 		PlantJournal journal = plantJournalRepository.saveAndFlush(
-				PlantJournal.create(user, profile, request.content(), today));
+				PlantJournal.create(user, profile, request.content(), today, now));
 		List<JournalImage> images = request.images().stream()
 				.map(img -> JournalImage.create(journal, user, img.imageUrl(), img.imageHash(),
-						img.representative(), today))
+						img.representative(), today, now))
 				.toList();
 		journalImageRepository.saveAll(images);
 
@@ -87,7 +88,6 @@ public class PlantJournalService {
 
 		// 계정·KST 날짜 유일 제약을 선점한 요청만 포인트·카드팩·알림을 같은 트랜잭션에서 처리한다.
 		// journalId는 FK가 아닌 논리 참조라 일지 soft delete 뒤에도 보상 판정은 유지된다.
-		LocalDateTime now = LocalDateTime.now(seoulClock);
 		GachaRewardReservation gachaReservation = GachaRewardReservation.none();
 		dailyJournalRewardRepository.claim(userId, today, journal.getId(), JOURNAL_REWARD_AMOUNT, now);
 		DailyJournalReward dailyReward = dailyJournalRewardRepository.findForUserAndRewardDate(userId, today)
@@ -166,9 +166,10 @@ public class PlantJournalService {
 		checkDuplicateImages(userId, request.images(), writtenDate);
 
 		User user = userRepository.getReferenceById(userId);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		List<JournalImage> images = request.images().stream()
 				.map(img -> JournalImage.create(journal, user, img.imageUrl(), img.imageHash(),
-						img.representative(), writtenDate))
+						img.representative(), writtenDate, now))
 				.toList();
 		journalImageRepository.saveAll(images);
 

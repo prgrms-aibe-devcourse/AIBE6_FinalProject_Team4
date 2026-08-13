@@ -108,6 +108,7 @@ class PlantJournalServiceTest {
 		PlantJournalCreateResponse response = plantJournalService.createJournal(7L, request);
 
 		assertThat(response.journal().id()).isEqualTo(31L);
+		assertThat(response.journal().createdAt()).isEqualTo(LocalDateTime.of(2026, 8, 13, 12, 0));
 		assertThat(response.rewardGranted()).isTrue();
 		assertThat(response.rewardAmount()).isEqualTo(100L);
 		assertThat(response.journal().gachaReward().granted()).isTrue();
