@@ -9,6 +9,7 @@ import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -79,16 +80,18 @@ public class PlantJournalInitData implements ApplicationRunner {
 			for (int entry = 0; entry < 2; entry++) {
 				LocalDate writtenDate = yesterday.minusDays(entry);
 				String content = SAMPLE_CONTENTS.get(seedIndex % SAMPLE_CONTENTS.size());
+				LocalDateTime createdAt = writtenDate.atTime(8 + seedIndex % 10, 0);
 
 				PlantJournal journal = plantJournalRepository.save(
-						PlantJournal.create(testUser, profile, content, writtenDate));
+						PlantJournal.create(testUser, profile, content, writtenDate, createdAt));
 
 				JournalImage image = JournalImage.create(
 						journal, testUser,
 						IMAGE_BASE_URL + profile.getPlantName(),
 						"seed-" + seedIndex,
 						true,
-						writtenDate);
+						writtenDate,
+						createdAt);
 				journalImageRepository.save(image);
 
 				seedIndex++;

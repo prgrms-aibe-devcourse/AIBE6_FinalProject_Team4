@@ -3,6 +3,7 @@ package com.kiwobollae.api.point.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,8 +22,10 @@ import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -39,8 +42,17 @@ class WalletServiceTest {
 	@Mock
 	private PointTransactionRepository pointTransactionRepository;
 
+	@Mock
+	private PointTransactionTimeProvider pointTransactionTimeProvider;
+
 	@InjectMocks
 	private WalletService walletService;
+
+	@BeforeEach
+	void setUp() {
+		lenient().when(pointTransactionTimeProvider.now())
+				.thenReturn(LocalDateTime.of(2026, 8, 13, 12, 0));
+	}
 
 	@Test
 	void walletResponseContainsTotalPaidAndFreePoints() {

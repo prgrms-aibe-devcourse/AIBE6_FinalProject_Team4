@@ -31,6 +31,7 @@ public class WalletService {
 
 	private final WalletRepository walletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
+	private final PointTransactionTimeProvider pointTransactionTimeProvider;
 
 	/** POINT-10: 일반·소셜 회원가입 트랜잭션에서 지갑 자동 생성(paid=0, free=0). auth 도메인이 호출. */
 	@Transactional
@@ -377,6 +378,7 @@ public class WalletService {
 				.refType(refType)
 				.refId(refId)
 				.adjustmentReason(adjustmentReason)
+				.createdAt(pointTransactionTimeProvider.now())
 				.build();
 		return pointTransactionRepository.save(tx);
 	}
@@ -398,6 +400,7 @@ public class WalletService {
 				.balanceAfter(balanceAfter)
 				.refType(refType)
 				.refId(refId)
+				.createdAt(pointTransactionTimeProvider.now())
 				.build());
 	}
 

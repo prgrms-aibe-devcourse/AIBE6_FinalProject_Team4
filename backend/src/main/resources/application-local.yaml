@@ -35,6 +35,8 @@ app:
       enabled: true
     point-scenario:
       # Seeds test@test.com's point history with admin adjustments, a mixed-point
-      # order and cancellation, a mixed-point card purchase, and a journal reward.
+      # order and cancellation, a mixed-point card purchase, and two journal rewards.
+      # The resulting free-point balance is 400P and seed activity times follow the
+      # relative journal dates instead of the server startup time.
       # Charge/refund history is created through Toss Payments test transactions.
       enabled: true

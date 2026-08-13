@@ -22,6 +22,7 @@ import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -402,6 +403,7 @@ class WalletServiceMySqlIntegrationTest {
 				.balanceAfter(600L)
 				.refType(PointRefType.ADMIN)
 				.refId(99L)
+				.createdAt(LocalDateTime.of(2026, 8, 1, 10, 0))
 				.build());
 
 		Page<PointActivityResponse> activities = pointTransactionService.getActivities(

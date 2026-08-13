@@ -57,6 +57,27 @@ public class JournalImage extends BaseEntity {
 
 	public static JournalImage create(PlantJournal journal, User user, String imageUrl,
 			String imageHash, boolean representative, LocalDate writtenDate) {
+		return create(
+				journal,
+				user,
+				imageUrl,
+				imageHash,
+				representative,
+				writtenDate,
+				LocalDateTime.now()
+		);
+	}
+
+	/** 데이터 이관·초기 데이터처럼 실제 촬영 시각이 이미 정해진 이미지를 생성한다. */
+	public static JournalImage create(
+			PlantJournal journal,
+			User user,
+			String imageUrl,
+			String imageHash,
+			boolean representative,
+			LocalDate writtenDate,
+			LocalDateTime createdAt
+	) {
 		return JournalImage.builder()
 				.journal(journal)
 				.user(user)
@@ -64,7 +85,7 @@ public class JournalImage extends BaseEntity {
 				.imageHash(imageHash)
 				.representative(representative)
 				.writtenDate(writtenDate)
-				.createdAt(LocalDateTime.now())
+				.createdAt(createdAt)
 				.build();
 	}
 }
