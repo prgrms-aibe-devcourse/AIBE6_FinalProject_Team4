@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AdminInquiryPanel from "@/components/admin/AdminInquiryPanel";
 import { ApiError } from "@/lib/api";
@@ -139,6 +139,64 @@ describe("AdminInquiryPanel", () => {
     expect(screen.queryByText("조건에 맞는 문의가 없어요")).not.toBeInTheDocument();
     expect(mocks.getInquiriesForAdmin).toHaveBeenCalledTimes(4);
     expect(mocks.getInquiriesForAdmin).toHaveBeenLastCalledWith("token", undefined, 0, 20, expect.anything());
+  });
+
+  it("뒤처진 응답이 늦게 도착해도 사용자가 이미 이동한 유효한 페이지를 건드리지 않는다", async () => {
+    // 페이지네이션 버튼은 loading 중엔 disabled라 답변 후 재조회가 끝나기 전엔 누를 수 없다 —
+    // 하지만 상태 필터 칩은 disabled 처리가 없어서, 재조회가 아직 안 끝난 사이에도 클릭할 수 있다.
+    // 그렇게 실제로 두 요청이 동시에 떠 있는 상태를 만들어 재현한다.
+    const itemA = { ...openInquiry, id: 1, title: "A 문의" };
+    const itemB = { ...openInquiry, id: 2, title: "B 문의" };
+    const itemC = { ...openInquiry, id: 3, title: "C 문의" };
+    const itemD = { ...openInquiry, id: 4, title: "D 문의" };
+    const itemE = { ...openInquiry, id: 5, title: "E 문의" };
+
+    let resolveStale!: (value: { content: unknown[]; totalElements: number; totalPages: number }) => void;
+    const staleResponse = new Promise((resolve) => {
+      resolveStale = resolve;
+    });
+
+    mocks.getInquiriesForAdmin
+      .mockResolvedValueOnce({ content: [itemA], totalElements: 3, totalPages: 3 }) // 초기 진입: 전체, page 0
+      .mockResolvedValueOnce({ content: [itemB], totalElements: 3, totalPages: 3 }) // 다음: 전체, page 1
+      .mockResolvedValueOnce({ content: [itemC], totalElements: 3, totalPages: 3 }) // 다음: 전체, page 2
+      .mockImplementationOnce(() => staleResponse) // 답변 후 재조회(전체, page 2) — 일부러 응답을 늦춤
+      .mockResolvedValueOnce({ content: [itemD], totalElements: 2, totalPages: 2 }) // 필터 전환: 대기, page 0
+      .mockResolvedValueOnce({ content: [itemE], totalElements: 2, totalPages: 2 }); // 다음: 대기, page 1
+    mocks.answerInquiry.mockResolvedValue({ ...itemC, status: "ANSWERED" });
+
+    render(<AdminInquiryPanel accessToken="token" />);
+    await screen.findByText("A 문의");
+
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await screen.findByText("B 문의");
+
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await screen.findByText("C 문의");
+
+    fireEvent.click(screen.getByRole("button", { name: "답변하기" }));
+    fireEvent.change(screen.getByPlaceholderText("답변 내용을 입력해 주세요."), {
+      target: { value: "확인했습니다." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "답변 등록" }));
+
+    // 답변 후 재조회(전체, page 2)가 나갈 때까지 기다린 다음, 그 응답이 오기 전에 다른 필터로 옮겨서
+    // 뒤이어 유효한 다른 페이지(대기, page 1)까지 이동해 둔다.
+    await waitFor(() => expect(mocks.getInquiriesForAdmin).toHaveBeenCalledTimes(4));
+    fireEvent.click(screen.getByRole("button", { name: "대기" }));
+    await screen.findByText("D 문의");
+
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await screen.findByText("E 문의");
+
+    // 뒤늦게 도착한 "전체, page 2" 응답(빈 결과) — 가드가 없으면 지금 보고 있는 유효한
+    // "대기, page 1"에서 최신 page state(1)를 기준으로 한 칸 더 물러나 page 0으로 밀어낸다.
+    resolveStale({ content: [], totalElements: 2, totalPages: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByText("E 문의")).toBeInTheDocument();
+    expect(screen.queryByText("조건에 맞는 문의가 없어요")).not.toBeInTheDocument();
+    expect(mocks.getInquiriesForAdmin).toHaveBeenCalledTimes(6);
   });
 
   it("답변완료 항목은 답변 내용을 읽기 전용으로 보여준다", async () => {
