@@ -11,7 +11,7 @@ import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.board.service.BoardCommentService;
 import com.kiwobollae.api.board.service.BoardPostService;
-import com.kiwobollae.api.content.service.PlantJournalService;
+import com.kiwobollae.api.journal.service.PlantJournalService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.report.dto.request.ReportRequest;

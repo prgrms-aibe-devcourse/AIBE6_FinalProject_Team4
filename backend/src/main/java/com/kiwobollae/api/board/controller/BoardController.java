@@ -6,7 +6,7 @@ import com.kiwobollae.api.board.dto.response.BoardPostResponse;
 import com.kiwobollae.api.board.entity.enums.BoardCategory;
 import com.kiwobollae.api.board.entity.enums.BoardSearchType;
 import com.kiwobollae.api.board.service.BoardPostService;
-import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
+import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
