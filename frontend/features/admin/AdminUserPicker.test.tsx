@@ -1,23 +1,23 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AdminUserPicker from '@/features/admin/AdminUserPicker';
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import AdminUserPicker from "@/features/admin/AdminUserPicker";
 
 const mocks = vi.hoisted(() => ({
   getAdminUsers: vi.fn(),
 }));
 
-vi.mock('@/features/admin/user-api', () => ({
+vi.mock("@/features/admin/user-api", () => ({
   getAdminUsers: mocks.getAdminUsers,
 }));
 
 const user = {
   id: 10,
-  email: 'green@example.com',
-  nickname: '초록',
-  name: '김초록',
-  role: 'USER' as const,
-  status: 'ACTIVE' as const,
-  createdAt: '2026-08-01T10:00:00',
+  email: "green@example.com",
+  nickname: "초록",
+  name: "김초록",
+  role: "USER" as const,
+  status: "ACTIVE" as const,
+  createdAt: "2026-08-01T10:00:00",
 };
 
 const page = {
@@ -32,39 +32,72 @@ const page = {
   empty: false,
 };
 
-describe('AdminUserPicker', () => {
+describe("AdminUserPicker", () => {
   beforeEach(() => {
     mocks.getAdminUsers.mockReset().mockResolvedValue(page);
   });
 
-  it('활성 회원을 기본 조회하고 다음 페이지를 요청한다', async () => {
+  it("활성 회원을 기본 조회하고 다음 페이지를 요청한다", async () => {
     render(<AdminUserPicker accessToken="admin-token" onSelect={vi.fn()} />);
 
-    await screen.findByText('green@example.com');
-    expect(mocks.getAdminUsers).toHaveBeenCalledWith(expect.objectContaining({
-      accessToken: 'admin-token',
-      status: 'ACTIVE',
-      page: 0,
-      size: 10,
-    }));
+    await screen.findByText("green@example.com");
+    expect(mocks.getAdminUsers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: "admin-token",
+        status: "ACTIVE",
+        page: 0,
+        size: 10,
+      }),
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: '다음' }));
-    await waitFor(() => expect(mocks.getAdminUsers).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 1 }),
-    ));
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await waitFor(() =>
+      expect(mocks.getAdminUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1 }),
+      ),
+    );
   });
 
-  it('검색어를 지연 적용하고 목록에서 회원을 선택한다', async () => {
+  it("검색어를 지연 적용하고 목록에서 회원을 선택한다", async () => {
     const onSelect = vi.fn();
     render(<AdminUserPicker accessToken="admin-token" onSelect={onSelect} />);
-    await screen.findByText('green@example.com');
+    await screen.findByText("green@example.com");
 
-    fireEvent.change(screen.getByLabelText('회원 검색'), { target: { value: '초록' } });
-    await waitFor(() => expect(mocks.getAdminUsers).toHaveBeenCalledWith(
-      expect.objectContaining({ keyword: '초록', page: 0 }),
-    ), { timeout: 1000 });
+    fireEvent.change(screen.getByLabelText("회원 검색"), {
+      target: { value: "초록" },
+    });
+    await waitFor(
+      () =>
+        expect(mocks.getAdminUsers).toHaveBeenCalledWith(
+          expect.objectContaining({ keyword: "초록", page: 0 }),
+        ),
+      { timeout: 1000 },
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: '초록 회원 선택' }));
+    fireEvent.click(screen.getByRole("button", { name: "초록 회원 선택" }));
     expect(onSelect).toHaveBeenCalledWith(user);
+  });
+
+  it("비활성화 상태에서는 검색과 회원 선택 및 페이지 이동을 막는다", async () => {
+    const onSelect = vi.fn();
+    render(
+      <AdminUserPicker
+        accessToken="admin-token"
+        onSelect={onSelect}
+        disabled
+      />,
+    );
+    await screen.findByText("green@example.com");
+
+    expect(screen.getByLabelText("회원 검색")).toBeDisabled();
+    expect(screen.getByLabelText("회원 상태")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "초록 회원 선택" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "초록 회원 선택" }));
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

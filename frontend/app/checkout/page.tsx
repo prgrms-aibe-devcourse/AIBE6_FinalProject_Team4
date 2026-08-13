@@ -139,8 +139,8 @@ function CheckoutInner() {
           <div className="mb-[22px] rounded-[14px] bg-[#F6F9EF] p-4 text-left text-sm">
             <div className="flex justify-between py-1"><span className="text-sub">주문번호</span><span className="font-extrabold">#{result.order.id}</span></div>
             <div className="flex justify-between py-1"><span className="text-sub">배송지</span><span className="font-bold">{result.order.address}</span></div>
-            <div className="mt-2 flex justify-between border-t border-[#e4ead8] pt-2"><span className="text-sub">유상 포인트 사용</span><span className="font-bold">{fmt(result.order.usedPaidPoint)}P</span></div>
-            <div className="flex justify-between py-1"><span className="text-sub">무상 포인트 사용</span><span className="font-bold">{fmt(result.order.usedFreePoint)}P</span></div>
+            <div className="mt-2 flex justify-between border-t border-[#e4ead8] pt-2"><span className="text-sub">충전 포인트 사용</span><span className="font-bold">{fmt(result.order.usedPaidPoint)}P</span></div>
+            <div className="flex justify-between py-1"><span className="text-sub">보너스 포인트 사용</span><span className="font-bold">{fmt(result.order.usedFreePoint)}P</span></div>
           </div>
           <div className="flex flex-wrap justify-center gap-2.5">
             <Link href="/my/orders" className="rounded-xl bg-brand px-6 py-[13px] font-bold text-white hover:text-white">주문 내역 보기</Link>
@@ -211,8 +211,8 @@ function CheckoutInner() {
 
         <div className="rounded-[18px] bg-white p-[22px] shadow-card">
           <div className="mb-4 font-extrabold">결제</div>
-          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">유상 포인트</span><span className="font-bold">{fmt(state.wallet.paid)}P</span></div>
-          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">무상 포인트</span><span className="font-bold">{fmt(state.wallet.free)}P</span></div>
+          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">충전 포인트</span><span className="font-bold">{fmt(state.wallet.paid)}P</span></div>
+          <div className="flex justify-between py-2 text-[14.5px]"><span className="text-sub">보너스 포인트</span><span className="font-bold">{fmt(state.wallet.free)}P</span></div>
           <div className="flex items-center justify-between py-2 text-[14.5px]"><span className="text-sub">주문 금액</span><PointPrice value={total} size="sm" /></div>
 
           <div className="my-4 rounded-[14px] border border-[#e4ead8] bg-[#FAFCF6] p-4">
@@ -228,9 +228,9 @@ function CheckoutInner() {
                 className="mt-0.5 h-[18px] w-[18px] accent-[#7CB342]"
               />
               <span>
-                <span className="block text-sm font-extrabold">무상 포인트 함께 사용</span>
+                <span className="block text-sm font-extrabold">보너스 포인트 함께 사용</span>
                 <span className="mt-0.5 block text-xs leading-[1.5] text-sub">
-                  선택하지 않으면 유상 포인트로만 결제돼요.
+                  선택하지 않으면 충전 포인트로만 결제돼요.
                 </span>
               </span>
             </label>
@@ -250,7 +250,7 @@ function CheckoutInner() {
                     value={freePointInput}
                     onChange={(event) => setFreePointInput(Number(event.target.value))}
                     className="min-w-0 flex-1 rounded-xl border-[1.5px] border-line bg-white px-3 py-2.5 text-right font-bold outline-none focus:border-brand"
-                    aria-label="사용할 무상 포인트"
+                    aria-label="사용할 보너스 포인트"
                   />
                   <button
                     type="button"
@@ -265,17 +265,17 @@ function CheckoutInner() {
           </div>
 
           <div className="border-t border-[#f2f3ec] pt-2 text-[14.5px]">
-            <div className="flex justify-between py-1.5"><span className="text-sub">유상 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedPaidPoint)}P</span></div>
-            <div className="flex justify-between py-1.5"><span className="text-sub">무상 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedFreePoint)}P</span></div>
-            <div className="mt-1.5 flex justify-between border-t border-[#f2f3ec] py-2"><span className="text-sub">결제 후 유상 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingPaidPoint))}P</span></div>
-            <div className="flex justify-between pb-2"><span className="text-sub">결제 후 무상 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingFreePoint))}P</span></div>
+            <div className="flex justify-between py-1.5"><span className="text-sub">충전 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedPaidPoint)}P</span></div>
+            <div className="flex justify-between py-1.5"><span className="text-sub">보너스 포인트 차감</span><span className="font-bold">{fmt(pointUsage.usedFreePoint)}P</span></div>
+            <div className="mt-1.5 flex justify-between border-t border-[#f2f3ec] py-2"><span className="text-sub">충전 포인트 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingPaidPoint))}P</span></div>
+            <div className="flex justify-between pb-2"><span className="text-sub">보너스 포인트 잔액</span><span className="font-extrabold">{fmt(Math.max(0, pointUsage.remainingFreePoint))}P</span></div>
           </div>
 
           {pointUsage.error && (
             <div className="mb-4 mt-2 rounded-[11px] bg-danger-soft px-[13px] py-[11px] text-[13px] font-semibold text-danger">
               {pointUsage.error}
               {!useFreePoint && maximumFreePoint > 0 && (
-                <span className="mt-1 block">무상 포인트를 함께 사용하려면 위 항목을 선택해 주세요.</span>
+                <span className="mt-1 block">보너스 포인트를 함께 사용하려면 위 항목을 선택해 주세요.</span>
               )}
             </div>
           )}
@@ -286,7 +286,7 @@ function CheckoutInner() {
               askConfirm({
                 icon: 'shopping_cart_checkout',
                 title: '주문을 완료할까요?',
-                body: `유상 ${fmt(pointUsage.usedPaidPoint)}P, 무상 ${fmt(pointUsage.usedFreePoint)}P가 사용돼요.`,
+                body: `충전 포인트 ${fmt(pointUsage.usedPaidPoint)}P, 보너스 포인트 ${fmt(pointUsage.usedFreePoint)}P가 사용돼요.`,
                 ok: '결제하고 주문 완료',
                 onOk: place,
               })

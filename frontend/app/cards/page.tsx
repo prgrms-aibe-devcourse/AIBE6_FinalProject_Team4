@@ -220,7 +220,7 @@ export default function Cards({ searchParams }: { searchParams?: CardSearchParam
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-base font-extrabold">{couponName(card.name)}</div>
                     <span className="shrink-0 rounded-full bg-brand-soft px-2 py-1 text-[10.5px] font-extrabold text-brand-dark">
-                      무상 포인트 우선
+                      보너스 포인트 우선
                     </span>
                   </div>
                   <div className="mb-3 mt-[3px] text-[13px] text-sub">

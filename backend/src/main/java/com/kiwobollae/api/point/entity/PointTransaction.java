@@ -1,6 +1,7 @@
 package com.kiwobollae.api.point.entity;
 
 import com.kiwobollae.api.global.common.BaseEntity;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -58,6 +59,10 @@ public class PointTransaction extends BaseEntity {
 	/** Polymorphic reference — target table determined by refType (ADMIN 조정 시 실행 관리자 user ID). */
 	@Column(name = "ref_id")
 	private Long refId;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "adjustment_reason", length = 30)
+	private AdminPointAdjustmentReason adjustmentReason;
 
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)

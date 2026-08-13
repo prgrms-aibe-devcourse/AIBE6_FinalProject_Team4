@@ -36,15 +36,15 @@ export function calculateOrderPointUsage({
   let error: string | null = null;
 
   if (!Number.isInteger(requestedFreePoint) || requestedFreePoint < 0) {
-    error = '사용할 무상 포인트를 0P 이상으로 입력해 주세요.';
+    error = '사용할 보너스 포인트를 0P 이상으로 입력해 주세요.';
   } else if (requestedFreePoint % ORDER_FREE_POINT_UNIT !== 0) {
-    error = `무상 포인트는 ${ORDER_FREE_POINT_UNIT}P 단위로 사용할 수 있어요.`;
+    error = `보너스 포인트는 ${ORDER_FREE_POINT_UNIT}P 단위로 사용할 수 있어요.`;
   } else if (requestedFreePoint > totalPoint) {
-    error = '주문 금액보다 많은 무상 포인트는 사용할 수 없어요.';
+    error = '주문 금액보다 많은 보너스 포인트는 사용할 수 없어요.';
   } else if (requestedFreePoint > freePoint) {
-    error = '보유한 무상 포인트보다 많이 사용할 수 없어요.';
+    error = '보유한 보너스 포인트보다 많이 사용할 수 없어요.';
   } else if (usedPaidPoint > paidPoint) {
-    error = `유상 포인트가 ${usedPaidPoint - paidPoint}P 부족해요.`;
+    error = `충전 포인트가 ${usedPaidPoint - paidPoint}P 부족해요.`;
   }
 
   return {

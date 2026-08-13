@@ -49,7 +49,8 @@ app:
     gacha-pack:
       enabled: true
     charge-product:
-      enabled: true
+      # 운영 충전 상품은 관리자 콘솔에서 구성한다. 기존 상품 행은 유지되며 자동 생성만 막는다.
+      enabled: false
     product:
       enabled: true
     card:

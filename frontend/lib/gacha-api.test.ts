@@ -34,6 +34,7 @@ describe("gacha api", () => {
     const response = await purchaseGachaPacks(
       9,
       1,
+      100,
       "access-token",
       "purchase-key",
     );
@@ -44,7 +45,11 @@ describe("gacha api", () => {
       headers: {
         "Idempotency-Key": "purchase-key",
       },
-      body: JSON.stringify({ productId: 9, quantity: 1 }),
+      body: JSON.stringify({
+        productId: 9,
+        quantity: 1,
+        expectedUnitPoint: 100,
+      }),
     });
     expect(response.drawIds).toEqual([701]);
   });

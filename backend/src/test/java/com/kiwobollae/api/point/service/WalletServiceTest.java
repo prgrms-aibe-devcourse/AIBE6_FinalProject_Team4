@@ -15,6 +15,7 @@ import com.kiwobollae.api.point.dto.response.PointDeductionResult;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.PointTransaction;
 import com.kiwobollae.api.point.entity.Wallet;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -583,11 +584,13 @@ class WalletServiceTest {
 		given(pointTransactionRepository.save(org.mockito.ArgumentMatchers.any(PointTransaction.class)))
 				.willAnswer(invocation -> invocation.getArgument(0));
 
-		var response = walletService.adjustByAdmin(1L, 7L, CurrencyType.PAID, 200L);
+		var response = walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.PAID, 200L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER);
 
 		assertThat(response.userId()).isEqualTo(7L);
 		assertThat(response.currencyType()).isEqualTo(CurrencyType.PAID);
 		assertThat(response.amount()).isEqualTo(200L);
+		assertThat(response.adjustmentReason()).isEqualTo(AdminPointAdjustmentReason.OUTSTANDING_MEMBER);
 		assertThat(response.balanceAfter()).isEqualTo(700L);
 		assertThat(response.paidPoint()).isEqualTo(700L);
 		assertThat(response.freePoint()).isEqualTo(300L);
@@ -600,6 +603,8 @@ class WalletServiceTest {
 		assertThat(captor.getValue().getAmount()).isEqualTo(200L);
 		assertThat(captor.getValue().getRefType()).isEqualTo(PointRefType.ADMIN);
 		assertThat(captor.getValue().getRefId()).isEqualTo(1L);
+		assertThat(captor.getValue().getAdjustmentReason())
+				.isEqualTo(AdminPointAdjustmentReason.OUTSTANDING_MEMBER);
 	}
 
 	@Test
@@ -609,7 +614,8 @@ class WalletServiceTest {
 		given(pointTransactionRepository.save(org.mockito.ArgumentMatchers.any(PointTransaction.class)))
 				.willAnswer(invocation -> invocation.getArgument(0));
 
-		var response = walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, -300L);
+		var response = walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.FREE, -300L, AdminPointAdjustmentReason.FRAUD_PENALTY);
 
 		assertThat(response.balanceAfter()).isZero();
 		assertThat(response.freePoint()).isZero();
@@ -625,10 +631,12 @@ class WalletServiceTest {
 				.willReturn(Optional.of(paidWallet))
 				.willReturn(Optional.of(freeWallet));
 
-		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.PAID, -501L))
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.PAID, -501L, AdminPointAdjustmentReason.FRAUD_PENALTY))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
-		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, -301L))
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.FREE, -301L, AdminPointAdjustmentReason.FRAUD_PENALTY))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
@@ -641,9 +649,57 @@ class WalletServiceTest {
 
 	@Test
 	void adminAdjustmentRejectsZeroAmountBeforeLockingWallet() {
-		assertThatThrownBy(() -> walletService.adjustByAdmin(1L, 7L, CurrencyType.FREE, 0L))
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.FREE, 0L, AdminPointAdjustmentReason.SPECIAL_EVENT))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void adminAdjustmentRejectsSelfAdjustmentBeforeLockingWallet() {
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 1L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode())
+								.isEqualTo(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void adminAdjustmentRejectsMissingAndDirectionMismatchedReasonsBeforeLockingWallet() {
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.FREE, 100L, null))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.FRAUD_PENALTY))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+		assertThatThrownBy(() -> walletService.adjustByAdmin(
+				1L, 7L, CurrencyType.FREE, -100L, AdminPointAdjustmentReason.SPECIAL_EVENT))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
+		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void genericDeltaRejectsAdminAdjustmentBeforeLockingWallet() {
+		assertThatThrownBy(() -> walletService.applyDelta(
+				7L,
+				PointTxType.ADMIN_ADJUST,
+				CurrencyType.FREE,
+				100L,
+				PointRefType.ADMIN,
+				1L
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
 
 		verify(walletRepository, never()).findByUserIdForUpdate(org.mockito.ArgumentMatchers.anyLong());
 		verify(pointTransactionRepository, never()).save(org.mockito.ArgumentMatchers.any());

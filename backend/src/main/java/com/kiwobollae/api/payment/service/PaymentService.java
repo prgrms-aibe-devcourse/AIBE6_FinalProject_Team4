@@ -6,7 +6,8 @@ import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
-import com.kiwobollae.api.payment.dto.request.ChargeProductRequest;
+import com.kiwobollae.api.payment.dto.request.ChargeProductCreateRequest;
+import com.kiwobollae.api.payment.dto.request.ChargeProductUpdateRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentConfirmRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRequest;
@@ -25,14 +26,17 @@ import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.PointCreditService;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -46,7 +50,11 @@ public class PaymentService {
 	private static final String CHARGE_API_TYPE = "PAYMENT_CHARGE";
 	private static final String CONFIRM_API_TYPE = "PAYMENT_CONFIRM";
 	private static final String FAILURE_API_TYPE = "PAYMENT_FAILURE";
+	private static final String ADMIN_CHARGE_PRODUCT_CREATE_API_TYPE =
+			"ADMIN_CHARGE_PRODUCT_CREATE";
 	private static final String USER_CANCELED_CODE = "PAY_PROCESS_CANCELED";
+	private static final long CHARGE_PRODUCT_MIN_POINT_RATE_PERCENT = 100L;
+	private static final long CHARGE_PRODUCT_MAX_POINT_RATE_PERCENT = 150L;
 
 	private final ChargeProductRepository chargeProductRepository;
 	private final PaymentRepository paymentRepository;
@@ -60,6 +68,12 @@ public class PaymentService {
 
 	public List<ChargeProductResponse> getChargeProducts() {
 		return chargeProductRepository.findAllByIsActiveTrueOrderByPriceAsc().stream()
+				.map(ChargeProductResponse::from)
+				.toList();
+	}
+
+	public List<ChargeProductResponse> getAdminChargeProducts() {
+		return chargeProductRepository.findAllByOrderByPriceAscIdAsc().stream()
 				.map(ChargeProductResponse::from)
 				.toList();
 	}
@@ -82,6 +96,7 @@ public class PaymentService {
 		Payment payment = Payment.builder()
 				.user(user)
 				.chargeProduct(chargeProduct)
+				.chargeProductName(chargeProduct.getName())
 				.cashAmount(chargeProduct.getPrice())
 				.pointAmount(chargeProduct.getPointAmount())
 				.status(PaymentStatus.PENDING)
@@ -195,25 +210,57 @@ public class PaymentService {
 	}
 
 	@Transactional
-	public ChargeProductResponse createChargeProduct(ChargeProductRequest request) {
+	public ChargeProductResponse createChargeProduct(
+			Long adminUserId,
+			String idempotencyKey,
+			ChargeProductCreateRequest request
+	) {
+		validateIdempotencyKey(idempotencyKey);
+		validateChargeProductPointRate(request.price(), request.pointAmount());
+		String normalizedName = request.name().strip();
+		IdempotencyExecution idempotency = idempotencyService.start(
+				adminUserId,
+				ADMIN_CHARGE_PRODUCT_CREATE_API_TYPE,
+				idempotencyKey,
+				sha256(normalizedChargeProductCreateRequest(request, normalizedName))
+		);
+		if (idempotency.replay()) {
+			return readChargeProductSnapshot(idempotency.key().getResponseSnapshot());
+		}
+
 		ChargeProduct chargeProduct = ChargeProduct.builder()
-				.name(request.name())
+				.name(normalizedName)
 				.price(request.price())
 				.pointAmount(request.pointAmount())
 				.isActive(request.isActive())
 				.build();
-		return ChargeProductResponse.from(chargeProductRepository.save(chargeProduct));
+		ChargeProductResponse response = ChargeProductResponse.from(
+				chargeProductRepository.saveAndFlush(chargeProduct)
+		);
+		idempotencyService.succeed(
+				idempotency.key(),
+				201,
+				writeSnapshot(response),
+				"CHARGE_PRODUCT",
+				response.id()
+		);
+		return response;
 	}
 
 	@Transactional
-	public ChargeProductResponse updateChargeProduct(Long productId, ChargeProductRequest request) {
+	public ChargeProductResponse updateChargeProduct(Long productId, ChargeProductUpdateRequest request) {
+		validateChargeProductPointRate(request.price(), request.pointAmount());
 		ChargeProduct chargeProduct = getChargeProduct(productId);
+		if (!Objects.equals(chargeProduct.getVersion(), request.version())) {
+			throw new ObjectOptimisticLockingFailureException(ChargeProduct.class, productId);
+		}
 		chargeProduct.update(
-				request.name(),
+				request.name().strip(),
 				request.price(),
 				request.pointAmount(),
 				request.isActive()
 		);
+		chargeProductRepository.flush();
 		return ChargeProductResponse.from(chargeProduct);
 	}
 
@@ -272,6 +319,17 @@ public class PaymentService {
 				+ "&amount=" + request.amount();
 	}
 
+	private String normalizedChargeProductCreateRequest(
+			ChargeProductCreateRequest request,
+			String normalizedName
+	) {
+		return "nameLength=" + normalizedName.length()
+				+ "&name=" + normalizedName
+				+ "&price=" + request.price()
+				+ "&pointAmount=" + request.pointAmount()
+				+ "&isActive=" + request.isActive();
+	}
+
 	private void validateTossPayment(Payment payment) {
 		if (payment.getProvider() != PaymentProviderType.TOSS
 				|| paymentProvider.getType() != PaymentProviderType.TOSS) {
@@ -285,6 +343,20 @@ public class PaymentService {
 	private void validateIdempotencyKey(String idempotencyKey) {
 		if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 64) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+	}
+
+	private void validateChargeProductPointRate(Long price, Long pointAmount) {
+		if (price == null || price < 1 || pointAmount == null || pointAmount < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+
+		BigInteger scaledPointAmount = BigInteger.valueOf(pointAmount).multiply(
+				BigInteger.valueOf(CHARGE_PRODUCT_MIN_POINT_RATE_PERCENT));
+		BigInteger scaledPrice = BigInteger.valueOf(price).multiply(
+				BigInteger.valueOf(CHARGE_PRODUCT_MAX_POINT_RATE_PERCENT));
+		if (pointAmount < price || scaledPointAmount.compareTo(scaledPrice) > 0) {
+			throw new BusinessException(ErrorCode.PAYMENT_CHARGE_PRODUCT_POINT_RATE_INVALID);
 		}
 	}
 
@@ -310,7 +382,7 @@ public class PaymentService {
 		);
 	}
 
-	private String writeSnapshot(PaymentResponse response) {
+	private String writeSnapshot(Object response) {
 		try {
 			return objectMapper.writeValueAsString(response);
 		} catch (JacksonException exception) {
@@ -323,6 +395,14 @@ public class PaymentService {
 			return objectMapper.readValue(snapshot, PaymentResponse.class);
 		} catch (JacksonException exception) {
 			throw new IllegalStateException("멱등성 응답 복원에 실패했습니다.", exception);
+		}
+	}
+
+	private ChargeProductResponse readChargeProductSnapshot(String snapshot) {
+		try {
+			return objectMapper.readValue(snapshot, ChargeProductResponse.class);
+		} catch (JacksonException exception) {
+			throw new IllegalStateException("멱등성 충전 상품 응답 복원에 실패했습니다.", exception);
 		}
 	}
 }
