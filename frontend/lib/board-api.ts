@@ -90,6 +90,7 @@ export function getBoardPosts(
   signal?: AbortSignal,
   keyword?: string,
   searchType?: BoardSearchType,
+  sort?: string,
 ): Promise<SpringPage<BoardPostData>> {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (category) query.set('category', category);
@@ -97,6 +98,7 @@ export function getBoardPosts(
     query.set('keyword', keyword.trim());
     if (searchType) query.set('searchType', searchType);
   }
+  if (sort) query.set('sort', sort);
   return request<SpringPage<BoardPostData>>(`/api/v1/board/posts?${query.toString()}`, {
     accessToken,
     signal,

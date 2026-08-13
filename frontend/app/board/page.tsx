@@ -44,6 +44,16 @@ const SEARCH_TYPES: { key: BoardSearchType; label: string }[] = [
 ];
 const SEARCH_TYPE_KEYS = new Set(SEARCH_TYPES.map((t) => t.key));
 
+const SORTS: { key: 'latest' | 'popular'; label: string; value?: string }[] = [
+  { key: 'latest', label: '최신순' },
+  { key: 'popular', label: '인기순', value: 'likeCount,desc' },
+];
+const SORT_KEYS = new Set(SORTS.map((s) => s.key));
+
+function parseSort(value: string | null): 'latest' | 'popular' {
+  return value && SORT_KEYS.has(value as 'latest' | 'popular') ? (value as 'latest' | 'popular') : 'latest';
+}
+
 function parseTab(value: string | null): 'ALL' | BoardCategory {
   return value && CATEGORY_KEYS.has(value) ? (value as BoardCategory) : 'ALL';
 }
@@ -76,6 +86,7 @@ function BoardPageContent() {
   const [keyword, setKeyword] = useState(() => searchParams.get('keyword') || '');
   const [keywordDraft, setKeywordDraft] = useState(() => searchParams.get('keyword') || '');
   const [searchType, setSearchType] = useState<BoardSearchType>(() => parseSearchType(searchParams.get('searchType')));
+  const [sort, setSort] = useState<'latest' | 'popular'>(() => parseSort(searchParams.get('sort')));
   const [posts, setPosts] = useState<BoardPostData[]>([]);
   const [notices, setNotices] = useState<BoardPostData[]>([]);
   const [totalElements, setTotalElements] = useState(0);
@@ -111,11 +122,12 @@ function BoardPageContent() {
       params.set('keyword', keyword);
       if (searchType !== 'TITLE_CONTENT') params.set('searchType', searchType);
     }
+    if (sort !== 'latest') params.set('sort', sort);
     const query = params.toString();
     const url = query ? `${pathname}?${query}` : pathname;
     router.replace(url, { scroll: false });
     if (typeof window !== 'undefined') window.sessionStorage.setItem(BOARD_LIST_URL_KEY, url);
-  }, [tab, page, keyword, searchType, pathname, router]);
+  }, [tab, page, keyword, searchType, sort, pathname, router]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -131,6 +143,7 @@ function BoardPageContent() {
       controller.signal,
       keyword,
       searchType,
+      SORTS.find((s) => s.key === sort)?.value,
     )
       .then((result) => {
         setPosts(result.content);
@@ -151,7 +164,7 @@ function BoardPageContent() {
       });
 
     return () => controller.abort();
-  }, [hydrated, tab, page, keyword, searchType, state.accessToken]);
+  }, [hydrated, tab, page, keyword, searchType, sort, state.accessToken]);
 
   // NOTICE 탭 자체를 볼 때는 목록이 이미 전부 공지라 별도 고정 영역이 필요 없다.
   const pinned = tab === 'NOTICE' ? [] : notices;
@@ -291,54 +304,71 @@ function BoardPageContent() {
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        {keyword && (
-          <span className="text-xs text-sub">
-            <span className="font-bold text-ink">&quot;{keyword}&quot;</span> 검색 결과 {totalElements}건
-          </span>
-        )}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <select
-          value={searchType}
+          value={sort}
           onChange={(e) => {
-            setSearchType(e.target.value as BoardSearchType);
+            setSort(e.target.value as 'latest' | 'popular');
             setPage(0);
           }}
           className="h-9 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-2 text-xs font-bold text-sub outline-none focus:border-brand"
         >
-          {SEARCH_TYPES.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.label}
+          {SORTS.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
             </option>
           ))}
         </select>
-        <div className="relative">
-          <input
-            value={keywordDraft}
-            onChange={(e) => setKeywordDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') submitSearch();
-            }}
-            placeholder="검색어 입력"
-            className="h-9 w-[160px] rounded-lg border-[1.5px] border-line bg-white pl-3 pr-8 text-xs outline-none focus:border-brand"
-          />
-          {keywordDraft && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer text-faint hover:text-sub"
-              aria-label="검색어 지우기"
-            >
-              <span className="material-symbols-outlined text-base">close</span>
-            </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {keyword && (
+            <span className="text-xs text-sub">
+              <span className="font-bold text-ink">&quot;{keyword}&quot;</span> 검색 결과 {totalElements}건
+            </span>
           )}
+          <select
+            value={searchType}
+            onChange={(e) => {
+              setSearchType(e.target.value as BoardSearchType);
+              setPage(0);
+            }}
+            className="h-9 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-2 text-xs font-bold text-sub outline-none focus:border-brand"
+          >
+            {SEARCH_TYPES.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <div className="relative">
+            <input
+              value={keywordDraft}
+              onChange={(e) => setKeywordDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitSearch();
+              }}
+              placeholder="검색어 입력"
+              className="h-9 w-[160px] rounded-lg border-[1.5px] border-line bg-white pl-3 pr-8 text-xs outline-none focus:border-brand"
+            />
+            {keywordDraft && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer text-faint hover:text-sub"
+                aria-label="검색어 지우기"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={submitSearch}
+            className="h-9 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-3 text-xs font-bold text-sub hover:bg-brand-soft hover:text-brand-dark"
+          >
+            검색
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={submitSearch}
-          className="h-9 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-3 text-xs font-bold text-sub hover:bg-brand-soft hover:text-brand-dark"
-        >
-          검색
-        </button>
       </div>
 
       {!loading && !error && posts.length > 0 && (
