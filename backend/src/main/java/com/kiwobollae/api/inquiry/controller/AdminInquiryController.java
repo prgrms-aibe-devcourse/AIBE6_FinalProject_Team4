@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -33,6 +34,9 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminInquiryController {
 
+	// 클라이언트가 ?size=로 과도한 값을 보내 대량 조회를 유발하지 않도록 이 엔드포인트에서만 상한을 둔다.
+	private static final int MAX_PAGE_SIZE = 100;
+
 	private final InquiryService inquiryService;
 
 	@Operation(summary = "문의 전체 목록 조회", description = "상태(선택)로 필터링해 전체 문의를 조회합니다.")
@@ -41,7 +45,14 @@ public class AdminInquiryController {
 			@RequestParam(required = false) InquiryStatus status,
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success(inquiryService.getInquiriesForAdmin(status, pageable)));
+		return ResponseEntity.ok(ApiResponse.success(inquiryService.getInquiriesForAdmin(status, boundPageSize(pageable))));
+	}
+
+	private Pageable boundPageSize(Pageable pageable) {
+		if (pageable.getPageSize() <= MAX_PAGE_SIZE) {
+			return pageable;
+		}
+		return PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort());
 	}
 
 	@Operation(summary = "문의 답변", description = "문의에 답변을 등록합니다. 답변과 동시에 종료 처리됩니다.")
