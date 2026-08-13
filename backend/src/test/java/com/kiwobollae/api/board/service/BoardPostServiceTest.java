@@ -165,9 +165,9 @@ class BoardPostServiceTest {
 		Pageable pageable = PageRequest.of(0, 10);
 		User user = mockUser(1L, UserRole.USER);
 		Page<BoardPost> page = new PageImpl<>(List.of(mockPost(10L, user, BoardStatus.ACTIVE)));
-		given(boardPostRepository.search(BoardStatus.ACTIVE, BoardCategory.FREE, pageable)).willReturn(page);
+		given(boardPostRepository.search(BoardStatus.ACTIVE, BoardCategory.FREE, null, "TITLE_CONTENT", pageable)).willReturn(page);
 
-		Page<BoardPostResponse> result = boardPostService.getPosts(BoardCategory.FREE, pageable, null);
+		Page<BoardPostResponse> result = boardPostService.getPosts(BoardCategory.FREE, null, null, pageable, null);
 
 		assertThat(result.getContent()).hasSize(1);
 		assertThat(result.getContent().get(0).id()).isEqualTo(10L);
@@ -178,10 +178,10 @@ class BoardPostServiceTest {
 		Pageable pageable = PageRequest.of(0, 10);
 		User user = mockUser(1L, UserRole.USER);
 		Page<BoardPost> page = new PageImpl<>(List.of(mockPost(10L, user, BoardStatus.ACTIVE)));
-		given(boardPostRepository.search(BoardStatus.ACTIVE, BoardCategory.FREE, pageable)).willReturn(page);
+		given(boardPostRepository.search(BoardStatus.ACTIVE, BoardCategory.FREE, null, "TITLE_CONTENT", pageable)).willReturn(page);
 		given(boardPostLikeRepository.findLikedPostIds(2L, List.of(10L))).willReturn(List.of(10L));
 
-		Page<BoardPostResponse> result = boardPostService.getPosts(BoardCategory.FREE, pageable, 2L);
+		Page<BoardPostResponse> result = boardPostService.getPosts(BoardCategory.FREE, null, null, pageable, 2L);
 
 		assertThat(result.getContent().get(0).likedByMe()).isTrue();
 	}

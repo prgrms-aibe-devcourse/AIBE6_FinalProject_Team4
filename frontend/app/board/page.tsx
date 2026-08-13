@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
-import { BOARD_LIST_URL_KEY, BoardCategory, BoardPostData, getBoardPosts } from '@/lib/board-api';
+import { BOARD_LIST_URL_KEY, BoardCategory, BoardPostData, BoardSearchType, getBoardPosts } from '@/lib/board-api';
 import { useStore } from '@/lib/store';
 
 const CATEGORY_LABEL: Record<BoardCategory, string> = {
@@ -35,8 +35,21 @@ const TABS: { key: 'ALL' | BoardCategory; label: string }[] = [
 const PAGE_SIZE = 15;
 const CATEGORY_KEYS = new Set(['NOTICE', 'FREE', 'PLANT_QNA']);
 
+const SEARCH_TYPES: { key: BoardSearchType; label: string }[] = [
+  { key: 'TITLE_CONTENT', label: '제목+내용' },
+  { key: 'TITLE', label: '제목' },
+  { key: 'CONTENT', label: '내용' },
+  { key: 'AUTHOR', label: '글쓴이' },
+  { key: 'COMMENT', label: '댓글' },
+];
+const SEARCH_TYPE_KEYS = new Set(SEARCH_TYPES.map((t) => t.key));
+
 function parseTab(value: string | null): 'ALL' | BoardCategory {
   return value && CATEGORY_KEYS.has(value) ? (value as BoardCategory) : 'ALL';
+}
+
+function parseSearchType(value: string | null): BoardSearchType {
+  return value && SEARCH_TYPE_KEYS.has(value as BoardSearchType) ? (value as BoardSearchType) : 'TITLE_CONTENT';
 }
 
 function parsePage(value: string | null): number {
@@ -60,6 +73,9 @@ function BoardPageContent() {
 
   const [tab, setTab] = useState<'ALL' | BoardCategory>(() => parseTab(searchParams.get('category')));
   const [page, setPage] = useState(() => parsePage(searchParams.get('page')));
+  const [keyword, setKeyword] = useState(() => searchParams.get('keyword') || '');
+  const [keywordDraft, setKeywordDraft] = useState(() => searchParams.get('keyword') || '');
+  const [searchType, setSearchType] = useState<BoardSearchType>(() => parseSearchType(searchParams.get('searchType')));
   const [posts, setPosts] = useState<BoardPostData[]>([]);
   const [notices, setNotices] = useState<BoardPostData[]>([]);
   const [totalElements, setTotalElements] = useState(0);
@@ -67,9 +83,13 @@ function BoardPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 공지사항은 카테고리/페이지와 무관하게 항상 맨 위에 고정해서 보여준다.
+  // 공지사항은 카테고리/페이지와 무관하게 항상 맨 위에 고정해서 보여주지만, 검색 중에는
+  // 검색과 무관한 공지가 고정 노출되면 혼란스러우니 끄고 검색 결과 목록에만 맡긴다.
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || keyword) {
+      if (keyword) setNotices([]);
+      return;
+    }
     const controller = new AbortController();
 
     getBoardPosts('NOTICE', 0, 50, state.accessToken, controller.signal)
@@ -80,18 +100,22 @@ function BoardPageContent() {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+  }, [hydrated, state.accessToken, keyword]);
 
-  // 카테고리 탭/페이지를 URL 쿼리로 반영해 새로고침해도 그대로 유지되게 한다.
+  // 카테고리 탭/페이지/검색어를 URL 쿼리로 반영해 새로고침해도 그대로 유지되게 한다.
   useEffect(() => {
     const params = new URLSearchParams();
     if (tab !== 'ALL') params.set('category', tab);
     if (page > 0) params.set('page', String(page + 1));
+    if (keyword) {
+      params.set('keyword', keyword);
+      if (searchType !== 'TITLE_CONTENT') params.set('searchType', searchType);
+    }
     const query = params.toString();
     const url = query ? `${pathname}?${query}` : pathname;
     router.replace(url, { scroll: false });
     if (typeof window !== 'undefined') window.sessionStorage.setItem(BOARD_LIST_URL_KEY, url);
-  }, [tab, page, pathname, router]);
+  }, [tab, page, keyword, searchType, pathname, router]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -99,7 +123,15 @@ function BoardPageContent() {
     setLoading(true);
     setError('');
 
-    getBoardPosts(tab === 'ALL' ? undefined : tab, page, PAGE_SIZE, state.accessToken, controller.signal)
+    getBoardPosts(
+      tab === 'ALL' ? undefined : tab,
+      page,
+      PAGE_SIZE,
+      state.accessToken,
+      controller.signal,
+      keyword,
+      searchType,
+    )
       .then((result) => {
         setPosts(result.content);
         setTotalElements(result.totalElements);
@@ -119,7 +151,7 @@ function BoardPageContent() {
       });
 
     return () => controller.abort();
-  }, [hydrated, tab, page, state.accessToken]);
+  }, [hydrated, tab, page, keyword, searchType, state.accessToken]);
 
   // NOTICE 탭 자체를 볼 때는 목록이 이미 전부 공지라 별도 고정 영역이 필요 없다.
   const pinned = tab === 'NOTICE' ? [] : notices;
@@ -131,6 +163,18 @@ function BoardPageContent() {
 
   const changeTab = (next: 'ALL' | BoardCategory) => {
     setTab(next);
+    setPage(0);
+  };
+
+  const submitSearch = () => {
+    setKeyword(keywordDraft.trim());
+    setPage(0);
+  };
+
+  const clearSearch = () => {
+    setKeywordDraft('');
+    setKeyword('');
+    setSearchType('TITLE_CONTENT');
     setPage(0);
   };
 
@@ -232,7 +276,7 @@ function BoardPageContent() {
           <div className="px-5 py-[60px] text-center text-sub">{error}</div>
         ) : posts.length === 0 && pinned.length === 0 ? (
           <div className="px-5 py-[60px] text-center text-sub">
-            아직 게시글이 없어요. 첫 글을 남겨보세요 🌱
+            {keyword ? '검색 결과가 없어요.' : '아직 게시글이 없어요. 첫 글을 남겨보세요 🌱'}
           </div>
         ) : (
           <div className="divide-y divide-[#f0f1ea]">
@@ -246,6 +290,57 @@ function BoardPageContent() {
           </div>
         )}
       </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+        {keyword && (
+          <span className="text-xs text-sub">
+            <span className="font-bold text-ink">&quot;{keyword}&quot;</span> 검색 결과 {totalElements}건
+          </span>
+        )}
+        <select
+          value={searchType}
+          onChange={(e) => {
+            setSearchType(e.target.value as BoardSearchType);
+            setPage(0);
+          }}
+          className="h-9 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-2 text-xs font-bold text-sub outline-none focus:border-brand"
+        >
+          {SEARCH_TYPES.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <div className="relative">
+          <input
+            value={keywordDraft}
+            onChange={(e) => setKeywordDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitSearch();
+            }}
+            placeholder="검색어 입력"
+            className="h-9 w-[160px] rounded-lg border-[1.5px] border-line bg-white pl-3 pr-8 text-xs outline-none focus:border-brand"
+          />
+          {keywordDraft && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer text-faint hover:text-sub"
+              aria-label="검색어 지우기"
+            >
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={submitSearch}
+          className="h-9 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-3 text-xs font-bold text-sub hover:bg-brand-soft hover:text-brand-dark"
+        >
+          검색
+        </button>
+      </div>
+
       {!loading && !error && posts.length > 0 && (
         <>
           <div className="mt-3 text-right text-xs text-faint">전체 {totalElements}개</div>

@@ -7,6 +7,7 @@ export const BOARD_LIST_URL_KEY = 'kwb_board_list_url';
 
 export type BoardCategory = 'NOTICE' | 'FREE' | 'PLANT_QNA';
 export type BoardStatus = 'ACTIVE' | 'HIDDEN';
+export type BoardSearchType = 'TITLE_CONTENT' | 'TITLE' | 'CONTENT' | 'AUTHOR' | 'COMMENT';
 
 export interface BoardPostData {
   id: number;
@@ -87,9 +88,15 @@ export function getBoardPosts(
   size = 20,
   accessToken?: string | null,
   signal?: AbortSignal,
+  keyword?: string,
+  searchType?: BoardSearchType,
 ): Promise<SpringPage<BoardPostData>> {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (category) query.set('category', category);
+  if (keyword && keyword.trim()) {
+    query.set('keyword', keyword.trim());
+    if (searchType) query.set('searchType', searchType);
+  }
   return request<SpringPage<BoardPostData>>(`/api/v1/board/posts?${query.toString()}`, {
     accessToken,
     signal,

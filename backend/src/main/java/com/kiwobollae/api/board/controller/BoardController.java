@@ -4,6 +4,7 @@ import com.kiwobollae.api.board.dto.request.BoardPostCreateRequest;
 import com.kiwobollae.api.board.dto.request.BoardPostUpdateRequest;
 import com.kiwobollae.api.board.dto.response.BoardPostResponse;
 import com.kiwobollae.api.board.entity.enums.BoardCategory;
+import com.kiwobollae.api.board.entity.enums.BoardSearchType;
 import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.content.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.global.common.ApiResponse;
@@ -52,15 +53,22 @@ public class BoardController {
 				.body(ApiResponse.success(boardPostService.createPost(userId, request)));
 	}
 
-	@Operation(summary = "게시글 목록 조회", description = "카테고리 필터, 페이지네이션, 정렬(최신 기본)을 지원합니다.")
+	@Operation(
+			summary = "게시글 목록 조회",
+			description = "카테고리 필터, 키워드 검색(searchType: TITLE_CONTENT(기본)/TITLE/CONTENT/AUTHOR/COMMENT), "
+					+ "페이지네이션, 정렬(최신 기본)을 지원합니다."
+	)
 	@GetMapping
 	public ResponseEntity<ApiResponse<Page<BoardPostResponse>>> getPosts(
 			@AuthenticationPrincipal Long userId,
 			@RequestParam(required = false) BoardCategory category,
+			@RequestParam(required = false) String keyword,
+			@RequestParam(required = false) BoardSearchType searchType,
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable
 	) {
-		return ResponseEntity.ok(ApiResponse.success(boardPostService.getPosts(category, pageable, userId)));
+		return ResponseEntity.ok(
+				ApiResponse.success(boardPostService.getPosts(category, keyword, searchType, pageable, userId)));
 	}
 
 	@Operation(summary = "게시글 상세 조회", description = "게시글 본문과 작성자 정보를 반환합니다. 조회수는 같은 IP당 1회만 증가합니다.")

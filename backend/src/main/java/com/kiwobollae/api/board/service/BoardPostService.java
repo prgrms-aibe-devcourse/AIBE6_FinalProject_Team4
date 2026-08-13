@@ -12,6 +12,7 @@ import com.kiwobollae.api.board.entity.BoardPostLike;
 import com.kiwobollae.api.board.entity.BoardPostView;
 import com.kiwobollae.api.board.entity.enums.BoardCategory;
 import com.kiwobollae.api.board.entity.enums.BoardHiddenBy;
+import com.kiwobollae.api.board.entity.enums.BoardSearchType;
 import com.kiwobollae.api.board.entity.enums.BoardStatus;
 import com.kiwobollae.api.board.repository.BoardPostImageRepository;
 import com.kiwobollae.api.board.repository.BoardPostLikeRepository;
@@ -78,8 +79,12 @@ public class BoardPostService {
 		return BoardPostResponse.from(post, images);
 	}
 
-	public Page<BoardPostResponse> getPosts(BoardCategory category, Pageable pageable, Long userId) {
-		Page<BoardPost> posts = boardPostRepository.search(BoardStatus.ACTIVE, category, pageable);
+	public Page<BoardPostResponse> getPosts(
+			BoardCategory category, String keyword, BoardSearchType searchType, Pageable pageable, Long userId) {
+		String trimmedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
+		BoardSearchType effectiveSearchType = searchType == null ? BoardSearchType.TITLE_CONTENT : searchType;
+		Page<BoardPost> posts = boardPostRepository.search(
+				BoardStatus.ACTIVE, category, trimmedKeyword, effectiveSearchType.name(), pageable);
 		if (posts.isEmpty()) {
 			return posts.map(post -> BoardPostResponse.from(post, List.of()));
 		}
