@@ -40,18 +40,11 @@ vi.mock("@/features/gacha/use-gacha-cosmetics", () => ({
 describe("Navbar", () => {
   afterEach(cleanup);
 
-  it("모바일 하단 '더보기' 시트를 열면 가챠 바로가기를 표시한다", () => {
+  it("모바일 하단 탭에 가챠 바로가기를 표시한다", () => {
     const { container } = render(<Navbar />);
 
-    // 데스크톱 상단 내비게이션에는 항상 가챠 링크가 있다.
-    expect(container.querySelectorAll('a[href="/gacha"]')).toHaveLength(1);
-
-    // 모바일 하단 탭은 쿠폰/가챠를 "더보기" 시트 안으로 몰아뒀으므로, 열기 전에는 없다가
-    // 열면 나타나야 한다.
-    fireEvent.click(screen.getByText("더보기"));
-
-    const gachaLinks = container.querySelectorAll('a[href="/gacha"]');
-    expect(gachaLinks).toHaveLength(2);
+    // 데스크톱 상단 내비게이션 + 모바일 하단 탭, 둘 다 항상 가챠 링크가 있다.
+    expect(container.querySelectorAll('a[href="/gacha"]')).toHaveLength(2);
     expect(screen.getByText("casino").closest("a")).toHaveAttribute(
       "href",
       "/gacha",
@@ -64,6 +57,18 @@ describe("Navbar", () => {
     expect(screen.getByText("forum").closest("a")).toHaveAttribute(
       "href",
       "/board",
+    );
+  });
+
+  it("모바일 하단 '더보기' 시트를 열면 마이페이지 바로가기를 표시한다", () => {
+    render(<Navbar />);
+
+    // 로그인 전이라 "더보기" 안의 마이페이지는 /auth로 연결된다.
+    fireEvent.click(screen.getByText("더보기"));
+
+    expect(screen.getByText("마이페이지").closest("a")).toHaveAttribute(
+      "href",
+      "/auth",
     );
   });
 });

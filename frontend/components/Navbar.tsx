@@ -31,19 +31,19 @@ const NAV = [
   { key: 'board', label: '커뮤니티', href: '/board' },
 ];
 
-// 모바일 하단 탭은 자리가 6개뿐이라 식물/일지는 "식물" 하나로 합치고, 상대적으로 덜 쓰는
-// 쿠폰·가챠는 "더보기" 시트 안으로 몰아서 커뮤니티가 들어갈 자리를 확보한다.
+// 모바일 하단 탭은 자리가 5개뿐이라 홈/식물/가챠/커뮤니티/상점만 남기고, 마이페이지는
+// 더 이상 별도 아바타 탭으로 두지 않고 다른 부가 메뉴들과 함께 "더보기" 시트로 옮긴다.
 const BOTTOM = [
   { key: 'home', label: '홈', icon: 'home', href: '/' },
   { key: 'plants', label: '식물', icon: 'potted_plant', href: '/plants' },
+  { key: 'gacha', label: '가챠', icon: 'casino', href: '/gacha' },
   { key: 'board', label: '커뮤니티', icon: 'forum', href: '/board' },
   { key: 'shop', label: '상점', icon: 'storefront', href: '/shop' },
-  { key: 'account', label: 'MY', icon: 'person', href: '/my' },
 ];
 
 const BOTTOM_MORE = [
   { key: 'cards', label: '쿠폰', icon: 'style', href: '/cards' },
-  { key: 'gacha', label: '가챠', icon: 'casino', href: '/gacha' },
+  { key: 'account', label: '마이페이지', icon: 'person', href: '/my' },
 ];
 
 function activeKey(pathname: string) {
@@ -275,43 +275,18 @@ export default function Navbar() {
       <div className="fixed bottom-0 left-0 right-0 z-[45] h-[66px] border-t border-line bg-paper/95 backdrop-blur-md md:hidden">
         <div className="flex h-[66px] w-full">
           {BOTTOM.map((b) => {
-            const href = b.key === 'account' && !state.authed ? '/auth' : b.href;
             // 일지 페이지는 BOTTOM에 자체 탭이 없으므로 "식물" 탭을 대신 활성 표시한다.
             const mobileActive = active === 'journal' ? 'plants' : active;
             return (
               <Link
                 key={b.key}
-                href={href}
+                href={b.href}
                 onClick={() => setMoreOpen(false)}
                 className={`flex flex-1 flex-col items-center justify-center gap-[3px] ${
                   mobileActive === b.key ? 'text-brand hover:text-brand' : 'text-[#9aa691] hover:text-[#9aa691]'
                 }`}
               >
-                {b.key === 'account' ? (
-                  !hydrated ? (
-                    <span
-                      aria-hidden="true"
-                      className="h-7 w-7 animate-pulse rounded-full bg-[#dfe6d8]"
-                    />
-                  ) : state.authed ? (
-                    <ProfileCosmeticFrame
-                      borderCode={equippedBorder?.code}
-                      className="h-8 w-8"
-                    >
-                      <span className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-[#AED581] to-[#7CB342] text-xs font-black text-white">
-                        {state.user?.nickname?.charAt(0) ?? '?'}
-                      </span>
-                    </ProfileCosmeticFrame>
-                  ) : (
-                    <span className="material-symbols-outlined text-2xl">
-                      person
-                    </span>
-                  )
-                ) : (
-                  <span className="material-symbols-outlined text-2xl">
-                    {b.icon}
-                  </span>
-                )}
+                <span className="material-symbols-outlined text-2xl">{b.icon}</span>
                 <span className="text-[11px] font-bold">{b.label}</span>
               </Link>
             );
@@ -320,7 +295,7 @@ export default function Navbar() {
             type="button"
             onClick={() => setMoreOpen((v) => !v)}
             className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-[3px] ${
-              moreOpen || active === 'cards' || active === 'gacha'
+              moreOpen || active === 'cards' || active === 'account'
                 ? 'text-brand hover:text-brand'
                 : 'text-[#9aa691] hover:text-[#9aa691]'
             }`}
@@ -347,19 +322,22 @@ export default function Navbar() {
               </button>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {BOTTOM_MORE.map((b) => (
-                <Link
-                  key={b.key}
-                  href={b.href}
-                  onClick={() => setMoreOpen(false)}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F8FAF3] py-4 ${
-                    active === b.key ? 'text-brand' : 'text-[#5b6a54]'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-2xl">{b.icon}</span>
-                  <span className="text-[12px] font-bold">{b.label}</span>
-                </Link>
-              ))}
+              {BOTTOM_MORE.map((b) => {
+                const href = b.key === 'account' && !state.authed ? '/auth' : b.href;
+                return (
+                  <Link
+                    key={b.key}
+                    href={href}
+                    onClick={() => setMoreOpen(false)}
+                    className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F8FAF3] py-4 ${
+                      active === b.key ? 'text-brand' : 'text-[#5b6a54]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-2xl">{b.icon}</span>
+                    <span className="text-[12px] font-bold">{b.label}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         </div>
