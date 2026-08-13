@@ -112,7 +112,10 @@ export function getPointActivityLink(
     return { href: "/my/points/payments", label: "결제 내역 보기" };
   }
   if (activity.refType === "JOURNAL_COMPLETION") {
-    return { href: "/journals", label: "성장일지 보기" };
+    return {
+      href: activity.refId ? `/journals/${activity.refId}` : "/journals",
+      label: "성장일지 보기",
+    };
   }
   return null;
 }
