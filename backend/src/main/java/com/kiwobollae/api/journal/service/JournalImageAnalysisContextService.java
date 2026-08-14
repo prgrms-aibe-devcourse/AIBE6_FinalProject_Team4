@@ -26,12 +26,24 @@ public class JournalImageAnalysisContextService implements JournalImageAnalysisC
 	private final JournalImageRepository journalImageRepository;
 
 	@Override
+	public void validateAnalysisTarget(Long userId, Long journalId, String imageHash) {
+		validateIdentifiers(userId, journalId);
+		if (imageHash == null || imageHash.isBlank()
+				|| !journalImageRepository.existsOwnedActiveImage(userId, journalId, imageHash)) {
+			throw new BusinessException(ErrorCode.AI_IMAGE_ANALYSIS_IMAGE_NOT_FOUND);
+		}
+	}
+
+	@Override
 	public JournalImageAnalysisContext getAnalysisContext(
 			Long userId,
 			Long journalId,
 			int recentJournalLimit
 	) {
-		validateRequest(userId, journalId, recentJournalLimit);
+		validateIdentifiers(userId, journalId);
+		if (recentJournalLimit < 1 || recentJournalLimit > MAX_RECENT_JOURNAL_LIMIT) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
 		List<JournalImage> images = journalImageRepository.findByJournalId(journalId);
@@ -64,12 +76,11 @@ public class JournalImageAnalysisContextService implements JournalImageAnalysisC
 		);
 	}
 
-	private void validateRequest(Long userId, Long journalId, int recentJournalLimit) {
+	private void validateIdentifiers(Long userId, Long journalId) {
 		if (userId == null || userId < 1) {
 			throw new IllegalArgumentException("AI 사진 분석 사용자 ID가 필요합니다.");
 		}
-		if (journalId == null || journalId < 1 || recentJournalLimit < 1
-				|| recentJournalLimit > MAX_RECENT_JOURNAL_LIMIT) {
+		if (journalId == null || journalId < 1) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
 	}

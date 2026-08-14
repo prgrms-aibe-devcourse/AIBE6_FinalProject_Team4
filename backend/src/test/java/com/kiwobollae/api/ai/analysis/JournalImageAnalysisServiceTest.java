@@ -3,8 +3,10 @@ package com.kiwobollae.api.ai.analysis;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -66,7 +68,6 @@ class JournalImageAnalysisServiceTest {
   @Test
   void reusesCompletedResultWithoutConsumingRateLimitOrCallingAi() {
     JournalImageAnalysis completed = completedAnalysis(IMAGE_HASH, RESULT_JSON);
-    given(contextQuery.getAnalysisContext(7L, 31L, 5)).willReturn(context());
     given(store.claim(31L, IMAGE_HASH)).willReturn(Claim.completed(completed));
 
     JournalImageAnalysisResponse response = service().analyze(7L, 31L, IMAGE_HASH);
@@ -74,6 +75,8 @@ class JournalImageAnalysisServiceTest {
     assertThat(response.imageHash()).isEqualTo(IMAGE_HASH);
     assertThat(response.summary()).contains("아래쪽 잎");
     assertThat(response.analyzedAt()).isEqualTo(ANALYZED_AT);
+    verify(contextQuery).validateAnalysisTarget(7L, 31L, IMAGE_HASH);
+    verify(contextQuery, never()).getAnalysisContext(any(), any(), anyInt());
     verifyNoInteractions(requestGuard, aiClient);
   }
 
@@ -115,7 +118,9 @@ class JournalImageAnalysisServiceTest {
 
   @Test
   void rejectsImageHashThatIsNotAttachedBeforeClaimingOrCallingAi() {
-    given(contextQuery.getAnalysisContext(7L, 31L, 5)).willReturn(context());
+    willThrow(new BusinessException(ErrorCode.AI_IMAGE_ANALYSIS_IMAGE_NOT_FOUND))
+        .given(contextQuery)
+        .validateAnalysisTarget(7L, 31L, OTHER_IMAGE_HASH);
 
     assertThatThrownBy(() -> service().analyze(7L, 31L, OTHER_IMAGE_HASH))
         .isInstanceOfSatisfying(
@@ -129,7 +134,6 @@ class JournalImageAnalysisServiceTest {
 
   @Test
   void rejectsConcurrentAnalysisWithoutCallingAi() {
-    given(contextQuery.getAnalysisContext(7L, 31L, 5)).willReturn(context());
     given(store.claim(31L, IMAGE_HASH)).willReturn(Claim.inProgress());
 
     assertThatThrownBy(() -> service().analyze(7L, 31L, IMAGE_HASH))
@@ -139,6 +143,23 @@ class JournalImageAnalysisServiceTest {
                 assertThat(exception.getErrorCode())
                     .isEqualTo(ErrorCode.AI_IMAGE_ANALYSIS_IN_PROGRESS));
 
+    verify(contextQuery, never()).getAnalysisContext(any(), any(), anyInt());
+    verifyNoInteractions(requestGuard, aiClient);
+  }
+
+  @Test
+  void marksClaimFailedWhenFullContextLookupFailsAfterClaiming() {
+    given(store.claim(31L, IMAGE_HASH)).willReturn(Claim.owner("claim-token"));
+    given(contextQuery.getAnalysisContext(7L, 31L, 5))
+        .willThrow(new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+
+    assertThatThrownBy(() -> service().analyze(7L, 31L, IMAGE_HASH))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.JOURNAL_NOT_FOUND));
+
+    verify(store).fail(31L, IMAGE_HASH, "claim-token");
     verifyNoInteractions(requestGuard, aiClient);
   }
 

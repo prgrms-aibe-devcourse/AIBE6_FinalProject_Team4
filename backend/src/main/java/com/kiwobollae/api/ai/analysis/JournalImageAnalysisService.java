@@ -63,9 +63,7 @@ public class JournalImageAnalysisService {
 
   public JournalImageAnalysisResponse analyze(Long userId, Long journalId, String rawImageHash) {
     String imageHash = normalizeImageHash(rawImageHash);
-    JournalImageAnalysisContext context =
-        contextQuery.getAnalysisContext(userId, journalId, RECENT_JOURNAL_LIMIT);
-    JournalImageAnalysisContext.Image image = findImage(context, imageHash);
+    contextQuery.validateAnalysisTarget(userId, journalId, imageHash);
     Claim claim = store.claim(journalId, imageHash);
 
     if (claim.status() == ClaimStatus.COMPLETED) {
@@ -76,6 +74,9 @@ public class JournalImageAnalysisService {
     }
 
     try {
+      JournalImageAnalysisContext context =
+          contextQuery.getAnalysisContext(userId, journalId, RECENT_JOURNAL_LIMIT);
+      JournalImageAnalysisContext.Image image = findImage(context, imageHash);
       requestGuard.checkRateLimit(userId, AiFeature.JOURNAL_IMAGE_ANALYSIS);
       AiResponse aiResponse = aiClient.generate(buildRequest(context, image));
       JournalImageAnalysisResult result = deserializeAndValidate(aiResponse);

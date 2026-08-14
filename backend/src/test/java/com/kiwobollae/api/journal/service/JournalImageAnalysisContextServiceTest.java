@@ -37,6 +37,30 @@ class JournalImageAnalysisContextServiceTest {
   @Mock private PlantSpecies species;
 
   @Test
+  void validatesOwnedCurrentImageWithoutLoadingFullJournalContext() {
+    given(journalImageRepository.existsOwnedActiveImage(7L, 31L, "a".repeat(64)))
+        .willReturn(true);
+
+    service().validateAnalysisTarget(7L, 31L, "a".repeat(64));
+
+    verify(journalImageRepository).existsOwnedActiveImage(7L, 31L, "a".repeat(64));
+    verifyNoInteractions(plantJournalRepository);
+  }
+
+  @Test
+  void rejectsImageThatIsNotAttachedToOwnedActiveJournal() {
+    assertThatThrownBy(() -> service().validateAnalysisTarget(7L, 31L, "a".repeat(64)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.AI_IMAGE_ANALYSIS_IMAGE_NOT_FOUND));
+
+    verify(journalImageRepository).existsOwnedActiveImage(7L, 31L, "a".repeat(64));
+    verifyNoInteractions(plantJournalRepository);
+  }
+
+  @Test
   void exposesOwnedSavedJournalThroughReadOnlyAiContract() {
     given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
     given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(image));
