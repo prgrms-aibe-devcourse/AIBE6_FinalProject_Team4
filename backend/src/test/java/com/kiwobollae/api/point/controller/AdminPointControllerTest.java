@@ -15,6 +15,7 @@ import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentDirection;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentHistoryResponse;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentResponse;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.service.AdminPointAdjustmentService;
 import com.kiwobollae.api.point.service.AdminPointAdjustmentHistoryService;
@@ -69,7 +70,8 @@ class AdminPointControllerTest {
 	void getAdjustmentsReturnsPagedAdminLedger() throws Exception {
 		AdminPointAdjustmentHistoryResponse history = new AdminPointAdjustmentHistoryResponse(
 				91L, 7L, "green@example.com", "초록", CurrencyType.FREE,
-				-200L, 100L, 1L, LocalDateTime.of(2026, 8, 3, 10, 0)
+				-200L, AdminPointAdjustmentReason.FRAUD_PENALTY,
+				100L, 1L, LocalDateTime.of(2026, 8, 3, 10, 0)
 		);
 		given(adminPointAdjustmentHistoryService.getAdjustments(
 				org.mockito.ArgumentMatchers.eq(7L),
@@ -87,6 +89,7 @@ class AdminPointControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].transactionId").value(91))
 				.andExpect(jsonPath("$.data.content[0].targetNickname").value("초록"))
+				.andExpect(jsonPath("$.data.content[0].adjustmentReason").value("FRAUD_PENALTY"))
 				.andExpect(jsonPath("$.data.content[0].adminUserId").value(1));
 	}
 
@@ -108,9 +111,11 @@ class AdminPointControllerTest {
 
 	@Test
 	void adjustPointReturnsUpdatedBalancesAndLedgerId() throws Exception {
-		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(7L, CurrencyType.FREE, -200L);
+		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
+				7L, CurrencyType.FREE, -200L, AdminPointAdjustmentReason.FRAUD_PENALTY);
 		AdminPointAdjustmentResponse response = new AdminPointAdjustmentResponse(
-				91L, 7L, CurrencyType.FREE, -200L, 100L, 500L, 100L, 600L
+				91L, 7L, CurrencyType.FREE, -200L, AdminPointAdjustmentReason.FRAUD_PENALTY,
+				100L, 500L, 100L, 600L
 		);
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request)).willReturn(response);
 
@@ -124,6 +129,7 @@ class AdminPointControllerTest {
 				.andExpect(jsonPath("$.data.userId").value(7))
 				.andExpect(jsonPath("$.data.currencyType").value("FREE"))
 				.andExpect(jsonPath("$.data.amount").value(-200))
+				.andExpect(jsonPath("$.data.adjustmentReason").value("FRAUD_PENALTY"))
 				.andExpect(jsonPath("$.data.balanceAfter").value(100))
 				.andExpect(jsonPath("$.data.balance").value(600));
 
@@ -136,7 +142,7 @@ class AdminPointControllerTest {
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{"userId":7,"amount":100}
+								{"userId":7,"amount":100,"adjustmentReason":"SPECIAL_EVENT"}
 								"""))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"))
@@ -144,8 +150,57 @@ class AdminPointControllerTest {
 	}
 
 	@Test
+	void adjustPointRejectsMissingAdjustmentReason() throws Exception {
+		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
+				7L, CurrencyType.FREE, 100L, null);
+		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
+				.willThrow(new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED));
+
+		mockMvc.perform(post("/api/v1/admin/point/adjust")
+						.header("Idempotency-Key", "adjust-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"userId":7,"currencyType":"FREE","amount":100}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
+
+		verify(adminPointAdjustmentService).adjust(1L, "adjust-key", request);
+	}
+
+	@Test
+	void adjustPointRejectsSelfAdjustment() throws Exception {
+		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
+				1L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT);
+		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
+				.willThrow(new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN));
+
+		mockMvc.perform(post("/api/v1/admin/point/adjust")
+						.header("Idempotency-Key", "adjust-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("POINT_SELF_ADJUSTMENT_FORBIDDEN"));
+
+		verify(adminPointAdjustmentService).adjust(1L, "adjust-key", request);
+	}
+
+	@Test
+	void adjustPointRejectsUnsupportedAdjustmentReason() throws Exception {
+		mockMvc.perform(post("/api/v1/admin/point/adjust")
+						.header("Idempotency-Key", "adjust-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"userId":7,"currencyType":"FREE","amount":100,"adjustmentReason":"MANUAL_INPUT"}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON_MALFORMED_JSON"));
+	}
+
+	@Test
 	void adjustPointReturnsInsufficientBalance() throws Exception {
-		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(7L, CurrencyType.PAID, -501L);
+		AdminPointAdjustmentRequest request = new AdminPointAdjustmentRequest(
+				7L, CurrencyType.PAID, -501L, AdminPointAdjustmentReason.FRAUD_PENALTY);
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
 				.willThrow(new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 

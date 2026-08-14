@@ -3,6 +3,7 @@ import {
   PointReferenceType,
   PointTransactionType,
 } from "@/features/point/api";
+import { getAdminPointAdjustmentReasonLabel } from "@/features/point/admin-adjustment-reasons";
 
 export type PointHistoryFilterKey =
   | "all"
@@ -11,6 +12,7 @@ export type PointHistoryFilterKey =
   | "journal-reward"
   | "order"
   | "card-purchase"
+  | "gacha-purchase"
   | "admin-adjust";
 
 export interface PointHistoryFilter {
@@ -27,6 +29,11 @@ export const POINT_HISTORY_FILTERS: PointHistoryFilter[] = [
   { key: "journal-reward", label: "성장일지 보상", type: "JOURNAL_REWARD" },
   { key: "order", label: "상품 주문", refType: "ORDER" },
   { key: "card-purchase", label: "쿠폰 구매", refType: "CARD_PURCHASE" },
+  {
+    key: "gacha-purchase",
+    label: "가챠 카드팩 구매",
+    refType: "GACHA_PURCHASE",
+  },
   { key: "admin-adjust", label: "운영팀 조정", type: "ADMIN_ADJUST" },
 ];
 
@@ -45,12 +52,15 @@ export function getPointActivityTitle(activity: PointActivity): string {
   if (activity.type === "PURCHASE") {
     if (activity.refType === "ORDER") return "상품 주문 결제";
     if (activity.refType === "CARD_PURCHASE") return "쿠폰 구매";
+    if (activity.refType === "GACHA_PURCHASE") return "가챠 카드팩 구매";
     return "포인트 사용";
   }
   if (activity.type === "RESTORE") {
     if (activity.refType === "ORDER") return "상품 주문 취소";
     if (activity.refType === "CARD_PURCHASE")
       return "쿠폰 구매 취소 · 포인트 반환";
+    if (activity.refType === "GACHA_PURCHASE")
+      return "가챠 카드팩 구매 취소 · 포인트 반환";
     return "결제 취소 · 포인트 반환";
   }
   return "포인트 내역";
@@ -63,16 +73,21 @@ export function getPointActivityDescription(activity: PointActivity): string {
   if (activity.type === "REFUND")
     return "현금 환불 처리로 충전 포인트가 함께 차감됐어요.";
   if (activity.type === "ADMIN_ADJUST") {
-    return activity.amount > 0
-      ? "운영팀에서 포인트를 지급했어요."
-      : "운영팀 조정으로 포인트가 차감됐어요.";
+    const action = activity.amount > 0 ? "지급" : "차감";
+    return activity.adjustmentReason
+      ? `운영팀에서 ${getAdminPointAdjustmentReasonLabel(activity.adjustmentReason)} 사유로 포인트를 ${action}했어요.`
+      : `운영팀에서 포인트를 ${action}했어요. 기존 내역이라 사유 기록 없음.`;
   }
+  if (activity.type === "RESTORE" && activity.refType === "GACHA_PURCHASE")
+    return "가챠 카드팩 구매에 사용한 포인트가 잔액으로 돌아왔어요.";
   if (activity.type === "RESTORE")
     return "결제에 사용한 포인트가 잔액으로 돌아왔어요.";
   if (activity.refType === "ORDER")
     return "상품 주문 결제에 포인트를 사용했어요.";
   if (activity.refType === "CARD_PURCHASE")
     return "쿠폰을 구매하는 데 포인트를 사용했어요.";
+  if (activity.refType === "GACHA_PURCHASE")
+    return "가챠 카드팩을 구매하는 데 포인트를 사용했어요.";
   return "포인트 잔액이 변경됐어요.";
 }
 
@@ -90,11 +105,17 @@ export function getPointActivityLink(
   if (activity.refType === "CARD_PURCHASE") {
     return { href: "/cards?scope=mine", label: "보유 쿠폰 보기" };
   }
+  if (activity.refType === "GACHA_PURCHASE") {
+    return { href: "/gacha?tab=history", label: "가챠 개봉 내역 보기" };
+  }
   if (activity.refType === "PAYMENT" || activity.refType === "PAYMENT_REFUND") {
     return { href: "/my/points/payments", label: "결제 내역 보기" };
   }
   if (activity.refType === "JOURNAL_COMPLETION") {
-    return { href: "/journals", label: "성장일지 보기" };
+    return {
+      href: activity.refId ? `/journals/${activity.refId}` : "/journals",
+      label: "성장일지 보기",
+    };
   }
   return null;
 }

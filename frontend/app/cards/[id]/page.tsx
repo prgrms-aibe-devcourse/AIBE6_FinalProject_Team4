@@ -139,7 +139,7 @@ export default function CardDetail({
       return;
     }
     askConfirm({ icon: 'eco', title: '쿠폰을 구매할까요?', ok: '구매하기',
-      body: `${couponName(card.name)} ${qty}장 · 무상 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 유상 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
+      body: `${couponName(card.name)} ${qty}장 · 보너스 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 충전 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
       onOk: async () => {
         const currentOwned = owned ?? 0;
         setPurchasing(true);
@@ -195,7 +195,7 @@ export default function CardDetail({
             <span className="text-sm font-bold text-sub">1장당</span>
             <PointPrice value={card.pointPrice} size="lg" />
             <span className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-extrabold text-brand-dark">
-              무상 포인트 우선
+              보너스 포인트 우선
             </span>
           </div>
           <p className="mb-5 text-[14.5px] leading-[1.7] text-[#6d7a68]">
@@ -286,13 +286,13 @@ export default function CardDetail({
           {owned !== null && (
             <div className="mb-4 rounded-[14px] border border-[#e4ead8] bg-[#FAFCF6] px-4 py-3.5">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-bold text-sub">보유 무상 포인트</span>
+                <span className="font-bold text-sub">보유 보너스 포인트</span>
                 <span className="font-extrabold text-brand-dark">
                   {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.free)}P`}
                 </span>
               </div>
               <div className="mt-1.5 flex items-center justify-between text-sm">
-                <span className="font-bold text-sub">보유 유상 포인트</span>
+                <span className="font-bold text-sub">보유 충전 포인트</span>
                 <span className="font-extrabold text-brand-dark">
                   {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.paid)}P`}
                 </span>
@@ -301,8 +301,8 @@ export default function CardDetail({
                 {pointShortage > 0 && walletLoaded
                   ? `사용 가능한 포인트가 ${fmt(pointShortage)}P 부족해요.`
                   : usedPaidPoint > 0
-                    ? `무상 ${fmt(usedFreePoint)}P를 먼저 사용하고 유상 ${fmt(usedPaidPoint)}P를 사용해요.`
-                    : `무상 포인트 ${fmt(usedFreePoint)}P를 먼저 사용해요.`}
+                    ? `보너스 포인트 ${fmt(usedFreePoint)}P를 먼저 사용하고 충전포인트 ${fmt(usedPaidPoint)}P를 사용해요.`
+                    : `보너스 포인트 ${fmt(usedFreePoint)}P를 먼저 사용해요.`}
               </p>
             </div>
           )}

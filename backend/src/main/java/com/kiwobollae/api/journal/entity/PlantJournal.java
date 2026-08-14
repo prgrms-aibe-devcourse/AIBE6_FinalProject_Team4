@@ -53,14 +53,24 @@ public class PlantJournal extends BaseEntity {
 	private LocalDateTime deletedAt;
 
 	public static PlantJournal create(User user, PlantProfile plantProfile, String content, LocalDate writtenDate) {
-		LocalDateTime now = LocalDateTime.now();
+		return create(user, plantProfile, content, writtenDate, LocalDateTime.now());
+	}
+
+	/** 데이터 이관·초기 데이터처럼 실제 작성 시각이 이미 정해진 일지를 생성한다. */
+	public static PlantJournal create(
+			User user,
+			PlantProfile plantProfile,
+			String content,
+			LocalDate writtenDate,
+			LocalDateTime createdAt
+	) {
 		return PlantJournal.builder()
 				.user(user)
 				.plantProfile(plantProfile)
 				.content(content)
 				.writtenDate(writtenDate)
-				.createdAt(now)
-				.updatedAt(now)
+				.createdAt(createdAt)
+				.updatedAt(createdAt)
 				.build();
 	}
 

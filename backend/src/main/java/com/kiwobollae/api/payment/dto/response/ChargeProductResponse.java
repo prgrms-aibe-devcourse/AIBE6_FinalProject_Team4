@@ -7,7 +7,8 @@ public record ChargeProductResponse(
 		String name,
 		Long price,
 		Long pointAmount,
-		Boolean isActive
+		Boolean isActive,
+		Long version
 ) {
 	public static ChargeProductResponse from(ChargeProduct chargeProduct) {
 		return new ChargeProductResponse(
@@ -15,7 +16,8 @@ public record ChargeProductResponse(
 				chargeProduct.getName(),
 				chargeProduct.getPrice(),
 				chargeProduct.getPointAmount(),
-				chargeProduct.getIsActive()
+				chargeProduct.getIsActive(),
+				chargeProduct.getVersion()
 		);
 	}
 }

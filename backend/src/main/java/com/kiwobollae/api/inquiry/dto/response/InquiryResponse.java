@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record InquiryResponse(
 		Long id,
 		Long userId,
+		String userName,
 		InquiryCategory category,
 		String title,
 		String content,
@@ -22,6 +23,7 @@ public record InquiryResponse(
 		return new InquiryResponse(
 				inquiry.getId(),
 				inquiry.getUser().getId(),
+				inquiry.getUser().getName(),
 				inquiry.getCategory(),
 				inquiry.getTitle(),
 				inquiry.getContent(),

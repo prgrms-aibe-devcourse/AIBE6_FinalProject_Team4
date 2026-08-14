@@ -183,7 +183,7 @@ export default function ProductDetail({
       onOk: async () => {
         setPurchasing(true);
         try {
-          const signature = `${product.id}:${gachaPackQuantity}`;
+          const signature = `${product.id}:${gachaPackQuantity}:${gachaTotalPoint}`;
           const idempotencyKey =
             purchaseAttempt.current?.signature === signature
               ? purchaseAttempt.current.key
@@ -192,6 +192,7 @@ export default function ProductDetail({
           const response = await purchaseGachaPacks(
             product.id,
             gachaPackQuantity,
+            gachaTotalPoint,
             state.accessToken!,
             idempotencyKey,
           );
@@ -200,6 +201,17 @@ export default function ProductDetail({
           showToast(`${response.quantity}팩 구매가 완료됐어요!`);
           router.push(`/gacha/open/${response.drawIds[0]}`);
         } catch (purchaseError) {
+          if (
+            purchaseError instanceof ApiError &&
+            purchaseError.code === 'GACHA_PRODUCT_PRICE_CHANGED'
+          ) {
+            purchaseAttempt.current = null;
+            try {
+              setProduct(await getProduct(product.id));
+            } catch {
+              // 다음 화면 진입 또는 새로고침에서도 서버가 현재 가격을 다시 검증한다.
+            }
+          }
           showToast(
             purchaseError instanceof ApiError
               ? purchaseError.message
@@ -246,6 +258,11 @@ export default function ProductDetail({
           <p className="mb-[18px] text-[14.5px] leading-[1.7] text-[#6d7a68]">
             {product.description || '상품 설명을 준비하고 있어요.'}
           </p>
+          {isGachaPack && (
+            <p className="mb-[18px] rounded-[14px] border border-[#ddd4f3] bg-[#f7f4ff] px-4 py-3 text-[13px] font-semibold leading-6 text-[#5f527d]">
+              보너스 포인트가 먼저 차감됩니다. 잔액 부족 시 충전포인트로 결제됩니다.
+            </p>
+          )}
           <div className={`mb-[18px] text-[13px] font-bold ${product.soldOut ? 'text-danger' : 'text-brand'}`}>
             {product.soldOut
               ? '품절 · 곧 다시 채워둘게요'

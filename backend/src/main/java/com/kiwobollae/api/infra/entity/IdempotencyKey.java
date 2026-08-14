@@ -43,6 +43,9 @@ public class IdempotencyKey extends BaseEntity {
 	@Column(name = "request_hash", nullable = false, length = 64)
 	private String requestHash;
 
+	@Column(name = "claim_token", length = 36)
+	private String claimToken;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private IdempotencyStatus status;
@@ -86,5 +89,6 @@ public class IdempotencyKey extends BaseEntity {
 		this.resourceId = responseResourceId;
 		this.completedAt = now;
 		this.responseExpiresAt = responseExpiration;
+		this.claimToken = null;
 	}
 }

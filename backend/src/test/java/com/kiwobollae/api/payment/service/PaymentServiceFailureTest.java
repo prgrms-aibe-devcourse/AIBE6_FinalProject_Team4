@@ -115,7 +115,7 @@ class PaymentServiceFailureTest {
 		given(user.getId()).willReturn(7L);
 		given(payment.getChargeProduct()).willReturn(chargeProduct);
 		given(chargeProduct.getId()).willReturn(3L);
-		given(chargeProduct.getName()).willReturn("1,000P 충전");
+		given(payment.getChargeProductName()).willReturn("1,000P 충전");
 		given(payment.getCashAmount()).willReturn(1_000L);
 		given(payment.getPointAmount()).willReturn(1_000L);
 		given(payment.getStatus()).willReturn(status);

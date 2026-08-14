@@ -21,6 +21,8 @@ public interface ExchangeOrderRepository extends JpaRepository<ExchangeOrder, Lo
 	@Query("select eo from ExchangeOrder eo where eo.id = :id and eo.user.id = :userId")
 	Optional<ExchangeOrder> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 
+	boolean existsByIdAndUserId(Long id, Long userId);
+
 	@Query(value = "select eo from ExchangeOrder eo where (:status is null or eo.status = :status)",
 			countQuery = "select count(eo) from ExchangeOrder eo where (:status is null or eo.status = :status)")
 	Page<ExchangeOrder> search(@Param("status") ExchangeStatus status, Pageable pageable);

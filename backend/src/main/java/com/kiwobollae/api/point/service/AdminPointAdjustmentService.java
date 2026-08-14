@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,13 +34,13 @@ public class AdminPointAdjustmentService {
 			String idempotencyKey,
 			AdminPointAdjustmentRequest request
 	) {
-		validateRequest(adminUserId, idempotencyKey, request);
-		IdempotencyExecution idempotency = idempotencyService.start(
-				adminUserId,
-				API_TYPE,
-				idempotencyKey,
-				sha256(normalizedRequest(request))
-		);
+		validateBaseRequest(adminUserId, idempotencyKey, request);
+		if (request.adjustmentReason() == null) {
+			return replayLegacyRequest(adminUserId, idempotencyKey, request);
+		}
+		validateAdjustmentReason(request);
+		IdempotencyExecution idempotency = startWithLegacyReplay(
+				adminUserId, idempotencyKey, request);
 		if (idempotency.replay()) {
 			return readSnapshot(idempotency.key().getResponseSnapshot());
 		}
@@ -48,7 +49,8 @@ public class AdminPointAdjustmentService {
 				adminUserId,
 				request.userId(),
 				request.currencyType(),
-				request.amount()
+				request.amount(),
+				request.adjustmentReason()
 		);
 		idempotencyService.succeed(
 				idempotency.key(),
@@ -60,7 +62,7 @@ public class AdminPointAdjustmentService {
 		return response;
 	}
 
-	private void validateRequest(
+	private void validateBaseRequest(
 			Long adminUserId,
 			String idempotencyKey,
 			AdminPointAdjustmentRequest request
@@ -71,9 +73,71 @@ public class AdminPointAdjustmentService {
 				|| request.currencyType() == null || request.amount() == null || request.amount() == 0) {
 			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
 		}
+		if (adminUserId.equals(request.userId())) {
+			throw new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN);
+		}
+	}
+
+	private void validateAdjustmentReason(AdminPointAdjustmentRequest request) {
+		if (!request.adjustmentReason().supports(request.amount())) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+	}
+
+	private AdminPointAdjustmentResponse replayLegacyRequest(
+			Long adminUserId,
+			String idempotencyKey,
+			AdminPointAdjustmentRequest request
+	) {
+		Optional<IdempotencyExecution> legacyReplay = idempotencyService.replayIfPresent(
+				adminUserId,
+				API_TYPE,
+				idempotencyKey,
+				sha256(legacyNormalizedRequest(request))
+		);
+		if (legacyReplay.isEmpty()) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+		return readSnapshot(legacyReplay.get().key().getResponseSnapshot());
 	}
 
 	private String normalizedRequest(AdminPointAdjustmentRequest request) {
+		return "userId=" + request.userId()
+				+ "&currencyType=" + request.currencyType()
+				+ "&amount=" + request.amount()
+				+ "&adjustmentReason=" + request.adjustmentReason();
+	}
+
+	private IdempotencyExecution startWithLegacyReplay(
+			Long adminUserId,
+			String idempotencyKey,
+			AdminPointAdjustmentRequest request
+	) {
+		try {
+			return idempotencyService.start(
+					adminUserId,
+					API_TYPE,
+					idempotencyKey,
+					sha256(normalizedRequest(request))
+			);
+		} catch (BusinessException exception) {
+			if (exception.getErrorCode() != ErrorCode.COMMON_IDEMPOTENCY_CONFLICT) {
+				throw exception;
+			}
+
+			// adjustmentReason 도입 전에 생성된 키는 기존 정규화 해시로 재생만 허용한다.
+			// 신규 실행은 항상 adjustmentReason을 포함한 해시로 시작한다.
+			Optional<IdempotencyExecution> legacyReplay = idempotencyService.replayIfPresent(
+					adminUserId,
+					API_TYPE,
+					idempotencyKey,
+					sha256(legacyNormalizedRequest(request))
+			);
+			return legacyReplay.orElseThrow(() -> exception);
+		}
+	}
+
+	private String legacyNormalizedRequest(AdminPointAdjustmentRequest request) {
 		return "userId=" + request.userId()
 				+ "&currencyType=" + request.currencyType()
 				+ "&amount=" + request.amount();

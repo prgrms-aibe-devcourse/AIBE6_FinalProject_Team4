@@ -71,7 +71,7 @@ class PlantControllerTest {
 	private PlantProfileResponse sampleResponse(Long id, PlantStatus status) {
 		return new PlantProfileResponse(
 				id, 7L, 1L, "바질", "정중앙에서 촬영하세요.", "바질이", LocalDate.now(), null, status,
-				LocalDateTime.now(), false
+				LocalDateTime.now()
 		);
 	}
 

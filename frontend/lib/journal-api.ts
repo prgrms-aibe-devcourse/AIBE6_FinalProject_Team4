@@ -145,6 +145,23 @@ export interface PlantJournalCreateData {
   rewardAmount: number;
 }
 
+export interface DailyJournalRewardStatusData {
+  rewardGrantedToday: boolean;
+}
+
+export function getDailyJournalRewardStatus(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<DailyJournalRewardStatusData> {
+  return request<DailyJournalRewardStatusData>(
+    "/api/v1/journals/reward-status",
+    {
+      accessToken,
+      signal,
+    },
+  );
+}
+
 export function createJournal(
   payload: CreateJournalPayload,
   accessToken: string,

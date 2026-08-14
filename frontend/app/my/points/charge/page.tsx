@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getChargeProducts, reportPaymentFailure, requestCharge } from "@/features/payment/api";
@@ -31,16 +31,13 @@ export default function Charge() {
   );
   const [paymentError, setPaymentError] = useState("");
 
-  useEffect(() => {
-    if (!state.accessToken) return;
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError("");
-
-    getChargeProducts(state.accessToken, controller.signal)
-      .then(setProducts)
-      .catch((requestError) => {
+  const loadProducts = useCallback(
+    async (accessToken: string, signal?: AbortSignal) => {
+      setLoading(true);
+      setError("");
+      try {
+        setProducts(await getChargeProducts(accessToken, signal));
+      } catch (requestError) {
         if (
           requestError instanceof DOMException &&
           requestError.name === "AbortError"
@@ -52,13 +49,21 @@ export default function Charge() {
             ? requestError.message
             : "충전 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
         );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!state.accessToken) return;
+
+    const controller = new AbortController();
+    void loadProducts(state.accessToken, controller.signal);
 
     return () => controller.abort();
-  }, [reloadKey, state.accessToken]);
+  }, [loadProducts, reloadKey, state.accessToken]);
 
   const startPayment = async (product: ChargeProduct) => {
     if (!state.accessToken || processingProductId !== null) return;
@@ -73,6 +78,37 @@ export default function Charge() {
         createIdempotencyKey("charge"),
       );
       providerOrderId = pendingPayment.providerOrderId;
+      sessionStorage.setItem(
+        TOSS_PENDING_ORDER_STORAGE_KEY,
+        pendingPayment.providerOrderId,
+      );
+      if (
+        pendingPayment.cashAmount !== product.price ||
+        pendingPayment.pointAmount !== product.pointAmount
+      ) {
+        try {
+          await reportPaymentFailure(
+            state.accessToken,
+            pendingPayment.providerOrderId,
+            "PAYMENT_QUOTE_CHANGED",
+            `failure-${pendingPayment.providerOrderId}`,
+          );
+          sessionStorage.removeItem(TOSS_PENDING_ORDER_STORAGE_KEY);
+        } catch {
+          const query = new URLSearchParams({
+            code: "PAYMENT_QUOTE_CHANGED",
+            message:
+              "충전 상품 정보가 변경되어 결제를 진행하지 않았어요. 결제 내역을 정리하고 있어요.",
+          });
+          router.push(`/my/points/charge/fail?${query.toString()}`);
+          return;
+        }
+        await loadProducts(state.accessToken);
+        setPaymentError(
+          "충전 상품의 금액 또는 지급 포인트가 변경됐어요. 최신 상품을 확인한 뒤 다시 결제해 주세요.",
+        );
+        return;
+      }
       await requestTossPayment({
         clientKey: tossClientKey,
         orderId: pendingPayment.providerOrderId,
@@ -128,7 +164,10 @@ export default function Charge() {
       </div>
 
       {paymentError && (
-        <p className="mb-4 rounded-xl bg-[#fff4ef] px-3 py-2.5 text-center text-sm font-bold text-danger">
+        <p
+          role="alert"
+          className="mb-4 rounded-xl bg-[#fff4ef] px-3 py-2.5 text-center text-sm font-bold text-danger"
+        >
           {paymentError}
         </p>
       )}

@@ -11,6 +11,7 @@ import com.kiwobollae.api.global.security.JwtTokenProvider;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentRequest;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentResponse;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.service.AdminPointAdjustmentService;
 import com.kiwobollae.api.point.service.AdminPointAdjustmentHistoryService;
@@ -70,7 +71,8 @@ class AdminPointControllerAuthorizationTest {
 		String token = jwtTokenProvider.generateAccessToken(1L, "ADMIN");
 		AdminPointAdjustmentRequest request = adjustmentRequest();
 		AdminPointAdjustmentResponse response = new AdminPointAdjustmentResponse(
-				91L, 7L, CurrencyType.FREE, 100L, 400L, 500L, 400L, 900L
+				91L, 7L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT,
+				400L, 500L, 400L, 900L
 		);
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request)).willReturn(response);
 
@@ -140,6 +142,7 @@ class AdminPointControllerAuthorizationTest {
 	}
 
 	private AdminPointAdjustmentRequest adjustmentRequest() {
-		return new AdminPointAdjustmentRequest(7L, CurrencyType.FREE, 100L);
+		return new AdminPointAdjustmentRequest(
+				7L, CurrencyType.FREE, 100L, AdminPointAdjustmentReason.SPECIAL_EVENT);
 	}
 }

@@ -4,32 +4,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
+import com.kiwobollae.api.commerce.gacha.entity.enums.GachaDrawStatus;
 import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservation;
 import com.kiwobollae.api.commerce.gacha.service.GachaRewardReservationService;
 import com.kiwobollae.api.journal.dto.request.JournalImageRequest;
 import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
+import com.kiwobollae.api.journal.dto.response.DailyJournalRewardStatusResponse;
 import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.journal.dto.request.PlantJournalUpdateRequest;
+import com.kiwobollae.api.journal.entity.DailyJournalReward;
 import com.kiwobollae.api.journal.entity.JournalImage;
 import com.kiwobollae.api.journal.entity.PlantJournal;
-import com.kiwobollae.api.plantProfile.entity.PlantProfile;
+import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
+import com.kiwobollae.api.notification.service.NotificationService;
+import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import com.kiwobollae.api.plantProfile.service.PlantProfileService;
 import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.service.WalletService;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -44,20 +53,31 @@ class PlantJournalServiceTest {
 
 	@Mock private PlantJournalRepository plantJournalRepository;
 	@Mock private JournalImageRepository journalImageRepository;
+	@Mock private DailyJournalRewardRepository dailyJournalRewardRepository;
 	@Mock private PlantProfileRepository plantProfileRepository;
 	@Mock private PlantProfileService plantProfileService;
 	@Mock private UserRepository userRepository;
 	@Mock private WalletService walletService;
 	@Mock private GachaRewardReservationService gachaRewardReservationService;
 	@Mock private JournalImageUploadService journalImageUploadService;
+	@Mock private NotificationService notificationService;
+	@Mock private Clock seoulClock;
 
 	@InjectMocks
 	private PlantJournalService plantJournalService;
 
+	@BeforeEach
+	void setUp() {
+		lenient().when(seoulClock.instant()).thenReturn(Instant.parse("2026-08-13T03:00:00Z"));
+		lenient().when(seoulClock.getZone()).thenReturn(KST);
+		lenient().when(dailyJournalRewardRepository.findForUserAndRewardDate(eq(7L), any(LocalDate.class)))
+				.thenReturn(Optional.of(DailyJournalReward.builder().journalId(-1L).build()));
+	}
+
 	@Test
 	void createJournalRewardsWithSavedJournalId() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournalRequest request = new PlantJournalRequest(
 				21L,
 				"오늘의 성장 기록",
@@ -71,34 +91,46 @@ class PlantJournalServiceTest {
 				any(LocalDate.class)
 		)).willReturn(List.of());
 		given(userRepository.getReferenceById(7L)).willReturn(user);
-		given(plantJournalRepository.save(any(PlantJournal.class))).willAnswer(invocation -> {
+		given(plantJournalRepository.saveAndFlush(any(PlantJournal.class))).willAnswer(invocation -> {
 			PlantJournal journal = invocation.getArgument(0);
 			ReflectionTestUtils.setField(journal, "id", 31L);
 			return journal;
 		});
-		given(plantProfileRepository.claimJournalReward(
-				eq(21L),
-				any(LocalDateTime.class),
-				any(LocalDateTime.class)
-		)).willReturn(1);
+		DailyJournalReward dailyReward = DailyJournalReward.builder().journalId(31L).build();
+		ReflectionTestUtils.setField(dailyReward, "id", 41L);
+		given(dailyJournalRewardRepository.findForUserAndRewardDate(eq(7L), any(LocalDate.class)))
+				.willReturn(Optional.of(dailyReward));
 		given(walletService.rewardJournal(7L, 31L))
 				.willReturn(new JournalRewardResult(100L));
 		given(gachaRewardReservationService.reserveDailyJournalReward(eq(7L), any(LocalDate.class)))
-				.willReturn(GachaRewardReservation.none());
+				.willReturn(new GachaRewardReservation(true, 71L, GachaDrawStatus.PENDING));
 
 		PlantJournalCreateResponse response = plantJournalService.createJournal(7L, request);
 
 		assertThat(response.journal().id()).isEqualTo(31L);
+		assertThat(response.journal().createdAt()).isEqualTo(LocalDateTime.of(2026, 8, 13, 12, 0));
 		assertThat(response.rewardGranted()).isTrue();
 		assertThat(response.rewardAmount()).isEqualTo(100L);
+		assertThat(response.journal().gachaReward().granted()).isTrue();
+		assertThat(response.journal().gachaReward().drawId()).isEqualTo(71L);
+		assertThat(dailyReward.getGachaDrawId()).isEqualTo(71L);
 		verify(walletService).rewardJournal(7L, 31L);
 		verify(gachaRewardReservationService).reserveDailyJournalReward(eq(7L), any(LocalDate.class));
+		verify(notificationService).notify(
+				eq(7L),
+				any(),
+				any(),
+				any(),
+				any(),
+				eq("DAILY_JOURNAL_REWARD"),
+				eq(41L)
+		);
 	}
 
 	@Test
-	void createJournalDoesNotRewardWhenDailyProfileClaimWasAlreadyUsed() {
+	void createJournalDoesNotRewardWhenDailyAccountClaimWasAlreadyUsed() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, LocalDateTime.now(KST));
+		PlantProfile profile = profile(21L, user);
 		PlantJournalRequest request = new PlantJournalRequest(
 				21L,
 				"같은 날 두 번째 성장 기록",
@@ -112,29 +144,49 @@ class PlantJournalServiceTest {
 				any(LocalDate.class)
 		)).willReturn(List.of());
 		given(userRepository.getReferenceById(7L)).willReturn(user);
-		given(plantJournalRepository.save(any(PlantJournal.class))).willAnswer(invocation -> {
+		given(plantJournalRepository.saveAndFlush(any(PlantJournal.class))).willAnswer(invocation -> {
 			PlantJournal journal = invocation.getArgument(0);
 			ReflectionTestUtils.setField(journal, "id", 32L);
 			return journal;
 		});
-		given(plantProfileRepository.claimJournalReward(
-				eq(21L),
-				any(LocalDateTime.class),
-				any(LocalDateTime.class)
-		)).willReturn(0);
-
 		PlantJournalCreateResponse response = plantJournalService.createJournal(7L, request);
 
 		assertThat(response.journal().id()).isEqualTo(32L);
 		assertThat(response.rewardGranted()).isFalse();
 		assertThat(response.rewardAmount()).isZero();
 		verifyNoInteractions(walletService);
+		verifyNoInteractions(gachaRewardReservationService, notificationService);
+	}
+
+	@Test
+	void dailyRewardStatusUsesAccountAndKstDate() {
+		given(dailyJournalRewardRepository.existsForUserAndRewardDate(7L, LocalDate.of(2026, 8, 13)))
+				.willReturn(true);
+
+		DailyJournalRewardStatusResponse response = plantJournalService.getDailyRewardStatus(7L);
+
+		assertThat(response.rewardGrantedToday()).isTrue();
+	}
+
+	@Test
+	void dailyRewardStatusChangesAtKstMidnight() {
+		given(seoulClock.instant()).willReturn(
+				Instant.parse("2026-08-12T14:59:59Z"),
+				Instant.parse("2026-08-12T15:00:00Z")
+		);
+		given(dailyJournalRewardRepository.existsForUserAndRewardDate(7L, LocalDate.of(2026, 8, 12)))
+				.willReturn(true);
+		given(dailyJournalRewardRepository.existsForUserAndRewardDate(7L, LocalDate.of(2026, 8, 13)))
+				.willReturn(false);
+
+		assertThat(plantJournalService.getDailyRewardStatus(7L).rewardGrantedToday()).isTrue();
+		assertThat(plantJournalService.getDailyRewardStatus(7L).rewardGrantedToday()).isFalse();
 	}
 
 	@Test
 	void createJournalAlwaysUpdatesPlantThumbnailWithRepresentativeImage() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournalRequest request = new PlantJournalRequest(
 				21L,
 				"대표사진 지정 테스트",
@@ -148,17 +200,11 @@ class PlantJournalServiceTest {
 				any(LocalDate.class)
 		)).willReturn(List.of());
 		given(userRepository.getReferenceById(7L)).willReturn(user);
-		given(plantJournalRepository.save(any(PlantJournal.class))).willAnswer(invocation -> {
+		given(plantJournalRepository.saveAndFlush(any(PlantJournal.class))).willAnswer(invocation -> {
 			PlantJournal journal = invocation.getArgument(0);
 			ReflectionTestUtils.setField(journal, "id", 33L);
 			return journal;
 		});
-		given(plantProfileRepository.claimJournalReward(
-				eq(21L),
-				any(LocalDateTime.class),
-				any(LocalDateTime.class)
-		)).willReturn(0);
-
 		plantJournalService.createJournal(7L, request);
 
 		verify(plantProfileService).updateThumbnail(7L, profile, "https://example.test/thumb.jpg");
@@ -167,8 +213,7 @@ class PlantJournalServiceTest {
 	@Test
 	void deleteRewardedJournalKeepsRewardClaimAndDoesNotChangePoints() {
 		User user = user(7L);
-		LocalDateTime grantedAt = LocalDateTime.now(KST);
-		PlantProfile profile = profile(21L, user, grantedAt);
+		PlantProfile profile = profile(21L, user);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L))
 				.willReturn(Optional.of(journal));
@@ -176,14 +221,13 @@ class PlantJournalServiceTest {
 		plantJournalService.deleteJournal(7L, 31L);
 
 		assertThat(journal.getDeletedAt()).isNotNull();
-		assertThat(profile.getJournalRewardGrantedAt()).isEqualTo(grantedAt);
 		verifyNoInteractions(walletService);
 	}
 
 	@Test
 	void deleteJournalClearsPlantThumbnailWhenRepresentativeImageMatches() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
 		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
@@ -198,7 +242,7 @@ class PlantJournalServiceTest {
 	@Test
 	void deleteJournalDoesNotTouchThumbnailWhenNoImageIsRepresentative() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
 		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
@@ -213,7 +257,7 @@ class PlantJournalServiceTest {
 	@Test
 	void deleteJournalCleansUpAllImages() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
 		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
@@ -230,7 +274,7 @@ class PlantJournalServiceTest {
 	@Test
 	void updateJournalDeletesOnlyReplacedImages() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
 		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
@@ -259,7 +303,7 @@ class PlantJournalServiceTest {
 	@Test
 	void updateJournalUpdatesPlantThumbnailWithNewRepresentativeImage() {
 		User user = user(7L);
-		PlantProfile profile = profile(21L, user, null);
+		PlantProfile profile = profile(21L, user);
 		PlantJournal journal = journal(31L, user, profile);
 		given(plantJournalRepository.findOwnedActive(31L, 7L)).willReturn(Optional.of(journal));
 		given(journalImageRepository.findByJournalId(31L)).willReturn(List.of(
@@ -306,11 +350,10 @@ class PlantJournalServiceTest {
 		return user;
 	}
 
-	private PlantProfile profile(Long id, User user, LocalDateTime grantedAt) {
+	private PlantProfile profile(Long id, User user) {
 		PlantProfile profile = PlantProfile.builder()
 				.user(user)
 				.plantName("바질")
-				.journalRewardGrantedAt(grantedAt)
 				.build();
 		ReflectionTestUtils.setField(profile, "id", id);
 		return profile;

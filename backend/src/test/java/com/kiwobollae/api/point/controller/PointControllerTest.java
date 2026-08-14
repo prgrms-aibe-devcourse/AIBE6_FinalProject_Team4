@@ -59,6 +59,7 @@ class PointControllerTest {
 				PointTxType.PURCHASE,
 				PointRefType.ORDER,
 				10L,
+				null,
 				-1_000L,
 				-700L,
 				-300L,

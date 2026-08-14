@@ -3,13 +3,10 @@ package com.kiwobollae.api.admin.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
@@ -19,8 +16,7 @@ import com.kiwobollae.api.commerce.entity.ExchangeProduct;
 import com.kiwobollae.api.commerce.entity.enums.CancelledBy;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.commerce.repository.ExchangeOrderRepository;
-import com.kiwobollae.api.commerce.repository.ExchangeProductRepository;
-import com.kiwobollae.api.commerce.repository.UserCardRepository;
+import com.kiwobollae.api.commerce.service.ExchangeRefundService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
@@ -40,8 +36,7 @@ import org.springframework.data.domain.Pageable;
 class ExchangeManagementServiceTest {
 
 	@Mock private ExchangeOrderRepository exchangeOrderRepository;
-	@Mock private ExchangeProductRepository exchangeProductRepository;
-	@Mock private UserCardRepository userCardRepository;
+	@Mock private ExchangeRefundService exchangeRefundService;
 	@InjectMocks private ExchangeManagementService exchangeManagementService;
 
 	private ExchangeOrder mockOrder(Long id, ExchangeStatus status, Long userId, Long cardId,
@@ -153,30 +148,22 @@ class ExchangeManagementServiceTest {
 	}
 
 	@Test
-	void adminCancelExchangeRefundsCardAndStockOnSuccess() {
-		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.ADMIN), eq("품절"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
-		)).willReturn(1);
-		ExchangeOrder refreshed = mockOrder(50L, ExchangeStatus.CANCELLED, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(refreshed));
+	void adminCancelExchangeDelegatesToRefundServiceOnSuccess() {
+		ExchangeOrder cancelled = mockOrder(50L, ExchangeStatus.CANCELLED, 7L, 1L, 10L, 3);
+		given(exchangeRefundService.cancelAndRefund(50L, CancelledBy.ADMIN, "품절")).willReturn(cancelled);
 
 		ExchangeOrderResponse response = exchangeManagementService.adminCancelExchange(50L, "품절");
 
 		assertThat(response.status()).isEqualTo(ExchangeStatus.CANCELLED);
-		verify(userCardRepository).incrementCount(7L, 1L, 3);
-		verify(exchangeProductRepository).incrementStock(10L);
 	}
 
 	@Test
-	void adminCancelExchangeFailsWhenOrderDoesNotExist() {
-		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.ADMIN), eq("품절"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
-		)).willReturn(0);
-		given(exchangeOrderRepository.existsById(50L)).willReturn(false);
+	void adminCancelExchangePropagatesNotFoundFromRefundService() {
+		given(exchangeRefundService.cancelAndRefund(50L, CancelledBy.ADMIN, "품절"))
+				.willThrow(new BusinessException(ErrorCode.EXCHANGE_NOT_FOUND));
 
 		assertThatThrownBy(() -> exchangeManagementService.adminCancelExchange(50L, "품절"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_NOT_FOUND));
-		verify(userCardRepository, never()).incrementCount(anyLong(), anyLong(), any());
 	}
 }

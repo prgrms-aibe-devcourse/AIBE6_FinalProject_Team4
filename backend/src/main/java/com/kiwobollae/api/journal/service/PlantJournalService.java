@@ -9,10 +9,15 @@ import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.journal.dto.request.PlantJournalUpdateRequest;
 import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
+import com.kiwobollae.api.journal.dto.response.DailyJournalRewardStatusResponse;
+import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.service.NotificationService;
 import com.kiwobollae.api.journal.entity.JournalImage;
 import com.kiwobollae.api.journal.entity.PlantJournal;
+import com.kiwobollae.api.journal.entity.DailyJournalReward;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
+import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
 import com.kiwobollae.api.plantProfile.service.PlantProfileService;
@@ -22,10 +27,11 @@ import com.kiwobollae.api.point.dto.response.JournalRewardResult;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -39,17 +45,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PlantJournalService {
 
-	// 작성일·하루 경계는 KST 기준으로 판정한다 (중복검사·완료 판정의 "같은 날" 기준).
-	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+	private static final long JOURNAL_REWARD_AMOUNT = 100L;
 
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
+	private final DailyJournalRewardRepository dailyJournalRewardRepository;
 	private final PlantProfileRepository plantProfileRepository;
 	private final PlantProfileService plantProfileService;
 	private final UserRepository userRepository;
 	private final WalletService walletService;
 	private final GachaRewardReservationService gachaRewardReservationService;
 	private final JournalImageUploadService journalImageUploadService;
+	private final NotificationService notificationService;
+	private final Clock seoulClock;
 
 	@Transactional
 	public PlantJournalCreateResponse createJournal(Long userId, PlantJournalRequest request) {
@@ -57,15 +65,16 @@ public class PlantJournalService {
 				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 		validateRepresentative(request.images());
 
-		LocalDate today = LocalDate.now(KST);
+		LocalDate today = LocalDate.now(seoulClock);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		checkDuplicateImages(userId, request.images(), today);
 
 		User user = userRepository.getReferenceById(userId);
-		PlantJournal journal = plantJournalRepository.save(
-				PlantJournal.create(user, profile, request.content(), today));
+		PlantJournal journal = plantJournalRepository.saveAndFlush(
+				PlantJournal.create(user, profile, request.content(), today, now));
 		List<JournalImage> images = request.images().stream()
 				.map(img -> JournalImage.create(journal, user, img.imageUrl(), img.imageHash(),
-						img.representative(), today))
+						img.representative(), today, now))
 				.toList();
 		journalImageRepository.saveAll(images);
 
@@ -77,18 +86,30 @@ public class PlantJournalService {
 				.getImageUrl();
 		plantProfileService.updateThumbnail(userId, profile, representativeImageUrl);
 
-		// 작성완료 체크(1식물 1일 1회, 매일 리셋): 오늘 아직 지급 안 됐을 때만 원자적으로 클레임하고,
-		// 클레임에 성공한 경우에만 point 도메인에 실제 지급을 요청한다(동시 요청 중복 지급 방지).
-		LocalDateTime now = LocalDateTime.now(KST);
-		LocalDateTime startOfToday = today.atStartOfDay();
+		// 계정·KST 날짜 유일 제약을 선점한 요청만 포인트·카드팩·알림을 같은 트랜잭션에서 처리한다.
+		// journalId는 FK가 아닌 논리 참조라 일지 soft delete 뒤에도 보상 판정은 유지된다.
 		GachaRewardReservation gachaReservation = GachaRewardReservation.none();
-		boolean rewardGranted =
-				plantProfileRepository.claimJournalReward(profile.getId(), now, startOfToday) == 1;
+		dailyJournalRewardRepository.claim(userId, today, journal.getId(), JOURNAL_REWARD_AMOUNT, now);
+		DailyJournalReward dailyReward = dailyJournalRewardRepository.findForUserAndRewardDate(userId, today)
+				.orElseThrow(() -> new IllegalStateException("선점한 일일 일지 보상 기록을 찾을 수 없습니다."));
+		// MySQL JDBC의 영향 행 수 설정은 ON DUPLICATE KEY UPDATE의 최초 삽입 여부를 보장하지 않는다.
+		// 따라서 유일 키로 확정된 기록이 현재 일지를 가리킬 때만 실제 보상을 지급한다.
+		boolean rewardGranted = Objects.equals(dailyReward.getJournalId(), journal.getId());
 		long rewardAmount = 0L;
 		if (rewardGranted) {
 			JournalRewardResult rewardResult = walletService.rewardJournal(userId, journal.getId());
 			rewardAmount = rewardResult.rewardAmount();
 			gachaReservation = gachaRewardReservationService.reserveDailyJournalReward(userId, today);
+			dailyReward.recordGachaDraw(gachaReservation.drawId());
+			notificationService.notify(
+					userId,
+					NotificationType.POINT,
+					"일지 작성 보너스 포인트가 지급됐어요",
+					"일지 작성 보상 100P 지급",
+					"/my/points",
+					"DAILY_JOURNAL_REWARD",
+					dailyReward.getId()
+			);
 		}
 		return PlantJournalCreateResponse.from(
 				journal,
@@ -111,7 +132,13 @@ public class PlantJournalService {
 
 	// "오늘 일지 안 쓴 것만 보기" 프론트 필터용 — 오늘(KST) 일지를 쓴 식물 프로필 id 목록만 가볍게 반환한다.
 	public List<Long> getProfileIdsWrittenToday(Long userId) {
-		return plantJournalRepository.findDistinctProfileIdsByUserIdAndWrittenDate(userId, LocalDate.now(KST));
+		return plantJournalRepository.findDistinctProfileIdsByUserIdAndWrittenDate(userId, LocalDate.now(seoulClock));
+	}
+
+	public DailyJournalRewardStatusResponse getDailyRewardStatus(Long userId) {
+		return new DailyJournalRewardStatusResponse(
+				dailyJournalRewardRepository.existsForUserAndRewardDate(userId, LocalDate.now(seoulClock))
+		);
 	}
 
 	public boolean existsActive(Long journalId) {
@@ -139,9 +166,10 @@ public class PlantJournalService {
 		checkDuplicateImages(userId, request.images(), writtenDate);
 
 		User user = userRepository.getReferenceById(userId);
+		LocalDateTime now = LocalDateTime.now(seoulClock);
 		List<JournalImage> images = request.images().stream()
 				.map(img -> JournalImage.create(journal, user, img.imageUrl(), img.imageHash(),
-						img.representative(), writtenDate))
+						img.representative(), writtenDate, now))
 				.toList();
 		journalImageRepository.saveAll(images);
 
@@ -169,9 +197,8 @@ public class PlantJournalService {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
 		List<JournalImage> images = journalImageRepository.findByJournalId(journalId);
-		journal.softDelete(LocalDateTime.now(KST));
-		// 작성 보상은 삭제 여부와 무관하게 확정 지급한다. 당일 클레임도 유지하므로
-		// 삭제 후 같은 식물 프로필로 다시 작성해도 당일 추가 보상은 지급되지 않는다.
+		journal.softDelete(LocalDateTime.now(seoulClock));
+		// daily_journal_rewards는 journal_id에 FK를 두지 않아 삭제 후에도 계정별 당일 보상 판정이 유지된다.
 
 		// 삭제되는 일지의 대표(★) 사진이 식물 대표사진으로 반영돼 있었다면, 대체할 사진이 없으므로 비운다.
 		images.stream()

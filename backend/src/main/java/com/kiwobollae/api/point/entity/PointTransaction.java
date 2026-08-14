@@ -1,6 +1,7 @@
 package com.kiwobollae.api.point.entity;
 
 import com.kiwobollae.api.global.common.BaseEntity;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -19,7 +20,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 // 불변 원장(append-only). 멱등은 공통 idempotency_keys 테이블 + (ref_type, ref_id) 조회로 처리 → 자체 멱등 컬럼 없음.
 @Getter
@@ -59,7 +59,10 @@ public class PointTransaction extends BaseEntity {
 	@Column(name = "ref_id")
 	private Long refId;
 
-	@CreationTimestamp
+	@Enumerated(EnumType.STRING)
+	@Column(name = "adjustment_reason", length = 30)
+	private AdminPointAdjustmentReason adjustmentReason;
+
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 }
