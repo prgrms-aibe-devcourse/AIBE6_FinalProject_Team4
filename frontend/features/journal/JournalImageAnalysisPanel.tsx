@@ -102,7 +102,10 @@ export default function JournalImageAnalysisPanel({
   >({});
   const [loadingSaved, setLoadingSaved] = useState(true);
   const [analyzingHash, setAnalyzingHash] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{
+    imageHash: string | null;
+    message: string;
+  } | null>(null);
   const imageSignature = useMemo(
     () => images.map((image) => image.imageHash).join(","),
     [images],
@@ -110,11 +113,16 @@ export default function JournalImageAnalysisPanel({
   const activeImage = images[activeIndex] ?? images[0] ?? null;
   const result = activeImage ? results[activeImage.imageHash] : null;
   const isAnalyzing = analyzingHash === activeImage?.imageHash;
+  const visibleError =
+    error &&
+    (error.imageHash === null || error.imageHash === activeImage?.imageHash)
+      ? error.message
+      : "";
 
   useEffect(() => {
     const controller = new AbortController();
     setLoadingSaved(true);
-    setError("");
+    setError(null);
     getJournalImageAnalyses(journalId, accessToken, controller.signal)
       .then((savedResults) => {
         setResults(
@@ -132,7 +140,10 @@ export default function JournalImageAnalysisPanel({
           requestError.name === "AbortError"
         )
           return;
-        setError("저장된 분석 결과를 불러오지 못했어요.");
+        setError({
+          imageHash: null,
+          message: "저장된 분석 결과를 불러오지 못했어요.",
+        });
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoadingSaved(false);
@@ -143,12 +154,13 @@ export default function JournalImageAnalysisPanel({
 
   const runAnalysis = async () => {
     if (!activeImage || analyzingHash) return;
-    setAnalyzingHash(activeImage.imageHash);
-    setError("");
+    const requestedImageHash = activeImage.imageHash;
+    setAnalyzingHash(requestedImageHash);
+    setError(null);
     try {
       const analysis = await analyzeJournalImage(
         journalId,
-        activeImage.imageHash,
+        requestedImageHash,
         accessToken,
       );
       setResults((current) => ({
@@ -160,13 +172,19 @@ export default function JournalImageAnalysisPanel({
         requestError instanceof ApiError &&
         requestError.code === "AI_IMAGE_ANALYSIS_IN_PROGRESS"
       ) {
-        setError("이 사진을 이미 분석하고 있어요. 잠시 후 다시 확인해 주세요.");
+        setError({
+          imageHash: requestedImageHash,
+          message:
+            "이 사진을 이미 분석하고 있어요. 잠시 후 다시 확인해 주세요.",
+        });
       } else {
-        setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : "사진을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.",
-        );
+        setError({
+          imageHash: requestedImageHash,
+          message:
+            requestError instanceof ApiError
+              ? requestError.message
+              : "사진을 분석하지 못했어요. 잠시 후 다시 시도해 주세요.",
+        });
       }
     } finally {
       setAnalyzingHash(null);
@@ -340,12 +358,12 @@ export default function JournalImageAnalysisPanel({
             </div>
           )}
 
-          {error && (
+          {visibleError && (
             <div
               role="alert"
               className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-semibold text-rose-700"
             >
-              <span>{error}</span>
+              <span>{visibleError}</span>
               {!isAnalyzing && (
                 <button
                   type="button"

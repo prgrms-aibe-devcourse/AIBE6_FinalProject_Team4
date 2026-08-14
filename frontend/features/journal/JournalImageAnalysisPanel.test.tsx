@@ -148,4 +148,47 @@ describe("JournalImageAnalysisPanel", () => {
       screen.getByRole("button", { name: "다시 시도" }),
     ).toBeInTheDocument();
   });
+
+  it("사진을 바꾸면 이전 사진의 분석 오류를 표시하지 않는다", async () => {
+    mockedAnalyze.mockRejectedValue(
+      new ApiError(
+        "AI_IMAGE_ANALYSIS_IN_PROGRESS",
+        "사진을 분석하고 있습니다.",
+        409,
+      ),
+    );
+    const { rerender } = render(
+      <JournalImageAnalysisPanel
+        journalId={31}
+        images={images}
+        activeIndex={0}
+        accessToken="access-token"
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /선택한 사진 AI로 살펴보기/,
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "이 사진을 이미 분석하고 있어요",
+    );
+
+    rerender(
+      <JournalImageAnalysisPanel
+        journalId={31}
+        images={images}
+        activeIndex={1}
+        accessToken="access-token"
+      />,
+    );
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: /선택한 사진 AI로 살펴보기/,
+      }),
+    ).toBeInTheDocument();
+  });
 });
