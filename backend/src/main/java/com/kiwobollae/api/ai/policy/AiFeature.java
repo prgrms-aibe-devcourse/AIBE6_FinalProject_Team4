@@ -10,6 +10,5 @@ public enum AiFeature {
   /** 사용자가 고른 종 하나에 대한 재배 가이드 생성. */
   PLANT_CARE_GUIDE,
   PLANT_CHAT,
-  JOURNAL_GUIDE,
   JOURNAL_IMAGE_ANALYSIS
 }

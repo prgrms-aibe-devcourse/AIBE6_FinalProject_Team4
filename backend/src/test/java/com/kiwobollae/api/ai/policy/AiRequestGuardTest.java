@@ -64,12 +64,12 @@ class AiRequestGuardTest {
   // 카운터가 DB에 있으므로 시각은 애플리케이션이 정해 넘긴다. 프로젝트 표준인 KST 시계를 쓰는지 고정한다.
   @Test
   void passesConfiguredPolicyAndSeoulClockToStore() {
-    guard(7, 5).checkRateLimit(1L, AiFeature.JOURNAL_GUIDE);
+    guard(7, 5).checkRateLimit(1L, AiFeature.JOURNAL_IMAGE_ANALYSIS);
 
     verify(rateLimitStore)
         .consume(
             1L,
-            AiFeature.JOURNAL_GUIDE,
+            AiFeature.JOURNAL_IMAGE_ANALYSIS,
             FIXED_KST_TIME,
             Duration.ofMinutes(1),
             7,
