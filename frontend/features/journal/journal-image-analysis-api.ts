@@ -33,7 +33,7 @@ export function analyzeJournalImage(
   journalId: number,
   imageHash: string,
   accessToken: string,
-  signal?: AbortSignal,
+  signal: AbortSignal,
 ): Promise<JournalImageAnalysisData> {
   return request<JournalImageAnalysisData>(
     `/api/v1/ai/journals/${journalId}/image-analysis`,

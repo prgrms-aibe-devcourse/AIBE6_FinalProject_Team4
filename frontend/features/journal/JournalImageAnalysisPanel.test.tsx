@@ -1,5 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import JournalImageAnalysisPanel from "@/features/journal/JournalImageAnalysisPanel";
 import {
   analyzeJournalImage,
@@ -50,6 +56,10 @@ describe("JournalImageAnalysisPanel", () => {
     mockedGetAnalyses.mockResolvedValue([]);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("새 사진 업로드 없이 현재 선택한 저장 사진을 분석한다", async () => {
     mockedAnalyze.mockResolvedValue(analysis());
     render(
@@ -73,6 +83,7 @@ describe("JournalImageAnalysisPanel", () => {
       31,
       images[0].imageHash,
       "access-token",
+      expect.any(AbortSignal),
     );
     expect(
       await screen.findByText("조금 더 관찰해 주세요"),
@@ -190,5 +201,76 @@ describe("JournalImageAnalysisPanel", () => {
         name: /선택한 사진 AI로 살펴보기/,
       }),
     ).toBeInTheDocument();
+  });
+
+  it("진행 중인 분석 요청을 사용자가 취소할 수 있다", async () => {
+    let requestSignal: AbortSignal | undefined;
+    mockedAnalyze.mockImplementation(
+      (_journalId, _imageHash, _accessToken, signal) => {
+        requestSignal = signal;
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        });
+      },
+    );
+    render(
+      <JournalImageAnalysisPanel
+        journalId={31}
+        images={images}
+        activeIndex={0}
+        accessToken="access-token"
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /선택한 사진 AI로 살펴보기/,
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "분석 취소" }));
+
+    expect(requestSignal?.aborted).toBe(true);
+    expect(
+      await screen.findByRole("button", {
+        name: /선택한 사진 AI로 살펴보기/,
+      }),
+    ).toBeEnabled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("40초 동안 응답이 없으면 요청을 취소하고 재시도를 허용한다", async () => {
+    mockedAnalyze.mockImplementation(
+      (_journalId, _imageHash, _accessToken, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    );
+    render(
+      <JournalImageAnalysisPanel
+        journalId={31}
+        images={images}
+        activeIndex={0}
+        accessToken="access-token"
+      />,
+    );
+    const analyzeButton = await screen.findByRole("button", {
+      name: /선택한 사진 AI로 살펴보기/,
+    });
+    vi.useFakeTimers();
+
+    fireEvent.click(analyzeButton);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(40_000);
+    });
+    vi.useRealTimers();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "AI 분석 응답 시간이 초과됐어요",
+    );
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeEnabled();
   });
 });

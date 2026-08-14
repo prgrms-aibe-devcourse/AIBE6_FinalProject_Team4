@@ -33,15 +33,16 @@ describe("journal image analysis api", () => {
 
   it("선택한 저장 사진 해시만 분석 요청으로 전달한다", async () => {
     const imageHash = "a".repeat(64);
+    const controller = new AbortController();
 
-    await analyzeJournalImage(31, imageHash, "access-token");
+    await analyzeJournalImage(31, imageHash, "access-token", controller.signal);
 
     expect(mockedRequest).toHaveBeenCalledWith(
       "/api/v1/ai/journals/31/image-analysis",
       {
         method: "POST",
         accessToken: "access-token",
-        signal: undefined,
+        signal: controller.signal,
         body: JSON.stringify({ imageHash }),
       },
     );

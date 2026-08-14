@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   analyzeJournalImage,
   getJournalImageAnalyses,
@@ -17,6 +17,8 @@ interface JournalImageAnalysisPanelProps {
   activeIndex: number;
   accessToken: string;
 }
+
+const ANALYSIS_TIMEOUT_MS = 40_000;
 
 const CONDITION_META: Record<
   JournalPlantCondition,
@@ -106,6 +108,8 @@ export default function JournalImageAnalysisPanel({
     imageHash: string | null;
     message: string;
   } | null>(null);
+  const analysisControllerRef = useRef<AbortController | null>(null);
+  const analysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imageSignature = useMemo(
     () => images.map((image) => image.imageHash).join(","),
     [images],
@@ -118,6 +122,18 @@ export default function JournalImageAnalysisPanel({
     (error.imageHash === null || error.imageHash === activeImage?.imageHash)
       ? error.message
       : "";
+
+  useEffect(() => {
+    setAnalyzingHash(null);
+    return () => {
+      analysisControllerRef.current?.abort();
+      analysisControllerRef.current = null;
+      if (analysisTimeoutRef.current !== null) {
+        clearTimeout(analysisTimeoutRef.current);
+        analysisTimeoutRef.current = null;
+      }
+    };
+  }, [activeImage?.imageHash, journalId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -155,6 +171,13 @@ export default function JournalImageAnalysisPanel({
   const runAnalysis = async () => {
     if (!activeImage || analyzingHash) return;
     const requestedImageHash = activeImage.imageHash;
+    const controller = new AbortController();
+    let timedOut = false;
+    analysisControllerRef.current = controller;
+    analysisTimeoutRef.current = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, ANALYSIS_TIMEOUT_MS);
     setAnalyzingHash(requestedImageHash);
     setError(null);
     try {
@@ -162,12 +185,24 @@ export default function JournalImageAnalysisPanel({
         journalId,
         requestedImageHash,
         accessToken,
+        controller.signal,
       );
+      if (controller.signal.aborted) return;
       setResults((current) => ({
         ...current,
         [analysis.imageHash]: analysis,
       }));
     } catch (requestError) {
+      if (controller.signal.aborted) {
+        if (timedOut) {
+          setError({
+            imageHash: requestedImageHash,
+            message:
+              "AI 분석 응답 시간이 초과됐어요. 잠시 후 다시 확인해 주세요.",
+          });
+        }
+        return;
+      }
       if (
         requestError instanceof ApiError &&
         requestError.code === "AI_IMAGE_ANALYSIS_IN_PROGRESS"
@@ -187,8 +222,25 @@ export default function JournalImageAnalysisPanel({
         });
       }
     } finally {
-      setAnalyzingHash(null);
+      if (analysisControllerRef.current === controller) {
+        analysisControllerRef.current = null;
+        if (analysisTimeoutRef.current !== null) {
+          clearTimeout(analysisTimeoutRef.current);
+          analysisTimeoutRef.current = null;
+        }
+        setAnalyzingHash(null);
+      }
     }
+  };
+
+  const cancelAnalysis = () => {
+    analysisControllerRef.current?.abort();
+    analysisControllerRef.current = null;
+    if (analysisTimeoutRef.current !== null) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
+    setAnalyzingHash(null);
   };
 
   if (!activeImage) return null;
@@ -304,6 +356,13 @@ export default function JournalImageAnalysisPanel({
               <div className="h-1.5 overflow-hidden rounded-full bg-emerald-100">
                 <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-emerald-400 to-lime-400" />
               </div>
+              <button
+                type="button"
+                onClick={cancelAnalysis}
+                className="mt-4 cursor-pointer rounded-lg bg-white px-3 py-1.5 text-xs font-extrabold text-emerald-800 ring-1 ring-inset ring-emerald-200"
+              >
+                분석 취소
+              </button>
             </div>
           ) : result ? (
             <div>
