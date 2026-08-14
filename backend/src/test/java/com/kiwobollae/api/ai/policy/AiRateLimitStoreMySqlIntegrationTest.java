@@ -67,7 +67,7 @@ class AiRateLimitStoreMySqlIntegrationTest {
     consume(1L, AiFeature.PLANT_CHAT, NOW);
     consume(1L, AiFeature.PLANT_CHAT, NOW);
 
-    assertThat(consume(1L, AiFeature.JOURNAL_GUIDE, NOW)).isEmpty();
+    assertThat(consume(1L, AiFeature.JOURNAL_IMAGE_ANALYSIS, NOW)).isEmpty();
     assertThat(consume(2L, AiFeature.PLANT_CHAT, NOW)).isEmpty();
     assertThat(consume(1L, AiFeature.PLANT_CHAT, NOW)).isPresent();
   }
@@ -75,7 +75,7 @@ class AiRateLimitStoreMySqlIntegrationTest {
   @Test
   void enforcesGlobalLimitAcrossUsersAndFeatures() {
     assertThat(consume(1L, AiFeature.PLANT_CHAT, NOW, 2)).isEmpty();
-    assertThat(consume(2L, AiFeature.JOURNAL_GUIDE, NOW, 2)).isEmpty();
+    assertThat(consume(2L, AiFeature.PLANT_CARE_GUIDE, NOW, 2)).isEmpty();
 
     // 사용자와 기능을 바꿔도 전역 예산은 하나다. 이 요청의 사용자별 카운터 증가는 트랜잭션
     // 롤백으로 남지 않아, 전역 예산이 다시 열렸을 때 정상적으로 첫 호출을 할 수 있다.

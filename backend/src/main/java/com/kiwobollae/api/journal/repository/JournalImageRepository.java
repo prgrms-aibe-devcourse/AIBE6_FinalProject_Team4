@@ -30,6 +30,13 @@ public interface JournalImageRepository extends JpaRepository<JournalImage, Long
 
 	List<JournalImage> findByJournalIdIn(Collection<Long> journalIds);
 
+	@Query("select count(i) > 0 from JournalImage i "
+			+ "where i.journal.id = :journalId and i.journal.user.id = :userId "
+			+ "and i.journal.deletedAt is null and i.imageHash = :imageHash")
+	boolean existsOwnedActiveImage(@Param("userId") Long userId,
+			@Param("journalId") Long journalId,
+			@Param("imageHash") String imageHash);
+
 	@Modifying
 	@Query("delete from JournalImage i where i.journal.id = :journalId")
 	int deleteByJournalId(@Param("journalId") Long journalId);

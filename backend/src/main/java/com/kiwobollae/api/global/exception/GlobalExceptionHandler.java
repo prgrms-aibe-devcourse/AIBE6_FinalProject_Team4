@@ -32,7 +32,8 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(BusinessException.class)
 	public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
-		if (e.getErrorCode() == ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS) {
+		if (e.getErrorCode() == ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS
+				|| e.getErrorCode() == ErrorCode.AI_IMAGE_ANALYSIS_IN_PROGRESS) {
 			return ResponseEntity.status(e.getErrorCode().getHttpStatus())
 					.header("Retry-After", "2")
 					.body(errorResponse(e.getErrorCode(), e.getMessage(), e.getDetails(), null, request));
