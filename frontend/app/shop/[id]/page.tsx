@@ -10,6 +10,7 @@ import { addCartItem, getCart } from '@/lib/order-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import { isAbortError } from '@/features/commerce/presentation';
 
 export default function ProductDetail({
   params,
@@ -52,7 +53,7 @@ export default function ProductDetail({
     getProduct(productId, undefined, controller.signal)
       .then(setProduct)
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (isAbortError(requestError)) return;
         setProduct(null);
         setError(
           requestError instanceof ApiError

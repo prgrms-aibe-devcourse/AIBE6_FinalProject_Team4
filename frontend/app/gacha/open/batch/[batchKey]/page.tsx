@@ -19,7 +19,10 @@ import {
 } from "@/features/gacha/batch-session";
 import { groupGachaDrawResults } from "@/features/gacha/result";
 import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
-import { ApiError } from "@/lib/api";
+import {
+  commerceErrorMessage,
+  isAbortError,
+} from "@/features/commerce/presentation";
 import {
   GachaDrawDetail,
   GachaRarity,
@@ -135,12 +138,9 @@ export default function GachaBatchOpenPage({
           setStage((current) => (current === "loading" ? "pack" : current));
         }
       } catch (cause) {
-        if (cause instanceof DOMException && cause.name === "AbortError")
-          return;
+        if (isAbortError(cause)) return;
         setError(
-          cause instanceof ApiError
-            ? cause.message
-            : "다중 팩 결과를 불러오지 못했습니다.",
+          commerceErrorMessage(cause, "다중 팩 결과를 불러오지 못했습니다."),
         );
       }
     },

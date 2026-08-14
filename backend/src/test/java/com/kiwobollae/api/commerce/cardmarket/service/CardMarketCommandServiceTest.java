@@ -80,18 +80,26 @@ class CardMarketCommandServiceTest {
 
   @BeforeEach
   void setUp() {
+    CardMarketTradeProcessor tradeProcessor =
+        new CardMarketTradeProcessor(
+            tradeRepository,
+            negotiationRepository,
+            collectionRepository,
+            goldenInstanceRepository,
+            pointPort,
+            notificationService);
     service =
         new CardMarketCommandService(
             listingRepository,
             negotiationRepository,
             proposalRepository,
-            tradeRepository,
             tradingCardRepository,
             collectionRepository,
             goldenInstanceRepository,
             userRepository,
             pointPort,
             notificationService,
+            tradeProcessor,
             new CardMarketIdempotencyExecutor(idempotencyService, new ObjectMapper()),
             new CardMarketResponseMapper(new CommerceAssetUrlResolver("")),
             Clock.fixed(Instant.parse("2026-08-05T15:00:00Z"), ZoneOffset.UTC));

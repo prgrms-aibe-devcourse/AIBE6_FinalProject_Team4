@@ -1,23 +1,21 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { MarketTradeModal } from "@/features/card-market/CardMarketComponents";
+import CardMarketHeader, {
+  MarketTab,
+} from "@/features/card-market/CardMarketHeader";
 import {
-  ListingCard,
-  MarketTradeModal,
-  NegotiationCard,
-  PrivatePager,
-  SectionTitle,
-  SellableCardRow,
-  WalletCard,
-} from "@/features/card-market/CardMarketComponents";
-import CommerceCardImage from "@/features/commerce/CommerceCardImage";
-import CommerceEmptyState from "@/features/commerce/CommerceEmptyState";
+  MarketListingsSection,
+  MarketNegotiationsSection,
+  MarketSellSection,
+  MarketSort,
+  MarketTradesSection,
+} from "@/features/card-market/CardMarketSections";
 import { parseOneBasedPage } from "@/features/commerce/list-query";
 import {
   commerceErrorMessage,
-  formatCommerceDateTime,
   formatPoint,
   isAbortError,
 } from "@/features/commerce/presentation";
@@ -46,9 +44,6 @@ import {
 import { useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 
-type Tab = "market" | "sell" | "sent" | "received" | "trades";
-type MarketSort = "createdAt,desc" | "askingPrice,asc" | "askingPrice,desc";
-
 export default function CardMarketPage() {
   return (
     <Suspense fallback={<CardMarketPageFallback />}>
@@ -71,7 +66,7 @@ function CardMarketPageContent() {
   const { askConfirm } = useUI();
   const { state, hydrated, refreshWallet } = useStore();
   const requestedView = searchParams.get("view");
-  const [tab, setTab] = useState<Tab>(() =>
+  const [tab, setTab] = useState<MarketTab>(() =>
     requestedView === "sell" ||
     requestedView === "sent" ||
     requestedView === "received" ||
@@ -79,10 +74,10 @@ function CardMarketPageContent() {
       ? requestedView
       : "market",
   );
-  const requestedAssetType = searchParams.get("rarity");
+  const requestedRarity = searchParams.get("rarity");
   const [assetType, setAssetType] = useState<MarketAssetType | undefined>(() =>
-    requestedAssetType === "HYPER_RARE" || requestedAssetType === "GOLDEN_RARE"
-      ? requestedAssetType
+    requestedRarity === "HYPER_RARE" || requestedRarity === "GOLDEN_RARE"
+      ? requestedRarity
       : undefined,
   );
   const [marketPage, setMarketPage] = useState(() =>
@@ -223,10 +218,7 @@ function CardMarketPageContent() {
         ? nextAssetType
         : undefined,
     );
-    const nextPage = Number(searchParams.get("page"));
-    setMarketPage(
-      Number.isInteger(nextPage) && nextPage > 0 ? nextPage - 1 : 0,
-    );
+    setMarketPage(parseOneBasedPage(searchParams.get("page")));
     const nextSort = searchParams.get("sort");
     setSort(
       nextSort === "askingPrice,asc" || nextSort === "askingPrice,desc"
@@ -245,12 +237,7 @@ function CardMarketPageContent() {
         ? nextView
         : "market",
     );
-    const nextPrivatePage = Number(searchParams.get("myPage"));
-    setPrivatePage(
-      Number.isInteger(nextPrivatePage) && nextPrivatePage > 0
-        ? nextPrivatePage - 1
-        : 0,
-    );
+    setPrivatePage(parseOneBasedPage(searchParams.get("myPage")));
   }, [searchParams]);
 
   useEffect(() => {
@@ -310,7 +297,7 @@ function CardMarketPageContent() {
     }
   };
 
-  const selectPrivateTab = (next: Tab) => {
+  const selectPrivateTab = (next: MarketTab) => {
     if (next !== "market" && !token) {
       setNotice("로그인하면 카드 판매와 가격 협상을 이용할 수 있어요.");
       return;
@@ -359,123 +346,77 @@ function CardMarketPageContent() {
     router.replace(`/card-market?${params}`, { scroll: false });
   };
 
+  const selectListing = (listing: MarketListing) => {
+    if (!token) {
+      setNotice("로그인 후 구매할 수 있어요.");
+      return;
+    }
+    setSelectedListing(listing);
+    setOfferPrice("");
+  };
+
+  const submitListing = (card: MarketSellableCard) => {
+    if (!token) return;
+    const priceValue = Number(sellPrices[card.cardId]);
+    const sellerReceived = Math.floor(priceValue * 0.8);
+    const assetGuide =
+      card.rarity === "GOLDEN_RARE"
+        ? `선택한 개체 #${selectedGolden[card.cardId]}가 판매 등록됩니다.`
+        : "판매 중에는 해당 카드 1장이 보유 수량에서 분리되며, 판매 취소나 기간 만료 시 돌아옵니다.";
+    const execute = () =>
+      void runAction(
+        () =>
+          createMarketListing(
+            card.cardId,
+            card.rarity === "GOLDEN_RARE"
+              ? (selectedGolden[card.cardId] ?? null)
+              : null,
+            priceValue,
+            token,
+          ),
+        "판매글을 등록했어요.",
+      );
+    askConfirm({
+      icon: "sell",
+      title: "판매 등록을 확인해 주세요",
+      body: `판매 카드: ${card.cardName}. 등록 가격은 ${formatPoint(priceValue)}이며, 거래 완료 시 수수료 20%를 제외한 ${formatPoint(sellerReceived)}를 받습니다. ${assetGuide}`,
+      ok: "판매 등록",
+      onOk: () => {
+        if (card.rarity !== "GOLDEN_RARE") {
+          execute();
+          return;
+        }
+        window.setTimeout(
+          () =>
+            askConfirm({
+              icon: "warning",
+              title: "귀중한 골든 카드를 정말 판매할까요?",
+              body: `${card.cardName} · 개체 #${selectedGolden[card.cardId]}를 판매합니다. 등록 중에는 다른 거래에 사용할 수 없고, 판매가 완료되면 소유권이 구매자에게 즉시 이전되어 되돌릴 수 없습니다.`,
+              ok: "위험을 확인하고 등록",
+              danger: true,
+              onOk: execute,
+            }),
+          0,
+        );
+      },
+    });
+  };
+
   const activeListings = useMemo(
     () => myListings.filter((listing) => listing.status === "OPEN"),
     [myListings],
   );
+  const negotiations = tab === "sent" ? sent : received;
 
   return (
     <main className="min-h-screen bg-[#f4f6f1] px-4 pb-24 pt-12 text-[#263023] md:px-8 md:pt-14">
       <div className="mx-auto max-w-[1160px]">
-        <section className="relative mb-12 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#1f3023] via-[#3f5b3d] to-[#9a7b26] px-7 py-11 text-white shadow-xl md:px-12 md:py-14">
-          <div className="relative z-10 max-w-2xl">
-            <span className="mb-6 inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-black tracking-[0.1em] text-[#f4e7ae] backdrop-blur-sm">
-              HYPER · GOLDEN ONLY
-            </span>
-            <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-[#e8dda7]">
-              Card market
-            </p>
-            <h1 className="text-3xl font-black tracking-[-0.04em] md:text-5xl">
-              카드 거래소
-            </h1>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-white/75 md:text-base">
-              하이퍼와 골든 카드를 판매하거나 원하는 가격을 제안해 보세요.
-              소중한 컬렉션을 안전한 규칙 안에서 거래할 수 있어요.
-            </p>
-          </div>
-          <div className="absolute -bottom-20 -right-10 h-64 w-64 rounded-full bg-[#f4d76e]/20 blur-3xl" />
-        </section>
-
-        <section className="mb-14 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="rounded-[28px] border border-[#d9e2d4] bg-white p-7 shadow-[0_18px_45px_-32px_rgba(39,67,35,.45)] md:p-8">
-            <div className="flex items-start gap-4">
-              <span className="material-symbols-outlined grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#eaf1e5] text-2xl text-[#496541]">
-                verified_user
-              </span>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#83907d]">
-                  Safe trading policy
-                </p>
-                <h2 className="mt-1 text-xl font-black md:text-2xl">
-                  왜 충전한 포인트만 사용할까요?
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-[#687264]">
-                  활동 보상으로 받은 포인트가 계정 간 거래를 통해 양도되거나
-                  현금처럼 바뀌는 악용을 막고, 판매자의 거래 가치를 보호하기
-                  위해서예요. 카드 구매와 가격 제안에는 결제로 충전한 포인트만
-                  사용할 수 있습니다.
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2 border-t border-[#edf1ea] pt-5">
-              {[
-                "구매·가격 제안 공통",
-                "판매 수수료 20%",
-                "거래 완료 후 취소 불가",
-              ].map((guide) => (
-                <span
-                  key={guide}
-                  className="rounded-full bg-[#f2f5ef] px-3 py-1.5 text-xs font-bold text-[#667260]"
-                >
-                  {guide}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {token && wallet ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              <WalletCard
-                icon="account_balance_wallet"
-                label="거래 가능 포인트"
-                value={formatPoint(wallet.paidPoint)}
-                tone="gold"
-              />
-              <WalletCard
-                icon="lock"
-                label="가격 제안 보관 중"
-                value={formatPoint(wallet.escrowedPaidPoint)}
-                tone="green"
-              />
-            </div>
-          ) : (
-            <div className="flex min-h-48 flex-col justify-center rounded-[28px] border border-dashed border-[#cbd6c5] bg-white/55 p-8 text-center">
-              <span className="material-symbols-outlined text-3xl text-[#75836e]">
-                account_circle
-              </span>
-              <p className="mt-3 font-black">로그인 후 거래를 시작해 보세요.</p>
-              <p className="mt-2 text-sm leading-6 text-[#758071]">
-                내 거래 가능 금액과 가격 제안 현황을 확인할 수 있어요.
-              </p>
-            </div>
-          )}
-        </section>
-
-        <nav className="mb-12 grid grid-cols-2 gap-3 rounded-[26px] border border-[#dde4d8] bg-white p-3 shadow-[0_16px_38px_-30px_rgba(39,67,35,.5)] md:grid-cols-5">
-          {(
-            [
-              ["market", "판매 목록", "storefront"],
-              ["sell", "내 판매", "sell"],
-              ["sent", "보낸 제안", "outgoing_mail"],
-              ["received", "받은 제안", "inbox"],
-              ["trades", "거래 내역", "receipt_long"],
-            ] as const
-          ).map(([key, label, icon]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => selectPrivateTab(key)}
-              className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl text-sm font-extrabold transition ${
-                tab === key
-                  ? "bg-[#344b32] text-white shadow-md"
-                  : "text-[#687264] hover:bg-[#eef2eb]"
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">{icon}</span>
-              {label}
-            </button>
-          ))}
-        </nav>
+        <CardMarketHeader
+          tab={tab}
+          authenticated={Boolean(token)}
+          wallet={wallet}
+          onTab={selectPrivateTab}
+        />
 
         {notice ? (
           <div className="mb-5 rounded-2xl bg-[#edf5e8] px-5 py-4 font-bold text-[#476541]">
@@ -487,7 +428,6 @@ function CardMarketPageContent() {
             {error}
           </div>
         ) : null}
-
         {(tab === "market" ? marketLoading : privateLoading) ? (
           <div className="rounded-3xl bg-white p-16 text-center font-bold text-[#7a8476]">
             거래소를 불러오는 중...
@@ -495,379 +435,111 @@ function CardMarketPageContent() {
         ) : null}
 
         {!marketLoading && tab === "market" ? (
-          <section className="rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8">
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8b947f]">
-                  Open listings
-                </p>
-                <h2 className="mt-1 text-2xl font-black">판매 중인 카드</h2>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {([undefined, "HYPER_RARE", "GOLDEN_RARE"] as const).map(
-                  (type) => (
-                    <button
-                      key={type ?? "ALL"}
-                      type="button"
-                      onClick={() => changeMarketQuery(type, 0)}
-                      className={`rounded-full px-4 py-2 text-xs font-black ${assetType === type ? "bg-[#344b32] text-white" : "bg-white text-[#667260]"}`}
-                    >
-                      {type === undefined
-                        ? "전체"
-                        : type === "HYPER_RARE"
-                          ? "하이퍼"
-                          : "골든"}
-                    </button>
-                  ),
-                )}
-              </div>
-            </div>
-            <form
-              className="mb-6 grid gap-3 rounded-2xl border border-[#dce4d7] bg-white p-3 sm:grid-cols-[1fr_180px_auto]"
-              onSubmit={(event) => {
-                event.preventDefault();
-                changeMarketQuery(assetType, 0, sort, keywordInput);
-              }}
-            >
-              <label className="flex items-center gap-2 rounded-xl bg-[#f4f6f1] px-4">
-                <span className="material-symbols-outlined text-xl text-[#76816f]">
-                  search
-                </span>
-                <input
-                  value={keywordInput}
-                  maxLength={50}
-                  onChange={(event) => setKeywordInput(event.target.value)}
-                  placeholder="카드 이름 검색"
-                  className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold outline-none"
-                />
-              </label>
-              <select
-                value={sort}
-                onChange={(event) =>
-                  changeMarketQuery(
-                    assetType,
-                    0,
-                    event.target.value as MarketSort,
-                    keyword,
-                  )
-                }
-                className="rounded-xl border border-[#d8e0d3] bg-white px-4 py-3 text-sm font-black outline-none"
-              >
-                <option value="createdAt,desc">최신 등록순</option>
-                <option value="askingPrice,asc">가격 낮은순</option>
-                <option value="askingPrice,desc">가격 높은순</option>
-              </select>
-              <button
-                type="submit"
-                className="rounded-xl bg-[#344b32] px-6 py-3 text-sm font-black text-white"
-              >
-                검색
-              </button>
-            </form>
-            {listings.length ? (
-              <>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {listings.map((listing) => (
-                    <ListingCard
-                      key={listing.id}
-                      listing={listing}
-                      mine={listing.sellerUserId === userId}
-                      onBuy={() => {
-                        if (!token)
-                          return setNotice("로그인 후 구매할 수 있어요.");
-                        setSelectedListing(listing);
-                        setOfferPrice("");
-                      }}
-                    />
-                  ))}
-                </div>
-                {marketTotalPages > 1 ? (
-                  <div className="mt-8 flex items-center justify-center gap-3 border-t border-[#dfe5da] pt-6">
-                    <button
-                      type="button"
-                      disabled={marketPage <= 0}
-                      onClick={() =>
-                        changeMarketQuery(assetType, marketPage - 1)
-                      }
-                      className="rounded-xl border border-[#cad5c5] bg-white px-5 py-2.5 text-sm font-black text-[#53644e] disabled:opacity-35"
-                    >
-                      이전
-                    </button>
-                    <span className="min-w-20 text-center text-sm font-black text-[#667260]">
-                      {marketPage + 1} / {marketTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={marketPage + 1 >= marketTotalPages}
-                      onClick={() =>
-                        changeMarketQuery(assetType, marketPage + 1)
-                      }
-                      className="rounded-xl border border-[#cad5c5] bg-white px-5 py-2.5 text-sm font-black text-[#53644e] disabled:opacity-35"
-                    >
-                      다음
-                    </button>
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <CommerceEmptyState text="현재 판매 중인 카드가 없어요." />
-            )}
-          </section>
+          <MarketListingsSection
+            listings={listings}
+            userId={userId}
+            assetType={assetType}
+            sort={sort}
+            keyword={keyword}
+            keywordInput={keywordInput}
+            page={marketPage}
+            totalPages={marketTotalPages}
+            onKeywordInput={setKeywordInput}
+            onQuery={changeMarketQuery}
+            onSelect={selectListing}
+          />
         ) : null}
 
         {!privateLoading && tab === "sell" && token ? (
-          <section className="grid gap-12 rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <SectionTitle eyebrow="Sell a card" title="판매할 카드 선택" />
-              <p className="mb-5 text-sm leading-6 text-[#737d6e]">
-                하이퍼는 동일 카드를 한 장 남기고 판매할 수 있으며, 골든은
-                개체를 직접 선택합니다.
-              </p>
-              <div className="space-y-4">
-                {sellable
-                  .filter((card) => card.sellableCount > 0)
-                  .map((card) => (
-                    <SellableCardRow
-                      key={card.cardId}
-                      card={card}
-                      price={sellPrices[card.cardId] ?? ""}
-                      goldenId={selectedGolden[card.cardId]}
-                      busy={actionLoading}
-                      onPrice={(value) =>
-                        setSellPrices((current) => ({
-                          ...current,
-                          [card.cardId]: value,
-                        }))
-                      }
-                      onGolden={(value) =>
-                        setSelectedGolden((current) => ({
-                          ...current,
-                          [card.cardId]: value,
-                        }))
-                      }
-                      onSubmit={() => {
-                        const priceValue = Number(sellPrices[card.cardId]);
-                        const sellerReceived = Math.floor(priceValue * 0.8);
-                        const assetGuide =
-                          card.rarity === "GOLDEN_RARE"
-                            ? `선택한 개체 #${selectedGolden[card.cardId]}가 판매 등록됩니다.`
-                            : "판매 중에는 해당 카드 1장이 보유 수량에서 분리되며, 판매 취소나 기간 만료 시 돌아옵니다.";
-                        const submitListing = () =>
-                          void runAction(
-                            () =>
-                              createMarketListing(
-                                card.cardId,
-                                card.rarity === "GOLDEN_RARE"
-                                  ? (selectedGolden[card.cardId] ?? null)
-                                  : null,
-                                priceValue,
-                                token,
-                              ),
-                            "판매글을 등록했어요.",
-                          );
-                        askConfirm({
-                          icon: "sell",
-                          title: "판매 등록을 확인해 주세요",
-                          body: `판매 카드: ${card.cardName}. 등록 가격은 ${formatPoint(priceValue)}이며, 거래 완료 시 수수료 20%를 제외한 ${formatPoint(sellerReceived)}를 받습니다. ${assetGuide}`,
-                          ok: "판매 등록",
-                          onOk: () => {
-                            if (card.rarity !== "GOLDEN_RARE") {
-                              submitListing();
-                              return;
-                            }
-                            window.setTimeout(
-                              () =>
-                                askConfirm({
-                                  icon: "warning",
-                                  title: "귀중한 골든 카드를 정말 판매할까요?",
-                                  body: `${card.cardName} · 개체 #${selectedGolden[card.cardId]}를 판매합니다. 등록 중에는 다른 거래에 사용할 수 없고, 판매가 완료되면 소유권이 구매자에게 즉시 이전되어 되돌릴 수 없습니다.`,
-                                  ok: "위험을 확인하고 등록",
-                                  danger: true,
-                                  onOk: submitListing,
-                                }),
-                              0,
-                            );
-                          },
-                        });
-                      }}
-                    />
-                  ))}
-                {!sellable.some((card) => card.sellableCount > 0) ? (
-                  <CommerceEmptyState text="현재 판매할 수 있는 카드가 없어요." />
-                ) : null}
-              </div>
-            </div>
-            <div>
-              <SectionTitle eyebrow="My listings" title="판매 중인 카드" />
-              <div className="space-y-3">
-                {activeListings.map((listing) => (
-                  <div
-                    key={listing.id}
-                    className="flex items-center gap-4 rounded-2xl border border-[#dce3d7] bg-white p-4"
-                  >
-                    <div className="h-24 w-16 shrink-0 overflow-hidden rounded-lg bg-[#eef1eb]">
-                      <CommerceCardImage
-                        src={listing.imageUrl}
-                        name={listing.cardName}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-black">{listing.cardName}</p>
-                      <p className="mt-1 text-sm font-bold text-[#8b6b18]">
-                        {formatPoint(listing.askingPrice)}
-                      </p>
-                      <p className="mt-1 text-xs text-[#7a8476]">
-                        받은 제안 {listing.activeOfferCount}개
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={actionLoading}
-                      onClick={() =>
-                        void runAction(
-                          () => cancelMarketListing(listing.id, token),
-                          "판매를 취소했어요.",
-                        )
-                      }
-                      className="rounded-xl border border-[#d8bcb2] px-3 py-2 text-xs font-black text-[#9c4d3c]"
-                    >
-                      취소
-                    </button>
-                  </div>
-                ))}
-                {!activeListings.length ? (
-                  <CommerceEmptyState text="판매 중인 카드가 없어요." />
-                ) : null}
-              </div>
-              <PrivatePager
-                page={privatePage}
-                totalPages={privateTotalPages}
-                onChange={changePrivatePage}
-              />
-            </div>
-          </section>
+          <MarketSellSection
+            sellable={sellable}
+            activeListings={activeListings}
+            prices={sellPrices}
+            selectedGolden={selectedGolden}
+            busy={actionLoading}
+            page={privatePage}
+            totalPages={privateTotalPages}
+            onPrice={(cardId, value) =>
+              setSellPrices((current) => ({ ...current, [cardId]: value }))
+            }
+            onGolden={(cardId, value) =>
+              setSelectedGolden((current) => ({ ...current, [cardId]: value }))
+            }
+            onSubmit={submitListing}
+            onCancel={(listing) =>
+              void runAction(
+                () => cancelMarketListing(listing.id, token),
+                "판매를 취소했어요.",
+              )
+            }
+            onPage={changePrivatePage}
+          />
         ) : null}
 
         {!privateLoading && (tab === "sent" || tab === "received") && token ? (
-          <section className="rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8">
-            <SectionTitle
-              eyebrow={tab === "sent" ? "Sent offers" : "Received offers"}
-              title={
-                tab === "sent" ? "내가 보낸 가격 제안" : "내가 받은 가격 제안"
-              }
-            />
-            <div className="grid gap-5 lg:grid-cols-2">
-              {(tab === "sent" ? sent : received).map((negotiation) => (
-                <NegotiationCard
-                  key={negotiation.id}
-                  negotiation={negotiation}
-                  userId={userId!}
-                  price={counterPrices[negotiation.id] ?? ""}
-                  busy={actionLoading}
-                  onPrice={(value) =>
-                    setCounterPrices((current) => ({
-                      ...current,
-                      [negotiation.id]: value,
-                    }))
-                  }
-                  onAccept={() =>
-                    askConfirm({
-                      icon: "handshake",
-                      title: "이 가격으로 거래를 완료할까요?",
-                      body: `${negotiation.cardName}을 ${formatPoint(negotiation.currentPrice)}에 거래합니다. 거래가 완료되면 카드와 포인트 이동을 취소할 수 없습니다.`,
-                      ok: "제안 수락",
-                      onOk: () =>
-                        void runAction(
-                          () => acceptMarketNegotiation(negotiation.id, token),
-                          "가격 제안을 수락해 거래를 완료했어요.",
-                        ),
-                    })
-                  }
-                  onReject={() =>
-                    void runAction(
-                      () => rejectMarketNegotiation(negotiation.id, token),
-                      "가격 제안을 거절했어요.",
-                    )
-                  }
-                  onCancel={() =>
-                    void runAction(
-                      () => cancelMarketNegotiation(negotiation.id, token),
-                      "가격 제안을 취소했어요.",
-                    )
-                  }
-                  onPropose={() =>
-                    void runAction(
-                      () =>
-                        proposeMarketPrice(
-                          negotiation.id,
-                          Number(counterPrices[negotiation.id]),
-                          null,
-                          token,
-                        ),
-                      "새로운 가격을 제안했어요.",
-                    )
-                  }
-                />
-              ))}
-            </div>
-            {!(tab === "sent" ? sent : received).length ? (
-              <CommerceEmptyState text="가격 제안 내역이 없어요." />
-            ) : null}
-            <PrivatePager
-              page={privatePage}
-              totalPages={privateTotalPages}
-              onChange={changePrivatePage}
-            />
-          </section>
+          <MarketNegotiationsSection
+            mode={tab}
+            negotiations={negotiations}
+            userId={userId!}
+            prices={counterPrices}
+            busy={actionLoading}
+            page={privatePage}
+            totalPages={privateTotalPages}
+            onPrice={(negotiationId, value) =>
+              setCounterPrices((current) => ({
+                ...current,
+                [negotiationId]: value,
+              }))
+            }
+            onAccept={(negotiation) =>
+              askConfirm({
+                icon: "handshake",
+                title: "이 가격으로 거래를 완료할까요?",
+                body: `${negotiation.cardName}을 ${formatPoint(negotiation.currentPrice)}에 거래합니다. 거래가 완료되면 카드와 포인트 이동을 취소할 수 없습니다.`,
+                ok: "제안 수락",
+                onOk: () =>
+                  void runAction(
+                    () => acceptMarketNegotiation(negotiation.id, token),
+                    "가격 제안을 수락해 거래를 완료했어요.",
+                  ),
+              })
+            }
+            onReject={(negotiation) =>
+              void runAction(
+                () => rejectMarketNegotiation(negotiation.id, token),
+                "가격 제안을 거절했어요.",
+              )
+            }
+            onCancel={(negotiation) =>
+              void runAction(
+                () => cancelMarketNegotiation(negotiation.id, token),
+                "가격 제안을 취소했어요.",
+              )
+            }
+            onPropose={(negotiation) =>
+              void runAction(
+                () =>
+                  proposeMarketPrice(
+                    negotiation.id,
+                    Number(counterPrices[negotiation.id]),
+                    null,
+                    token,
+                  ),
+                "새로운 가격을 제안했어요.",
+              )
+            }
+            onPage={changePrivatePage}
+          />
         ) : null}
 
         {!privateLoading && tab === "trades" && token ? (
-          <section className="rounded-[30px] border border-[#e0e6dc] bg-white/45 p-5 md:p-8">
-            <SectionTitle eyebrow="Trade history" title="완료된 거래" />
-            <div className="space-y-3">
-              {trades.map((trade) => (
-                <div
-                  key={trade.id}
-                  className="grid items-center gap-4 rounded-2xl border border-[#dce3d7] bg-white p-4 md:grid-cols-[72px_1fr_auto_auto]"
-                >
-                  <div className="h-24 w-16 overflow-hidden rounded-lg bg-[#edf0e9]">
-                    <CommerceCardImage
-                      src={trade.imageUrl}
-                      name={trade.cardName}
-                    />
-                  </div>
-                  <div>
-                    <p className="font-black">{trade.cardName}</p>
-                    <p className="mt-1 text-xs text-[#788273]">
-                      {trade.tradeType === "BUY_NOW"
-                        ? "바로 구매"
-                        : "가격 협상"}{" "}
-                      · {formatCommerceDateTime(trade.completedAt)}
-                    </p>
-                  </div>
-                  <div className="text-left md:text-right">
-                    <p className="text-xs text-[#788273]">거래 금액</p>
-                    <p className="font-black text-[#765b12]">
-                      {formatPoint(trade.tradePrice)}
-                    </p>
-                  </div>
-                  <span
-                    className={`w-fit rounded-full px-3 py-1 text-xs font-black ${trade.buyerUserId === userId ? "bg-[#e7f0e2] text-[#43623c]" : "bg-[#f7ebc9] text-[#806419]"}`}
-                  >
-                    {trade.buyerUserId === userId ? "구매" : "판매"}
-                  </span>
-                </div>
-              ))}
-              {!trades.length ? (
-                <CommerceEmptyState text="완료된 거래가 없어요." />
-              ) : null}
-            </div>
-            <PrivatePager
-              page={privatePage}
-              totalPages={privateTotalPages}
-              onChange={changePrivatePage}
-            />
-          </section>
+          <MarketTradesSection
+            trades={trades}
+            userId={userId!}
+            page={privatePage}
+            totalPages={privateTotalPages}
+            onPage={changePrivatePage}
+          />
         ) : null}
       </div>
 

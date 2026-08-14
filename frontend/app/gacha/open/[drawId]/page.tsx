@@ -15,7 +15,10 @@ import GachaPackStage from "@/components/gacha/GachaPackStage";
 import GachaShuffleStage from "@/components/gacha/GachaShuffleStage";
 import { playRarityRevealSound } from "@/features/gacha/audio";
 import { usePreventBackNavigation } from "@/features/gacha/use-prevent-back-navigation";
-import { ApiError } from "@/lib/api";
+import {
+  commerceErrorMessage,
+  isAbortError,
+} from "@/features/commerce/presentation";
 import {
   GachaDrawDetail,
   GachaDrawItem,
@@ -134,12 +137,9 @@ export default function GachaOpenPage({
             : "loading",
         );
       } catch (cause) {
-        if (cause instanceof DOMException && cause.name === "AbortError")
-          return;
+        if (isAbortError(cause)) return;
         setError(
-          cause instanceof ApiError
-            ? cause.message
-            : "개봉 결과를 불러오지 못했습니다.",
+          commerceErrorMessage(cause, "개봉 결과를 불러오지 못했습니다."),
         );
       }
     },

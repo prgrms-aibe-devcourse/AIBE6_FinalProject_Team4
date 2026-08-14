@@ -8,6 +8,7 @@ import { CardData, getCard, purchaseCard } from '@/lib/card-api';
 import { useStore, fmt } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import { isAbortError } from '@/features/commerce/presentation';
 
 const CONFETTI = [
   { left: '10%', dur: '1.5s', delay: '0s', emoji: '🎉' }, { left: '28%', dur: '1.8s', delay: '.2s', emoji: '✨' },
@@ -65,7 +66,7 @@ export default function CardDetail({
         setOwned(response.ownedCount);
       })
       .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        if (isAbortError(requestError)) return;
         setCard(null);
         setError(
           requestError instanceof ApiError

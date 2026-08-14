@@ -16,11 +16,9 @@ import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketAssetType;
 import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketListingStatus;
 import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketNegotiationStatus;
 import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketParticipantType;
-import com.kiwobollae.api.commerce.cardmarket.entity.enums.CardMarketTradeType;
 import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketListingRepository;
 import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketNegotiationRepository;
 import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketProposalRepository;
-import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketTradeRepository;
 import com.kiwobollae.api.commerce.cardmarket.port.CardMarketPointPort;
 import com.kiwobollae.api.commerce.gacha.entity.GoldenCardInstance;
 import com.kiwobollae.api.commerce.gacha.entity.TradingCard;
@@ -34,10 +32,7 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -52,13 +47,13 @@ public class CardMarketCommandService {
   private final CardMarketListingRepository listingRepository;
   private final CardMarketNegotiationRepository negotiationRepository;
   private final CardMarketProposalRepository proposalRepository;
-  private final CardMarketTradeRepository tradeRepository;
   private final TradingCardRepository tradingCardRepository;
   private final UserCardCollectionRepository collectionRepository;
   private final GoldenCardInstanceRepository goldenInstanceRepository;
   private final UserRepository userRepository;
   private final CardMarketPointPort pointPort;
   private final CardMarketNotificationService notificationService;
+  private final CardMarketTradeProcessor tradeProcessor;
   private final CardMarketIdempotencyExecutor idempotencyExecutor;
   private final CardMarketResponseMapper responseMapper;
   private final Clock seoulClock;
@@ -255,7 +250,8 @@ public class CardMarketCommandService {
     }
     LocalDateTime now = now();
     List<CardMarketPointPort.OfferRelease> releases =
-        closeOtherNegotiations(listing.getId(), null, "LISTING_CANCELLED", now);
+        tradeProcessor.closeOtherNegotiations(
+            listing.getId(), null, "LISTING_CANCELLED", now);
     pointPort.releaseOffers(releases);
     if (listing.getAssetType() == CardMarketAssetType.HYPER_RARE) {
       collectionRepository.incrementOwnedCount(userId, listing.getCard().getId(), now);
@@ -270,20 +266,7 @@ public class CardMarketCommandService {
     validateActiveCard(listing);
     LocalDateTime now = now();
     User buyer = userRepository.getReferenceById(userId);
-    CardMarketTrade trade = createTrade(listing, null, buyer, CardMarketTradeType.BUY_NOW, listing.getAskingPrice(), now);
-    List<CardMarketPointPort.OfferRelease> releases =
-        closeOtherNegotiations(listing.getId(), null, "LISTING_SOLD", now);
-    pointPort.settleTrade(
-        userId,
-        listing.getSeller().getId(),
-        listing.getAskingPrice(),
-        trade.getSellerReceivedPoint(),
-        trade.getId(),
-        releases);
-    transferCard(listing, buyer, now);
-    listing.markSold("BUY_NOW", now);
-    notificationService.tradeCompleted(
-        listing, buyer.getId(), trade.getId(), trade.getTradePrice());
+    CardMarketTrade trade = tradeProcessor.completeBuyNow(listing, buyer, now);
     return responseMapper.trade(trade);
   }
 
@@ -390,32 +373,13 @@ public class CardMarketCommandService {
     long additionalBuyerPoint = Math.max(0L, tradePrice - escrowedPaidPoint);
     long excessEscrow = Math.max(0L, escrowedPaidPoint - tradePrice);
     CardMarketTrade trade =
-        createTrade(
+        tradeProcessor.completeNegotiated(
             listing,
             negotiation,
-            negotiation.getBuyer(),
-            CardMarketTradeType.NEGOTIATED,
             tradePrice,
+            additionalBuyerPoint,
+            excessEscrow,
             now);
-    List<CardMarketPointPort.OfferRelease> releases =
-        closeOtherNegotiations(listing.getId(), negotiationId, "LISTING_SOLD", now);
-    if (excessEscrow > 0) {
-      releases.add(
-          new CardMarketPointPort.OfferRelease(
-              negotiation.getBuyer().getId(), excessEscrow, negotiationId));
-    }
-    pointPort.settleTrade(
-        negotiation.getBuyer().getId(),
-        listing.getSeller().getId(),
-        additionalBuyerPoint,
-        trade.getSellerReceivedPoint(),
-        trade.getId(),
-        releases);
-    negotiation.accept(now);
-    transferCard(listing, negotiation.getBuyer(), now);
-    listing.markSold("NEGOTIATED", now);
-    notificationService.tradeCompleted(
-        listing, negotiation.getBuyer().getId(), trade.getId(), trade.getTradePrice());
     return responseMapper.trade(trade);
   }
 
@@ -452,82 +416,6 @@ public class CardMarketCommandService {
     pointPort.releaseOffer(userId, release, negotiationId);
     notificationService.negotiationCancelled(negotiation);
     return responseMapper.negotiation(negotiation, List.of());
-  }
-
-  private CardMarketTrade createTrade(
-      CardMarketListing listing,
-      CardMarketNegotiation negotiation,
-      User buyer,
-      CardMarketTradeType tradeType,
-      long tradePrice,
-      LocalDateTime now) {
-    long fee = CardMarketPolicy.fee(tradePrice);
-    long sellerReceived = tradePrice - fee;
-    return tradeRepository.saveAndFlush(
-        CardMarketTrade.builder()
-            .listing(listing)
-            .negotiation(negotiation)
-            .tradeType(tradeType)
-            .seller(listing.getSeller())
-            .buyer(buyer)
-            .card(listing.getCard())
-            .goldenInstance(listing.getGoldenInstance())
-            .cardCodeSnapshot(listing.getCard().getCode())
-            .cardNameSnapshot(listing.getCard().getName())
-            .raritySnapshot(listing.getCard().getRarity())
-            .imageKeySnapshot(listing.getCard().getImageKey())
-            .askingPriceSnapshot(listing.getAskingPrice())
-            .tradePrice(tradePrice)
-            .feeRateBps(CardMarketPolicy.FEE_RATE_BPS)
-            .feePoint(fee)
-            .sellerReceivedPoint(sellerReceived)
-            .completedAt(now)
-            .build());
-  }
-
-  private void transferCard(CardMarketListing listing, User buyer, LocalDateTime now) {
-    if (listing.getAssetType() == CardMarketAssetType.HYPER_RARE) {
-      collectionRepository.incrementOwnedCount(buyer.getId(), listing.getCard().getId(), now);
-      return;
-    }
-    GoldenCardInstance instance =
-        goldenInstanceRepository
-            .findByIdForUpdate(listing.getGoldenInstance().getId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.COMMON_DATA_CONFLICT));
-    if (!instance.getOwnerUser().getId().equals(listing.getSeller().getId())) {
-      throw new BusinessException(ErrorCode.COMMON_DATA_CONFLICT);
-    }
-    if (collectionRepository.decrementOwnedCount(
-            listing.getSeller().getId(), listing.getCard().getId(), now)
-        == 0) {
-      throw new BusinessException(ErrorCode.COMMON_DATA_CONFLICT);
-    }
-    collectionRepository.incrementOwnedCount(buyer.getId(), listing.getCard().getId(), now);
-    instance.transferTo(buyer, now);
-  }
-
-  private List<CardMarketPointPort.OfferRelease> closeOtherNegotiations(
-      Long listingId, Long acceptedNegotiationId, String reason, LocalDateTime now) {
-    List<CardMarketPointPort.OfferRelease> releases = new ArrayList<>();
-    negotiationRepository
-        .findAllByListingIdAndStatusForUpdate(
-            listingId, CardMarketNegotiationStatus.NEGOTIATING)
-        .stream()
-        .filter(negotiation -> !Objects.equals(negotiation.getId(), acceptedNegotiationId))
-        .sorted(Comparator.comparing(negotiation -> negotiation.getBuyer().getId()))
-        .forEach(
-            negotiation -> {
-              long amount =
-                  negotiation.closeAndRelease(
-                      CardMarketNegotiationStatus.LISTING_CLOSED, reason, now);
-              if (amount > 0) {
-                releases.add(
-                    new CardMarketPointPort.OfferRelease(
-                        negotiation.getBuyer().getId(), amount, negotiation.getId()));
-              }
-              notificationService.negotiationClosed(negotiation, reason);
-            });
-    return releases;
   }
 
   private void validateCounterPrice(
