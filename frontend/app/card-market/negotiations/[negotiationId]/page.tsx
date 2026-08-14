@@ -13,7 +13,7 @@ import {
 import {
   MarketNegotiation,
   getMyMarketNegotiation,
-} from "@/lib/card-market-api";
+} from "@/features/card-market/api";
 import { useStore } from "@/lib/store";
 
 export default function MarketNegotiationDetailPage() {

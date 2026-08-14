@@ -12,7 +12,7 @@ import {
   getMyMarketListings,
   proposeMarketPrice,
   rejectMarketNegotiation,
-} from "@/lib/card-market-api";
+} from "@/features/card-market/api";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();

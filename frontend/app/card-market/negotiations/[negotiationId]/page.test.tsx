@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getMyMarketNegotiation } from "@/lib/card-market-api";
+import { getMyMarketNegotiation } from "@/features/card-market/api";
 import MarketNegotiationDetailPage from "./page";
 
 vi.mock("next/navigation", () => ({
@@ -15,9 +15,9 @@ vi.mock("@/lib/store", () => ({
   }),
 }));
 
-vi.mock("@/lib/card-market-api", async (importOriginal) => {
+vi.mock("@/features/card-market/api", async (importOriginal) => {
   const original =
-    await importOriginal<typeof import("@/lib/card-market-api")>();
+    await importOriginal<typeof import("@/features/card-market/api")>();
   return { ...original, getMyMarketNegotiation: vi.fn() };
 });
 

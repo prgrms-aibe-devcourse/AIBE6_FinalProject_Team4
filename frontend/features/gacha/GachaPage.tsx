@@ -18,12 +18,11 @@ import {
   RARITY_LABEL,
   RARITY_ORDER,
 } from "@/features/gacha/GachaCardPresentation";
-import {
-  GachaCatalogSection,
-  GachaHistorySection,
-  GachaMineSection,
+import GachaCatalogSection from "@/features/gacha/GachaCatalogSection";
+import GachaHistorySection, {
   GachaRatesSection,
-} from "@/features/gacha/GachaSections";
+} from "@/features/gacha/GachaHistorySection";
+import GachaMineSection from "@/features/gacha/GachaMineSection";
 import GachaWorkshop from "@/features/gacha/GachaWorkshop";
 import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
 import {

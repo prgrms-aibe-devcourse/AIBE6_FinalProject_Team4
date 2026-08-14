@@ -9,7 +9,7 @@ import {
   formatPoint,
   isAbortError,
 } from "@/features/commerce/presentation";
-import { MarketListing, getMarketListing } from "@/lib/card-market-api";
+import { MarketListing, getMarketListing } from "@/features/card-market/api";
 
 export default function MarketListingDetailPage() {
   const params = useParams<{ listingId: string }>();

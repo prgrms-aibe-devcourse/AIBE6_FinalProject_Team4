@@ -17,7 +17,7 @@ import {
   MarketNegotiation,
   MarketSellableCard,
   MarketTrade,
-} from "@/lib/card-market-api";
+} from "@/features/card-market/api";
 
 export type MarketSort =
   "createdAt,desc" | "askingPrice,asc" | "askingPrice,desc";

@@ -8,7 +8,7 @@ import type {
   MarketListing,
   MarketNegotiation,
   MarketSellableCard,
-} from "@/lib/card-market-api";
+} from "@/features/card-market/api";
 
 const STATUS_LABEL: Record<string, string> = {
   OPEN: "판매 중",

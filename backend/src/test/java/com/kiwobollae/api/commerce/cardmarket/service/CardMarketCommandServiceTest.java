@@ -88,20 +88,36 @@ class CardMarketCommandServiceTest {
             goldenInstanceRepository,
             pointPort,
             notificationService);
-    service =
-        new CardMarketCommandService(
+    CardMarketResponseMapper responseMapper =
+        new CardMarketResponseMapper(new CommerceAssetUrlResolver(""));
+    CardMarketCommandSupport support =
+        new CardMarketCommandSupport(listingRepository, negotiationRepository);
+    CardMarketListingCommandHandler listingHandler =
+        new CardMarketListingCommandHandler(
             listingRepository,
-            negotiationRepository,
-            proposalRepository,
             tradingCardRepository,
             collectionRepository,
             goldenInstanceRepository,
             userRepository,
             pointPort,
+            tradeProcessor,
+            responseMapper,
+            support);
+    CardMarketNegotiationCommandHandler negotiationHandler =
+        new CardMarketNegotiationCommandHandler(
+            negotiationRepository,
+            proposalRepository,
+            userRepository,
+            pointPort,
             notificationService,
             tradeProcessor,
+            responseMapper,
+            support);
+    service =
+        new CardMarketCommandService(
+            listingHandler,
+            negotiationHandler,
             new CardMarketIdempotencyExecutor(idempotencyService, new ObjectMapper()),
-            new CardMarketResponseMapper(new CommerceAssetUrlResolver("")),
             Clock.fixed(Instant.parse("2026-08-05T15:00:00Z"), ZoneOffset.UTC));
     seller = user(1L, "판매자");
     buyer = user(2L, "구매자");

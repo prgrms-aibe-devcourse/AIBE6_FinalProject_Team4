@@ -1,20 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import GachaTitleBadge from "@/components/gacha/GachaTitleBadge";
 import ProfileCosmeticFrame from "@/components/gacha/ProfileCosmeticFrame";
-import { commerceErrorMessage } from "@/features/commerce/presentation";
-import {
-  GachaCollectionCard,
-  GachaCosmetic,
-  dismantleGachaCards,
-  equipGachaCosmetic,
-  purchaseGachaCosmetic,
-  unequipGachaCosmetic,
-} from "@/lib/gacha-api";
+import { GachaCollectionCard } from "@/lib/gacha-api";
 import { useUI } from "@/lib/ui";
-import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
+import { useGachaCosmeticShop } from "@/features/gacha/use-gacha-cosmetic-shop";
+import {
+  MAX_DISMANTLE_QUANTITY,
+  useGachaDismantle,
+} from "@/features/gacha/use-gacha-dismantle";
 import GachaWorkshopOverview from "@/features/gacha/GachaWorkshopOverview";
 
 const COSMETIC_DESCRIPTION: Record<string, string> = {
@@ -24,13 +20,6 @@ const COSMETIC_DESCRIPTION: Record<string, string> = {
   BORDER_SPROUT_VINE: "싱그러운 풀잎이 프로필을 감싸는 생명의 테두리",
   BORDER_BLOOM_GARDEN: "벚꽃 송이와 흩날리는 꽃잎이 피어나는 테두리",
   BORDER_GOLDEN_HARVEST: "황금 사과 문장과 찬란한 별빛이 빛나는 최고급 테두리",
-};
-
-const MAX_DISMANTLE_QUANTITY = 20;
-const DISMANTLE_RARITY_PRIORITY: Record<string, number> = {
-  COMMON: 0,
-  RARE: 1,
-  SUPER_RARE: 2,
 };
 
 export default function GachaWorkshop({
@@ -46,122 +35,34 @@ export default function GachaWorkshop({
   onBack?: () => void;
   initialSection?: "menu" | "dismantle" | "cosmetics";
 }) {
-  const { showToast, askConfirm } = useUI();
-  const { data, setData, refresh } = useGachaCosmetics();
+  const { askConfirm } = useUI();
+  const {
+    data,
+    refresh,
+    busy: cosmeticBusy,
+    purchase,
+    toggleEquip,
+  } = useGachaCosmeticShop(accessToken);
   const [section, setSection] = useState<"menu" | "dismantle" | "cosmetics">(
     initialSection,
   );
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [busy, setBusy] = useState(false);
-  const dismantleableCards = collection.filter(
-    (card) => card.dismantleableCount > 0,
-  );
-  const selected = useMemo(
-    () =>
-      dismantleableCards
-        .map((card) => ({
-          card,
-          quantity: Math.min(
-            Math.max(quantities[card.id] ?? 0, 0),
-            card.dismantleableCount,
-          ),
-        }))
-        .filter((item) => item.quantity > 0),
-    [dismantleableCards, quantities],
-  );
-  const selectedCount = selected.reduce((sum, item) => sum + item.quantity, 0);
-  const expectedShards = selected.reduce(
-    (sum, item) => sum + item.quantity * item.card.shardPerCard,
-    0,
-  );
-
-  const selectLowestRarityCards = () => {
-    let remaining = MAX_DISMANTLE_QUANTITY;
-    const next: Record<number, number> = {};
-
-    [...dismantleableCards]
-      .sort(
-        (left, right) =>
-          (DISMANTLE_RARITY_PRIORITY[left.rarity] ?? 99) -
-            (DISMANTLE_RARITY_PRIORITY[right.rarity] ?? 99) ||
-          left.displayOrder - right.displayOrder ||
-          left.id - right.id,
-      )
-      .forEach((card) => {
-        if (remaining <= 0) return;
-        const quantity = Math.min(card.dismantleableCount, remaining);
-        if (quantity > 0) {
-          next[card.id] = quantity;
-          remaining -= quantity;
-        }
-      });
-
-    setQuantities(next);
-  };
-
-  const runDismantle = async () => {
-    if (!selected.length || busy) return;
-    if (selectedCount > MAX_DISMANTLE_QUANTITY) {
-      showToast("한 번에 최대 20장까지 분해할 수 있어요.", "err");
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await dismantleGachaCards(
-        selected.map(({ card, quantity }) => ({ cardId: card.id, quantity })),
-        accessToken,
-        crypto.randomUUID(),
-      );
-      setQuantities({});
-      await onCollectionRefresh();
-      await refresh();
-      showToast(`${result.earnedShards}조각을 획득했어요.`);
-    } catch (error) {
-      showToast(
-        commerceErrorMessage(error, "카드를 분해하지 못했어요."),
-        "err",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const purchase = async (cosmetic: GachaCosmetic) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const next = await purchaseGachaCosmetic(
-        cosmetic.code,
-        accessToken,
-        crypto.randomUUID(),
-      );
-      setData(next);
-      showToast(`${cosmetic.name}을(를) 해금했어요.`);
-    } catch (error) {
-      showToast(commerceErrorMessage(error, "해금하지 못했어요."), "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const toggleEquip = async (cosmetic: GachaCosmetic) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const next = cosmetic.equipped
-        ? await unequipGachaCosmetic(cosmetic.type, accessToken)
-        : await equipGachaCosmetic(cosmetic.code, accessToken);
-      setData(next);
-      showToast(cosmetic.equipped ? "장착을 해제했어요." : "장착했어요.");
-    } catch (error) {
-      showToast(
-        commerceErrorMessage(error, "장착 상태를 바꾸지 못했어요."),
-        "err",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const {
+    busy: dismantleBusy,
+    dismantleableCards,
+    quantities,
+    selected,
+    selectedCount,
+    expectedShards,
+    selectLowestRarityCards,
+    decrement,
+    increment,
+    dismantle,
+  } = useGachaDismantle({
+    accessToken,
+    collection,
+    onCollectionRefresh,
+    onWalletRefresh: refresh,
+  });
 
   return (
     <section aria-labelledby="workshop-title" className="space-y-8">
@@ -187,7 +88,7 @@ export default function GachaWorkshop({
             </div>
             <button
               type="button"
-              disabled={!dismantleableCards.length || busy}
+              disabled={!dismantleableCards.length || dismantleBusy}
               onClick={selectLowestRarityCards}
               className="rounded-xl border border-brand px-4 py-2 text-sm font-extrabold text-brand disabled:opacity-40"
             >
@@ -240,12 +141,7 @@ export default function GachaWorkshop({
                       <button
                         type="button"
                         aria-label={`${card.name} 분해 수량 감소`}
-                        onClick={() =>
-                          setQuantities((current) => ({
-                            ...current,
-                            [card.id]: Math.max(0, quantity - 1),
-                          }))
-                        }
+                        onClick={() => decrement(card.id)}
                         className="h-8 w-8 rounded-lg font-black"
                       >
                         −
@@ -256,24 +152,7 @@ export default function GachaWorkshop({
                       <button
                         type="button"
                         aria-label={`${card.name} 분해 수량 증가`}
-                        onClick={() =>
-                          setQuantities((current) => {
-                            const currentTotal = Object.values(current).reduce(
-                              (sum, value) => sum + Math.max(0, value),
-                              0,
-                            );
-                            if (currentTotal >= MAX_DISMANTLE_QUANTITY) {
-                              return current;
-                            }
-                            return {
-                              ...current,
-                              [card.id]: Math.min(
-                                card.dismantleableCount,
-                                (current[card.id] ?? 0) + 1,
-                              ),
-                            };
-                          })
-                        }
+                        onClick={() => increment(card)}
                         disabled={
                           selectedCount >= MAX_DISMANTLE_QUANTITY ||
                           quantity >= card.dismantleableCount
@@ -300,7 +179,7 @@ export default function GachaWorkshop({
             </p>
             <button
               type="button"
-              disabled={!selected.length || busy}
+              disabled={!selected.length || dismantleBusy}
               onClick={() =>
                 askConfirm({
                   icon: "recycling",
@@ -308,7 +187,7 @@ export default function GachaWorkshop({
                   body: `${selectedCount}장을 분해해 ${expectedShards}조각을 획득합니다. 카드별 한 장은 남습니다.`,
                   ok: `${selectedCount}개 변환하기`,
                   danger: true,
-                  onOk: () => void runDismantle(),
+                  onOk: () => void dismantle(),
                 })
               }
               className="rounded-xl bg-brand px-5 py-3 font-extrabold text-white disabled:opacity-40"
@@ -383,7 +262,7 @@ export default function GachaWorkshop({
                 {cosmetic.owned ? (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={cosmeticBusy}
                     onClick={() => void toggleEquip(cosmetic)}
                     className={`mt-5 w-full rounded-xl py-2.5 font-extrabold ${
                       cosmetic.equipped
@@ -397,7 +276,8 @@ export default function GachaWorkshop({
                   <button
                     type="button"
                     disabled={
-                      busy || (data?.shards.balance ?? 0) < cosmetic.price
+                      cosmeticBusy ||
+                      (data?.shards.balance ?? 0) < cosmetic.price
                     }
                     onClick={() =>
                       askConfirm({

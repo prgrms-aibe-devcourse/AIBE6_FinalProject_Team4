@@ -1,6 +1,6 @@
 import { WalletCard } from "@/features/card-market/CardMarketComponents";
 import { formatPoint } from "@/features/commerce/presentation";
-import { MarketWallet } from "@/lib/card-market-api";
+import { MarketWallet } from "@/features/card-market/api";
 
 export type MarketTab = "market" | "sell" | "sent" | "received" | "trades";
 
