@@ -25,8 +25,8 @@ import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository
 import com.kiwobollae.api.commerce.gacha.service.GachaCollectionAcquisitionService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
-import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.service.WalletService;
@@ -241,13 +241,12 @@ class CardMarketMySqlIntegrationTest {
   }
 
   private void addPaidPoint(User user, long amount, long referenceId) {
-    walletService.applyDelta(
+    walletService.adjustByAdmin(
+        referenceId,
         user.getId(),
-        PointTxType.ADMIN_ADJUST,
         CurrencyType.PAID,
         amount,
-        PointRefType.ADMIN,
-        referenceId);
+        AdminPointAdjustmentReason.SPECIAL_EVENT);
   }
 
   private String buyAfterBarrier(
