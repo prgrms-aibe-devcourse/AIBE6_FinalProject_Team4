@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ProductDetail from "./page";
-import { getProduct } from "@/lib/product-api";
+import { getProduct } from "@/features/shop/api";
 import { purchaseGachaPacks } from "@/lib/gacha-api";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
@@ -38,8 +38,8 @@ vi.mock("@/lib/ui", () => ({
   useUI: () => ui,
 }));
 
-vi.mock("@/lib/product-api", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/lib/product-api")>();
+vi.mock("@/features/shop/api", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/features/shop/api")>();
   return { ...original, getProduct: vi.fn() };
 });
 

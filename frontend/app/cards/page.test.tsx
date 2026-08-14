@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Cards from './page';
-import { getCards } from '@/lib/card-api';
+import { getCards } from '@/features/coupon/api';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -15,8 +15,8 @@ vi.mock('@/lib/store', () => ({
   }),
 }));
 
-vi.mock('@/lib/card-api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@/lib/card-api')>();
+vi.mock('@/features/coupon/api', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/features/coupon/api')>();
   return {
     ...original,
     getCards: vi.fn(),

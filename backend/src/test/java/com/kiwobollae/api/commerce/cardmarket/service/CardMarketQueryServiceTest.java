@@ -47,7 +47,7 @@ class CardMarketQueryServiceTest {
   void hidesClosedOrHiddenListingFromPublicDetail() {
     CardMarketListingRepository listingRepository = mock(CardMarketListingRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             mock(CardMarketNegotiationRepository.class),
             mock(CardMarketProposalRepository.class),
@@ -79,7 +79,7 @@ class CardMarketQueryServiceTest {
     UserCardCollectionRepository collectionRepository =
         mock(UserCardCollectionRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             mock(CardMarketNegotiationRepository.class),
             mock(CardMarketProposalRepository.class),
@@ -115,7 +115,7 @@ class CardMarketQueryServiceTest {
   void hidesExpiredListingFromPublicDetailBeforeSchedulerRuns() {
     CardMarketListingRepository listingRepository = mock(CardMarketListingRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             mock(CardMarketNegotiationRepository.class),
             mock(CardMarketProposalRepository.class),
@@ -147,7 +147,7 @@ class CardMarketQueryServiceTest {
     CardMarketNegotiationRepository negotiationRepository =
         mock(CardMarketNegotiationRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             negotiationRepository,
             mock(CardMarketProposalRepository.class),
@@ -192,7 +192,7 @@ class CardMarketQueryServiceTest {
         mock(CardMarketNegotiationRepository.class);
     CardMarketProposalRepository proposalRepository = mock(CardMarketProposalRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             mock(CardMarketListingRepository.class),
             negotiationRepository,
             proposalRepository,
@@ -234,5 +234,28 @@ class CardMarketQueryServiceTest {
 
   private static CardMarketResponseMapper responseMapper() {
     return new CardMarketResponseMapper(new CommerceAssetUrlResolver(""));
+  }
+
+  private static CardMarketQueryService queryService(
+      CardMarketListingRepository listingRepository,
+      CardMarketNegotiationRepository negotiationRepository,
+      CardMarketProposalRepository proposalRepository,
+      CardMarketTradeRepository tradeRepository,
+      UserCardCollectionRepository collectionRepository,
+      GoldenCardInstanceRepository goldenInstanceRepository,
+      CardMarketPointPort pointPort,
+      CardMarketResponseMapper responseMapper,
+      Clock clock) {
+    return new CardMarketQueryService(
+        listingRepository,
+        negotiationRepository,
+        tradeRepository,
+        collectionRepository,
+        goldenInstanceRepository,
+        pointPort,
+        responseMapper,
+        new CardMarketQueryResponseAssembler(
+            negotiationRepository, proposalRepository, responseMapper),
+        clock);
   }
 }
