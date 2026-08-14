@@ -15,7 +15,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -38,9 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(ApiVersion.V1 + "/journals")
 public class JournalController {
 
-	// 클라이언트가 ?size=로 과도한 값을 보내 대량 조회를 유발하지 않도록 이 엔드포인트에서만 상한을 둔다.
-	private static final int MAX_PAGE_SIZE = 100;
-
 	private final PlantJournalService plantJournalService;
 
 	@Operation(summary = "성장 일지 작성", description = "선택한 식물 프로필에 이미지(1~3장)와 내용으로 일지를 작성합니다.")
@@ -61,16 +57,8 @@ public class JournalController {
 			@RequestParam(required = false) Integer month,
 			@ParameterObject @PageableDefault(size = 20, sort = {"writtenDate", "id"}, direction = Sort.Direction.DESC)
 			Pageable pageable) {
-		Pageable boundedPageable = boundPageSize(pageable);
 		return ResponseEntity.ok(ApiResponse.success(
-				plantJournalService.getJournals(userId, profileId, year, month, boundedPageable)));
-	}
-
-	private Pageable boundPageSize(Pageable pageable) {
-		if (pageable.getPageSize() <= MAX_PAGE_SIZE) {
-			return pageable;
-		}
-		return PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort());
+				plantJournalService.getJournals(userId, profileId, year, month, pageable)));
 	}
 
 	@Operation(summary = "오늘 일지 작성한 프로필 목록", description = "오늘(KST) 일지를 작성한 식물 프로필 id 목록을 반환합니다.")

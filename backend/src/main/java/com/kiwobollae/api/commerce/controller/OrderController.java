@@ -12,7 +12,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -32,9 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping(ApiVersion.V1 + "/order")
 public class OrderController {
-
-	// 클라이언트가 ?size=로 과도한 값을 보내 대량 조회를 유발하지 않도록 이 엔드포인트에서만 상한을 둔다.
-	private static final int MAX_PAGE_SIZE = 100;
 
 	private final OrderService orderService;
 
@@ -59,14 +55,7 @@ public class OrderController {
 			@ParameterObject @PageableDefault(size = 20, sort = {"orderedAt", "id"}, direction = Sort.Direction.DESC)
 			Pageable pageable
 	) {
-		return ResponseEntity.ok(ApiResponse.success(orderService.getOrders(userId, boundPageSize(pageable))));
-	}
-
-	private Pageable boundPageSize(Pageable pageable) {
-		if (pageable.getPageSize() <= MAX_PAGE_SIZE) {
-			return pageable;
-		}
-		return PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort());
+		return ResponseEntity.ok(ApiResponse.success(orderService.getOrders(userId, pageable)));
 	}
 
 	@Operation(summary = "주문 상세 조회", description = "소유권을 검증하고 스냅샷 기준으로 표시합니다.")
