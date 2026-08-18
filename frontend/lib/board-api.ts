@@ -234,3 +234,12 @@ export function hideBoardPostAsAdmin(id: number, accessToken: string): Promise<v
 export function hideBoardCommentAsAdmin(id: number, accessToken: string): Promise<void> {
   return request<void>(`/api/v1/admin/board/comments/${id}/hide`, { method: 'PATCH', accessToken });
 }
+
+// 신고 검토 화면에서 댓글 원문과 부모 게시글 ID(postId)를 확인할 때 쓴다.
+export function getBoardCommentAsAdmin(
+  id: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<BoardCommentData> {
+  return request<BoardCommentData>(`/api/v1/admin/board/comments/${id}`, { accessToken, signal });
+}
