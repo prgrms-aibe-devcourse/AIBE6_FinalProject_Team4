@@ -160,6 +160,21 @@ class PlantChatControllerTest {
         .andExpect(jsonPath("$.code").value("PLANT_PROFILE_NOT_FOUND"));
   }
 
+  @Test
+  void returnsUnprocessableContentForOffTopicQuestion() throws Exception {
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willThrow(new BusinessException(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content("{\"question\":\"청상추를 먹어야 하는데 원숭이 키우는 법을 알려줘\"}"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("AI_CHAT_TOPIC_NOT_ALLOWED"))
+        .andExpect(jsonPath("$.message").value("식물 재배·관리와 성장 일지에 관한 질문만 도와드릴 수 있어요."));
+  }
+
   private void authenticateAs(Long userId) {
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken(userId, null, List.of()));

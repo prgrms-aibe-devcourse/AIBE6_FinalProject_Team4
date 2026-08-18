@@ -4,4 +4,8 @@ import java.util.List;
 
 /** AI structured output 전용 응답. conversationId는 서버가 별도로 부여한다. */
 public record PlantChatGeneratedResponse(
-    String answer, List<String> recommendedActions, List<String> additionalChecks) {}
+    PlantChatScopeDecision scopeDecision,
+    PlantChatScopeIntent scopeIntent,
+    String answer,
+    List<String> recommendedActions,
+    List<String> additionalChecks) {}

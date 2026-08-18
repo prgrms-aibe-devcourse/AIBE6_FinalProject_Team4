@@ -12,12 +12,19 @@ public final class PlantChatSchema {
 
   public static AiJsonSchema create() {
     Map<String, Object> properties = new LinkedHashMap<>();
+    properties.put("scopeDecision", stringEnum("ANSWER", "REFUSE", "UNCERTAIN"));
+    properties.put(
+        "scopeIntent",
+        stringEnum(
+            "CARE", "GROWTH_OBSERVATION", "JOURNAL_INTERPRETATION", "DIRECT_FOLLOW_UP", "NONE"));
     properties.put("answer", string());
     properties.put("recommendedActions", array(string()));
     properties.put("additionalChecks", array(string()));
 
     return new AiJsonSchema(
-        "plant_profile_chat", "식물 프로필과 최근 성장 기록을 근거로 한 질문 답변, 권장 행동, 추가 확인사항", object(properties));
+        "plant_profile_chat",
+        "질문의 의미 기반 허용 범위 판정과 식물 프로필 기반 답변, 권장 행동, 추가 확인사항",
+        object(properties));
   }
 
   private static Map<String, Object> object(Map<String, Object> properties) {
@@ -38,5 +45,9 @@ public final class PlantChatSchema {
 
   private static Map<String, Object> string() {
     return Map.of("type", "string");
+  }
+
+  private static Map<String, Object> stringEnum(String... values) {
+    return Map.of("type", "string", "enum", List.of(values));
   }
 }

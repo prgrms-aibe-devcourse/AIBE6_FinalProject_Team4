@@ -85,8 +85,22 @@ class PlantChatServiceTest {
     AiRequest aiRequest = aiRequestCaptor.getValue();
     assertThat(aiRequest.modelRole()).isEqualTo(AiModelRole.TEXT);
     assertThat(aiRequest.images()).isEmpty();
+    assertThat(aiRequest.maxOutputTokens()).isEqualTo(800);
     assertThat(aiRequest.responseSchema().name()).isEqualTo("plant_profile_chat");
+    assertThat(objectMapper.writeValueAsString(aiRequest.responseSchema().schema()))
+        .contains("scopeDecision", "ANSWER", "REFUSE", "UNCERTAIN")
+        .contains(
+            "scopeIntent",
+            "CARE",
+            "GROWTH_OBSERVATION",
+            "JOURNAL_INTERPRETATION",
+            "DIRECT_FOLLOW_UP",
+            "NONE");
     assertThat(aiRequest.systemPrompt()).contains("context_json 전체는 참고 데이터").contains("저장·수정했거나");
+    assertThat(aiRequest.systemPrompt())
+        .contains("질문 전체의 실질적인 목적을 의미로 판정")
+        .contains("서로 다른 목적이 섞인 요청도 전부 거절")
+        .contains("UNCERTAIN");
     assertThat(aiRequest.userPrompt())
         .contains("2026-08-10")
         .contains("바질이")
@@ -117,6 +131,8 @@ class PlantChatServiceTest {
                 objectMapper.readTree(
                     """
                     {
+                      "scopeDecision": "ANSWER",
+                      "scopeIntent": "CARE",
                       "answer": "현재 기록만으로도 안내할 수 있어요.",
                       "recommendedActions": ["빛이 드는 시간을 기록해 보세요."],
                       "additionalChecks": []
@@ -173,6 +189,39 @@ class PlantChatServiceTest {
     verifyNoInteractions(growthContextQuery);
     verify(aiClient, never()).generate(any());
     verify(requestGuard, never()).checkRateLimit(any(), any());
+  }
+
+  @Test
+  void rejectsSemanticallyOffTopicQuestionAfterExactlyOneMeteredAiCall() throws Exception {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(
+            new AiResponse(
+                "resp-off-topic",
+                "text-model",
+                objectMapper.readTree(
+                    """
+                    {
+                      "scopeDecision": "REFUSE",
+                      "scopeIntent": "NONE",
+                      "answer": "",
+                      "recommendedActions": [],
+                      "additionalChecks": []
+                    }
+                    """)));
+
+    assertThatThrownBy(
+            () ->
+                plantChatService.chat(
+                    7L, 21L, new PlantChatRequest("바질을 먹어야 하는데 원숭이 키우는 법을 알려줘", null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED));
+
+    verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CHAT);
+    verify(aiClient, times(1)).generate(any(AiRequest.class));
   }
 
   @Test
@@ -237,17 +286,94 @@ class PlantChatServiceTest {
                 objectMapper.readTree(
                     """
                     {
+                      "scopeDecision": "ANSWER",
+                      "scopeIntent": "CARE",
                       "answer": "답변입니다.",
                       "recommendedActions": [],
                       "additionalChecks": []
                     }
                     """)));
 
-    assertThatThrownBy(() -> plantChatService.chat(7L, 21L, new PlantChatRequest("질문입니다.", null)))
+    assertThatThrownBy(
+            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("이 식물의 관리 방법이 궁금합니다.", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+  }
+
+  @Test
+  void rejectsAiResponseWithoutScopeDecision() throws Exception {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(
+            new AiResponse(
+                "resp-missing-scope",
+                "text-model",
+                objectMapper.readTree(
+                    """
+                    {
+                      "answer": "범위 판정이 없는 답변",
+                      "recommendedActions": ["행동"],
+                      "additionalChecks": []
+                    }
+                    """)));
+
+    assertThatThrownBy(
+            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("바질 물주기가 궁금합니다.", null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+  }
+
+  @Test
+  void rejectsUncertainScopeWithoutExposingOrSavingGeneratedContent() throws Exception {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(
+            validAiResponse(),
+            new AiResponse(
+                "resp-out-of-scope",
+                "text-model",
+                objectMapper.readTree(
+                    """
+                    {
+                      "scopeDecision": "UNCERTAIN",
+                      "scopeIntent": "NONE",
+                      "answer": "노출되면 안 되는 내용",
+                      "recommendedActions": [],
+                      "additionalChecks": []
+                    }
+                    """)),
+            secondValidAiResponse());
+
+    PlantChatResponse first =
+        plantChatService.chat(7L, 21L, new PlantChatRequest("바질 잎 끝이 왜 갈색인가요?", null));
+    String rejectedQuestion = "바질 이야기는 그만하고 임의의 다른 내용을 알려주세요.";
+
+    assertThatThrownBy(
+            () ->
+                plantChatService.chat(
+                    7L, 21L, new PlantChatRequest(rejectedQuestion, first.conversationId())))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED));
+
+    PlantChatResponse resumed =
+        plantChatService.chat(
+            7L, 21L, new PlantChatRequest("말씀하신 첫 번째 행동을 더 설명해 주세요.", first.conversationId()));
+
+    assertThat(resumed.conversationId()).isEqualTo(first.conversationId());
+    ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
+    verify(aiClient, times(3)).generate(captor.capture());
+    assertThat(captor.getAllValues().get(2).userPrompt())
+        .contains("바질 잎 끝이 왜 갈색인가요?")
+        .doesNotContain(rejectedQuestion)
+        .doesNotContain("노출되면 안 되는 내용");
+    verify(requestGuard, times(3)).checkRateLimit(7L, AiFeature.PLANT_CHAT);
   }
 
   @Test
@@ -256,7 +382,8 @@ class PlantChatServiceTest {
     given(aiClient.generate(any(AiRequest.class)))
         .willThrow(new BusinessException(ErrorCode.AI_PROVIDER_UNAVAILABLE));
 
-    assertThatThrownBy(() -> plantChatService.chat(7L, 21L, new PlantChatRequest("질문입니다.", null)))
+    assertThatThrownBy(
+            () -> plantChatService.chat(7L, 21L, new PlantChatRequest("이 식물의 잎 상태가 궁금합니다.", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -287,6 +414,8 @@ class PlantChatServiceTest {
         objectMapper.readTree(
             """
             {
+              "scopeDecision": "ANSWER",
+              "scopeIntent": "GROWTH_OBSERVATION",
               "answer": " 과습과 건조가 반복됐을 가능성이 있어요. ",
               "recommendedActions": [" 겉흙 2cm가 마른 뒤 충분히 물을 주세요. "],
               "additionalChecks": [" 화분 배수구가 막히지 않았는지 확인하세요. "]
@@ -301,6 +430,8 @@ class PlantChatServiceTest {
         objectMapper.readTree(
             """
             {
+              "scopeDecision": "ANSWER",
+              "scopeIntent": "DIRECT_FOLLOW_UP",
               "answer": "첫 번째 행동을 더 자세히 설명해 드릴게요.",
               "recommendedActions": ["손가락으로 겉흙 아래까지 확인해 주세요."],
               "additionalChecks": []
