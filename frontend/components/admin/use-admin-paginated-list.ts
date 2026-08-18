@@ -31,7 +31,11 @@ export function useAdminPaginatedList<T>(
           if (requestIdRef.current !== requestId) return;
           // 처리/답변 등으로 필터 조건을 벗어난 항목이 빠지면서 마지막 페이지가 사라질 수
           // 있다 — 그 경우 빈 결과를 그대로 보여주는 대신 이전 페이지로 물러나 다시 불러온다.
-          if (result.content.length === 0 && page > 0 && result.totalElements > 0) {
+          // totalElements가 0(마지막 남은 한 건까지 처리돼 조건에 맞는 항목이 아예 없어진
+          // 경우)이어도 롤백해야 한다 — 그래야 page가 0으로 돌아와 "0 / 0"인데 "이전" 버튼은
+          // 활성인 상태로 멈추지 않는다. 롤백된 page=0 조회도 비어 있다면 그때는 page>0이
+          // 아니므로 더 이상 롤백하지 않고 정상적인 빈 상태로 끝난다.
+          if (result.content.length === 0 && page > 0) {
             setPage((current) => Math.max(0, current - 1));
             return;
           }

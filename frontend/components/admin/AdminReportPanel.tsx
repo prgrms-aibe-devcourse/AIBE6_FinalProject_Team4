@@ -2,6 +2,7 @@
 
 import { ApiError } from "@/lib/api";
 import { hideBoardCommentAsAdmin, hideBoardPostAsAdmin } from "@/lib/board-api";
+import Link from "next/link";
 import {
   completeReport,
   getReportsForAdmin,
@@ -273,10 +274,25 @@ export default function AdminReportPanel({
             <h3 className="mb-1 text-[19px] font-extrabold">
               {TARGET[selected.targetType]} #{selected.targetId} 신고
             </h3>
-            <p className="mb-4 whitespace-pre-wrap text-[13.5px] leading-[1.6] text-sub">
+            <p className="mb-1 whitespace-pre-wrap text-[13.5px] leading-[1.6] text-sub">
               사유: {selected.reason} · 신고자 {selected.reporterName} ·{" "}
               {formatDateTime(selected.createdAt)}
             </p>
+            {selected.targetType === "POST" ? (
+              <Link
+                href={`/board/${selected.targetId}`}
+                target="_blank"
+                className="mb-4 inline-block text-[13px] font-bold text-brand hover:text-brand-dark"
+              >
+                신고된 게시글 보기 →
+              </Link>
+            ) : (
+              // COMMENT는 부모 게시글 ID를, JOURNAL은 관리자용 조회 경로를 서버가 아직 내려주지
+              // 않아 여기서 바로 이동할 수 없다 — 사유/신고자 정보만으로 판단해야 한다.
+              <p className="mb-4 text-[12px] text-faint">
+                이 대상 유형은 아직 콘텐츠 바로가기를 지원하지 않아요.
+              </p>
+            )}
 
             {selected.status !== "PENDING" ? (
               <>
