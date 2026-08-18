@@ -1,15 +1,10 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ApiError } from '@/lib/api';
-import { withTopicParticle } from '@/lib/korean';
-import { purchaseGachaPacks } from '@/lib/gacha-api';
-import { getProduct, ProductDetail as ProductDetailData } from '@/lib/product-api';
-import { addCartItem, getCart } from '@/lib/order-api';
-import { useStore } from '@/lib/store';
-import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import { useProductDetail } from '@/features/shop/use-product-detail';
+import { withTopicParticle } from '@/lib/korean';
 
 export default function ProductDetail({
   params,
@@ -19,79 +14,23 @@ export default function ProductDetail({
   searchParams?: { returnTo?: string | string[] };
 }) {
   const router = useRouter();
-  const { state, hydrated, refreshWallet, walletLoaded, walletLoading, refreshCartCount } = useStore();
-  const { showToast, askConfirm } = useUI();
-  const productId = Number(params.id);
-  const requestedReturnTo = Array.isArray(searchParams?.returnTo)
-    ? searchParams?.returnTo[0]
-    : searchParams?.returnTo;
-  const returnTo = requestedReturnTo?.startsWith('/shop')
-    ? requestedReturnTo
-    : '/shop';
-  const [product, setProduct] = useState<ProductDetailData | null>(null);
-  const [qty, setQty] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
-  const [error, setError] = useState('');
-  const purchaseAttempt = useRef<{ signature: string; key: string } | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [alreadyInCart, setAlreadyInCart] = useState(false);
-  const [checkingCart, setCheckingCart] = useState(true);
-
-  useEffect(() => {
-    if (!Number.isInteger(productId) || productId < 1) {
-      setError('잘못된 상품 주소예요.');
-      setLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError('');
-
-    getProduct(productId, undefined, controller.signal)
-      .then(setProduct)
-      .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
-        setProduct(null);
-        setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : '상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [productId]);
-
-  // 로그인 상태면 이 상품이 이미 장바구니에 있는지 확인해서 중복 담기를 막는다. 확인이 끝나기
-  // 전까지는 버튼을 눌러도 진행되지 않게 막아서, 조회가 끝나기 전에 클릭해 중복 담기가
-  // 통과해버리는 경쟁 상태를 막는다.
-  useEffect(() => {
-    if (!hydrated) return;
-    if (!state.accessToken) {
-      setAlreadyInCart(false);
-      setCheckingCart(false);
-      return;
-    }
-    let cancelled = false;
-    setCheckingCart(true);
-    getCart(state.accessToken)
-      .then((cart) => {
-        if (cancelled) return;
-        setAlreadyInCart(cart.items.some((item) => item.productId === productId));
-      })
-      .catch(() => {
-        // 조회 실패해도 담기 자체는 서버가 다시 검증하니 조용히 무시한다.
-      })
-      .finally(() => {
-        if (!cancelled) setCheckingCart(false);
-      });
-    return () => { cancelled = true; };
-  }, [hydrated, state.accessToken, productId]);
+  const {
+    product,
+    qty,
+    setQty,
+    loading,
+    error,
+    purchasing,
+    adding,
+    alreadyInCart,
+    checkingCart,
+    isGachaPack,
+    maxQuantity,
+    gachaTotalPoint,
+    returnTo,
+    addToCart,
+    purchaseGachaPack,
+  } = useProductDetail({ id: params.id, requestedReturnTo: searchParams?.returnTo });
 
   if (loading) {
     return (
@@ -118,112 +57,6 @@ export default function ProductDetail({
       </div>
     );
   }
-
-  // 서버가 실제 소유권·재고·1~99 범위를 다시 검증하므로 여기서는 로그인 여부와 중복 담기만 먼저 막는다.
-  const addToCart = async (): Promise<boolean> => {
-    if (!hydrated || !state.accessToken) {
-      showToast('장바구니와 구매 기능은 로그인 후 이용할 수 있어요.', 'err');
-      return false;
-    }
-    if (checkingCart) {
-      showToast('장바구니 확인 중이에요. 잠시 후 다시 시도해 주세요.', 'err');
-      return false;
-    }
-    if (alreadyInCart) {
-      showToast('이미 장바구니에 있는 상품이에요.', 'err');
-      return false;
-    }
-    setAdding(true);
-    try {
-      await addCartItem(product.id, qty, state.accessToken);
-      await refreshCartCount();
-      setAlreadyInCart(true);
-      showToast('장바구니에 담았어요 🛒');
-      return true;
-    } catch (requestError) {
-      showToast(
-        requestError instanceof ApiError ? requestError.message : '장바구니에 담지 못했어요.',
-        'err',
-      );
-      return false;
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  const isGachaPack = product.category === 'GACHA_PACK';
-  const maxQuantity = product.stock;
-  const gachaPackQuantity = 1;
-  const gachaTotalPoint = product.pointPrice;
-
-  const purchaseGachaPack = () => {
-    if (!hydrated || !state.accessToken) {
-      showToast('가챠 팩 구매는 로그인 후 이용할 수 있어요.', 'err');
-      return;
-    }
-    if (!walletLoaded) {
-      showToast(
-        walletLoading
-          ? '포인트 잔액을 확인하고 있어요.'
-          : '포인트 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
-        'err',
-      );
-      return;
-    }
-    if (state.wallet.free + state.wallet.paid < gachaTotalPoint) {
-      showToast('사용 가능한 포인트가 부족해요.', 'err');
-      return;
-    }
-
-    askConfirm({
-      icon: 'casino',
-      title: '가챠 팩 1개를 구매할까요?',
-      body: `총 ${gachaTotalPoint.toLocaleString()}P를 사용하고 구매 즉시 개봉합니다.`,
-      ok: '구매하고 개봉하기',
-      onOk: async () => {
-        setPurchasing(true);
-        try {
-          const signature = `${product.id}:${gachaPackQuantity}:${gachaTotalPoint}`;
-          const idempotencyKey =
-            purchaseAttempt.current?.signature === signature
-              ? purchaseAttempt.current.key
-              : crypto.randomUUID();
-          purchaseAttempt.current = { signature, key: idempotencyKey };
-          const response = await purchaseGachaPacks(
-            product.id,
-            gachaPackQuantity,
-            gachaTotalPoint,
-            state.accessToken!,
-            idempotencyKey,
-          );
-          purchaseAttempt.current = null;
-          await refreshWallet().catch(() => undefined);
-          showToast(`${response.quantity}팩 구매가 완료됐어요!`);
-          router.push(`/gacha/open/${response.drawIds[0]}`);
-        } catch (purchaseError) {
-          if (
-            purchaseError instanceof ApiError &&
-            purchaseError.code === 'GACHA_PRODUCT_PRICE_CHANGED'
-          ) {
-            purchaseAttempt.current = null;
-            try {
-              setProduct(await getProduct(product.id));
-            } catch {
-              // 다음 화면 진입 또는 새로고침에서도 서버가 현재 가격을 다시 검증한다.
-            }
-          }
-          showToast(
-            purchaseError instanceof ApiError
-              ? purchaseError.message
-              : '가챠 팩을 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
-            'err',
-          );
-        } finally {
-          setPurchasing(false);
-        }
-      },
-    });
-  };
 
   return (
     <div className="container">

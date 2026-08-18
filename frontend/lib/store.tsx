@@ -12,6 +12,7 @@ import { ApiError, AUTH_EXPIRED_EVENT, reissue, logout as apiLogout, setAccessTo
 import { getWallet } from '@/features/point/api';
 import { getCart } from '@/lib/order-api';
 import { getMyPlants } from '@/lib/plant-api';
+import { getMyCards } from '@/features/coupon/api';
 import {
   getNotifications,
   getUnreadNotificationCount,
@@ -78,6 +79,7 @@ export interface StoreContextValue {
   refreshWallet: () => Promise<void>;
   refreshCartCount: () => Promise<void>;
   refreshPlantStats: () => Promise<void>;
+  refreshReadyCards: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   refreshUnreadCount: () => Promise<void>;
 }
@@ -93,7 +95,7 @@ const DEFAULTS: StoreState = {
   plantCount: 5,
   harvestedCount: 1,
   failedCount: 1,
-  readyCards: 2,
+  readyCards: 0,
   cartCount: 0,
   notifications: [],
   unreadNotificationCount: 0,
@@ -112,6 +114,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const cartCountRequestId = useRef(0);
   const notificationsRequestId = useRef(0);
   const plantStatsRequestId = useRef(0);
+  const readyCardsRequestId = useRef(0);
 
   const clearAuthentication = useCallback((expired: boolean) => {
     walletRequestId.current += 1;
@@ -138,6 +141,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...DEFAULTS,
           ...JSON.parse(raw),
           wallet: EMPTY_WALLET,
+          readyCards: 0,
           notifications: [],
           unreadNotificationCount: 0,
         });
@@ -182,7 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(
         KEY,
-        JSON.stringify({ ...state, wallet: EMPTY_WALLET, notifications: [], unreadNotificationCount: 0 }),
+        JSON.stringify({ ...state, wallet: EMPTY_WALLET, readyCards: 0, notifications: [], unreadNotificationCount: 0 }),
       );
     } catch (e) {}
   }, [state, hydrated]);
@@ -289,6 +293,36 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     void refreshPlantStats();
   }, [hydrated, refreshPlantStats]);
+
+  // 메인페이지 "교환 가능한 쿠폰이 N종 있어요" 배너용. 로그인 직후/새로고침 시점엔
+  // 카드 구매·가챠 등을 거치지 않아 하드코딩 기본값이 그대로 남는다 — 여기서 실제
+  // 서버 값으로 채운다. /cards 페이지의 "교환 가능 🎉" 배지와 동일한 기준(보유 수량
+  // 충족 + 교환 상품 재고 있음)을 써서, 배너를 보고 들어갔다가 품절만 보는 걸 막는다.
+  const refreshReadyCards = useCallback(async () => {
+    const requestId = ++readyCardsRequestId.current;
+    if (!state.authed || !state.accessToken) {
+      setState((s) => ({ ...s, readyCards: 0 }));
+      return;
+    }
+    try {
+      const cards = await getMyCards(state.accessToken);
+      if (requestId !== readyCardsRequestId.current) return;
+      const readyCards = cards.filter(
+        (card) =>
+          card.ownedCount !== null &&
+          card.ownedCount >= card.requiredCountForExchange &&
+          card.exchangeProductStock > 0,
+      ).length;
+      setState((s) => ({ ...s, readyCards }));
+    } catch {
+      // 조용히 무시한다 — 다음 갱신 시점(재로그인/새로고침)에 다시 시도된다.
+    }
+  }, [state.accessToken, state.authed]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void refreshReadyCards();
+  }, [hydrated, refreshReadyCards]);
 
   // 벨 배지·미리보기용. 읽음/전체읽음/삭제 뒤에도 이걸 다시 호출해 서버 상태로 재동기화한다 —
   // 장바구니 배지와 같은 이유로 클라이언트에서 카운트를 임의로 -1 하지 않는다.
@@ -430,6 +464,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         refreshWallet,
         refreshCartCount,
         refreshPlantStats,
+        refreshReadyCards,
         refreshNotifications,
         refreshUnreadCount,
       }}

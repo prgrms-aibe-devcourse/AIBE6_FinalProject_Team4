@@ -3,14 +3,18 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
+import CommerceCardImage from "@/features/commerce/CommerceCardImage";
+import {
+  commerceErrorMessage,
+  formatCommerceDateTime,
+  formatPoint,
+  isAbortError,
+} from "@/features/commerce/presentation";
 import {
   MarketNegotiation,
   getMyMarketNegotiation,
-} from "@/lib/card-market-api";
+} from "@/features/card-market/api";
 import { useStore } from "@/lib/store";
-
-const POINT = new Intl.NumberFormat("ko-KR");
 
 export default function MarketNegotiationDetailPage() {
   const params = useParams<{ negotiationId: string }>();
@@ -36,16 +40,9 @@ export default function MarketNegotiationDetailPage() {
     )
       .then(setNegotiation)
       .catch((requestError) => {
-        if (
-          requestError instanceof DOMException &&
-          requestError.name === "AbortError"
-        ) {
-          return;
-        }
+        if (isAbortError(requestError)) return;
         setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : "가격 제안을 불러오지 못했어요.",
+          commerceErrorMessage(requestError, "가격 제안을 불러오지 못했어요."),
         );
       });
     return () => controller.abort();
@@ -73,14 +70,10 @@ export default function MarketNegotiationDetailPage() {
           <section className="mt-8 rounded-[30px] border border-[#dce4d7] bg-white p-6 shadow-xl md:p-9">
             <div className="flex gap-5">
               <div className="h-36 w-24 overflow-hidden rounded-xl bg-[#edf0e9]">
-                {negotiation.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={negotiation.imageUrl}
-                    alt={negotiation.cardName}
-                    className="h-full w-full object-contain"
-                  />
-                ) : null}
+                <CommerceCardImage
+                  src={negotiation.imageUrl}
+                  name={negotiation.cardName}
+                />
               </div>
               <div>
                 <p className="text-xs font-black text-[#7a8476]">
@@ -90,7 +83,7 @@ export default function MarketNegotiationDetailPage() {
                   {negotiation.cardName}
                 </h1>
                 <p className="mt-3 text-2xl font-black text-[#765b12]">
-                  {POINT.format(negotiation.currentPrice)}P
+                  {formatPoint(negotiation.currentPrice)}
                 </p>
                 <p className="mt-2 text-sm font-bold text-[#667260]">
                   상태 {negotiation.status}
@@ -110,11 +103,11 @@ export default function MarketNegotiationDetailPage() {
                       제안
                     </p>
                     <p className="mt-1 text-xs text-[#7a8476]">
-                      {new Date(proposal.createdAt).toLocaleString("ko-KR")}
+                      {formatCommerceDateTime(proposal.createdAt)}
                     </p>
                   </div>
                   <b className="text-[#765b12]">
-                    {POINT.format(proposal.proposedPrice)}P
+                    {formatPoint(proposal.proposedPrice)}
                   </b>
                 </li>
               ))}

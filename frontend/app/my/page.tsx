@@ -39,6 +39,7 @@ const LINKS = [
     href: "/gacha?tab=workshop&section=cosmetics",
   },
   { icon: "menu_book", label: "내 일지", href: "/journals" },
+  { icon: "forum", label: "내가 쓴 글/댓글", href: "/my/board" },
   { icon: "mail", label: "1:1 문의", href: "/my/inquiries" },
 ];
 

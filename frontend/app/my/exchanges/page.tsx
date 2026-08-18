@@ -24,7 +24,7 @@ export default function MyExchanges({
   searchParams?: { page?: string | string[] };
 }) {
   const router = useRouter();
-  const { state, hydrated } = useStore();
+  const { state, hydrated, refreshReadyCards } = useStore();
   const { showToast, askConfirm } = useUI();
   const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
   const [myCards, setMyCards] = useState<CardData[]>([]);
@@ -108,6 +108,7 @@ export default function MyExchanges({
       try {
         await cancelExchange(id, '단순 변심', state.accessToken);
         setExchanges((prev) => prev.map((x) => (x.id === id ? { ...x, status: 'CANCELLED', cancelledBy: 'USER' } : x)));
+        void refreshReadyCards();
         showToast('교환을 취소했어요. 쿠폰과 수량이 다시 돌아왔어요.');
       } catch (requestError) {
         showToast(

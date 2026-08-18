@@ -9,7 +9,8 @@ import {
   InquiryStatus,
 } from "@/lib/inquiry-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useAdminPaginatedList } from "./use-admin-paginated-list";
 
 const CAT: Record<InquiryCategory, string> = {
   PAYMENT: "결제",
@@ -42,67 +43,25 @@ export default function AdminInquiryPanel({
 }) {
   const { showToast } = useUI();
   const [status, setStatus] = useState<InquiryStatus | "">("");
-  const [page, setPage] = useState(0);
-  const [inquiries, setInquiries] = useState<InquiryData[]>([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
   const [selected, setSelected] = useState<InquiryData | null>(null);
   const [answerContent, setAnswerContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // load()는 useEffect(page 변경 시 자동 취소)뿐 아니라 submitAnswer 성공 후에도 signal 없이
-  // 직접 호출된다 — 그 사이 사용자가 페이지를 옮기면 먼저 보낸 요청이 나중에 응답할 수 있다.
-  // requestId로 "가장 최근에 보낸 요청의 응답인지"를 확인해, 뒤처진 응답이 최신 state를 덮어쓰거나
-  // (예: 이미 정상인 다른 페이지에서) totalPages 보정을 잘못 트리거하지 않도록 막는다.
-  const requestIdRef = useRef(0);
-
-  const load = useCallback(
-    (signal?: AbortSignal) => {
-      const requestId = ++requestIdRef.current;
-      setLoading(true);
-      setErrorMessage("");
-
-      return getInquiriesForAdmin(accessToken, status || undefined, page, 20, signal)
-        .then((result) => {
-          if (requestIdRef.current !== requestId) return;
-          // 답변 등록으로 필터 조건을 벗어난 항목이 빠지면서 마지막 페이지가 사라질 수 있다 —
-          // 그 경우 빈 결과를 그대로 보여주는 대신 이전 페이지로 물러나 다시 불러온다.
-          if (result.content.length === 0 && page > 0 && result.totalElements > 0) {
-            setPage((current) => Math.max(0, current - 1));
-            return;
-          }
-          setInquiries(result.content);
-          setTotalPages(result.totalPages);
-          setTotalElements(result.totalElements);
-        })
-        .catch((requestError) => {
-          if (
-            requestError instanceof DOMException &&
-            requestError.name === "AbortError"
-          )
-            return;
-          if (requestIdRef.current !== requestId) return;
-          setInquiries([]);
-          setErrorMessage(
-            requestError instanceof ApiError
-              ? requestError.message
-              : "문의 목록을 불러오지 못했어요.",
-          );
-        })
-        .finally(() => {
-          if (requestIdRef.current === requestId) setLoading(false);
-        });
-    },
-    [accessToken, page, status],
+  const fetchPage = useCallback(
+    (page: number, signal?: AbortSignal) =>
+      getInquiriesForAdmin(accessToken, status || undefined, page, 20, signal),
+    [accessToken, status],
   );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
+  const {
+    page,
+    setPage,
+    items: inquiries,
+    totalPages,
+    totalElements,
+    loading,
+    errorMessage,
+    reload,
+  } = useAdminPaginatedList(fetchPage, "문의 목록을 불러오지 못했어요.");
 
   const changeStatus = (next: InquiryStatus | "") => {
     setStatus(next);
@@ -124,7 +83,7 @@ export default function AdminInquiryPanel({
       await answerInquiry(selected.id, answerContent.trim(), accessToken);
       showToast("답변을 등록했어요.");
       setSelected(null);
-      void load();
+      reload();
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError
@@ -136,7 +95,7 @@ export default function AdminInquiryPanel({
       // 목록을 새로고침하지 않으면 버튼이 계속 "답변하기"로 남아 재시도를 유도하게 된다.
       if (requestError instanceof ApiError && requestError.status === 409) {
         setSelected(null);
-        void load();
+        reload();
       }
     } finally {
       setSubmitting(false);

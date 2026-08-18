@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
-import { MarketListing, getMarketListing } from "@/lib/card-market-api";
-
-const POINT = new Intl.NumberFormat("ko-KR");
+import {
+  commerceErrorMessage,
+  formatCommerceDateTime,
+  formatPoint,
+  isAbortError,
+} from "@/features/commerce/presentation";
+import { MarketListing, getMarketListing } from "@/features/card-market/api";
 
 export default function MarketListingDetailPage() {
   const params = useParams<{ listingId: string }>();
@@ -25,16 +28,9 @@ export default function MarketListingDetailPage() {
     void getMarketListing(listingId, controller.signal)
       .then(setListing)
       .catch((requestError) => {
-        if (
-          requestError instanceof DOMException &&
-          requestError.name === "AbortError"
-        ) {
-          return;
-        }
+        if (isAbortError(requestError)) return;
         setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : "매물 정보를 불러오지 못했어요.",
+          commerceErrorMessage(requestError, "매물 정보를 불러오지 못했어요."),
         );
       });
     return () => controller.abort();
@@ -109,10 +105,10 @@ export default function MarketListingDetailPage() {
                 {listing.activeOfferCount}개
               </p>
               <p className="mt-8 text-3xl font-black text-[#765b12]">
-                {POINT.format(listing.askingPrice)}P
+                {formatPoint(listing.askingPrice)}
               </p>
               <p className="mt-3 text-sm font-bold text-[#74806f]">
-                {new Date(listing.expiresAt).toLocaleString("ko-KR")}까지 판매
+                {formatCommerceDateTime(listing.expiresAt)}까지 판매
               </p>
               <Link
                 href={`/card-market?keyword=${encodeURIComponent(listing.cardName)}`}

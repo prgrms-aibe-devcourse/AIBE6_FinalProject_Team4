@@ -19,6 +19,7 @@ import com.kiwobollae.api.commerce.gacha.repository.GachaDrawItemRepository;
 import com.kiwobollae.api.commerce.gacha.repository.GachaDrawRepository;
 import com.kiwobollae.api.commerce.gacha.repository.TradingCardRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
+import com.kiwobollae.api.commerce.service.CommerceAssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.math.BigDecimal;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -47,9 +47,7 @@ public class GachaQueryService {
   private final UserCardCollectionRepository collectionRepository;
   private final GachaDrawRepository gachaDrawRepository;
   private final GachaDrawItemRepository gachaDrawItemRepository;
-
-  @Value("${app.asset.base-url:}")
-  private String assetBaseUrl;
+  private final CommerceAssetUrlResolver assetUrlResolver;
 
   public List<GachaCardResponse> getCatalog(TradingCardRarity rarity) {
     List<TradingCard> cards =
@@ -81,7 +79,8 @@ public class GachaQueryService {
         .map(
             card -> {
               UserCardCollection collection = collections.get(card.getId());
-              String unlockedImageUrl = collection == null ? null : imageUrl(card.getImageKey());
+              String unlockedImageUrl =
+                  collection == null ? null : assetUrlResolver.resolve(card.getImageKey());
               return GachaCollectionResponse.from(card, collection, unlockedImageUrl);
             })
         .toList();
@@ -129,7 +128,7 @@ public class GachaQueryService {
                 item ->
                     GachaDrawItemResponse.from(
                         item,
-                        imageUrl(item.getCard().getImageKey()),
+                        assetUrlResolver.resolve(item.getCard().getImageKey()),
                         nextMilestone(item.getOwnedCountAfter())))
             .toList();
     return GachaDrawDetailResponse.from(draw, items);
@@ -163,17 +162,6 @@ public class GachaQueryService {
 
   private Integer nextMilestone(int ownedCount) {
     return MILESTONES.stream().filter(value -> value > ownedCount).findFirst().orElse(null);
-  }
-
-  private String imageUrl(String imageKey) {
-    if (imageKey == null || imageKey.isBlank()) {
-      return null;
-    }
-    String normalizedKey = imageKey.startsWith("/") ? imageKey.substring(1) : imageKey;
-    if (assetBaseUrl == null || assetBaseUrl.isBlank()) {
-      return "/" + normalizedKey;
-    }
-    return assetBaseUrl.replaceAll("/+$", "") + "/" + normalizedKey;
   }
 
   private void requireUser(Long userId) {

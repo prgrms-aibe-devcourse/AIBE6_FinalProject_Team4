@@ -40,3 +40,7 @@ app:
       # relative journal dates instead of the server startup time.
       # Charge/refund history is created through Toss Payments test transactions.
       enabled: true
+    board:
+      # Seeds sample board posts/comments (including a reply-to-reply thread) for
+      # the InitData test users, so /board isn't empty on a fresh local DB.
+      enabled: true

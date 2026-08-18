@@ -17,7 +17,7 @@ import {
   getMyMarketListings,
   getMyMarketNegotiations,
   getMyMarketTrades,
-} from "@/lib/card-market-api";
+} from "@/features/card-market/api";
 
 const auth = vi.hoisted(() => ({
   accessToken: null as string | null,
@@ -47,9 +47,9 @@ vi.mock("@/lib/store", () => ({
   }),
 }));
 
-vi.mock("@/lib/card-market-api", async (importOriginal) => {
+vi.mock("@/features/card-market/api", async (importOriginal) => {
   const original =
-    await importOriginal<typeof import("@/lib/card-market-api")>();
+    await importOriginal<typeof import("@/features/card-market/api")>();
   return {
     ...original,
     getMarketListings: vi.fn(),

@@ -14,6 +14,7 @@ import com.kiwobollae.api.commerce.gacha.repository.GachaDrawItemRepository;
 import com.kiwobollae.api.commerce.gacha.repository.GachaDrawRepository;
 import com.kiwobollae.api.commerce.gacha.repository.TradingCardRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
+import com.kiwobollae.api.commerce.service.CommerceAssetUrlResolver;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,8 +36,8 @@ class GachaQueryServiceTest {
             cardRepository,
             collectionRepository,
             mock(GachaDrawRepository.class),
-            mock(GachaDrawItemRepository.class));
-    ReflectionTestUtils.setField(service, "assetBaseUrl", "");
+            mock(GachaDrawItemRepository.class),
+            new CommerceAssetUrlResolver(""));
   }
 
   @Test

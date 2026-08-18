@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { deleteJournal, deleteJournalImage, getJournal, PlantJournalData, updateJournal, uploadJournalImage } from '@/lib/journal-api';
+import { getBoardPostJournal } from '@/lib/board-api';
 import { formatDate } from '@/lib/format';
 import { createReport } from '@/lib/report-api';
 import JournalImageAnalysisPanel from '@/features/journal/JournalImageAnalysisPanel';
@@ -45,10 +46,20 @@ function revokeNewPhotoBlobs(photos: EditPhoto[]) {
 }
 
 export default function JournalDetail({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<div className="container" />}>
+      <JournalDetailInner params={params} />
+    </Suspense>
+  );
+}
+
+function JournalDetailInner({ params }: { params: { id: string } }) {
   const { state, hydrated } = useStore();
   const { showToast, askConfirm } = useUI();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = Number(params.id);
+  const viaBoardPostId = searchParams.get('viaBoardPost');
 
   const [journal, setJournal] = useState<PlantJournalData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +76,33 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!hydrated || !state.accessToken) return;
+    if (!hydrated) return;
+    // 게시판(PLANT_QNA)의 "일지 보기"를 통해 들어온 경우, 작성자가 아니어도 그 게시글에
+    // 연동된 일지만은 볼 수 있어야 하므로 소유자 확인이 없는 공개 조회 API를 쓴다.
+    if (viaBoardPostId) {
+      const controller = new AbortController();
+      setLoading(true);
+      setError('');
+
+      getBoardPostJournal(Number(viaBoardPostId), controller.signal)
+        .then((data) => setJournal(data))
+        .catch((requestError) => {
+          if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+          setJournal(null);
+          setError(
+            requestError instanceof ApiError
+              ? requestError.message
+              : '일지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+          );
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+
+      return () => controller.abort();
+    }
+
+    if (!state.accessToken) return;
     const accessToken = state.accessToken;
     const controller = new AbortController();
     setLoading(true);
@@ -87,7 +124,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
       });
 
     return () => controller.abort();
-  }, [hydrated, state.accessToken, id]);
+  }, [hydrated, state.accessToken, id, viaBoardPostId]);
 
   useEffect(() => {
     if (!journal) return;
@@ -322,6 +359,7 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
   }
 
   const image = representativeImage(journal);
+  const isOwner = journal.userId === state.user?.id;
   const activeImage = journal.images[viewIndex] ? resolveImageUrl(journal.images[viewIndex].imageUrl) : image;
 
   return (
@@ -357,21 +395,31 @@ export default function JournalDetail({ params }: { params: { id: string } }) {
         </div>
         <div>
           <div className="mb-3 flex items-center gap-2">
-            <Link href={`/plants/${journal.plantProfileId}`} className="rounded-full bg-brand-soft px-3 py-[5px] text-[13px] font-extrabold text-brand-dark">
-              <span className="material-symbols-outlined text-sm">potted_plant</span> {journal.plantProfileNickname}
-            </Link>
+            {isOwner ? (
+              <Link href={`/plants/${journal.plantProfileId}`} className="rounded-full bg-brand-soft px-3 py-[5px] text-[13px] font-extrabold text-brand-dark">
+                <span className="material-symbols-outlined text-sm">potted_plant</span> {journal.plantProfileNickname}
+              </Link>
+            ) : (
+              <span className="rounded-full bg-brand-soft px-3 py-[5px] text-[13px] font-extrabold text-brand-dark">
+                <span className="material-symbols-outlined text-sm">potted_plant</span> {journal.plantProfileNickname}
+              </span>
+            )}
           </div>
           <div className="mb-3.5 text-sm text-faint">
             <span className="material-symbols-outlined text-[15px]">calendar_month</span> {formatDate(journal.writtenDate)}
           </div>
           <p className="mb-6 whitespace-pre-wrap text-base leading-[1.75] text-ink">{journal.content}</p>
           <div className="flex flex-wrap gap-2.5">
-            <button type="button" onClick={openEdit} className="cursor-pointer rounded-[11px] bg-brand-soft px-[18px] py-[11px] font-bold text-brand-dark">
-              <span className="material-symbols-outlined text-[17px]">edit</span> 수정
-            </button>
-            <button type="button" onClick={confirmDelete} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-[18px] py-[11px] font-bold text-[#b5502f]">
-              <span className="material-symbols-outlined text-[17px]">delete</span> 삭제
-            </button>
+            {isOwner && (
+              <>
+                <button type="button" onClick={openEdit} className="cursor-pointer rounded-[11px] bg-brand-soft px-[18px] py-[11px] font-bold text-brand-dark">
+                  <span className="material-symbols-outlined text-[17px]">edit</span> 수정
+                </button>
+                <button type="button" onClick={confirmDelete} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-[18px] py-[11px] font-bold text-[#b5502f]">
+                  <span className="material-symbols-outlined text-[17px]">delete</span> 삭제
+                </button>
+              </>
+            )}
             <button type="button" onClick={() => setReportOpen(true)} className="cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white px-4 py-[11px] font-bold text-sub">
               <span className="material-symbols-outlined text-[17px]">flag</span> 신고
             </button>

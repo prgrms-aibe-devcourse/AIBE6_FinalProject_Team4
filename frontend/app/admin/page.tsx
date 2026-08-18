@@ -4,6 +4,7 @@ import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
 import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
 import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
 import AdminInquiryPanel from "@/components/admin/AdminInquiryPanel";
+import AdminReportPanel from "@/components/admin/AdminReportPanel";
 import AdminCardMarketRevenuePanel from "@/components/admin/AdminCardMarketRevenuePanel";
 import AdminChargeProductPanel from "@/features/payment/AdminChargeProductPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
@@ -372,39 +373,6 @@ export default function Admin({
       });
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
-  const [reports, setReports] = useState([
-    {
-      id: 1,
-      target: "토실이 · 2026.07.21 일지",
-      emoji: "🍅",
-      grad: "linear-gradient(135deg,#FFCC80,#FF8A65)",
-      reason: "사진 도용",
-      reporter: "민트",
-      date: "오늘",
-      status: "PENDING",
-    },
-    {
-      id: 2,
-      target: "바질이 · 2026.07.19 일지",
-      emoji: "🌿",
-      grad: "linear-gradient(135deg,#AED581,#7CB342)",
-      reason: "스팸/광고",
-      reporter: "단풍",
-      date: "어제",
-      status: "PENDING",
-    },
-    {
-      id: 3,
-      target: "매콤이 · 2026.07.12 일지",
-      emoji: "🌶️",
-      grad: "linear-gradient(135deg,#EF9A9A,#E57373)",
-      reason: "부적절한 콘텐츠",
-      reporter: "노을",
-      date: "2026.07.13",
-      status: "RESOLVED",
-    },
-  ]);
-
   const advOrder = async (o: OrderData) => {
     if (!state.accessToken) return;
     try {
@@ -794,13 +762,6 @@ export default function Admin({
       },
     });
   };
-  const resolveReport = (id: number, msg: string) => {
-    setReports(
-      reports.map((r) => (r.id === id ? { ...r, status: "RESOLVED" } : r)),
-    );
-    showToast(msg);
-  };
-
   const changeTab = (nextTab: string) => {
     setTab(nextTab);
     setAdminPage(0);
@@ -1649,56 +1610,8 @@ export default function Admin({
         </div>
       )}
 
-      {tab === "reports" && (
-        <div className="flex flex-col gap-3">
-          {reports.map((r) => {
-            const pending = r.status === "PENDING";
-            return (
-              <div
-                key={r.id}
-                className="flex flex-wrap items-center gap-3.5 rounded-2xl bg-white px-5 py-[18px] shadow-card"
-              >
-                <div
-                  className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl"
-                  style={{ background: r.grad }}
-                >
-                  {r.emoji}
-                </div>
-                <div className="min-w-[180px] flex-1">
-                  <div className="font-bold">{r.target}</div>
-                  <div className="mt-0.5 text-[13px] text-sub">
-                    사유: {r.reason} · 신고자 {r.reporter} · {r.date}
-                  </div>
-                </div>
-                <span
-                  className={`${CHIP} ${pending ? "bg-[#FBEDE3] text-[#b5771a]" : "bg-[#E8F3D8] text-brand-text"}`}
-                >
-                  {pending ? "검토 대기" : "처리 완료"}
-                </span>
-                {pending && (
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        resolveReport(r.id, "콘텐츠를 숨김 처리했어요.")
-                      }
-                      className="cursor-pointer rounded-[9px] bg-danger-soft px-[13px] py-2 text-[13px] font-bold text-[#b5502f] transition-colors duration-150 hover:bg-danger hover:text-white"
-                    >
-                      숨김 처리
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => resolveReport(r.id, "신고를 반려했어요.")}
-                      className="cursor-pointer rounded-[9px] bg-brand-soft px-[13px] py-2 text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white"
-                    >
-                      반려
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {tab === "reports" && state.accessToken && (
+        <AdminReportPanel accessToken={state.accessToken} />
       )}
     </div>
   );
