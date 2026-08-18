@@ -189,3 +189,17 @@ export function updateJournal(
     body: JSON.stringify(payload),
   });
 }
+
+// ---- Admin ----
+
+// 신고 검토 화면에서 일지 원문을 확인할 때 쓴다. 작성자 소유 여부는 확인하지 않는다.
+export function getJournalAsAdmin(
+  journalId: number,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<PlantJournalData> {
+  return request<PlantJournalData>(`/api/v1/admin/journals/${journalId}`, {
+    accessToken,
+    signal,
+  });
+}
