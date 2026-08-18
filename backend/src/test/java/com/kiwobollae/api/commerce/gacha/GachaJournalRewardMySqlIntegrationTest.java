@@ -75,8 +75,7 @@ class GachaJournalRewardMySqlIntegrationTest {
     assertThat(first.journal().gachaReward().granted()).isTrue();
     assertThat(first.journal().gachaReward().drawId()).isNotNull();
     assertThat(second.journal().gachaReward().granted()).isFalse();
-    assertThat(second.journal().gachaReward().drawId())
-        .isEqualTo(first.journal().gachaReward().drawId());
+    assertThat(second.journal().gachaReward().drawId()).isNull();
     assertThat(tradingCardRepository.count()).isEqualTo(43);
     assertThat(gachaDrawRepository.count()).isEqualTo(1);
 

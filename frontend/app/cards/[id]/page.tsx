@@ -1,18 +1,18 @@
 'use client';
-import { useEffect, useState } from 'react';
+
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ApiError } from '@/lib/api';
-import { couponName } from '@/lib/coupon-label';
-import { CardData, getCard, purchaseCard } from '@/lib/card-api';
-import { useStore, fmt } from '@/lib/store';
-import { useUI } from '@/lib/ui';
 import PointPrice from '@/components/PointPrice';
+import { useCouponDetail } from '@/features/coupon/use-coupon-detail';
+import { couponName } from '@/lib/coupon-label';
+import { fmt } from '@/lib/store';
 
 const CONFETTI = [
-  { left: '10%', dur: '1.5s', delay: '0s', emoji: '🎉' }, { left: '28%', dur: '1.8s', delay: '.2s', emoji: '✨' },
-  { left: '48%', dur: '1.4s', delay: '.1s', emoji: '🍉' }, { left: '66%', dur: '1.9s', delay: '.3s', emoji: '🥕' },
-  { left: '82%', dur: '1.6s', delay: '.15s', emoji: '✨' }, { left: '92%', dur: '1.7s', delay: '.25s', emoji: '🎉' },
+  { left: '10%', dur: '1.5s', delay: '0s', emoji: '🎉' },
+  { left: '28%', dur: '1.8s', delay: '.2s', emoji: '✨' },
+  { left: '48%', dur: '1.4s', delay: '.1s', emoji: '🍉' },
+  { left: '66%', dur: '1.9s', delay: '.3s', emoji: '🥕' },
+  { left: '82%', dur: '1.6s', delay: '.15s', emoji: '✨' },
+  { left: '92%', dur: '1.7s', delay: '.25s', emoji: '🎉' },
 ];
 
 export default function CardDetail({
@@ -22,63 +22,28 @@ export default function CardDetail({
   params: { id: string };
   searchParams?: { returnTo?: string | string[] };
 }) {
-  const router = useRouter();
   const {
-    state,
-    hydrated,
+    card,
+    owned,
+    qty,
+    setQty,
+    celebrate,
+    setCelebrate,
+    loading,
+    error,
+    purchasing,
+    total,
+    usedFreePoint,
+    usedPaidPoint,
+    pointShortage,
+    ring,
+    returnTo,
+    wallet,
     walletLoading,
     walletLoaded,
-    refreshWallet,
-    set,
-  } = useStore();
-  const { showToast, askConfirm } = useUI();
-  const cardId = Number(params.id);
-  const requestedReturnTo = Array.isArray(searchParams?.returnTo)
-    ? searchParams?.returnTo[0]
-    : searchParams?.returnTo;
-  const returnTo = requestedReturnTo?.startsWith('/cards')
-    ? requestedReturnTo
-    : '/cards';
-  const [card, setCard] = useState<CardData | null>(null);
-  const [owned, setOwned] = useState<number | null>(null);
-  const [qty, setQty] = useState(1);
-  const [celebrate, setCelebrate] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
-
-  useEffect(() => {
-    if (!Number.isInteger(cardId) || cardId < 1) {
-      setError('잘못된 쿠폰 주소예요.');
-      setLoading(false);
-      return;
-    }
-    if (!hydrated) return;
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError('');
-
-    getCard(cardId, state.accessToken, controller.signal)
-      .then((response) => {
-        setCard(response);
-        setOwned(response.ownedCount);
-      })
-      .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
-        setCard(null);
-        setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : '쿠폰을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [cardId, hydrated, state.accessToken]);
+    buy,
+    goToExchange,
+  } = useCouponDetail({ id: params.id, requestedReturnTo: searchParams?.returnTo });
 
   if (loading) {
     return (
@@ -105,75 +70,6 @@ export default function CardDetail({
       </div>
     );
   }
-
-  const total = card.pointPrice * qty;
-  const availableFreePoint = Math.max(state.wallet.free, 0);
-  const availablePaidPoint = Math.max(state.wallet.paid, 0);
-  const usedFreePoint = Math.min(availableFreePoint, total);
-  const usedPaidPoint = total - usedFreePoint;
-  const pointShortage = Math.max(0, usedPaidPoint - availablePaidPoint);
-  const ring = `conic-gradient(#7CB342 ${Math.min(
-    360,
-    ((owned ?? 0) / card.requiredCountForExchange) * 360,
-  )}deg,#eef0e6 0)`;
-
-  const buy = () => {
-    if (!hydrated || !state.accessToken || owned === null) {
-      showToast('쿠폰 구매는 로그인 후 이용할 수 있어요.', 'err');
-      return;
-    }
-    if (!walletLoaded) {
-      showToast(
-        walletLoading
-          ? '포인트 잔액을 확인하고 있어요.'
-          : '포인트 잔액을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
-        'err',
-      );
-      return;
-    }
-    if (pointShortage > 0) {
-      showToast(
-        `사용 가능한 포인트가 ${fmt(pointShortage)}P 부족해요.`,
-        'err',
-      );
-      return;
-    }
-    askConfirm({ icon: 'eco', title: '쿠폰을 구매할까요?', ok: '구매하기',
-      body: `${couponName(card.name)} ${qty}장 · 보너스 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 충전 포인트 ${fmt(usedPaidPoint)}P` : ''}를 사용해요.`,
-      onOk: async () => {
-        const currentOwned = owned ?? 0;
-        setPurchasing(true);
-        try {
-          const response = await purchaseCard(
-            card.id,
-            qty,
-            state.accessToken!,
-            crypto.randomUUID(),
-          );
-          await refreshWallet();
-          setOwned(response.ownedCount);
-          setQty(1);
-          const reached =
-            response.ownedCount >= card.requiredCountForExchange &&
-            currentOwned < card.requiredCountForExchange;
-          if (reached) {
-            set((s) => ({ readyCards: s.readyCards + 1 }));
-            setCelebrate(true);
-          } else {
-            showToast('쿠폰을 구매했어요! 🎟️');
-          }
-        } catch (purchaseError) {
-          showToast(
-            purchaseError instanceof ApiError
-              ? purchaseError.message
-              : '쿠폰을 구매하지 못했어요. 잠시 후 다시 시도해 주세요.',
-            'err',
-          );
-        } finally {
-          setPurchasing(false);
-        }
-      } });
-  };
 
   return (
     <div className="container">
@@ -288,13 +184,13 @@ export default function CardDetail({
               <div className="flex items-center justify-between text-sm">
                 <span className="font-bold text-sub">보유 보너스 포인트</span>
                 <span className="font-extrabold text-brand-dark">
-                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.free)}P`}
+                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(wallet.free)}P`}
                 </span>
               </div>
               <div className="mt-1.5 flex items-center justify-between text-sm">
                 <span className="font-bold text-sub">보유 충전 포인트</span>
                 <span className="font-extrabold text-brand-dark">
-                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(state.wallet.paid)}P`}
+                  {walletLoading && !walletLoaded ? '확인 중…' : `${fmt(wallet.paid)}P`}
                 </span>
               </div>
               <p className={`mt-2 text-xs ${pointShortage > 0 && walletLoaded ? 'font-semibold text-danger' : 'text-sub'}`}>
@@ -339,7 +235,7 @@ export default function CardDetail({
             <p className="mb-6 leading-[1.6] text-[#6d7a68]">{couponName(card.name)}이 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
             <div className="flex gap-2.5">
               {card.exchangeProductStock > 0 ? (
-                <button type="button" onClick={() => router.push(`/exchange/new?cardId=${card.id}`)} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
+                <button type="button" onClick={goToExchange} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">
                   교환 신청하기
                 </button>
               ) : (

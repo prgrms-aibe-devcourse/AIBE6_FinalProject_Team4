@@ -24,6 +24,7 @@ import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardRarity;
 import com.kiwobollae.api.commerce.gacha.entity.enums.TradingCardStatus;
 import com.kiwobollae.api.commerce.gacha.repository.GoldenCardInstanceRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
+import com.kiwobollae.api.commerce.service.CommerceAssetUrlResolver;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.Clock;
@@ -46,7 +47,7 @@ class CardMarketQueryServiceTest {
   void hidesClosedOrHiddenListingFromPublicDetail() {
     CardMarketListingRepository listingRepository = mock(CardMarketListingRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             mock(CardMarketNegotiationRepository.class),
             mock(CardMarketProposalRepository.class),
@@ -54,6 +55,7 @@ class CardMarketQueryServiceTest {
             mock(UserCardCollectionRepository.class),
             mock(GoldenCardInstanceRepository.class),
             mock(CardMarketPointPort.class),
+            responseMapper(),
             CLOCK);
     CardMarketListing listing = mock(CardMarketListing.class);
     TradingCard card = mock(TradingCard.class);
@@ -77,7 +79,7 @@ class CardMarketQueryServiceTest {
     UserCardCollectionRepository collectionRepository =
         mock(UserCardCollectionRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             mock(CardMarketNegotiationRepository.class),
             mock(CardMarketProposalRepository.class),
@@ -85,6 +87,7 @@ class CardMarketQueryServiceTest {
             collectionRepository,
             mock(GoldenCardInstanceRepository.class),
             mock(CardMarketPointPort.class),
+            responseMapper(),
             CLOCK);
     UserCardCollection activeCollection = mock(UserCardCollection.class);
     UserCardCollection hiddenCollection = mock(UserCardCollection.class);
@@ -112,7 +115,7 @@ class CardMarketQueryServiceTest {
   void hidesExpiredListingFromPublicDetailBeforeSchedulerRuns() {
     CardMarketListingRepository listingRepository = mock(CardMarketListingRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             mock(CardMarketNegotiationRepository.class),
             mock(CardMarketProposalRepository.class),
@@ -120,6 +123,7 @@ class CardMarketQueryServiceTest {
             mock(UserCardCollectionRepository.class),
             mock(GoldenCardInstanceRepository.class),
             mock(CardMarketPointPort.class),
+            responseMapper(),
             CLOCK);
     CardMarketListing listing = mock(CardMarketListing.class);
     TradingCard card = mock(TradingCard.class);
@@ -143,7 +147,7 @@ class CardMarketQueryServiceTest {
     CardMarketNegotiationRepository negotiationRepository =
         mock(CardMarketNegotiationRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             listingRepository,
             negotiationRepository,
             mock(CardMarketProposalRepository.class),
@@ -151,6 +155,7 @@ class CardMarketQueryServiceTest {
             mock(UserCardCollectionRepository.class),
             mock(GoldenCardInstanceRepository.class),
             mock(CardMarketPointPort.class),
+            responseMapper(),
             CLOCK);
     CardMarketListing listing = mock(CardMarketListing.class);
     TradingCard card = mock(TradingCard.class);
@@ -187,7 +192,7 @@ class CardMarketQueryServiceTest {
         mock(CardMarketNegotiationRepository.class);
     CardMarketProposalRepository proposalRepository = mock(CardMarketProposalRepository.class);
     CardMarketQueryService service =
-        new CardMarketQueryService(
+        queryService(
             mock(CardMarketListingRepository.class),
             negotiationRepository,
             proposalRepository,
@@ -195,6 +200,7 @@ class CardMarketQueryServiceTest {
             mock(UserCardCollectionRepository.class),
             mock(GoldenCardInstanceRepository.class),
             mock(CardMarketPointPort.class),
+            responseMapper(),
             CLOCK);
     CardMarketNegotiation negotiation = mock(CardMarketNegotiation.class);
     CardMarketListing listing = mock(CardMarketListing.class);
@@ -224,5 +230,32 @@ class CardMarketQueryServiceTest {
     verify(proposalRepository)
         .findAllByNegotiation_IdInOrderByNegotiation_IdAscSequenceNoAsc(List.of(30L));
     verify(proposalRepository, never()).findAllByNegotiation_IdOrderBySequenceNoAsc(30L);
+  }
+
+  private static CardMarketResponseMapper responseMapper() {
+    return new CardMarketResponseMapper(new CommerceAssetUrlResolver(""));
+  }
+
+  private static CardMarketQueryService queryService(
+      CardMarketListingRepository listingRepository,
+      CardMarketNegotiationRepository negotiationRepository,
+      CardMarketProposalRepository proposalRepository,
+      CardMarketTradeRepository tradeRepository,
+      UserCardCollectionRepository collectionRepository,
+      GoldenCardInstanceRepository goldenInstanceRepository,
+      CardMarketPointPort pointPort,
+      CardMarketResponseMapper responseMapper,
+      Clock clock) {
+    return new CardMarketQueryService(
+        listingRepository,
+        negotiationRepository,
+        tradeRepository,
+        collectionRepository,
+        goldenInstanceRepository,
+        pointPort,
+        responseMapper,
+        new CardMarketQueryResponseAssembler(
+            negotiationRepository, proposalRepository, responseMapper),
+        clock);
   }
 }

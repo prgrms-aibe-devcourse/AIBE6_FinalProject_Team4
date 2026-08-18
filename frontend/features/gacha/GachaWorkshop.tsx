@@ -1,20 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import GachaTitleBadge from "@/components/gacha/GachaTitleBadge";
 import ProfileCosmeticFrame from "@/components/gacha/ProfileCosmeticFrame";
-import { ApiError } from "@/lib/api";
-import {
-  GachaCollectionCard,
-  GachaCosmetic,
-  dismantleGachaCards,
-  equipGachaCosmetic,
-  purchaseGachaCosmetic,
-  unequipGachaCosmetic,
-} from "@/lib/gacha-api";
+import { GachaCollectionCard } from "@/lib/gacha-api";
 import { useUI } from "@/lib/ui";
-import { useGachaCosmetics } from "@/features/gacha/use-gacha-cosmetics";
+import { useGachaCosmeticShop } from "@/features/gacha/use-gacha-cosmetic-shop";
+import {
+  MAX_DISMANTLE_QUANTITY,
+  useGachaDismantle,
+} from "@/features/gacha/use-gacha-dismantle";
+import GachaWorkshopOverview from "@/features/gacha/GachaWorkshopOverview";
 
 const COSMETIC_DESCRIPTION: Record<string, string> = {
   TITLE_SPROUT_COLLECTOR: "새싹빛과 잎사귀가 피어나는 생동감 효과 칭호",
@@ -23,13 +20,6 @@ const COSMETIC_DESCRIPTION: Record<string, string> = {
   BORDER_SPROUT_VINE: "싱그러운 풀잎이 프로필을 감싸는 생명의 테두리",
   BORDER_BLOOM_GARDEN: "벚꽃 송이와 흩날리는 꽃잎이 피어나는 테두리",
   BORDER_GOLDEN_HARVEST: "황금 사과 문장과 찬란한 별빛이 빛나는 최고급 테두리",
-};
-
-const MAX_DISMANTLE_QUANTITY = 20;
-const DISMANTLE_RARITY_PRIORITY: Record<string, number> = {
-  COMMON: 0,
-  RARE: 1,
-  SUPER_RARE: 2,
 };
 
 export default function GachaWorkshop({
@@ -45,302 +35,43 @@ export default function GachaWorkshop({
   onBack?: () => void;
   initialSection?: "menu" | "dismantle" | "cosmetics";
 }) {
-  const { showToast, askConfirm } = useUI();
-  const { data, setData, refresh } = useGachaCosmetics();
+  const { askConfirm } = useUI();
+  const {
+    data,
+    refresh,
+    busy: cosmeticBusy,
+    purchase,
+    toggleEquip,
+  } = useGachaCosmeticShop(accessToken);
   const [section, setSection] = useState<"menu" | "dismantle" | "cosmetics">(
     initialSection,
   );
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [busy, setBusy] = useState(false);
-  const dismantleableCards = collection.filter(
-    (card) => card.dismantleableCount > 0,
-  );
-  const selected = useMemo(
-    () =>
-      dismantleableCards
-        .map((card) => ({
-          card,
-          quantity: Math.min(
-            Math.max(quantities[card.id] ?? 0, 0),
-            card.dismantleableCount,
-          ),
-        }))
-        .filter((item) => item.quantity > 0),
-    [dismantleableCards, quantities],
-  );
-  const selectedCount = selected.reduce((sum, item) => sum + item.quantity, 0);
-  const expectedShards = selected.reduce(
-    (sum, item) => sum + item.quantity * item.card.shardPerCard,
-    0,
-  );
-
-  const selectLowestRarityCards = () => {
-    let remaining = MAX_DISMANTLE_QUANTITY;
-    const next: Record<number, number> = {};
-
-    [...dismantleableCards]
-      .sort(
-        (left, right) =>
-          (DISMANTLE_RARITY_PRIORITY[left.rarity] ?? 99) -
-            (DISMANTLE_RARITY_PRIORITY[right.rarity] ?? 99) ||
-          left.displayOrder - right.displayOrder ||
-          left.id - right.id,
-      )
-      .forEach((card) => {
-        if (remaining <= 0) return;
-        const quantity = Math.min(card.dismantleableCount, remaining);
-        if (quantity > 0) {
-          next[card.id] = quantity;
-          remaining -= quantity;
-        }
-      });
-
-    setQuantities(next);
-  };
-
-  const runDismantle = async () => {
-    if (!selected.length || busy) return;
-    if (selectedCount > MAX_DISMANTLE_QUANTITY) {
-      showToast("한 번에 최대 20장까지 분해할 수 있어요.", "err");
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await dismantleGachaCards(
-        selected.map(({ card, quantity }) => ({ cardId: card.id, quantity })),
-        accessToken,
-        crypto.randomUUID(),
-      );
-      setQuantities({});
-      await onCollectionRefresh();
-      await refresh();
-      showToast(`${result.earnedShards}조각을 획득했어요.`);
-    } catch (error) {
-      showToast(message(error, "카드를 분해하지 못했어요."), "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const purchase = async (cosmetic: GachaCosmetic) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const next = await purchaseGachaCosmetic(
-        cosmetic.code,
-        accessToken,
-        crypto.randomUUID(),
-      );
-      setData(next);
-      showToast(`${cosmetic.name}을(를) 해금했어요.`);
-    } catch (error) {
-      showToast(message(error, "해금하지 못했어요."), "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const toggleEquip = async (cosmetic: GachaCosmetic) => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const next = cosmetic.equipped
-        ? await unequipGachaCosmetic(cosmetic.type, accessToken)
-        : await equipGachaCosmetic(cosmetic.code, accessToken);
-      setData(next);
-      showToast(cosmetic.equipped ? "장착을 해제했어요." : "장착했어요.");
-    } catch (error) {
-      showToast(message(error, "장착 상태를 바꾸지 못했어요."), "err");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const {
+    busy: dismantleBusy,
+    dismantleableCards,
+    quantities,
+    selected,
+    selectedCount,
+    expectedShards,
+    selectLowestRarityCards,
+    decrement,
+    increment,
+    dismantle,
+  } = useGachaDismantle({
+    accessToken,
+    collection,
+    onCollectionRefresh,
+    onWalletRefresh: refresh,
+  });
 
   return (
     <section aria-labelledby="workshop-title" className="space-y-8">
-      <div className="rounded-[30px] border border-[#527565] bg-gradient-to-br from-[#285646] via-[#3c6955] to-[#73703a] p-6 text-white shadow-[0_22px_55px_-32px_rgba(38,82,65,.85)] sm:p-8">
-        {onBack ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-6 inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-black text-[#285646] shadow-sm transition hover:bg-[#fff4c9]"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m12.5 4.5-5.5 5.5 5.5 5.5" />
-              <path d="M7.5 10H17" />
-            </svg>
-            내 카드 갤러리
-          </button>
-        ) : null}
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-[#f2d675]">
-          Collector atelier
-        </p>
-        <h2
-          id="workshop-title"
-          className="mt-2 text-3xl font-black tracking-[-0.04em] text-white"
-        >
-          컬렉터 아틀리에
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-[#eff5ef]">
-          중복 카드를 조각으로 바꾸고, 컬렉션에 특별한 빛을 더해보세요. 카드별
-          한 장은 언제나 남습니다.
-        </p>
-      </div>
-
-      <div
-        aria-label={`보유 카드 조각 ${data?.shards.balance ?? 0}개`}
-        className="relative flex flex-wrap items-center gap-4 overflow-hidden rounded-[24px] border border-[#e4cf8b] bg-[#fff8e3] px-5 py-5 shadow-sm sm:flex-nowrap sm:px-6"
-      >
-        <div className="pointer-events-none absolute right-0 top-0 h-full w-40 bg-gradient-to-l from-[#fff7d8] to-transparent" />
-        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ebd178] bg-[#fff8dc]">
-          <span className="absolute inset-2 rounded-full bg-[#f4ce4d]/25 blur-md motion-safe:animate-pulse" />
-          <span className="relative text-[30px] leading-none text-[#d19c18] drop-shadow-[0_0_7px_rgba(222,176,44,.45)]">
-            ✦
-          </span>
-          <span className="absolute right-1.5 top-1.5 text-[7px] text-[#8e6915] motion-safe:animate-pulse">
-            ✦
-          </span>
-        </div>
-
-        <div className="relative min-w-0 flex-1">
-          <p className="text-xs font-black text-[#617064]">현재 보유 조각</p>
-          <div className="mt-0.5 flex items-baseline gap-1.5">
-            <strong className="text-3xl font-black tabular-nums text-ink">
-              {(data?.shards.balance ?? 0).toLocaleString("ko-KR")}
-            </strong>
-            <span className="text-sm font-black text-brand">개</span>
-          </div>
-        </div>
-
-        <div className="relative ml-auto border-l border-[#e2e8df] pl-5 text-right">
-          <p className="text-[11px] font-bold text-sub">누적 획득</p>
-          <p className="mt-0.5 text-sm font-black tabular-nums text-[#75601d]">
-            {(data?.shards.lifetimeEarned ?? 0).toLocaleString("ko-KR")}개
-          </p>
-        </div>
-      </div>
-
-      {section === "menu" ? (
-        <div className="space-y-5">
-          <div className="flex items-end justify-between gap-3 px-1">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8b6b16]">
-                Select atelier
-              </p>
-              <h3 className="mt-1 text-lg font-black">작업을 선택하세요</h3>
-            </div>
-            <span className="hidden text-xs font-bold text-sub sm:block">
-              선택한 작업 화면으로 바로 이동합니다
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setSection("dismantle")}
-              className="group relative flex min-h-56 cursor-pointer flex-col items-start rounded-[28px] border border-[#c7d9c3] bg-[#edf5ea] p-6 text-left text-ink shadow-sm transition-all hover:-translate-y-1 hover:border-[#6f9474] hover:shadow-lg"
-            >
-              <span className="pointer-events-none absolute right-6 top-5 text-xs font-black tracking-[0.18em] text-[#718576]">
-                01
-              </span>
-              <span
-                aria-hidden="true"
-                className="pointer-events-none flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-[#315f3e] shadow-sm transition-colors group-hover:bg-[#315f3e] group-hover:text-white"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-7 w-7"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m7 19-3-3 3-3" />
-                  <path d="M4 16h11a4 4 0 0 0 4-4" />
-                  <path d="m17 5 3 3-3 3" />
-                  <path d="M20 8H9a4 4 0 0 0-4 4" />
-                </svg>
-              </span>
-              <span className="pointer-events-none mt-5 min-w-0 flex-1">
-                <span className="block text-xl font-black">카드 분해</span>
-                <span className="mt-2 block text-sm leading-6 text-[#5d6d60]">
-                  중복 카드를 조각으로 바꾸기
-                </span>
-              </span>
-              <span className="pointer-events-none mt-5 shrink-0 rounded-full bg-[#315f3e] px-4 py-2 text-xs font-black text-white">
-                시작하기 →
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSection("cosmetics")}
-              className="group relative flex min-h-56 cursor-pointer flex-col items-start rounded-[28px] border border-[#e6d18c] bg-[#fff5d8] p-6 text-left text-ink shadow-sm transition-all hover:-translate-y-1 hover:border-[#b69a47] hover:shadow-lg"
-            >
-              <span className="pointer-events-none absolute right-6 top-5 text-xs font-black tracking-[0.18em] text-[#93772a]">
-                02
-              </span>
-              <span
-                aria-hidden="true"
-                className="pointer-events-none flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-[#8b6b16] shadow-sm transition-colors group-hover:bg-[#8b6b16] group-hover:text-white"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-7 w-7"
-                  fill="currentColor"
-                >
-                  <path d="M12 2.5c.7 4.1 2.9 6.3 7 7-4.1.7-6.3 2.9-7 7-.7-4.1-2.9-6.3-7-7 4.1-.7 6.3-2.9 7-7Z" />
-                  <path d="M19 15.5c.3 1.8 1.2 2.7 3 3-1.8.3-2.7 1.2-3 3-.3-1.8-1.2-2.7-3-3 1.8-.3 2.7-1.2 3-3Z" />
-                </svg>
-              </span>
-              <span className="pointer-events-none mt-5 min-w-0 flex-1">
-                <span className="block text-xl font-black">이펙트 상점</span>
-                <span className="mt-2 block text-sm leading-6 text-[#75683f]">
-                  칭호와 프로필 테두리 미리보기·해금
-                </span>
-              </span>
-              <span className="pointer-events-none mt-5 shrink-0 rounded-full bg-[#8b6b16] px-4 py-2 text-xs font-black text-white">
-                입장하기 →
-              </span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d8e1d5] px-1 pb-5">
-          <div className="flex flex-wrap gap-2">
-            {onBack ? (
-              <button
-                type="button"
-                onClick={onBack}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#c7d9c3] bg-white px-4 py-2.5 text-sm font-black text-[#315f3e] transition hover:bg-[#f1f6ee]"
-              >
-                ← 내 카드 갤러리
-              </button>
-            ) : null}
-            <button
-              type="button"
-              aria-label="작업 선택으로 돌아가기"
-              onClick={() => setSection("menu")}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#e7efe3] px-4 py-2.5 text-sm font-black text-[#315f3e] transition hover:bg-[#d9e8d5]"
-            >
-              ← 작업 선택
-            </button>
-          </div>
-          <p className="text-sm font-black text-[#68766b]">
-            현재 작업 · {section === "dismantle" ? "카드 분해" : "이펙트 상점"}
-          </p>
-        </div>
-      )}
+      <GachaWorkshopOverview
+        section={section}
+        onSectionChange={setSection}
+        data={data}
+        onBack={onBack}
+      />
 
       {section === "dismantle" ? (
         <div
@@ -357,7 +88,7 @@ export default function GachaWorkshop({
             </div>
             <button
               type="button"
-              disabled={!dismantleableCards.length || busy}
+              disabled={!dismantleableCards.length || dismantleBusy}
               onClick={selectLowestRarityCards}
               className="rounded-xl border border-brand px-4 py-2 text-sm font-extrabold text-brand disabled:opacity-40"
             >
@@ -410,12 +141,7 @@ export default function GachaWorkshop({
                       <button
                         type="button"
                         aria-label={`${card.name} 분해 수량 감소`}
-                        onClick={() =>
-                          setQuantities((current) => ({
-                            ...current,
-                            [card.id]: Math.max(0, quantity - 1),
-                          }))
-                        }
+                        onClick={() => decrement(card.id)}
                         className="h-8 w-8 rounded-lg font-black"
                       >
                         −
@@ -426,24 +152,7 @@ export default function GachaWorkshop({
                       <button
                         type="button"
                         aria-label={`${card.name} 분해 수량 증가`}
-                        onClick={() =>
-                          setQuantities((current) => {
-                            const currentTotal = Object.values(current).reduce(
-                              (sum, value) => sum + Math.max(0, value),
-                              0,
-                            );
-                            if (currentTotal >= MAX_DISMANTLE_QUANTITY) {
-                              return current;
-                            }
-                            return {
-                              ...current,
-                              [card.id]: Math.min(
-                                card.dismantleableCount,
-                                (current[card.id] ?? 0) + 1,
-                              ),
-                            };
-                          })
-                        }
+                        onClick={() => increment(card)}
                         disabled={
                           selectedCount >= MAX_DISMANTLE_QUANTITY ||
                           quantity >= card.dismantleableCount
@@ -470,7 +179,7 @@ export default function GachaWorkshop({
             </p>
             <button
               type="button"
-              disabled={!selected.length || busy}
+              disabled={!selected.length || dismantleBusy}
               onClick={() =>
                 askConfirm({
                   icon: "recycling",
@@ -478,7 +187,7 @@ export default function GachaWorkshop({
                   body: `${selectedCount}장을 분해해 ${expectedShards}조각을 획득합니다. 카드별 한 장은 남습니다.`,
                   ok: `${selectedCount}개 변환하기`,
                   danger: true,
-                  onOk: () => void runDismantle(),
+                  onOk: () => void dismantle(),
                 })
               }
               className="rounded-xl bg-brand px-5 py-3 font-extrabold text-white disabled:opacity-40"
@@ -553,7 +262,7 @@ export default function GachaWorkshop({
                 {cosmetic.owned ? (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={cosmeticBusy}
                     onClick={() => void toggleEquip(cosmetic)}
                     className={`mt-5 w-full rounded-xl py-2.5 font-extrabold ${
                       cosmetic.equipped
@@ -567,7 +276,8 @@ export default function GachaWorkshop({
                   <button
                     type="button"
                     disabled={
-                      busy || (data?.shards.balance ?? 0) < cosmetic.price
+                      cosmeticBusy ||
+                      (data?.shards.balance ?? 0) < cosmetic.price
                     }
                     onClick={() =>
                       askConfirm({
@@ -590,8 +300,4 @@ export default function GachaWorkshop({
       ) : null}
     </section>
   );
-}
-
-function message(error: unknown, fallback: string) {
-  return error instanceof ApiError ? error.message : fallback;
 }
