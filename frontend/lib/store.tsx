@@ -141,6 +141,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...DEFAULTS,
           ...JSON.parse(raw),
           wallet: EMPTY_WALLET,
+          readyCards: 0,
           notifications: [],
           unreadNotificationCount: 0,
         });
@@ -185,7 +186,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(
         KEY,
-        JSON.stringify({ ...state, wallet: EMPTY_WALLET, notifications: [], unreadNotificationCount: 0 }),
+        JSON.stringify({ ...state, wallet: EMPTY_WALLET, readyCards: 0, notifications: [], unreadNotificationCount: 0 }),
       );
     } catch (e) {}
   }, [state, hydrated]);
