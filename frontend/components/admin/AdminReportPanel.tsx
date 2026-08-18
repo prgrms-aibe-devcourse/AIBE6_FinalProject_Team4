@@ -10,7 +10,8 @@ import {
   ReportTargetType,
 } from "@/lib/report-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
+import { useAdminPaginatedList } from "./use-admin-paginated-list";
 
 const TARGET: Record<ReportTargetType, string> = {
   JOURNAL: "일지",
@@ -44,68 +45,26 @@ export default function AdminReportPanel({
 }) {
   const { showToast } = useUI();
   const [status, setStatus] = useState<ReportStatus | "">("");
-  const [page, setPage] = useState(0);
-  const [reports, setReports] = useState<ReportData[]>([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
   const [selected, setSelected] = useState<ReportData | null>(null);
   const [actionType, setActionType] = useState("");
   const [actionDetail, setActionDetail] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // load()는 useEffect(필터/페이지 변경 시 자동 취소)뿐 아니라 처리 완료 후에도 signal 없이
-  // 직접 호출된다 — 그 사이 사용자가 페이지를 옮기면 먼저 보낸 요청이 나중에 응답할 수 있다.
-  // requestId로 "가장 최근에 보낸 요청의 응답인지"를 확인해, 뒤처진 응답이 최신 state를 덮어쓰지
-  // 않도록 막는다.
-  const requestIdRef = useRef(0);
-
-  const load = useCallback(
-    (signal?: AbortSignal) => {
-      const requestId = ++requestIdRef.current;
-      setLoading(true);
-      setErrorMessage("");
-
-      return getReportsForAdmin(accessToken, status || undefined, page, 20, signal)
-        .then((result) => {
-          if (requestIdRef.current !== requestId) return;
-          // 처리 완료로 필터 조건을 벗어난 항목이 빠지면서 마지막 페이지가 사라질 수 있다 —
-          // 그 경우 빈 결과를 그대로 보여주는 대신 이전 페이지로 물러나 다시 불러온다.
-          if (result.content.length === 0 && page > 0 && result.totalElements > 0) {
-            setPage((current) => Math.max(0, current - 1));
-            return;
-          }
-          setReports(result.content);
-          setTotalPages(result.totalPages);
-          setTotalElements(result.totalElements);
-        })
-        .catch((requestError) => {
-          if (
-            requestError instanceof DOMException &&
-            requestError.name === "AbortError"
-          )
-            return;
-          if (requestIdRef.current !== requestId) return;
-          setReports([]);
-          setErrorMessage(
-            requestError instanceof ApiError
-              ? requestError.message
-              : "신고 목록을 불러오지 못했어요.",
-          );
-        })
-        .finally(() => {
-          if (requestIdRef.current === requestId) setLoading(false);
-        });
-    },
-    [accessToken, page, status],
+  const fetchPage = useCallback(
+    (page: number, signal?: AbortSignal) =>
+      getReportsForAdmin(accessToken, status || undefined, page, 20, signal),
+    [accessToken, status],
   );
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
+  const {
+    page,
+    setPage,
+    items: reports,
+    totalPages,
+    totalElements,
+    loading,
+    errorMessage,
+    reload,
+  } = useAdminPaginatedList(fetchPage, "신고 목록을 불러오지 못했어요.");
 
   const changeStatus = (next: ReportStatus | "") => {
     setStatus(next);
@@ -133,7 +92,7 @@ export default function AdminReportPanel({
       }
       showToast(kind === "complete" ? "신고를 완료 처리했어요." : "신고를 반려했어요.");
       setSelected(null);
-      void load();
+      reload();
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError
@@ -145,7 +104,7 @@ export default function AdminReportPanel({
       // 목록을 새로고침하지 않으면 모달이 계속 처리 대기 상태로 남아 재시도를 유도하게 된다.
       if (requestError instanceof ApiError && requestError.status === 409) {
         setSelected(null);
-        void load();
+        reload();
       }
     } finally {
       setSubmitting(false);
