@@ -129,6 +129,13 @@ public class BoardCommentService {
 		boardPostRepository.decrementCommentCount(comment.getPost().getId());
 	}
 
+	// 신고 검토 화면에서 관리자가 신고된 댓글의 원문/게시글을 확인할 때 쓴다. 소유권 체크 없이
+	// 존재 여부만 확인한다 — 관리자는 남의 댓글도 봐야 신고 타당성을 판단할 수 있다.
+	public BoardCommentResponse getForAdmin(Long commentId) {
+		BoardComment comment = findActiveComment(commentId);
+		return BoardCommentResponse.from(comment);
+	}
+
 	@Transactional
 	public void adminHideComment(Long commentId) {
 		BoardComment comment = findActiveComment(commentId);
