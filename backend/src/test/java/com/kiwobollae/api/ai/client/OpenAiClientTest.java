@@ -104,6 +104,30 @@ class OpenAiClientTest {
   }
 
   @Test
+  void appliesRequestOutputLimitWithoutExceedingConfiguredGlobalLimit() {
+    server
+        .expect(requestTo(BASE_URL + "/v1/responses"))
+        .andExpect(content().json("{\"max_output_tokens\":400}", JsonCompareMode.LENIENT))
+        .andRespond(withSuccess(completedResponse(), MediaType.APPLICATION_JSON));
+    server
+        .expect(requestTo(BASE_URL + "/v1/responses"))
+        .andExpect(content().json("{\"max_output_tokens\":1200}", JsonCompareMode.LENIENT))
+        .andRespond(withSuccess(completedResponse(), MediaType.APPLICATION_JSON));
+
+    client.generate(textRequest(400));
+    client.generate(textRequest(5000));
+
+    server.verify();
+  }
+
+  @Test
+  void rejectsNonPositiveRequestOutputLimit() {
+    assertThatThrownBy(() -> textRequest(0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("AI 요청별 최대 출력 토큰은 0보다 커야 합니다.");
+  }
+
+  @Test
   void selectsVisionModelAndSendsImageInput() {
     server
         .expect(requestTo(BASE_URL + "/v1/responses"))
@@ -216,6 +240,11 @@ class OpenAiClientTest {
 
   private AiRequest textRequest() {
     return new AiRequest(AiModelRole.TEXT, "system prompt", "user prompt", List.of(), schema());
+  }
+
+  private AiRequest textRequest(int maxOutputTokens) {
+    return new AiRequest(
+        AiModelRole.TEXT, "system prompt", "user prompt", List.of(), schema(), maxOutputTokens);
   }
 
   private AiJsonSchema schema() {

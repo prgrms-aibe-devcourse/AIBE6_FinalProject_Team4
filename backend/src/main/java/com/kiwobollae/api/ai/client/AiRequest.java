@@ -7,7 +7,18 @@ public record AiRequest(
     String systemPrompt,
     String userPrompt,
     List<AiImageInput> images,
-    AiJsonSchema responseSchema) {
+    AiJsonSchema responseSchema,
+    Integer maxOutputTokens) {
+
+  public AiRequest(
+      AiModelRole modelRole,
+      String systemPrompt,
+      String userPrompt,
+      List<AiImageInput> images,
+      AiJsonSchema responseSchema) {
+    this(modelRole, systemPrompt, userPrompt, images, responseSchema, null);
+  }
+
   public AiRequest {
     if (modelRole == null) {
       throw new IllegalArgumentException("AI 모델 역할이 필요합니다.");
@@ -24,6 +35,9 @@ public record AiRequest(
     }
     if (responseSchema == null) {
       throw new IllegalArgumentException("AI 구조화 응답 스키마가 필요합니다.");
+    }
+    if (maxOutputTokens != null && maxOutputTokens <= 0) {
+      throw new IllegalArgumentException("AI 요청별 최대 출력 토큰은 0보다 커야 합니다.");
     }
   }
 }
