@@ -17,7 +17,9 @@ import com.kiwobollae.api.commerce.gacha.repository.TradingCardRepository;
 import com.kiwobollae.api.commerce.gacha.repository.UserCardCollectionRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,8 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class CardMarketListingCommandHandler {
+
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final CardMarketListingRepository listingRepository;
   private final TradingCardRepository tradingCardRepository;
@@ -35,9 +39,9 @@ public class CardMarketListingCommandHandler {
   private final CardMarketTradeProcessor tradeProcessor;
   private final CardMarketResponseMapper responseMapper;
   private final CardMarketCommandSupport support;
+  private final Clock seoulClock;
 
-  public CardMarketListingResponse create(
-      Long userId, CardMarketListingCreateRequest request, LocalDateTime now) {
+  public CardMarketListingResponse create(Long userId, CardMarketListingCreateRequest request) {
     CardMarketPolicy.requirePrice(request.askingPrice());
     TradingCard card =
         tradingCardRepository
@@ -52,9 +56,6 @@ public class CardMarketListingCommandHandler {
     if (card.getRarity() == TradingCardRarity.HYPER_RARE) {
       if (request.goldenInstanceId() != null) {
         throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
-      }
-      if (collectionRepository.decrementKeepingOne(userId, card.getId(), 1, now) == 0) {
-        throw new BusinessException(ErrorCode.CARD_MARKET_CARD_KEEP_ONE_REQUIRED);
       }
       assetType = CardMarketAssetType.HYPER_RARE;
     } else if (card.getRarity() == TradingCardRarity.GOLDEN_RARE) {
@@ -78,6 +79,12 @@ public class CardMarketListingCommandHandler {
       throw new BusinessException(ErrorCode.CARD_MARKET_CARD_NOT_TRADABLE);
     }
 
+    LocalDateTime now = now();
+    if (assetType == CardMarketAssetType.HYPER_RARE
+        && collectionRepository.decrementKeepingOne(userId, card.getId(), 1, now) == 0) {
+      throw new BusinessException(ErrorCode.CARD_MARKET_CARD_KEEP_ONE_REQUIRED);
+    }
+
     CardMarketListing listing =
         listingRepository.save(
             CardMarketListing.builder()
@@ -95,9 +102,10 @@ public class CardMarketListingCommandHandler {
     return responseMapper.listing(listing, 0);
   }
 
-  public CardMarketListingResponse cancel(
-      Long userId, Long listingId, LocalDateTime now) {
-    CardMarketListing listing = support.requireOpenListingForUpdate(listingId, now);
+  public CardMarketListingResponse cancel(Long userId, Long listingId) {
+    CardMarketListing listing = support.requireListingForUpdate(listingId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     if (!listing.getSeller().getId().equals(userId)) {
       throw new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND);
     }
@@ -110,5 +118,9 @@ public class CardMarketListingCommandHandler {
     }
     listing.cancel("SELLER_CANCELLED", now);
     return responseMapper.listing(listing, 0);
+  }
+
+  private LocalDateTime now() {
+    return LocalDateTime.ofInstant(seoulClock.instant(), KST);
   }
 }

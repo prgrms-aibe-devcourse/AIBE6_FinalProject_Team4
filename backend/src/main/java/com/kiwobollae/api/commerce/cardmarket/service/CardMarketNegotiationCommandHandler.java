@@ -16,7 +16,9 @@ import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketNegotiationRe
 import com.kiwobollae.api.commerce.cardmarket.repository.CardMarketProposalRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class CardMarketNegotiationCommandHandler {
+
+  private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
   private final CardMarketNegotiationRepository negotiationRepository;
   private final CardMarketProposalRepository proposalRepository;
@@ -33,10 +37,12 @@ public class CardMarketNegotiationCommandHandler {
   private final CardMarketTradeProcessor tradeProcessor;
   private final CardMarketResponseMapper responseMapper;
   private final CardMarketCommandSupport support;
+  private final Clock seoulClock;
 
-  public CardMarketTradeResponse buyNow(
-      Long userId, Long listingId, LocalDateTime now) {
-    CardMarketListing listing = support.requireOpenListingForUpdate(listingId, now);
+  public CardMarketTradeResponse buyNow(Long userId, Long listingId) {
+    CardMarketListing listing = support.requireListingForUpdate(listingId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     support.validateNotSelf(userId, listing);
     support.validateActiveCard(listing);
     User buyer = userRepository.getReferenceById(userId);
@@ -47,9 +53,10 @@ public class CardMarketNegotiationCommandHandler {
   public CardMarketNegotiationResponse create(
       Long userId,
       Long listingId,
-      CardMarketProposalRequest request,
-      LocalDateTime now) {
-    CardMarketListing listing = support.requireOpenListingForUpdate(listingId, now);
+      CardMarketProposalRequest request) {
+    CardMarketListing listing = support.requireListingForUpdate(listingId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     support.validateNotSelf(userId, listing);
     support.validateActiveCard(listing);
     if (request.price() >= listing.getAskingPrice()) {
@@ -95,12 +102,12 @@ public class CardMarketNegotiationCommandHandler {
   public CardMarketNegotiationResponse propose(
       Long userId,
       Long negotiationId,
-      CardMarketProposalRequest request,
-      LocalDateTime now) {
+      CardMarketProposalRequest request) {
     CardMarketNegotiation snapshot = support.requireNegotiation(negotiationId);
-    CardMarketListing listing =
-        support.requireOpenListingForUpdate(snapshot.getListing().getId(), now);
+    CardMarketListing listing = support.requireListingForUpdate(snapshot.getListing().getId());
     CardMarketNegotiation negotiation = support.requireNegotiationForUpdate(negotiationId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     support.validateNegotiating(negotiation, now);
     support.validateActiveCard(listing);
     CardMarketParticipantType proposer = support.participantType(userId, negotiation);
@@ -140,12 +147,12 @@ public class CardMarketNegotiationCommandHandler {
     return responseMapper.negotiation(negotiation, List.of());
   }
 
-  public CardMarketTradeResponse accept(
-      Long userId, Long negotiationId, LocalDateTime now) {
+  public CardMarketTradeResponse accept(Long userId, Long negotiationId) {
     CardMarketNegotiation snapshot = support.requireNegotiation(negotiationId);
-    CardMarketListing listing =
-        support.requireOpenListingForUpdate(snapshot.getListing().getId(), now);
+    CardMarketListing listing = support.requireListingForUpdate(snapshot.getListing().getId());
     CardMarketNegotiation negotiation = support.requireNegotiationForUpdate(negotiationId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     support.validateNegotiating(negotiation, now);
     support.validateActiveCard(listing);
     CardMarketParticipantType responder = support.participantType(userId, negotiation);
@@ -168,11 +175,12 @@ public class CardMarketNegotiationCommandHandler {
     return responseMapper.trade(trade);
   }
 
-  public CardMarketNegotiationResponse reject(
-      Long userId, Long negotiationId, LocalDateTime now) {
+  public CardMarketNegotiationResponse reject(Long userId, Long negotiationId) {
     CardMarketNegotiation snapshot = support.requireNegotiation(negotiationId);
-    support.requireOpenListingForUpdate(snapshot.getListing().getId(), now);
+    CardMarketListing listing = support.requireListingForUpdate(snapshot.getListing().getId());
     CardMarketNegotiation negotiation = support.requireNegotiationForUpdate(negotiationId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     support.validateNegotiating(negotiation, now);
     CardMarketParticipantType responder = support.participantType(userId, negotiation);
     if (negotiation.getTurn() != responder) {
@@ -187,11 +195,12 @@ public class CardMarketNegotiationCommandHandler {
     return responseMapper.negotiation(negotiation, List.of());
   }
 
-  public CardMarketNegotiationResponse cancel(
-      Long userId, Long negotiationId, LocalDateTime now) {
+  public CardMarketNegotiationResponse cancel(Long userId, Long negotiationId) {
     CardMarketNegotiation snapshot = support.requireNegotiation(negotiationId);
-    support.requireOpenListingForUpdate(snapshot.getListing().getId(), now);
+    CardMarketListing listing = support.requireListingForUpdate(snapshot.getListing().getId());
     CardMarketNegotiation negotiation = support.requireNegotiationForUpdate(negotiationId);
+    LocalDateTime now = now();
+    support.validateOpenListing(listing, now);
     support.validateNegotiating(negotiation, now);
     if (!negotiation.getBuyer().getId().equals(userId)) {
       throw new BusinessException(ErrorCode.CARD_MARKET_NEGOTIATION_NOT_FOUND);
@@ -202,6 +211,10 @@ public class CardMarketNegotiationCommandHandler {
     pointPort.releaseOffer(userId, release, negotiationId);
     notificationService.negotiationCancelled(negotiation);
     return responseMapper.negotiation(negotiation, List.of());
+  }
+
+  private LocalDateTime now() {
+    return LocalDateTime.ofInstant(seoulClock.instant(), KST);
   }
 
   private void validateCounterPrice(

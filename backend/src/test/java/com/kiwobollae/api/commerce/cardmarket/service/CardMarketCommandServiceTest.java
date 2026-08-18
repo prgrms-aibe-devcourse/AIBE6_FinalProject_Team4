@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,13 +46,13 @@ import com.kiwobollae.api.infra.service.IdempotencyService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -73,6 +74,7 @@ class CardMarketCommandServiceTest {
   @Mock private CardMarketPointPort pointPort;
   @Mock private CardMarketNotificationService notificationService;
   @Mock private IdempotencyService idempotencyService;
+  @Mock private Clock seoulClock;
 
   private CardMarketCommandService service;
   private User seller;
@@ -80,6 +82,7 @@ class CardMarketCommandServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(seoulClock.instant()).thenReturn(Instant.parse("2026-08-05T15:00:00Z"));
     CardMarketTradeProcessor tradeProcessor =
         new CardMarketTradeProcessor(
             tradeRepository,
@@ -102,7 +105,8 @@ class CardMarketCommandServiceTest {
             pointPort,
             tradeProcessor,
             responseMapper,
-            support);
+            support,
+            seoulClock);
     CardMarketNegotiationCommandHandler negotiationHandler =
         new CardMarketNegotiationCommandHandler(
             negotiationRepository,
@@ -112,13 +116,13 @@ class CardMarketCommandServiceTest {
             notificationService,
             tradeProcessor,
             responseMapper,
-            support);
+            support,
+            seoulClock);
     service =
         new CardMarketCommandService(
             listingHandler,
             negotiationHandler,
-            new CardMarketIdempotencyExecutor(idempotencyService, new ObjectMapper()),
-            Clock.fixed(Instant.parse("2026-08-05T15:00:00Z"), ZoneOffset.UTC));
+            new CardMarketIdempotencyExecutor(idempotencyService, new ObjectMapper()));
     seller = user(1L, "판매자");
     buyer = user(2L, "구매자");
     IdempotencyKey key = mock(IdempotencyKey.class);
@@ -303,6 +307,10 @@ class CardMarketCommandServiceTest {
     assertThat(negotiation.getStatus()).isEqualTo(CardMarketNegotiationStatus.ACCEPTED);
     verify(pointPort).settleTrade(2L, 1L, 100L, 720L, 502L, List.of());
     verify(collectionRepository).incrementOwnedCount(2L, 11L, NOW);
+    InOrder timing = inOrder(listingRepository, negotiationRepository, seoulClock);
+    timing.verify(listingRepository).findByIdForUpdate(201L);
+    timing.verify(negotiationRepository).findByIdForUpdate(401L);
+    timing.verify(seoulClock).instant();
   }
 
   @Test
@@ -366,6 +374,9 @@ class CardMarketCommandServiceTest {
             501L,
             List.of(new CardMarketPointPort.OfferRelease(2L, 900L, 401L)));
     verify(collectionRepository).incrementOwnedCount(2L, 11L, NOW);
+    InOrder timing = inOrder(listingRepository, seoulClock);
+    timing.verify(listingRepository).findByIdForUpdate(201L);
+    timing.verify(seoulClock).instant();
   }
 
   @Test

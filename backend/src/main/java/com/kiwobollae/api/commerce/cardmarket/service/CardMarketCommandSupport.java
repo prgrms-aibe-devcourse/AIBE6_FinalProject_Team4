@@ -21,20 +21,20 @@ public class CardMarketCommandSupport {
   private final CardMarketListingRepository listingRepository;
   private final CardMarketNegotiationRepository negotiationRepository;
 
-  public CardMarketListing requireOpenListingForUpdate(
-      Long listingId, LocalDateTime now) {
+  public CardMarketListing requireListingForUpdate(Long listingId) {
     if (listingId == null || listingId < 1) {
       throw new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND);
     }
-    CardMarketListing listing =
-        listingRepository
-            .findByIdForUpdate(listingId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND));
+    return listingRepository
+        .findByIdForUpdate(listingId)
+        .orElseThrow(() -> new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_FOUND));
+  }
+
+  public void validateOpenListing(CardMarketListing listing, LocalDateTime now) {
     if (listing.getStatus() != CardMarketListingStatus.OPEN
         || !listing.getExpiresAt().isAfter(now)) {
       throw new BusinessException(ErrorCode.CARD_MARKET_LISTING_NOT_OPEN);
     }
-    return listing;
   }
 
   public CardMarketNegotiation requireNegotiation(Long negotiationId) {
