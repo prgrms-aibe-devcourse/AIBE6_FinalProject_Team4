@@ -224,3 +224,13 @@ export function getMyBoardComments(
     accessToken,
   });
 }
+
+// ---- Admin ----
+
+export function hideBoardPostAsAdmin(id: number, accessToken: string): Promise<void> {
+  return request<void>(`/api/v1/admin/board/posts/${id}/hide`, { method: 'PATCH', accessToken });
+}
+
+export function hideBoardCommentAsAdmin(id: number, accessToken: string): Promise<void> {
+  return request<void>(`/api/v1/admin/board/comments/${id}/hide`, { method: 'PATCH', accessToken });
+}

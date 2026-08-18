@@ -1,6 +1,7 @@
 "use client";
 
 import { ApiError } from "@/lib/api";
+import { hideBoardCommentAsAdmin, hideBoardPostAsAdmin } from "@/lib/board-api";
 import {
   completeReport,
   getReportsForAdmin,
@@ -19,6 +20,10 @@ const TARGET: Record<ReportTargetType, string> = {
   POST: "게시글",
   COMMENT: "댓글",
 };
+// 관리자 숨김 API가 있는 대상만 "완료 처리"가 실제로 콘텐츠를 숨긴다. JOURNAL/USER는 대응하는
+// 숨김 기능이 백엔드에 없어, 완료 처리해도 신고 조치 기록만 남고 콘텐츠는 그대로 노출된다.
+const HIDEABLE_TARGETS: ReportTargetType[] = ["POST", "COMMENT"];
+
 const STAT: Record<ReportStatus, [string, string]> = {
   PENDING: ["검토 대기", "bg-[#FBEDE3] text-[#b5771a]"],
   COMPLETED: ["처리 완료", "bg-[#E8F3D8] text-brand-text"],
@@ -86,11 +91,24 @@ export default function AdminReportPanel({
     try {
       const payload = { actionType: actionType.trim(), actionDetail: actionDetail.trim() };
       if (kind === "complete") {
+        // 실제 숨김이 먼저 성공해야 완료 기록을 남긴다 — 순서를 반대로 하면 완료 처리는
+        // 됐는데 콘텐츠는 그대로 노출되는 "거짓 성공" 상태가 남을 수 있다.
+        if (selected.targetType === "POST") {
+          await hideBoardPostAsAdmin(selected.targetId, accessToken);
+        } else if (selected.targetType === "COMMENT") {
+          await hideBoardCommentAsAdmin(selected.targetId, accessToken);
+        }
         await completeReport(selected.id, payload, accessToken);
       } else {
         await rejectReport(selected.id, payload, accessToken);
       }
-      showToast(kind === "complete" ? "신고를 완료 처리했어요." : "신고를 반려했어요.");
+      showToast(
+        kind === "complete"
+          ? HIDEABLE_TARGETS.includes(selected.targetType)
+            ? "콘텐츠를 숨기고 신고를 완료 처리했어요."
+            : "신고를 완료 처리했어요."
+          : "신고를 반려했어요.",
+      );
       setSelected(null);
       reload();
     } catch (requestError) {
@@ -284,6 +302,11 @@ export default function AdminReportPanel({
               </>
             ) : (
               <>
+                <p className="mb-3 rounded-lg bg-[#f6f7f1] px-3 py-2.5 text-[12.5px] leading-[1.5] text-sub">
+                  {HIDEABLE_TARGETS.includes(selected.targetType)
+                    ? "완료 처리 시 해당 게시글/댓글이 즉시 숨겨져요."
+                    : "이 신고 유형은 자동 숨김을 지원하지 않아요 — 완료 처리해도 조치 기록만 남습니다."}
+                </p>
                 <input
                   value={actionType}
                   onChange={(e) => setActionType(e.target.value)}
@@ -305,7 +328,11 @@ export default function AdminReportPanel({
                     disabled={submitting}
                     className="flex-1 rounded-xl bg-danger px-4 py-[13px] font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {submitting ? "처리 중..." : "완료 처리"}
+                    {submitting
+                      ? "처리 중..."
+                      : HIDEABLE_TARGETS.includes(selected.targetType)
+                        ? "숨김 처리"
+                        : "완료 처리"}
                   </button>
                   <button
                     type="button"
