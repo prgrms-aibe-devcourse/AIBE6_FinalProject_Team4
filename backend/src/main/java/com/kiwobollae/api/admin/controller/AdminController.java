@@ -3,6 +3,8 @@ package com.kiwobollae.api.admin.controller;
 import com.kiwobollae.api.admin.service.ExchangeManagementService;
 import com.kiwobollae.api.admin.service.OrderManagementService;
 import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
+import com.kiwobollae.api.board.service.BoardCommentService;
+import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
 import com.kiwobollae.api.commerce.dto.request.OrderCancelRequest;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
@@ -53,6 +55,8 @@ public class AdminController {
 	private final ExchangeManagementService exchangeManagementService;
 	private final OrderManagementService orderManagementService;
 	private final PlantSpeciesManagementService plantSpeciesManagementService;
+	private final BoardPostService boardPostService;
+	private final BoardCommentService boardCommentService;
 
 	@Operation(summary = "식물 종 추가", description = "새로운 식물 종을 등록합니다.")
 	@PostMapping("/plants/species")
@@ -147,5 +151,19 @@ public class AdminController {
 		return ResponseEntity.ok(ApiResponse.success(
 				exchangeManagementService.adminCancelExchange(id, request.reason())
 		));
+	}
+
+	@Operation(summary = "게시글 숨김 처리", description = "부적절한 게시글을 관리자가 숨깁니다. 물리 삭제는 하지 않습니다.")
+	@PatchMapping("/board/posts/{id}/hide")
+	public ResponseEntity<Void> hideBoardPost(@PathVariable Long id) {
+		boardPostService.adminHidePost(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@Operation(summary = "댓글 숨김 처리", description = "부적절한 댓글을 관리자가 숨깁니다. 물리 삭제는 하지 않습니다.")
+	@PatchMapping("/board/comments/{id}/hide")
+	public ResponseEntity<Void> hideBoardComment(@PathVariable Long id) {
+		boardCommentService.adminHideComment(id);
+		return ResponseEntity.noContent().build();
 	}
 }

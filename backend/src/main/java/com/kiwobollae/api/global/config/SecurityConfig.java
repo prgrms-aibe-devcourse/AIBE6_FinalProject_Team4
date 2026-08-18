@@ -50,6 +50,7 @@ public class SecurityConfig {
 						.requestMatchers(ApiVersion.V1 + "/card/gacha/draws/**").authenticated()
 						.requestMatchers(ApiVersion.V1 + "/card/market/me/**").authenticated()
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/card/**").permitAll()
+						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/board/**").permitAll()
 						// <img> 태그는 Authorization 헤더를 못 보내므로, private S3 버킷을 대신 서빙하는
 						// 이 엔드포인트만 GET에 한해 공개한다(파일명이 UUID라 URL 추측은 사실상 불가능).
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/journals/images/**").permitAll()

@@ -2,6 +2,8 @@ package com.kiwobollae.api.report.service;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
+import com.kiwobollae.api.board.service.BoardCommentService;
+import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.journal.service.PlantJournalService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
@@ -27,15 +29,12 @@ public class ReportService {
 	private final ReportRepository reportRepository;
 	private final UserRepository userRepository;
 	private final PlantJournalService plantJournalService;
+	private final BoardPostService boardPostService;
+	private final BoardCommentService boardCommentService;
 
 	@Transactional
 	public ReportResponse createReport(Long userId, ReportRequest request) {
-		if (request.targetType() != ReportTargetType.JOURNAL) {
-			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "현재는 성장 일지만 신고할 수 있습니다.");
-		}
-		if (!plantJournalService.existsActive(request.targetId())) {
-			throw new BusinessException(ErrorCode.JOURNAL_NOT_FOUND);
-		}
+		validateTarget(request.targetType(), request.targetId());
 		if (reportRepository.existsWithStatus(userId, request.targetType(), request.targetId(), ReportStatus.PENDING)) {
 			throw new BusinessException(ErrorCode.REPORT_DUPLICATE_PENDING);
 		}
@@ -43,6 +42,29 @@ public class ReportService {
 		Report saved = reportRepository.save(
 				Report.create(reporter, request.targetType(), request.targetId(), request.reason()));
 		return ReportResponse.from(saved);
+	}
+
+	private void validateTarget(ReportTargetType targetType, Long targetId) {
+		switch (targetType) {
+			case JOURNAL:
+				if (!plantJournalService.existsActive(targetId)) {
+					throw new BusinessException(ErrorCode.JOURNAL_NOT_FOUND);
+				}
+				break;
+			case POST:
+				if (!boardPostService.existsActive(targetId)) {
+					throw new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND);
+				}
+				break;
+			case COMMENT:
+				if (!boardCommentService.existsActive(targetId)) {
+					throw new BusinessException(ErrorCode.BOARD_COMMENT_NOT_FOUND);
+				}
+				break;
+			case USER:
+			default:
+				throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "현재는 일지·게시글·댓글만 신고할 수 있습니다.");
+		}
 	}
 
 	public Page<ReportResponse> getMyReports(Long userId, Pageable pageable) {

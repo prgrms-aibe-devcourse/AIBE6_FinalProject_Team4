@@ -151,6 +151,15 @@ public class PlantJournalService {
 		return PlantJournalResponse.from(journal, journalImageRepository.findByJournalId(journalId));
 	}
 
+	// 게시판 PLANT_QNA 게시글에 연동된 일지를 작성자 본인이 아닌 열람자에게도 보여줄 때 쓴다.
+	// 소유자 확인이 없으므로 호출부가 실제로 그 일지를 참조하는 활성 게시글 컨텍스트에서만
+	// 호출해야 한다(BoardPostService.getLinkedJournal 참고).
+	public PlantJournalResponse getPublicSnapshot(Long journalId) {
+		PlantJournal journal = plantJournalRepository.findActive(journalId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		return PlantJournalResponse.from(journal, journalImageRepository.findByJournalId(journalId));
+	}
+
 	@Transactional
 	public PlantJournalResponse updateJournal(Long userId, Long journalId, PlantJournalUpdateRequest request) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)

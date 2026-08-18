@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
@@ -29,17 +30,43 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
 	private final ObjectMapper objectMapper;
 	private final int maxRequestsPerWindow;
+	private final Predicate<HttpServletRequest> requestMatcher;
+	// null이면 기존처럼 요청 URI 그대로를 버킷 키로 쓴다. 경로 변수가 있는 엔드포인트
+	// (예: /board/posts/{id}/comments)는 URI 그대로 쓰면 id별로 버킷이 갈라져 여러 글에
+	// 나눠 스팸을 뿌리면 각각 새 예산으로 통과해버린다 — 그런 엔드포인트는 고정된 이름을
+	// 줘서 같은 사용자의 모든 요청이 하나의 버킷을 공유하게 한다.
+	private final String bucketName;
 	private final ConcurrentHashMap<String, Window> windowsByClient = new ConcurrentHashMap<>();
 
 	public RateLimitFilter(ObjectMapper objectMapper, int maxRequestsPerWindow) {
+		this(objectMapper, maxRequestsPerWindow, request -> true);
+	}
+
+	// urlPatterns의 servlet 매핑은 "/board/posts/*/likes"처럼 경로 중간에 오는 와일드카드를
+	// 지원하지 않는다. 이런 엔드포인트는 넓은 prefix 패턴으로 등록하고, 실제로 제한을 적용할
+	// 요청인지는 이 predicate로 걸러낸다(그 외 요청은 그대로 통과).
+	public RateLimitFilter(ObjectMapper objectMapper, int maxRequestsPerWindow, Predicate<HttpServletRequest> requestMatcher) {
+		this(objectMapper, maxRequestsPerWindow, requestMatcher, null);
+	}
+
+	public RateLimitFilter(
+			ObjectMapper objectMapper, int maxRequestsPerWindow,
+			Predicate<HttpServletRequest> requestMatcher, String bucketName) {
 		this.objectMapper = objectMapper;
 		this.maxRequestsPerWindow = maxRequestsPerWindow;
+		this.requestMatcher = requestMatcher;
+		this.bucketName = bucketName;
 	}
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		String clientKey = resolveClientKey(request) + "|" + request.getRequestURI();
+		if (!requestMatcher.test(request)) {
+			filterChain.doFilter(request, response);
+			return;
+		}
+
+		String clientKey = resolveClientKey(request) + "|" + (bucketName != null ? bucketName : request.getRequestURI());
 		Window window = windowsByClient.computeIfAbsent(clientKey, key -> new Window());
 
 		if (window.tryConsume(maxRequestsPerWindow)) {
@@ -58,10 +85,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
 		response.getWriter().write(objectMapper.writeValueAsString(body));
 	}
 
+	// 이 앱 앞에는 리버스 프록시(NPM/nginx)가 정확히 한 홉만 있고, X-Forwarded-For의 "마지막"
+	// 항목이 그 프록시가 직접 관측해 append한 값이다. 맨 앞 항목은 클라이언트가 요청에 직접
+	// 실어 보낸 임의의 값일 수 있어, 그걸 신뢰하면 헤더 하나로 rate limit을 우회할 수 있다.
 	private String resolveClientKey(HttpServletRequest request) {
 		String forwardedFor = request.getHeader("X-Forwarded-For");
 		if (forwardedFor != null && !forwardedFor.isBlank()) {
-			return forwardedFor.split(",")[0].trim();
+			String[] hops = forwardedFor.split(",");
+			return hops[hops.length - 1].trim();
 		}
 		return request.getRemoteAddr();
 	}

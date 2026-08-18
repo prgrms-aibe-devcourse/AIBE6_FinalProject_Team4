@@ -36,6 +36,13 @@ public interface PlantJournalRepository extends JpaRepository<PlantJournal, Long
 			+ "where j.id = :id and j.user.id = :userId and j.deletedAt is null")
 	Optional<PlantJournal> findOwnedActive(@Param("id") Long id, @Param("userId") Long userId);
 
+	// 게시판 PLANT_QNA 게시글에 연동된 일지를 작성자가 아닌 다른 열람자도 볼 수 있게 하는 용도.
+	// 소유자 확인 없이 삭제되지 않은 일지인지만 확인한다 — 호출부(BoardPostService)가 실제로
+	// 활성 PLANT_QNA 게시글에 연동된 journalId인지를 먼저 검증한다.
+	@Query("select j from PlantJournal j join fetch j.plantProfile "
+			+ "where j.id = :id and j.deletedAt is null")
+	Optional<PlantJournal> findActive(@Param("id") Long id);
+
 	@Query("select j from PlantJournal j "
 			+ "where j.user.id = :userId and j.plantProfile.id = :profileId and j.deletedAt is null "
 			+ "order by j.writtenDate desc, j.id desc")

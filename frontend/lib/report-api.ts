@@ -1,6 +1,6 @@
 import { request } from '@/lib/api';
 
-export type ReportTargetType = 'JOURNAL' | 'USER';
+export type ReportTargetType = 'JOURNAL' | 'USER' | 'POST' | 'COMMENT';
 
 export interface ReportData {
   id: number;
