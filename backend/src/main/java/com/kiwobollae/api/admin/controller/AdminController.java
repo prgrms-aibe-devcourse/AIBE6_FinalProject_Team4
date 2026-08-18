@@ -8,6 +8,10 @@ import com.kiwobollae.api.board.service.BoardCommentService;
 import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
 import com.kiwobollae.api.journal.service.PlantJournalService;
+import com.kiwobollae.api.report.entity.enums.ReportTargetType;
+import com.kiwobollae.api.report.service.ReportService;
+import com.kiwobollae.api.global.exception.BusinessException;
+import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
 import com.kiwobollae.api.commerce.dto.request.OrderCancelRequest;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
@@ -61,6 +65,7 @@ public class AdminController {
 	private final BoardPostService boardPostService;
 	private final BoardCommentService boardCommentService;
 	private final PlantJournalService plantJournalService;
+	private final ReportService reportService;
 
 	@Operation(summary = "식물 종 추가", description = "새로운 식물 종을 등록합니다.")
 	@PostMapping("/plants/species")
@@ -171,15 +176,26 @@ public class AdminController {
 		return ResponseEntity.noContent().build();
 	}
 
-	@Operation(summary = "댓글 상세 조회(신고 검토용)", description = "관리자가 신고된 댓글의 원문과 게시글 정보를 확인합니다.")
+	@Operation(summary = "댓글 상세 조회(신고 검토용)", description = "관리자가 신고된 댓글의 원문과 게시글 정보를 확인합니다. 실제로 신고된 댓글만 조회할 수 있습니다.")
 	@GetMapping("/board/comments/{id}")
 	public ResponseEntity<ApiResponse<BoardCommentResponse>> getBoardComment(@PathVariable Long id) {
+		requireReported(ReportTargetType.COMMENT, id);
 		return ResponseEntity.ok(ApiResponse.success(boardCommentService.getForAdmin(id)));
 	}
 
-	@Operation(summary = "일지 상세 조회(신고 검토용)", description = "관리자가 신고된 일지 원문을 확인합니다. 작성자 소유 여부와 삭제 여부를 확인하지 않습니다.")
+	@Operation(summary = "일지 상세 조회(신고 검토용)", description = "관리자가 신고된 일지 원문을 확인합니다. 실제로 신고된 일지만 조회할 수 있어, 신고와 무관한 비공개 일지는 볼 수 없습니다.")
 	@GetMapping("/journals/{id}")
 	public ResponseEntity<ApiResponse<PlantJournalResponse>> getJournalForAdmin(@PathVariable Long id) {
+		requireReported(ReportTargetType.JOURNAL, id);
 		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getForAdmin(id)));
+	}
+
+	// getForAdmin류(BoardCommentService/PlantJournalService)는 소유권 체크를 건너뛰므로, 실제로
+	// 신고된 대상인지 여기서 먼저 확인한다 — 이 체크가 없으면 ADMIN은 targetId만 바꿔가며 신고되지
+	// 않은 비공개 일지·댓글까지도 조회할 수 있게 된다.
+	private void requireReported(ReportTargetType targetType, Long targetId) {
+		if (!reportService.existsReportForTarget(targetType, targetId)) {
+			throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
+		}
 	}
 }
