@@ -3,8 +3,11 @@ package com.kiwobollae.api.admin.controller;
 import com.kiwobollae.api.admin.service.ExchangeManagementService;
 import com.kiwobollae.api.admin.service.OrderManagementService;
 import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
+import com.kiwobollae.api.board.dto.response.BoardCommentResponse;
 import com.kiwobollae.api.board.service.BoardCommentService;
 import com.kiwobollae.api.board.service.BoardPostService;
+import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
+import com.kiwobollae.api.journal.service.PlantJournalService;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
 import com.kiwobollae.api.commerce.dto.request.OrderCancelRequest;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
@@ -57,6 +60,7 @@ public class AdminController {
 	private final PlantSpeciesManagementService plantSpeciesManagementService;
 	private final BoardPostService boardPostService;
 	private final BoardCommentService boardCommentService;
+	private final PlantJournalService plantJournalService;
 
 	@Operation(summary = "식물 종 추가", description = "새로운 식물 종을 등록합니다.")
 	@PostMapping("/plants/species")
@@ -165,5 +169,17 @@ public class AdminController {
 	public ResponseEntity<Void> hideBoardComment(@PathVariable Long id) {
 		boardCommentService.adminHideComment(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	@Operation(summary = "댓글 상세 조회(신고 검토용)", description = "관리자가 신고된 댓글의 원문과 게시글 정보를 확인합니다.")
+	@GetMapping("/board/comments/{id}")
+	public ResponseEntity<ApiResponse<BoardCommentResponse>> getBoardComment(@PathVariable Long id) {
+		return ResponseEntity.ok(ApiResponse.success(boardCommentService.getForAdmin(id)));
+	}
+
+	@Operation(summary = "일지 상세 조회(신고 검토용)", description = "관리자가 신고된 일지 원문을 확인합니다. 작성자 소유 여부는 확인하지 않습니다.")
+	@GetMapping("/journals/{id}")
+	public ResponseEntity<ApiResponse<PlantJournalResponse>> getJournalForAdmin(@PathVariable Long id) {
+		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getPublicSnapshot(id)));
 	}
 }
