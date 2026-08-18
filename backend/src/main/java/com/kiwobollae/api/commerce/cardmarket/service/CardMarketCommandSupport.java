@@ -13,8 +13,11 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@Transactional(propagation = Propagation.MANDATORY)
 @RequiredArgsConstructor
 public class CardMarketCommandSupport {
 
