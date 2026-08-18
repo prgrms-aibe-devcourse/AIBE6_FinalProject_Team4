@@ -13,7 +13,7 @@ import AddressForm, { AddressFields, EMPTY_ADDRESS_FIELDS, isValidPhone } from '
 function ExchangeNewInner() {
   const params = useSearchParams();
   const cardId = Number(params.get('cardId'));
-  const { state, hydrated } = useStore();
+  const { state, hydrated, refreshReadyCards } = useStore();
   const { showToast } = useUI();
 
   const [card, setCard] = useState<CardData | null>(null);
@@ -111,6 +111,7 @@ function ExchangeNewInner() {
         state.accessToken,
       );
       setDone(true);
+      void refreshReadyCards();
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError ? requestError.message : '교환 신청에 실패했어요. 잠시 후 다시 시도해 주세요.',
