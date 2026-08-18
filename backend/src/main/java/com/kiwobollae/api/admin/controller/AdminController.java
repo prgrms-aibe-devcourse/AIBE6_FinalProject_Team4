@@ -177,9 +177,9 @@ public class AdminController {
 		return ResponseEntity.ok(ApiResponse.success(boardCommentService.getForAdmin(id)));
 	}
 
-	@Operation(summary = "일지 상세 조회(신고 검토용)", description = "관리자가 신고된 일지 원문을 확인합니다. 작성자 소유 여부는 확인하지 않습니다.")
+	@Operation(summary = "일지 상세 조회(신고 검토용)", description = "관리자가 신고된 일지 원문을 확인합니다. 작성자 소유 여부와 삭제 여부를 확인하지 않습니다.")
 	@GetMapping("/journals/{id}")
 	public ResponseEntity<ApiResponse<PlantJournalResponse>> getJournalForAdmin(@PathVariable Long id) {
-		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getPublicSnapshot(id)));
+		return ResponseEntity.ok(ApiResponse.success(plantJournalService.getForAdmin(id)));
 	}
 }
