@@ -1,7 +1,8 @@
 "use client";
 
 import { ApiError } from "@/lib/api";
-import { hideBoardCommentAsAdmin, hideBoardPostAsAdmin } from "@/lib/board-api";
+import { BoardCommentData, getBoardCommentAsAdmin, hideBoardCommentAsAdmin, hideBoardPostAsAdmin } from "@/lib/board-api";
+import { getJournalAsAdmin, PlantJournalData } from "@/lib/journal-api";
 import Link from "next/link";
 import {
   completeReport,
@@ -12,8 +13,12 @@ import {
   ReportTargetType,
 } from "@/lib/report-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useAdminPaginatedList } from "./use-admin-paginated-list";
+
+type TargetPreview =
+  | { type: "comment"; data: BoardCommentData }
+  | { type: "journal"; data: PlantJournalData };
 
 const TARGET: Record<ReportTargetType, string> = {
   JOURNAL: "일지",
@@ -55,6 +60,13 @@ export default function AdminReportPanel({
   const [actionType, setActionType] = useState("");
   const [actionDetail, setActionDetail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [preview, setPreview] = useState<TargetPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  // openReport가 빠르게 여러 번 클릭되면(다른 행을 연달아 열면) 먼저 보낸 조회가 나중에
+  // 응답할 수 있다 — requestId로 가장 최근에 연 신고의 응답인지 확인해 뒤처진 응답이
+  // 엉뚱한 신고의 미리보기를 덮어쓰지 않도록 막는다.
+  const previewRequestId = useRef(0);
 
   const fetchPage = useCallback(
     (page: number, signal?: AbortSignal) =>
@@ -81,6 +93,34 @@ export default function AdminReportPanel({
     setSelected(report);
     setActionType("");
     setActionDetail("");
+    setPreview(null);
+    setPreviewError("");
+
+    if (report.targetType !== "COMMENT" && report.targetType !== "JOURNAL") return;
+    const requestId = ++previewRequestId.current;
+    setPreviewLoading(true);
+    const fetchPreview =
+      report.targetType === "COMMENT"
+        ? getBoardCommentAsAdmin(report.targetId, accessToken).then(
+            (data): TargetPreview => ({ type: "comment", data }),
+          )
+        : getJournalAsAdmin(report.targetId, accessToken).then(
+            (data): TargetPreview => ({ type: "journal", data }),
+          );
+    fetchPreview
+      .then((result) => {
+        if (previewRequestId.current !== requestId) return;
+        setPreview(result);
+      })
+      .catch((requestError) => {
+        if (previewRequestId.current !== requestId) return;
+        setPreviewError(
+          requestError instanceof ApiError ? requestError.message : "콘텐츠를 불러오지 못했어요.",
+        );
+      })
+      .finally(() => {
+        if (previewRequestId.current === requestId) setPreviewLoading(false);
+      });
   };
 
   const submitAction = async (kind: "complete" | "reject") => {
@@ -286,13 +326,34 @@ export default function AdminReportPanel({
               >
                 신고된 게시글 보기 →
               </Link>
-            ) : (
-              // COMMENT는 부모 게시글 ID를, JOURNAL은 관리자용 조회 경로를 서버가 아직 내려주지
-              // 않아 여기서 바로 이동할 수 없다 — 사유/신고자 정보만으로 판단해야 한다.
-              <p className="mb-4 text-[12px] text-faint">
-                이 대상 유형은 아직 콘텐츠 바로가기를 지원하지 않아요.
-              </p>
-            )}
+            ) : previewLoading ? (
+              <p className="mb-4 text-[12.5px] text-sub">콘텐츠를 불러오고 있어요...</p>
+            ) : previewError ? (
+              <p className="mb-4 text-[12.5px] text-danger">{previewError}</p>
+            ) : preview?.type === "comment" ? (
+              <div className="mb-4 rounded-xl bg-[#f6f7f1] p-3.5">
+                <div className="mb-1 text-xs font-bold text-sub">
+                  {preview.data.nickname ?? "(삭제된 댓글)"}
+                </div>
+                <p className="mb-2 whitespace-pre-wrap text-sm leading-[1.6]">
+                  {preview.data.content ?? "(삭제된 댓글)"}
+                </p>
+                <Link
+                  href={`/board/${preview.data.postId}`}
+                  target="_blank"
+                  className="text-[13px] font-bold text-brand hover:text-brand-dark"
+                >
+                  게시글 보기 →
+                </Link>
+              </div>
+            ) : preview?.type === "journal" ? (
+              <div className="mb-4 rounded-xl bg-[#f6f7f1] p-3.5">
+                <div className="mb-1 text-xs font-bold text-sub">
+                  {preview.data.plantProfileNickname}
+                </div>
+                <p className="whitespace-pre-wrap text-sm leading-[1.6]">{preview.data.content}</p>
+              </div>
+            ) : null}
 
             {selected.status !== "PENDING" ? (
               <>
