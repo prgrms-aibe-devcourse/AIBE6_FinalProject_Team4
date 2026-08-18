@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { runIdempotentMutation } from "@/features/commerce/idempotent-mutation";
 import { isAbortError } from "@/features/commerce/presentation";
 import { getProduct, ProductDetail } from "@/features/shop/api";
 import { ApiError } from "@/lib/api";
@@ -37,9 +38,6 @@ export function useProductDetail({
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState("");
-  const purchaseAttempt = useRef<{ signature: string; key: string } | null>(
-    null,
-  );
   const [adding, setAdding] = useState(false);
   const [alreadyInCart, setAlreadyInCart] = useState(false);
   const [checkingCart, setCheckingCart] = useState(true);
@@ -161,19 +159,18 @@ export function useProductDetail({
         setPurchasing(true);
         try {
           const signature = `${product.id}:1:${gachaTotalPoint}`;
-          const idempotencyKey =
-            purchaseAttempt.current?.signature === signature
-              ? purchaseAttempt.current.key
-              : crypto.randomUUID();
-          purchaseAttempt.current = { signature, key: idempotencyKey };
-          const response = await purchaseGachaPacks(
-            product.id,
-            1,
-            gachaTotalPoint,
-            state.accessToken!,
-            idempotencyKey,
+          const response = await runIdempotentMutation(
+            "gacha-pack-purchase",
+            signature,
+            (idempotencyKey) =>
+              purchaseGachaPacks(
+                product.id,
+                1,
+                gachaTotalPoint,
+                state.accessToken!,
+                idempotencyKey,
+              ),
           );
-          purchaseAttempt.current = null;
           await refreshWallet().catch(() => undefined);
           showToast(`${response.quantity}팩 구매가 완료됐어요!`);
           router.push(`/gacha/open/${response.drawIds[0]}`);
@@ -182,7 +179,6 @@ export function useProductDetail({
             purchaseError instanceof ApiError &&
             purchaseError.code === "GACHA_PRODUCT_PRICE_CHANGED"
           ) {
-            purchaseAttempt.current = null;
             try {
               setProduct(await getProduct(product.id));
             } catch {
