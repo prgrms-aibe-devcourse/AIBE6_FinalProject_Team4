@@ -31,13 +31,15 @@ const TOUR_STEPS_DESKTOP: TourStep[] = [
 // 별도 스텝으로 관리한다. 일지는 하단 탭에 자체 항목이 없어(activeKey가 journal일 때도
 // "식물" 탭이 활성 표시됨) plants 탭을 같이 가리키며 설명을 합친다. 쿠폰/거래소/마이페이지는
 // "더보기" 시트 안에 있어 각각 스포트라이트하는 대신 "더보기" 버튼 하나로 안내한다.
+// 실제 하단 탭 배치 순서(Navbar.tsx의 BOTTOM: 홈→식물→가챠→커뮤니티→상점)와 동일한 순서로
+// 진행해야 사용자가 스텝을 따라가면서 자연스럽게 왼쪽에서 오른쪽으로 훑게 된다.
 const TOUR_STEPS_MOBILE: TourStep[] = [
   { targetId: null, title: '환영해요! 🌱', description: '키워볼래가 처음이시죠? 아래 메뉴를 하나씩 소개해드릴게요.' },
   { targetId: 'home', title: '홈', description: '오늘의 포인트, 일지, 식물 현황을 한눈에 볼 수 있어요.' },
   { targetId: 'plants', title: '내 식물 · 일지', description: '반려 식물을 등록하고, 매일의 모습을 일지로 기록해요.' },
-  { targetId: 'shop', title: '상점', description: '포인트로 다양한 상품과 가챠 카드팩을 구매해요.' },
   { targetId: 'gacha', title: '가챠', description: '카드팩을 열어 카드를 모으고 도감을 완성해보세요.' },
   { targetId: 'board', title: '커뮤니티', description: '다른 사용자들과 식물 이야기를 나눠보세요.' },
+  { targetId: 'shop', title: '상점', description: '포인트로 다양한 상품과 가챠 카드팩을 구매해요.' },
   { targetId: 'more', title: '더보기', description: '쿠폰·거래소·마이페이지는 여기서 찾을 수 있어요.' },
 ];
 
@@ -88,8 +90,17 @@ export default function OnboardingTour() {
       setRect(null);
       return;
     }
-    const el = document.querySelector(`[data-tour-id="${step.targetId}"]`);
-    setRect(el ? el.getBoundingClientRect() : null);
+    // 데스크톱 NAV와 모바일 하단 탭이 같은 data-tour-id를 공유한다(둘 다 렌더링은 되고
+    // Tailwind hidden/md:hidden으로 화면에서만 안 보이게 함) — querySelector는 DOM에 먼저
+    // 나오는(항상 데스크톱 NAV) 쪽을 집어서, 모바일에서는 숨겨진 요소의 0 근처 좌표를 잘못
+    // 가리키는 버그가 있었다. 실제로 화면에 보이는(너비/높이가 있는) 요소를 찾아야 한다.
+    const candidates = document.querySelectorAll(`[data-tour-id="${step.targetId}"]`);
+    let visibleRect: DOMRect | null = null;
+    candidates.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) visibleRect = r;
+    });
+    setRect(visibleRect);
   }, [steps, stepIndex]);
 
   useEffect(() => {

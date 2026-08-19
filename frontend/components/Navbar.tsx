@@ -200,15 +200,6 @@ export default function Navbar() {
                   관리자 콘솔
                 </Link>
               )}
-              <button
-                type="button"
-                title="온보딩 투어 다시 보기"
-                aria-label="온보딩 투어 다시 보기"
-                onClick={openOnboardingTour}
-                className="hidden h-10 w-10 cursor-pointer place-items-center rounded-xl border border-line bg-white text-[#5b6a54] transition-colors duration-150 hover:border-brand hover:bg-brand-soft hover:text-brand-dark md:grid"
-              >
-                <span className="material-symbols-outlined text-[21px]">lightbulb</span>
-              </button>
               <Link
                 href="/cart"
                 title="장바구니"
@@ -446,19 +437,6 @@ export default function Navbar() {
                   <span className="text-[12px] font-bold">{b.label}</span>
                 </Link>
               ))}
-              {state.authed && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    openOnboardingTour();
-                  }}
-                  className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F8FAF3] py-4 text-[#5b6a54]"
-                >
-                  <span className="material-symbols-outlined text-2xl">lightbulb</span>
-                  <span className="text-[12px] font-bold">투어 다시보기</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -493,6 +471,18 @@ export default function Navbar() {
             </div>
           </div>
         </div>
+      )}
+
+      {state.authed && (
+        <button
+          type="button"
+          title="온보딩 투어 다시 보기"
+          aria-label="온보딩 투어 다시 보기"
+          onClick={openOnboardingTour}
+          className="fixed bottom-[82px] right-4 z-[44] flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_20px_rgba(85,139,47,.35)] transition-colors duration-150 hover:bg-brand-dark md:bottom-6 md:right-6"
+        >
+          <span className="material-symbols-outlined text-2xl">lightbulb</span>
+        </button>
       )}
     </div>
   );
