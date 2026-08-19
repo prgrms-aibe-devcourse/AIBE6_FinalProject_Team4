@@ -38,7 +38,6 @@ import tools.jackson.databind.ObjectMapper;
 public class PlantChatService {
 
   static final int JOURNAL_HISTORY_FETCH_LIMIT = 500;
-  static final int JOURNAL_CONTEXT_CHAR_BUDGET = JOURNAL_HISTORY_FETCH_LIMIT;
 
   private static final int CHAT_MAX_OUTPUT_TOKENS = 800;
 

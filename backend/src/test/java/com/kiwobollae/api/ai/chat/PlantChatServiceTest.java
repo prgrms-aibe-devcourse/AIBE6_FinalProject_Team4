@@ -72,7 +72,7 @@ class PlantChatServiceTest {
   void answersFromOwnedPlantContextWithExactlyOneAiCall() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class))).willReturn(validAiResponse());
     PlantChatRequest request = new PlantChatRequest("  잎 끝이 갈색인데 어떻게 해야 하나요?  ", null);
@@ -123,7 +123,7 @@ class PlantChatServiceTest {
     order.verify(requestGuard).validateUserInput(request.question());
     order
         .verify(growthContextQuery)
-        .getGrowthContext(7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET);
+        .getGrowthContext(7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT);
     order.verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CHAT);
     order.verify(aiClient).generate(any(AiRequest.class));
   }
@@ -132,7 +132,7 @@ class PlantChatServiceTest {
   void answersCareQuestionWhenCompoundSpeciesIsTheSelectedPlant() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(compoundSpeciesGrowthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -168,7 +168,7 @@ class PlantChatServiceTest {
   void startsNewConversationWithoutClientProvidedHistory() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -200,7 +200,7 @@ class PlantChatServiceTest {
   void continuesWithServerStoredUserAndAssistantMessages() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(validAiResponse(), secondValidAiResponse());
@@ -245,7 +245,7 @@ class PlantChatServiceTest {
   void rejectsSemanticallyOffTopicQuestionAfterExactlyOneMeteredAiCall() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -281,7 +281,7 @@ class PlantChatServiceTest {
   void rejectsDifferentPlantWithDedicatedErrorWithoutSavingItToConversation() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(validAiResponse(), otherPlantAiResponse(), secondValidAiResponse());
@@ -319,7 +319,7 @@ class PlantChatServiceTest {
   void doesNotConsumeRateLimitWhenProfileIsNotOwned() {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 99L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 99L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willThrow(new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 
     assertThatThrownBy(
@@ -337,7 +337,7 @@ class PlantChatServiceTest {
   void rejectsUnknownConversationBeforeConsumingRateLimit() {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
 
     assertThatThrownBy(
@@ -358,7 +358,7 @@ class PlantChatServiceTest {
   void doesNotCallAiWhenRateLimitIsExceeded() {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     doThrow(new BusinessException(ErrorCode.COMMON_RATE_LIMITED))
         .when(requestGuard)
@@ -378,7 +378,7 @@ class PlantChatServiceTest {
   void rejectsSemanticallyInvalidAiResponse() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -408,7 +408,7 @@ class PlantChatServiceTest {
   void rejectsAiResponseWithoutScopeDecision() throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -437,7 +437,7 @@ class PlantChatServiceTest {
       throws Exception {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willReturn(
@@ -488,7 +488,7 @@ class PlantChatServiceTest {
   void propagatesAiProviderFailureWithoutRetrying() {
     given(
             growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
+                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
         .willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
         .willThrow(new BusinessException(ErrorCode.AI_PROVIDER_UNAVAILABLE));
