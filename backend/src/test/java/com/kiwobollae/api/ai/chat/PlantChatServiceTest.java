@@ -103,7 +103,9 @@ class PlantChatServiceTest {
         .contains("SELECTED_PLANT 식별자로 취급")
         .contains("다른 판정보다 우선하여 REFUSE")
         .contains("scopeDecision을 OTHER_PLANT")
-        .contains("UNCERTAIN");
+        .contains("UNCERTAIN")
+        .contains("두 배열의 순서를 시간 흐름으로 읽지 말고 각 항목의 writtenDate로만")
+        .contains("relatedPastJournals를 최근 흐름의 일부처럼 서술하지 마세요");
     assertThat(aiRequest.userPrompt())
         .contains("2026-08-10")
         .contains("바질이")
@@ -112,6 +114,8 @@ class PlantChatServiceTest {
         .contains("새 잎이 조금 말렸어요.")
         .contains("잎 끝이 갈색인데 어떻게 해야 하나요?")
         .contains("\"recentConversation\":[]")
+        .contains("\"journalContext\":{\"recentJournals\":[")
+        .contains("\"relatedPastJournals\":[]")
         .doesNotContain("\"profileId\"")
         .doesNotContain("\"speciesId\"")
         .doesNotContain("\"journalId\"");
@@ -156,6 +160,24 @@ class PlantChatServiceTest {
     assertThat(captor.getValue().systemPrompt())
         .contains("값 전체를 하나의")
         .contains("일부 문자열이 가진 다른 뜻만으로 별도 대상이나 주제로 분해하지 마세요");
+  }
+
+  @Test
+  void labelsRelatedPastJournalsSeparatelyFromRecentJournalsInPrompt() throws Exception {
+    given(growthContextQuery.getJournalHistoryContext(7L, 21L))
+        .willReturn(longJournalHistoryGrowthContext());
+    given(aiClient.generate(any(AiRequest.class))).willReturn(validAiResponse());
+
+    plantChatService.chat(7L, 21L, new PlantChatRequest("예전에 노란 잎이 생겼을 때 어떻게 했나요?", null));
+
+    ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
+    verify(aiClient).generate(captor.capture());
+    assertThat(captor.getValue().userPrompt())
+        .contains("\"recentJournals\":[{\"writtenDate\":\"2026-08-08\"")
+        .contains(
+            "\"relatedPastJournals\":[{\"writtenDate\":\"2026-07-03\","
+                + "\"content\":\"노란 잎이 생겨 물주기 간격을 조절했어요.\"}]")
+        .doesNotContain("화분을 닦고 주변을 정리했어요.");
   }
 
   @Test
@@ -479,6 +501,26 @@ class PlantChatServiceTest {
         List.of(
             new RecentJournal(31L, LocalDate.of(2026, 8, 8), "새 잎이 조금 말렸어요."),
             new RecentJournal(30L, LocalDate.of(2026, 8, 5), "물을 충분히 줬어요.")));
+  }
+
+  private PlantGrowthContextResponse longJournalHistoryGrowthContext() {
+    return new PlantGrowthContextResponse(
+        21L,
+        "바질이",
+        LocalDate.of(2026, 7, 1),
+        PlantStatus.GROWING,
+        3L,
+        "바질",
+        "허브",
+        "바질은 겉흙이 마르면 물을 줍니다.",
+        List.of(
+            new RecentJournal(37L, LocalDate.of(2026, 8, 8), "오늘은 새 잎이 한 장 나왔어요."),
+            new RecentJournal(36L, LocalDate.of(2026, 8, 7), "물을 주고 창가로 옮겼어요."),
+            new RecentJournal(35L, LocalDate.of(2026, 8, 6), "줄기가 조금 자랐어요."),
+            new RecentJournal(34L, LocalDate.of(2026, 8, 5), "흙 표면이 말라 물을 줬어요."),
+            new RecentJournal(33L, LocalDate.of(2026, 8, 4), "잎 색은 대체로 초록색이에요."),
+            new RecentJournal(32L, LocalDate.of(2026, 7, 3), "노란 잎이 생겨 물주기 간격을 조절했어요."),
+            new RecentJournal(31L, LocalDate.of(2026, 7, 2), "화분을 닦고 주변을 정리했어요.")));
   }
 
   private PlantGrowthContextResponse compoundSpeciesGrowthContext() {

@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-/** 최근 기록은 항상 보존하고, 질문과 문자 단위로 겹치는 과거 기록만 제한해 추가한다. */
+/** 최근 기록은 항상 보존하고, 질문과 문자 단위로 겹치는 과거 기록만 제한해 따로 추가한다. */
 @Component
 final class PlantChatJournalContextSelector {
 
@@ -16,18 +16,18 @@ final class PlantChatJournalContextSelector {
   static final int RELEVANT_HISTORY_LIMIT = 3;
   static final int RELEVANT_HISTORY_CHAR_BUDGET = 4_000;
 
-  List<RecentJournal> select(List<RecentJournal> journals, String question) {
+  Selection select(List<RecentJournal> journals, String question) {
     List<RecentJournal> orderedJournals = journals == null ? List.of() : journals;
-    List<RecentJournal> selected =
-        new ArrayList<>(orderedJournals.stream().limit(RECENT_JOURNAL_LIMIT).toList());
+    List<RecentJournal> recentJournals =
+        orderedJournals.stream().limit(RECENT_JOURNAL_LIMIT).toList();
     Set<String> questionNgrams = ngrams(question);
     Set<Integer> questionMeaningfulCharacters = meaningfulCharacters(question);
     if ((questionNgrams.isEmpty() && questionMeaningfulCharacters.isEmpty())
         || orderedJournals.size() <= RECENT_JOURNAL_LIMIT) {
-      return List.copyOf(selected);
+      return new Selection(recentJournals, List.of());
     }
 
-    List<ScoredJournal> relevantJournals =
+    List<ScoredJournal> scoredJournals =
         orderedJournals.stream()
             .skip(RECENT_JOURNAL_LIMIT)
             .map(
@@ -46,19 +46,20 @@ final class PlantChatJournalContextSelector {
                         scored -> scored.journal().journalId(), Comparator.reverseOrder()))
             .toList();
 
+    List<RecentJournal> relatedPastJournals = new ArrayList<>();
     int consumed = 0;
-    for (ScoredJournal scored : relevantJournals) {
-      if (selected.size() >= RECENT_JOURNAL_LIMIT + RELEVANT_HISTORY_LIMIT) {
+    for (ScoredJournal scored : scoredJournals) {
+      if (relatedPastJournals.size() >= RELEVANT_HISTORY_LIMIT) {
         break;
       }
       int contentLength = contentLength(scored.journal());
       if (consumed + contentLength > RELEVANT_HISTORY_CHAR_BUDGET) {
         continue;
       }
-      selected.add(scored.journal());
+      relatedPastJournals.add(scored.journal());
       consumed += contentLength;
     }
-    return List.copyOf(selected);
+    return new Selection(recentJournals, relatedPastJournals);
   }
 
   private int overlapScore(
@@ -118,6 +119,14 @@ final class PlantChatJournalContextSelector {
 
   private int contentLength(RecentJournal journal) {
     return journal.content() == null ? 0 : journal.content().length();
+  }
+
+  /** 최신순 기록과, 질문 관련성으로 따로 찾아낸 과거 기록을 구분해 담는다. */
+  record Selection(List<RecentJournal> recentJournals, List<RecentJournal> relatedPastJournals) {
+    Selection {
+      recentJournals = List.copyOf(recentJournals);
+      relatedPastJournals = List.copyOf(relatedPastJournals);
+    }
   }
 
   private record ScoredJournal(RecentJournal journal, int score) {}
