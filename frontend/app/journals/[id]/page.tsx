@@ -168,12 +168,27 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
     setEditing(false);
   };
 
-  const pickEditPhoto = (file: File | null) => {
-    if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) return showToast('jpg, png, webp 형식만 가능해요.', 'err');
-    if (file.size > MAX_SIZE) return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
-    if (editPhotos.length >= MAX_PHOTOS) return showToast(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있어요.`, 'err');
-    setEditPhotos((prev) => [...prev, { kind: 'new', file, preview: URL.createObjectURL(file) }]);
+  const pickEditPhotos = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_PHOTOS - editPhotos.length;
+    if (files.length > remaining) {
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+      return showToast(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있어요. 남은 ${remaining}장 이하로 다시 선택해 주세요.`, 'err');
+    }
+    for (const file of files) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        if (editFileInputRef.current) editFileInputRef.current.value = '';
+        return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+      }
+      if (file.size > MAX_SIZE) {
+        if (editFileInputRef.current) editFileInputRef.current.value = '';
+        return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+      }
+    }
+    setEditPhotos((prev) => [
+      ...prev,
+      ...Array.from(files).map((file) => ({ kind: 'new' as const, file, preview: URL.createObjectURL(file) })),
+    ]);
     if (editFileInputRef.current) editFileInputRef.current.value = '';
   };
 
@@ -195,18 +210,28 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
     const accessToken = state.accessToken;
 
     setSaving(true);
-    const newlyUploaded: string[] = [];
     try {
-      const uploadedImages = [];
-      for (const photo of editPhotos) {
-        if (photo.kind === 'existing') {
-          uploadedImages.push({ imageUrl: photo.imageUrl, imageHash: photo.imageHash });
-        } else {
-          const uploaded = await uploadJournalImage(photo.file, accessToken);
-          newlyUploaded.push(uploaded.imageUrl);
-          uploadedImages.push(uploaded);
-        }
+      const results = await Promise.allSettled(
+        editPhotos.map((photo) =>
+          photo.kind === 'existing'
+            ? Promise.resolve({ imageUrl: photo.imageUrl, imageHash: photo.imageHash })
+            : uploadJournalImage(photo.file, accessToken),
+        ),
+      );
+      const firstRejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (firstRejected) {
+        // 일부만 실패하면 이번에 새로 S3에 올라간 성공분만 정리한다(기존 사진은 업로드하지 않았으므로 대상 아님).
+        results.forEach((r, i) => {
+          if (editPhotos[i].kind === 'new' && r.status === 'fulfilled') {
+            deleteJournalImage(r.value.imageUrl, accessToken).catch(() => {});
+          }
+        });
+        throw firstRejected.reason;
       }
+      const uploadedImages = results.map((r) => (r as PromiseFulfilledResult<{ imageUrl: string; imageHash: string }>).value);
+      const newlyUploaded = editPhotos
+        .map((photo, i) => (photo.kind === 'new' ? uploadedImages[i].imageUrl : null))
+        .filter((url): url is string => url !== null);
 
       let updated;
       try {
@@ -289,7 +314,8 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
             ref={editFileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => pickEditPhoto(e.target.files?.[0] ?? null)}
+            multiple
+            onChange={(e) => pickEditPhotos(e.target.files)}
             className="hidden"
           />
           <div className="mb-5 flex flex-wrap gap-2.5">

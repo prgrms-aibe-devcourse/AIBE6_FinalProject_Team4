@@ -91,18 +91,25 @@ function NewJournalInner() {
     fileInputRef.current?.click();
   };
 
-  const pickPhoto = (file: File | null) => {
-    if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+  const pickPhotos = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_PHOTOS - photos.length;
+    if (files.length > remaining) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return showToast(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있어요. 남은 ${remaining}장 이하로 다시 선택해 주세요.`, 'err');
     }
-    if (file.size > MAX_SIZE) {
-      return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+    for (const file of files) {
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return showToast('jpg, png, webp 형식만 가능해요.', 'err');
+      }
+      if (file.size > MAX_SIZE) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
+      }
     }
-    if (photos.length >= MAX_PHOTOS) {
-      return showToast(`사진은 최대 ${MAX_PHOTOS}장까지 첨부할 수 있어요.`, 'err');
-    }
-    setPhotos((prev) => [...prev, { file, preview: URL.createObjectURL(file) }]);
+    const added = Array.from(files).map((file) => ({ file, preview: URL.createObjectURL(file) }));
+    setPhotos((prev) => [...prev, ...added]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -124,11 +131,18 @@ function NewJournalInner() {
     const accessToken = state.accessToken;
 
     setSubmitting(true);
-    const uploaded: { imageUrl: string; imageHash: string }[] = [];
+    let uploaded: { imageUrl: string; imageHash: string }[] = [];
     try {
-      for (const photo of photos) {
-        uploaded.push(await uploadJournalImage(photo.file, accessToken));
+      const results = await Promise.allSettled(photos.map((photo) => uploadJournalImage(photo.file, accessToken)));
+      const firstRejected = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+      if (firstRejected) {
+        // 일부만 실패하면 이미 S3에 올라간 나머지 성공분을 정리해 orphan 이미지가 남지 않게 한다.
+        results.forEach((r) => {
+          if (r.status === 'fulfilled') deleteJournalImage(r.value.imageUrl, accessToken).catch(() => {});
+        });
+        throw firstRejected.reason;
       }
+      uploaded = results.map((r) => (r as PromiseFulfilledResult<{ imageUrl: string; imageHash: string }>).value);
       let result;
       try {
         result = await createJournal(
@@ -235,7 +249,8 @@ function NewJournalInner() {
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+            multiple
+            onChange={(e) => pickPhotos(e.target.files)}
             className="hidden"
           />
           <div className="mb-[26px]">
