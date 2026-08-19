@@ -19,6 +19,10 @@ import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
+import com.kiwobollae.api.ai.guide.knowledge.PlantCareEvidence;
+import com.kiwobollae.api.ai.guide.knowledge.PlantCareKnowledge;
+import com.kiwobollae.api.ai.guide.knowledge.PlantCareKnowledgeQuery;
+import com.kiwobollae.api.ai.guide.knowledge.PlantCareKnowledgeRetriever;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -29,6 +33,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +76,7 @@ class PlantCareGuideServiceTest {
       """;
 
   @Mock private PlantSpeciesService plantSpeciesService;
+  @Mock private PlantCareKnowledgeRetriever knowledgeRetriever;
   @Mock private PlantCareGuideCacheRepository cacheRepository;
   @Mock private PlantCareGuideCacheWriter cacheWriter;
   @Mock private AiClient aiClient;
@@ -81,6 +87,7 @@ class PlantCareGuideServiceTest {
 
   @BeforeEach
   void acquireGenerationLeaseByDefault() {
+    lenient().when(knowledgeRetriever.retrieve(any())).thenReturn(knowledge());
     lenient()
         .when(generationLockStore.tryAcquire(any(PlantCareGuideGenerationKey.class)))
         .thenAnswer(
@@ -93,6 +100,7 @@ class PlantCareGuideServiceTest {
   private PlantCareGuideService service() {
     return new PlantCareGuideService(
         plantSpeciesService,
+        knowledgeRetriever,
         cacheRepository,
         cacheWriter,
         aiClient,
@@ -167,8 +175,36 @@ class PlantCareGuideServiceTest {
     AiRequest request = requestCaptor.getValue();
     assertThat(request.modelRole()).isEqualTo(AiModelRole.TEXT);
     assertThat(request.images()).isEmpty();
-    assertThat(request.userPrompt()).contains("청상추").contains("서늘하고 밝은 곳");
+    assertThat(request.userPrompt())
+        .contains("청상추")
+        .contains("서비스 등록 공식 재배 가이드")
+        .contains("서늘하고 밝은 곳");
     assertThat(request.responseSchema().name()).isEqualTo("plant_care_guide");
+
+    ArgumentCaptor<PlantCareKnowledgeQuery> queryCaptor =
+        ArgumentCaptor.forClass(PlantCareKnowledgeQuery.class);
+    verify(knowledgeRetriever).retrieve(queryCaptor.capture());
+    assertThat(queryCaptor.getValue().speciesId()).isEqualTo(21L);
+    assertThat(queryCaptor.getValue().speciesName()).isEqualTo("청상추");
+    assertThat(queryCaptor.getValue().officialGuide()).contains("서늘하고 밝은 곳");
+  }
+
+  @Test
+  void rejectsGuideGenerationWithoutVerifiedKnowledgeBeforeCallingAi() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+    given(knowledgeRetriever.retrieve(any())).willReturn(new PlantCareKnowledge(List.of()));
+
+    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.AI_CARE_GUIDE_SOURCE_NOT_FOUND));
+
+    verifyNoInteractions(aiClient);
+    verifyNoInteractions(requestGuard);
+    verifyNoInteractions(cacheRepository);
+    verifyNoInteractions(generationLockStore);
   }
 
   // 캐시 키는 정규화된 이름이다. 앞뒤·연속 공백만 정리하고 내부 공백은 남긴다.
@@ -330,6 +366,16 @@ class PlantCareGuideServiceTest {
         .guideJson(GUIDE_JSON)
         .createdAt(LocalDateTime.of(2026, 8, 5, 10, 0))
         .build();
+  }
+
+  private PlantCareKnowledge knowledge() {
+    return new PlantCareKnowledge(
+        List.of(
+            new PlantCareEvidence(
+                "plant-species:21:official-care-guide",
+                "서비스 등록 공식 재배 가이드",
+                "2026-08-01T09:00:00",
+                "서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요.")));
   }
 
   private AiResponse aiResponse() {

@@ -120,6 +120,8 @@ public enum ErrorCode {
 	AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스를 일시적으로 사용할 수 없습니다."),
 	AI_REQUEST_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."),
 	AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI 서비스로부터 올바르지 않은 응답을 받았습니다."),
+	AI_CARE_GUIDE_SOURCE_NOT_FOUND(HttpStatus.UNPROCESSABLE_CONTENT,
+			"이 식물의 검증된 재배 자료가 없어 AI 재배 가이드를 만들 수 없습니다."),
 	AI_CHAT_CONVERSATION_INVALID(HttpStatus.CONFLICT, "AI 대화가 만료되었어요. 새 대화를 시작해 주세요."),
 	AI_CHAT_SELECTED_PLANT_MISMATCH(HttpStatus.UNPROCESSABLE_CONTENT,
 			"현재 선택한 식물과 질문 대상이 달라요. 상담할 식물을 변경한 뒤 다시 질문해 주세요."),
