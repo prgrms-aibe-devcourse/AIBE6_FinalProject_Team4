@@ -1,3 +1,5 @@
+import org.codehaus.groovy.tools.shell.util.Logger.io
+
 plugins {
 	java
 	id("org.springframework.boot") version "4.1.0"
