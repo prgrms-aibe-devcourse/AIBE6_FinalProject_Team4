@@ -3,6 +3,7 @@ package com.kiwobollae.api.ai.guide.knowledge;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -40,6 +41,19 @@ class VerifiedPlantCareKnowledgeRetrieverTest {
         .singleElement()
         .extracting(PlantCareEvidence::sourceId)
         .isEqualTo("nise-cherry-tomato-cultivation");
+  }
+
+  @Test
+  void retrievesVerifiedKnowledgeForEveryDisplayedServiceSpecies() {
+    List<String> displayedSpecies = List.of("방울토마토", "바질", "상추", "딸기", "고추", "수박", "당근", "청경채");
+
+    for (String speciesName : displayedSpecies) {
+      PlantCareKnowledge knowledge =
+          retriever.retrieve(
+              new PlantCareKnowledgeQuery(21L, speciesName, "VEGETABLE", "  ", null));
+
+      assertThat(knowledge.evidence()).as("verified knowledge for %s", speciesName).isNotEmpty();
+    }
   }
 
   @Test
