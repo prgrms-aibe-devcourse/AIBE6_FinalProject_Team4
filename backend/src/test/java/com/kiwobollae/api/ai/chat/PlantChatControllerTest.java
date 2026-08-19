@@ -175,6 +175,25 @@ class PlantChatControllerTest {
         .andExpect(jsonPath("$.message").value("식물 재배·관리와 성장 일지에 관한 질문만 도와드릴 수 있어요."));
   }
 
+  @Test
+  void returnsDedicatedUnprocessableContentForDifferentPlantQuestion() throws Exception {
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willThrow(
+            new BusinessException(
+                ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH,
+                java.util.Map.of("selectedSpeciesName", "바질")));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content("{\"question\":\"원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?\"}"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("AI_CHAT_SELECTED_PLANT_MISMATCH"))
+        .andExpect(jsonPath("$.message").value("현재 선택한 식물과 질문 대상이 달라요. 상담할 식물을 변경한 뒤 다시 질문해 주세요."))
+        .andExpect(jsonPath("$.details.selectedSpeciesName").value("바질"));
+  }
+
   private void authenticateAs(Long userId) {
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken(userId, null, List.of()));

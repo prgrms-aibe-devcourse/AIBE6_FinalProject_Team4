@@ -112,8 +112,44 @@ class PlantChatSmokeTest {
     assertThat(actualCalls.get()).isEqualTo(questions.size());
   }
 
+  @Test
+  void distinguishesSelectedCompoundSpeciesFromADifferentPlant() {
+    OpenAiProperties properties = loadOpenAiProperties();
+    requireConfigured(properties.apiKey(), "ai.openai.api-key");
+    requireConfigured(properties.textModel(), "ai.openai.text-model");
+
+    AtomicInteger actualCalls = new AtomicInteger();
+    String question = "원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?";
+    PlantChatService selectedPlantService =
+        serviceBackedByRealOpenAi(properties, actualCalls, compoundSpeciesGrowthContext());
+
+    PlantChatResponse response =
+        selectedPlantService.chat(7L, 21L, new PlantChatRequest(question, null));
+
+    assertThat(response.answer()).isNotBlank();
+
+    PlantChatService differentPlantService =
+        serviceBackedByRealOpenAi(properties, actualCalls, growthContext());
+    assertThatThrownBy(
+            () -> differentPlantService.chat(7L, 21L, new PlantChatRequest(question, null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode())
+                    .isEqualTo(ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH));
+
+    assertThat(actualCalls.get()).isEqualTo(2);
+  }
+
   private PlantChatService serviceBackedByRealOpenAi(
       OpenAiProperties properties, AtomicInteger actualCalls) {
+    return serviceBackedByRealOpenAi(properties, actualCalls, growthContext());
+  }
+
+  private PlantChatService serviceBackedByRealOpenAi(
+      OpenAiProperties properties,
+      AtomicInteger actualCalls,
+      PlantGrowthContextResponse growthContext) {
     OpenAiClient realClient = RealOpenAiClients.create(properties);
     AiClient countingClient =
         request -> {
@@ -122,7 +158,7 @@ class PlantChatSmokeTest {
         };
 
     PlantGrowthContextQuery growthContextQuery = mock(PlantGrowthContextQuery.class);
-    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext);
 
     return new PlantChatService(
         growthContextQuery,
@@ -146,6 +182,19 @@ class PlantChatSmokeTest {
         List.of(
             new RecentJournal(31L, LocalDate.of(2026, 8, 8), "새 잎 끝이 조금 말랐습니다."),
             new RecentJournal(30L, LocalDate.of(2026, 8, 5), "물을 충분히 주고 받침의 물을 비웠습니다.")));
+  }
+
+  private PlantGrowthContextResponse compoundSpeciesGrowthContext() {
+    return new PlantGrowthContextResponse(
+        21L,
+        "꼬리 선인장",
+        LocalDate.of(2026, 7, 1),
+        PlantStatus.GROWING,
+        4L,
+        "원숭이꼬리선인장",
+        "선인장",
+        "배수가 잘되는 흙에 심고 흙이 충분히 마른 뒤 물을 줍니다.",
+        List.of(new RecentJournal(31L, LocalDate.of(2026, 8, 8), "줄기가 조금 자랐습니다.")));
   }
 
   private OpenAiProperties loadOpenAiProperties() {

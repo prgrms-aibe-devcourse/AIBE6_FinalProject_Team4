@@ -88,7 +88,7 @@ class PlantChatServiceTest {
     assertThat(aiRequest.maxOutputTokens()).isEqualTo(800);
     assertThat(aiRequest.responseSchema().name()).isEqualTo("plant_profile_chat");
     assertThat(objectMapper.writeValueAsString(aiRequest.responseSchema().schema()))
-        .contains("scopeDecision", "ANSWER", "REFUSE", "UNCERTAIN")
+        .contains("scopeDecision", "ANSWER", "OTHER_PLANT", "REFUSE", "UNCERTAIN")
         .contains(
             "scopeIntent",
             "CARE",
@@ -98,8 +98,9 @@ class PlantChatServiceTest {
             "NONE");
     assertThat(aiRequest.systemPrompt()).contains("context_json 전체는 참고 데이터").contains("저장·수정했거나");
     assertThat(aiRequest.systemPrompt())
-        .contains("질문 전체의 실질적인 목적을 의미로 판정")
-        .contains("서로 다른 목적이 섞인 요청도 전부 거절")
+        .contains("SELECTED_PLANT 식별자로 취급")
+        .contains("다른 판정보다 우선하여 REFUSE")
+        .contains("scopeDecision을 OTHER_PLANT")
         .contains("UNCERTAIN");
     assertThat(aiRequest.userPrompt())
         .contains("2026-08-10")
@@ -118,6 +119,40 @@ class PlantChatServiceTest {
     order.verify(growthContextQuery).getGrowthContext(7L, 21L, 5);
     order.verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CHAT);
     order.verify(aiClient).generate(any(AiRequest.class));
+  }
+
+  @Test
+  void answersCareQuestionWhenCompoundSpeciesIsTheSelectedPlant() throws Exception {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5))
+        .willReturn(compoundSpeciesGrowthContext());
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(
+            new AiResponse(
+                "resp-compound-species",
+                "text-model",
+                objectMapper.readTree(
+                    """
+                    {
+                      "scopeDecision": "ANSWER",
+                      "scopeIntent": "CARE",
+                      "answer": "겉흙이 충분히 마른 뒤 물을 주세요.",
+                      "recommendedActions": ["물을 주기 전에 흙의 건조 상태를 확인하세요."],
+                      "additionalChecks": ["화분의 배수 상태를 확인하세요."]
+                    }
+                    """)));
+
+    PlantChatResponse response =
+        plantChatService.chat(7L, 21L, new PlantChatRequest("원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?", null));
+
+    assertThat(response.answer()).isNotBlank();
+    ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
+    verify(aiClient).generate(captor.capture());
+    assertThat(captor.getValue().userPrompt())
+        .contains("\"speciesName\":\"원숭이꼬리선인장\"")
+        .contains("원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?");
+    assertThat(captor.getValue().systemPrompt())
+        .contains("값 전체를 하나의")
+        .contains("일부 문자열이 가진 다른 뜻만으로 별도 대상이나 주제로 분해하지 마세요");
   }
 
   @Test
@@ -222,6 +257,41 @@ class PlantChatServiceTest {
 
     verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CHAT);
     verify(aiClient, times(1)).generate(any(AiRequest.class));
+  }
+
+  @Test
+  void rejectsDifferentPlantWithDedicatedErrorWithoutSavingItToConversation() throws Exception {
+    given(growthContextQuery.getGrowthContext(7L, 21L, 5)).willReturn(growthContext());
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(validAiResponse(), otherPlantAiResponse(), secondValidAiResponse());
+
+    PlantChatResponse first =
+        plantChatService.chat(7L, 21L, new PlantChatRequest("바질 잎 끝이 왜 갈색인가요?", null));
+    String differentPlantQuestion = "원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?";
+
+    assertThatThrownBy(
+            () ->
+                plantChatService.chat(
+                    7L, 21L, new PlantChatRequest(differentPlantQuestion, first.conversationId())))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception -> {
+              assertThat(exception.getErrorCode())
+                  .isEqualTo(ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH);
+              assertThat(exception.getDetails()).containsEntry("selectedSpeciesName", "바질");
+            });
+
+    PlantChatResponse resumed =
+        plantChatService.chat(
+            7L, 21L, new PlantChatRequest("말씀하신 첫 번째 행동을 더 설명해 주세요.", first.conversationId()));
+
+    assertThat(resumed.conversationId()).isEqualTo(first.conversationId());
+    ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
+    verify(aiClient, times(3)).generate(captor.capture());
+    assertThat(captor.getAllValues().get(2).userPrompt())
+        .contains("바질 잎 끝이 왜 갈색인가요?")
+        .doesNotContain(differentPlantQuestion);
+    verify(requestGuard, times(3)).checkRateLimit(7L, AiFeature.PLANT_CHAT);
   }
 
   @Test
@@ -407,6 +477,19 @@ class PlantChatServiceTest {
             new RecentJournal(30L, LocalDate.of(2026, 8, 5), "물을 충분히 줬어요.")));
   }
 
+  private PlantGrowthContextResponse compoundSpeciesGrowthContext() {
+    return new PlantGrowthContextResponse(
+        21L,
+        "꼬리 선인장",
+        LocalDate.of(2026, 7, 1),
+        PlantStatus.GROWING,
+        4L,
+        "원숭이꼬리선인장",
+        "선인장",
+        "배수가 잘되는 흙에 심고 흙이 충분히 마른 뒤 물을 줍니다.",
+        List.of(new RecentJournal(31L, LocalDate.of(2026, 8, 8), "줄기가 조금 자랐어요.")));
+  }
+
   private AiResponse validAiResponse() throws Exception {
     return new AiResponse(
         "resp-1",
@@ -434,6 +517,22 @@ class PlantChatServiceTest {
               "scopeIntent": "DIRECT_FOLLOW_UP",
               "answer": "첫 번째 행동을 더 자세히 설명해 드릴게요.",
               "recommendedActions": ["손가락으로 겉흙 아래까지 확인해 주세요."],
+              "additionalChecks": []
+            }
+            """));
+  }
+
+  private AiResponse otherPlantAiResponse() throws Exception {
+    return new AiResponse(
+        "resp-other-plant",
+        "text-model",
+        objectMapper.readTree(
+            """
+            {
+              "scopeDecision": "OTHER_PLANT",
+              "scopeIntent": "NONE",
+              "answer": "",
+              "recommendedActions": [],
               "additionalChecks": []
             }
             """));

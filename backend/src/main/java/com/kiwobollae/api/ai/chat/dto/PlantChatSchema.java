@@ -12,7 +12,7 @@ public final class PlantChatSchema {
 
   public static AiJsonSchema create() {
     Map<String, Object> properties = new LinkedHashMap<>();
-    properties.put("scopeDecision", stringEnum("ANSWER", "REFUSE", "UNCERTAIN"));
+    properties.put("scopeDecision", stringEnum("ANSWER", "OTHER_PLANT", "REFUSE", "UNCERTAIN"));
     properties.put(
         "scopeIntent",
         stringEnum(
@@ -23,7 +23,7 @@ public final class PlantChatSchema {
 
     return new AiJsonSchema(
         "plant_profile_chat",
-        "질문의 의미 기반 허용 범위 판정과 식물 프로필 기반 답변, 권장 행동, 추가 확인사항",
+        "질문의 의미 기반 허용 범위와 선택 식물 일치 여부 판정, 식물 프로필 기반 답변, 권장 행동, 추가 확인사항",
         object(properties));
   }
 
