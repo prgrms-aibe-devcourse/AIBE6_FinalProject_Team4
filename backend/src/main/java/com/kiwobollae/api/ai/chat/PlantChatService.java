@@ -235,16 +235,10 @@ public class PlantChatService {
     if (response == null || response.scopeDecision() == null || response.scopeIntent() == null) {
       throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
     }
-    switch (response.scopeDecision()) {
-      case OTHER_PLANT ->
-          throw new BusinessException(
-              ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH,
-              Map.of("selectedSpeciesName", selectedSpeciesName));
-      case REFUSE -> throw new BusinessException(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED);
-      case UNCERTAIN -> throw new BusinessException(ErrorCode.AI_CHAT_CONTEXT_REQUIRED);
-      case ANSWER -> {
-        // 아래에서 ANSWER 응답의 intent와 사용자 노출 필드를 검증한다.
-      }
+    // ANSWER만 아래 노출 필드 검증으로 넘어간다. 판정 값이 추가되면 이 조건에서 먼저 막히고,
+    // rejection의 switch 식이 컴파일 단계에서 처리 누락을 드러낸다.
+    if (response.scopeDecision() != PlantChatScopeDecision.ANSWER) {
+      throw rejection(response.scopeDecision(), selectedSpeciesName);
     }
     if (response.scopeIntent() == PlantChatScopeIntent.NONE) {
       throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
@@ -262,6 +256,20 @@ public class PlantChatService {
         response.answer().strip(),
         normalizeItems(response.recommendedActions()),
         normalizeItems(response.additionalChecks()));
+  }
+
+  private BusinessException rejection(
+      PlantChatScopeDecision scopeDecision, String selectedSpeciesName) {
+    return switch (scopeDecision) {
+      case OTHER_PLANT ->
+          new BusinessException(
+              ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH,
+              Map.of("selectedSpeciesName", selectedSpeciesName));
+      case REFUSE -> new BusinessException(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED);
+      case UNCERTAIN -> new BusinessException(ErrorCode.AI_CHAT_CONTEXT_REQUIRED);
+      // 호출 전에 ANSWER를 걸러내므로 도달하지 않는다. 도달하면 계약 위반으로 본다.
+      case ANSWER -> new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
+    };
   }
 
   private String assistantContext(PlantChatGeneratedResponse response) {
