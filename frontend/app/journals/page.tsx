@@ -7,6 +7,16 @@ import { useStore } from '@/lib/store';
 import PlantJournalAssistant from '@/features/journal/PlantJournalAssistant';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useSpotlightTour } from '@/lib/onboarding/useSpotlightTour';
+import SpotlightTour, { TourStep } from '@/components/onboarding/SpotlightTour';
+
+const JOURNALS_TOUR_STEPS: TourStep[] = [
+  {
+    targetId: 'journals-new-btn',
+    title: '오늘의 일지 쓰기',
+    description: '여기를 눌러 오늘 식물의 모습을 기록하고 포인트를 받아보세요.',
+  },
+];
 
 function representativeImage(journal: PlantJournalData): string | null {
   const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
@@ -17,6 +27,7 @@ const currentMonth = () => new Date().toISOString().slice(0, 7);
 
 export default function JournalsPage() {
   const { state, hydrated } = useStore();
+  const tour = useSpotlightTour('journals', JOURNALS_TOUR_STEPS.length);
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   const [journals, setJournals] = useState<PlantJournalData[]>([]);
   const [dailyRewardGranted, setDailyRewardGranted] = useState(false);
@@ -86,10 +97,29 @@ export default function JournalsPage() {
   return (
     <div className="container">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[27px] font-extrabold">성장 일지</h1>
-        <Link href="/journals/new" className="rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white hover:text-white">+ 오늘의 일지 쓰기</Link>
+        <div className="flex items-center gap-1.5">
+          <h1 className="text-[27px] font-extrabold">성장 일지</h1>
+          <button
+            type="button"
+            title="온보딩 투어 다시 보기"
+            aria-label="온보딩 투어 다시 보기"
+            onClick={tour.start}
+            className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white hover:bg-brand-dark"
+          >
+            ?
+          </button>
+        </div>
+        <Link href="/journals/new" data-tour-id="journals-new-btn" className="rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white hover:text-white">+ 오늘의 일지 쓰기</Link>
       </div>
       <p className="mb-5 text-sub">매일 한 장씩 모여서 하나의 이야기가 돼요.</p>
+      {tour.open && (
+        <SpotlightTour
+          steps={JOURNALS_TOUR_STEPS}
+          stepIndex={tour.stepIndex}
+          onNext={tour.next}
+          onSkip={tour.skip}
+        />
+      )}
 
       {todayRewardSummary && (
         <div className="mb-5 rounded-[14px] bg-brand-soft px-4 py-3 text-[13.5px] font-bold text-brand-dark">
