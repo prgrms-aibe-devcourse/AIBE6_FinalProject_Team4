@@ -109,7 +109,7 @@ export default function SpotlightTour({
             onClick={onNext}
             className="flex-1 cursor-pointer rounded-xl bg-brand p-[11px] font-extrabold text-white hover:bg-brand-dark hover:text-white"
           >
-            {isLast ? "시작하기" : "다음"}
+            {isLast ? "확인" : "다음"}
           </button>
           <button
             type="button"

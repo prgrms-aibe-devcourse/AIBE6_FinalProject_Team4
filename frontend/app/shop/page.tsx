@@ -10,6 +10,16 @@ import {
   type ShopSearchParams,
   useShopList,
 } from '@/features/shop/use-shop-list';
+import { useSpotlightTour } from '@/lib/onboarding/useSpotlightTour';
+import SpotlightTour, { TourStep } from '@/components/onboarding/SpotlightTour';
+
+const SHOP_TOUR_STEPS: TourStep[] = [
+  {
+    targetId: 'shop-first-product',
+    title: '상품 둘러보기',
+    description: '포인트로 다양한 상품과 가챠 카드팩을 구매할 수 있어요.',
+  },
+];
 
 export default function Shop({ searchParams }: { searchParams?: ShopSearchParams }) {
   const {
@@ -25,10 +35,33 @@ export default function Shop({ searchParams }: { searchParams?: ShopSearchParams
     changeSort,
     changePage,
   } = useShopList(searchParams);
+  // 상품 목록이 비동기로 로드되므로, 로딩이 끝나고 실제로 스포트라이트할 카드가 있을 때만
+  // 자동 노출을 판단한다 — 그렇지 않으면 로딩 중에 열려 대상 없이 뜨거나, 다 로드된 뒤에도
+  // (스텝 변경/리사이즈 전까지는) 갱신되지 않아 위치가 안 잡힌다.
+  const tour = useSpotlightTour('shop', SHOP_TOUR_STEPS.length, !loading && products.length > 0);
 
   return (
     <div className="container animate-upIn">
-      <h1 className="mb-4 text-2xl font-extrabold">상점</h1>
+      <div className="mb-4 flex items-center gap-1.5">
+        <h1 className="text-2xl font-extrabold">상점</h1>
+        <button
+          type="button"
+          title="온보딩 투어 다시 보기"
+          aria-label="온보딩 투어 다시 보기"
+          onClick={tour.start}
+          className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white hover:bg-brand-dark"
+        >
+          ?
+        </button>
+      </div>
+      {tour.open && (
+        <SpotlightTour
+          steps={SHOP_TOUR_STEPS}
+          stepIndex={tour.stepIndex}
+          onNext={tour.next}
+          onSkip={tour.skip}
+        />
+      )}
 
       <FilterBar
         tabs={SHOP_TABS}
@@ -60,10 +93,11 @@ export default function Shop({ searchParams }: { searchParams?: ShopSearchParams
       ) : (
         <>
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(210px,1fr))]">
-            {products.map((product) => (
+            {products.map((product, i) => (
               <Link
                 key={product.id}
                 href={`/shop/${product.id}?returnTo=${encodeURIComponent(returnTo)}`}
+                data-tour-id={i === 0 ? 'shop-first-product' : undefined}
                 className="block overflow-hidden rounded-[20px] bg-white text-ink shadow-card hover:text-ink"
               >
                 <div

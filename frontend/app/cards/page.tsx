@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import FilterBar from '@/components/FilterBar';
+import SpotlightTour, { TourStep } from '@/components/onboarding/SpotlightTour';
 import PointPrice from '@/components/PointPrice';
-import { couponName } from '@/lib/coupon-label';
 import {
   COUPON_SORTS,
   COUPON_TABS,
@@ -11,6 +10,17 @@ import {
   type CouponSearchParams,
   useCouponList,
 } from '@/features/coupon/use-coupon-list';
+import { couponName } from '@/lib/coupon-label';
+import { useSpotlightTour } from '@/lib/onboarding/useSpotlightTour';
+import Link from 'next/link';
+
+const CARDS_TOUR_STEPS: TourStep[] = [
+  {
+    targetId: 'cards-first-card',
+    title: '쿠폰 카드 살펴보기',
+    description: "포인트로 쿠폰을 모아 실제 농작물로 교환해요.  상품을 눌러 상세내용을 확인해보세요.",
+  },
+];
 
 export default function Cards({ searchParams }: { searchParams?: CouponSearchParams }) {
   const {
@@ -27,10 +37,30 @@ export default function Cards({ searchParams }: { searchParams?: CouponSearchPar
     changeSort,
     changePage,
   } = useCouponList(searchParams);
+  const tour = useSpotlightTour('cards', CARDS_TOUR_STEPS.length, !loading && visibleCards.length > 0);
 
   return (
     <div className="container animate-upIn">
-      <h1 className="mb-4 text-2xl font-extrabold">쿠폰</h1>
+      <div className="mb-4 flex items-center gap-1.5">
+        <h1 className="text-2xl font-extrabold">쿠폰</h1>
+        <button
+          type="button"
+          title="온보딩 투어 다시 보기"
+          aria-label="온보딩 투어 다시 보기"
+          onClick={tour.start}
+          className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white hover:bg-brand-dark"
+        >
+          ?
+        </button>
+      </div>
+      {tour.open && (
+        <SpotlightTour
+          steps={CARDS_TOUR_STEPS}
+          stepIndex={tour.stepIndex}
+          onNext={tour.next}
+          onSkip={tour.skip}
+        />
+      )}
 
       <FilterBar
         tabs={personalized ? COUPON_TABS : COUPON_TABS.slice(0, 1)}
@@ -55,7 +85,7 @@ export default function Cards({ searchParams }: { searchParams?: CouponSearchPar
         </div>
       ) : (
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-          {visibleCards.map((card) => {
+          {visibleCards.map((card, i) => {
             const ready =
               card.ownedCount !== null &&
               card.ownedCount >= card.requiredCountForExchange;
@@ -64,6 +94,7 @@ export default function Cards({ searchParams }: { searchParams?: CouponSearchPar
             return (
               <article
                 key={card.id}
+                data-tour-id={i === 0 ? 'cards-first-card' : undefined}
                 className={`relative block overflow-hidden rounded-[20px] border-[2.5px] bg-white text-ink shadow-card ${
                   ready ? 'animate-glowPulse border-gold' : 'border-transparent'
                 }`}
