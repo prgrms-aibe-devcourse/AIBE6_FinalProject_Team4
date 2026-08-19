@@ -1,22 +1,24 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
 import { useStore } from "@/lib/store";
 
-export function useGachaOpenNavigation() {
+export function useGachaOpenNavigation(returnTo?: "journals") {
   const router = useRouter();
   const { refreshNotifications } = useStore();
 
-  const moveToJournals = async (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
+  const moveBack = async () => {
     await refreshNotifications();
-    router.push("/journals");
+    if (returnTo === "journals") {
+      router.replace("/journals");
+      return;
+    }
+    router.back();
   };
 
   const moveToCollection = () => {
     router.replace("/gacha?tab=mine");
   };
 
-  return { moveToJournals, moveToCollection };
+  return { moveBack, moveToCollection };
 }

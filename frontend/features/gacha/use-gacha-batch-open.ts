@@ -154,7 +154,11 @@ export function useGachaBatchOpen({
   }, [details, drawIds, error, load]);
 
   usePreventBackNavigation(
-    hydrated && Boolean(accessToken) && Boolean(drawIds?.length) && !error,
+    hydrated &&
+      Boolean(accessToken) &&
+      Boolean(drawIds?.length) &&
+      !error &&
+      stage !== "summary",
   );
 
   const groupedResults = useMemo(
