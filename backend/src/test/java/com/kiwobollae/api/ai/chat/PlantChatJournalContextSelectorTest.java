@@ -66,6 +66,30 @@ class PlantChatJournalContextSelectorTest {
   }
 
   @Test
+  void ranksShortRelevantHistoryAboveLongUnrelatedHistory() {
+    // bigram이 어긋나 글자 단위 폴백을 쓰는 상황. 겹친 글자 수만 세면 장문(겹침 6글자)이 단문(겹침 2글자)을 이긴다.
+    String longUnrelatedContent =
+        "화분 위치를 바꾸고 통풍을 늘렸습니다. 지지대를 세워 줄기를 노끈으로 묶고 흙 표면 상태를 적었습니다. "
+            + "잎 개수와 줄기 굵기도 함께 확인하고 물받이 접시는 깨끗하게 닦았습니다. 물주기 알림을 켜 두었고 "
+            + "창문 근처 온도가 조금 내려가서 밤에는 커튼을 쳐 두기로 했습니다.";
+    List<RecentJournal> journals =
+        List.of(
+            journal(10L, "최근 기록"),
+            journal(9L, "최근 기록"),
+            journal(8L, "최근 기록"),
+            journal(7L, "최근 기록"),
+            journal(6L, "최근 기록"),
+            journal(5L, "노란 잎 발견"),
+            journal(4L, longUnrelatedContent));
+
+    Selection selection = selector.select(journals, "잎끝이 노래졌던 때를 알려주세요");
+
+    assertThat(selection.relatedPastJournals())
+        .extracting(RecentJournal::journalId)
+        .containsExactly(5L, 4L);
+  }
+
+  @Test
   void keepsRelevantHistoryWithinCharacterBudget() {
     String longContent = "가".repeat(PlantChatJournalContextSelector.RELEVANT_HISTORY_CHAR_BUDGET);
     List<RecentJournal> journals =
