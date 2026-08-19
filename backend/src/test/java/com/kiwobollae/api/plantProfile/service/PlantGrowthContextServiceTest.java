@@ -100,6 +100,27 @@ class PlantGrowthContextServiceTest {
 	}
 
 	@Test
+	void verifiesOwnershipWithoutReadingJournalHistory() {
+		given(plantProfileRepository.existsByIdAndUserId(21L, 7L)).willReturn(true);
+
+		growthContextService.verifyOwnership(7L, 21L);
+
+		verify(plantProfileRepository).existsByIdAndUserId(21L, 7L);
+		verifyNoInteractions(plantJournalRepository);
+	}
+
+	@Test
+	void rejectsUnownedProfileBeforeReadingJournalHistory() {
+		given(plantProfileRepository.existsByIdAndUserId(99L, 7L)).willReturn(false);
+
+		assertThatThrownBy(() -> growthContextService.verifyOwnership(7L, 99L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
+
+		verifyNoInteractions(plantJournalRepository);
+	}
+
+	@Test
 	void rejectsOutOfRangeJournalHistoryFetchLimitBeforeQuerying() {
 		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 21L, 501))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->

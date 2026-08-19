@@ -88,16 +88,18 @@ public class PlantChatService {
 
   public PlantChatResponse chat(Long userId, Long profileId, PlantChatRequest request) {
     String question = validateRequest(request);
-    PlantGrowthContextResponse growthContext =
-        growthContextQuery.getGrowthContext(userId, profileId, JOURNAL_HISTORY_FETCH_LIMIT);
-    PlantGrowthContextResponse selectedJournalContext =
-        withSelectedJournalContext(growthContext, question);
+    growthContextQuery.verifyOwnership(userId, profileId);
 
     try (ConversationHandle conversation =
         conversationStore.open(request.conversationId(), userId, profileId)) {
-      // 입력·소유권·대화 세션을 확인한 뒤 외부 호출 예산을 예약한다. 질문 범위는 같은 한 번의
-      // 구조화 AI 호출 안에서 의미로 판정하며, 서버는 ANSWER 판정만 노출·저장한다.
+      // 입력·소유권·대화 세션을 확인한 뒤 외부 호출 예산을 예약한다. 이를 통과한 요청만 최대
+      // 500건의 일지 이력을 읽는다. 질문 범위는 같은 한 번의 구조화 AI 호출 안에서 의미로 판정하며,
+      // 서버는 ANSWER 판정만 노출·저장한다.
       requestGuard.checkRateLimit(userId, AiFeature.PLANT_CHAT);
+      PlantGrowthContextResponse growthContext =
+          growthContextQuery.getGrowthContext(userId, profileId, JOURNAL_HISTORY_FETCH_LIMIT);
+      PlantGrowthContextResponse selectedJournalContext =
+          withSelectedJournalContext(growthContext, question);
       AiResponse response =
           aiClient.generate(
               buildAiRequest(

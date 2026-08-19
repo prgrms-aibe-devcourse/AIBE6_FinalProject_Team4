@@ -24,6 +24,14 @@ public class PlantGrowthContextService implements PlantGrowthContextQuery {
 	private final PlantJournalRepository plantJournalRepository;
 
 	@Override
+	public void verifyOwnership(Long userId, Long profileId) {
+		validateIds(userId, profileId);
+		if (!plantProfileRepository.existsByIdAndUserId(profileId, userId)) {
+			throw new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND);
+		}
+	}
+
+	@Override
 	public PlantGrowthContextResponse getGrowthContext(Long userId, Long profileId, int journalHistoryFetchLimit) {
 		validateIds(userId, profileId);
 		if (journalHistoryFetchLimit < 1 || journalHistoryFetchLimit > MAX_JOURNAL_HISTORY_FETCH_LIMIT) {

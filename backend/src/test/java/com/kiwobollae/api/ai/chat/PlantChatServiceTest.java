@@ -121,10 +121,11 @@ class PlantChatServiceTest {
 
     InOrder order = inOrder(requestGuard, growthContextQuery, aiClient);
     order.verify(requestGuard).validateUserInput(request.question());
+    order.verify(growthContextQuery).verifyOwnership(7L, 21L);
+    order.verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CHAT);
     order
         .verify(growthContextQuery)
         .getGrowthContext(7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT);
-    order.verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CHAT);
     order.verify(aiClient).generate(any(AiRequest.class));
   }
 
@@ -317,10 +318,9 @@ class PlantChatServiceTest {
 
   @Test
   void doesNotConsumeRateLimitWhenProfileIsNotOwned() {
-    given(
-            growthContextQuery.getGrowthContext(
-                7L, 99L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
-        .willThrow(new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
+    doThrow(new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND))
+        .when(growthContextQuery)
+        .verifyOwnership(7L, 99L);
 
     assertThatThrownBy(
             () -> plantChatService.chat(7L, 99L, new PlantChatRequest("이 식물은 괜찮나요?", null)))
@@ -330,16 +330,13 @@ class PlantChatServiceTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 
     verify(requestGuard, never()).checkRateLimit(any(), any());
+    verify(growthContextQuery, never())
+        .getGrowthContext(7L, 99L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT);
     verifyNoInteractions(aiClient);
   }
 
   @Test
   void rejectsUnknownConversationBeforeConsumingRateLimit() {
-    given(
-            growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
-        .willReturn(growthContext());
-
     assertThatThrownBy(
             () ->
                 plantChatService.chat(
@@ -351,15 +348,13 @@ class PlantChatServiceTest {
                     .isEqualTo(ErrorCode.AI_CHAT_CONVERSATION_INVALID));
 
     verify(requestGuard, never()).checkRateLimit(any(), any());
+    verify(growthContextQuery, never())
+        .getGrowthContext(7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT);
     verifyNoInteractions(aiClient);
   }
 
   @Test
   void doesNotCallAiWhenRateLimitIsExceeded() {
-    given(
-            growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
-        .willReturn(growthContext());
     doThrow(new BusinessException(ErrorCode.COMMON_RATE_LIMITED))
         .when(requestGuard)
         .checkRateLimit(7L, AiFeature.PLANT_CHAT);
@@ -371,6 +366,8 @@ class PlantChatServiceTest {
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_RATE_LIMITED));
 
+    verify(growthContextQuery, never())
+        .getGrowthContext(7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT);
     verifyNoInteractions(aiClient);
   }
 
