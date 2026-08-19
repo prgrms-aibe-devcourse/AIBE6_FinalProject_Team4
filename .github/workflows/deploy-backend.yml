@@ -126,6 +126,10 @@ jobs:
             echo "blue(now): ${BLUE}, green(next): ${GREEN}"
 
             docker rm -f "${GREEN}" >/dev/null 2>&1 || true
+            # AI_*/OPENAI_MAX_OUTPUT_TOKENS의 기본값은 application.yaml과 같은 값으로 유지한다.
+            # 빈 문자열을 넘기면 yaml의 ${VAR:default}가 "설정됨"으로 보고 Duration/int 바인딩에
+            # 실패하므로, 값을 안 넘기는 대신 반드시 :- 로 기본값을 채워 넘긴다.
+            # 운영에서 조정할 때는 EC2의 /etc/environment에 해당 변수를 넣으면 여기서 그대로 실린다.
             docker run -d --name "${GREEN}" \
               --restart unless-stopped \
               --network "${NET}" \
@@ -161,6 +165,14 @@ jobs:
               -e OPENAI_TEXT_MODEL="${OPENAI_TEXT_MODEL:-}" \
               -e OPENAI_VISION_MODEL="${OPENAI_VISION_MODEL:-}" \
               -e AI_IMAGE_PUBLIC_BASE_URL="https://${APP_DOMAIN}" \
+              -e OPENAI_MAX_OUTPUT_TOKENS="${OPENAI_MAX_OUTPUT_TOKENS:-2000}" \
+              -e AI_MAX_INPUT_LENGTH="${AI_MAX_INPUT_LENGTH:-2000}" \
+              -e AI_RATE_LIMIT_MAX_REQUESTS="${AI_RATE_LIMIT_MAX_REQUESTS:-10}" \
+              -e AI_RATE_LIMIT_WINDOW="${AI_RATE_LIMIT_WINDOW:-1m}" \
+              -e AI_USER_DAILY_LIMIT_MAX_REQUESTS="${AI_USER_DAILY_LIMIT_MAX_REQUESTS:-20}" \
+              -e AI_USER_DAILY_LIMIT_WINDOW="${AI_USER_DAILY_LIMIT_WINDOW:-1d}" \
+              -e AI_GLOBAL_RATE_LIMIT_MAX_REQUESTS="${AI_GLOBAL_RATE_LIMIT_MAX_REQUESTS:-100}" \
+              -e AI_GLOBAL_RATE_LIMIT_WINDOW="${AI_GLOBAL_RATE_LIMIT_WINDOW:-1d}" \
               "${IMAGE}"
 
             echo "health-check: ${GREEN}"

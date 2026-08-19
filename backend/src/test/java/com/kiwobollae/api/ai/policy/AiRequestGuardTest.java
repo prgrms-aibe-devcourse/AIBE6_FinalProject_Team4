@@ -44,6 +44,8 @@ class AiRequestGuardTest {
             any(Duration.class),
             anyInt(),
             any(Duration.class),
+            anyInt(),
+            any(Duration.class),
             anyInt());
 
     assertThatThrownBy(() -> guard(2, 5).checkRateLimit(1L, AiFeature.PLANT_CHAT))
@@ -73,6 +75,8 @@ class AiRequestGuardTest {
             FIXED_KST_TIME,
             Duration.ofMinutes(1),
             7,
+            Duration.ofDays(1),
+            20,
             Duration.ofDays(1),
             100);
   }
@@ -110,6 +114,7 @@ class AiRequestGuardTest {
         new AiPolicyProperties(
             maxInputLength,
             new AiPolicyProperties.RateLimit(maxRequests, Duration.ofMinutes(1)),
+            new AiPolicyProperties.RateLimit(20, Duration.ofDays(1)),
             new AiPolicyProperties.RateLimit(100, Duration.ofDays(1))),
         rateLimitStore,
         FIXED_KST_CLOCK);

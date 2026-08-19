@@ -14,11 +14,18 @@ export function resolveImageUrl(path: string): string {
 export class ApiError extends Error {
   code: string;
   status: number;
+  retryAfterSeconds?: number;
 
-  constructor(code: string, message: string, status: number) {
+  constructor(
+    code: string,
+    message: string,
+    status: number,
+    retryAfterSeconds?: number,
+  ) {
     super(message);
     this.code = code;
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -92,12 +99,39 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
     }
     const code = body?.code || 'UNKNOWN_ERROR';
     const message = body?.message || '요청 처리 중 문제가 발생했어요.';
-    throw new ApiError(code, message, res.status);
+    throw new ApiError(
+      code,
+      message,
+      res.status,
+      resolveRetryAfterSeconds(body?.details?.retryAfterSeconds, res.headers.get('Retry-After')),
+    );
   }
 
   // 204 No Content (delete/cancel/confirm 등)처럼 응답 본문이 없는 성공 응답은 body가 null이라
   // body.data에 접근하면 TypeError가 나서 성공한 요청이 실패로 보인다.
   return (body ? body.data : undefined) as T;
+}
+
+function resolveRetryAfterSeconds(
+  detailValue: unknown,
+  retryAfterHeader: string | null,
+): number | undefined {
+  const detailSeconds = toPositiveWholeSeconds(detailValue);
+  if (detailSeconds !== undefined) return detailSeconds;
+
+  const headerSeconds = toPositiveWholeSeconds(retryAfterHeader);
+  if (headerSeconds !== undefined) return headerSeconds;
+
+  if (!retryAfterHeader) return undefined;
+  const retryAt = Date.parse(retryAfterHeader);
+  if (Number.isNaN(retryAt)) return undefined;
+  return Math.max(1, Math.ceil((retryAt - Date.now()) / 1000));
+}
+
+function toPositiveWholeSeconds(value: unknown): number | undefined {
+  const seconds = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return undefined;
+  return Math.ceil(seconds);
 }
 
 // Shape of Spring Data's Page<T> as Jackson serializes it by default (content/number/

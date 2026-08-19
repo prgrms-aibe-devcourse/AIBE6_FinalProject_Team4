@@ -122,9 +122,16 @@ ai:
   policy:
     # MVP 기본값이며 운영 사용량을 확인한 뒤 환경변수로 조정한다.
     max-input-length: ${AI_MAX_INPUT_LENGTH:2000}
+    # (사용자, 기능)별 짧은 창. 순간 폭주만 막는다 — 하루 총량은 아래 user-daily-limit이 맡는다.
     rate-limit:
       max-requests: ${AI_RATE_LIMIT_MAX_REQUESTS:10}
       window: ${AI_RATE_LIMIT_WINDOW:1m}
+    # 사용자 한 명의 하루 총량(기능 합산). 이 항목이 없으면 짧은 창을 계속 채우는 것만으로
+    # 계정 하나가 아래 전역 예산을 통째로 소진해 다른 모든 사용자의 AI 기능을 그날 내내 멈출 수 있다.
+    # 전역 예산보다 충분히 작게 유지한다 — 값이 global 이상이면 이 방어가 사실상 없는 것과 같다.
+    user-daily-limit:
+      max-requests: ${AI_USER_DAILY_LIMIT_MAX_REQUESTS:20}
+      window: ${AI_USER_DAILY_LIMIT_WINDOW:1d}
     # 모든 사용자·기능이 공유하는 실제 외부 AI 호출 상한이다. 캐시 히트는 소모하지 않는다.
     # 운영 비용 한도에 맞게 두 환경변수를 반드시 조정한다.
     global-rate-limit:
