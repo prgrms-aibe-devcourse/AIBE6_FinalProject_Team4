@@ -28,6 +28,12 @@ final class PlantChatJournalContextSelector {
   /** 폴백에서 우연한 한 글자 일치를 걸러내기 위한 최소 겹침 글자 수. */
   private static final int MIN_FALLBACK_CHARACTER_OVERLAP = 2;
 
+  /**
+   * 조사·어미 후보 글자. 토큰의 첫 글자일 때는 제거하지 않는다. 고추·가지·도라지·이끼·로즈마리·하월시아·게발선인장처럼 종 이름의 첫 글자가 조사와 겹치므로, 단어 끝에
+   * 붙은 경우만 조사·어미로 본다.
+   */
+  private static final String PARTICLE_OR_ENDING_CANDIDATES = "은는이가을를에의와과도만로으론하였했어습니다요때서고게";
+
   Selection select(List<RecentJournal> journals, String question) {
     List<RecentJournal> orderedJournals = journals == null ? List.of() : journals;
     List<RecentJournal> recentJournals =
@@ -134,16 +140,27 @@ final class PlantChatJournalContextSelector {
     if (value == null || value.isBlank()) {
       return Set.of();
     }
-    return value
-        .codePoints()
-        .filter(Character::isLetterOrDigit)
-        .filter(character -> !isKoreanParticleOrEnding(character))
-        .boxed()
-        .collect(java.util.stream.Collectors.toSet());
+
+    Set<Integer> characters = new HashSet<>();
+    boolean atTokenStart = true;
+    int index = 0;
+    while (index < value.length()) {
+      int character = value.codePointAt(index);
+      index += Character.charCount(character);
+      if (!Character.isLetterOrDigit(character)) {
+        atTokenStart = true;
+        continue;
+      }
+      if (atTokenStart || !isParticleOrEndingCandidate(character)) {
+        characters.add(character);
+      }
+      atTokenStart = false;
+    }
+    return characters;
   }
 
-  private boolean isKoreanParticleOrEnding(int character) {
-    return "은는이가을를에의와과도만로으론하였했어습니니다요때서고게".indexOf(character) >= 0;
+  private boolean isParticleOrEndingCandidate(int character) {
+    return PARTICLE_OR_ENDING_CANDIDATES.indexOf(character) >= 0;
   }
 
   private int contentLength(RecentJournal journal) {

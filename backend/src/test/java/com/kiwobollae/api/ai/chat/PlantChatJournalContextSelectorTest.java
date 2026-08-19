@@ -90,6 +90,26 @@ class PlantChatJournalContextSelectorTest {
   }
 
   @Test
+  void keepsSpeciesNameInitialCharacterThatAlsoLooksLikeAParticle() {
+    // "고"를 조사로 보고 지우면 고추 관련 과거 기록이 폴백 점수에서 탈락한다.
+    List<RecentJournal> journals =
+        List.of(
+            journal(10L, "최근 기록"),
+            journal(9L, "최근 기록"),
+            journal(8L, "최근 기록"),
+            journal(7L, "최근 기록"),
+            journal(6L, "최근 기록"),
+            journal(5L, "고춧잎 색이 옅어요"),
+            journal(4L, "물받이 접시를 닦았습니다."));
+
+    Selection selection = selector.select(journals, "고추 잎이 왜 노래졌나요?");
+
+    assertThat(selection.relatedPastJournals())
+        .extracting(RecentJournal::journalId)
+        .containsExactly(5L);
+  }
+
+  @Test
   void keepsRelevantHistoryWithinCharacterBudget() {
     String longContent = "가".repeat(PlantChatJournalContextSelector.RELEVANT_HISTORY_CHAR_BUDGET);
     List<RecentJournal> journals =
