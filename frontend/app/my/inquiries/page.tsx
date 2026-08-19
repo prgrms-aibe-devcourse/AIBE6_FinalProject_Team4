@@ -31,7 +31,6 @@ function formatDateTime(value: string): string {
 }
 
 const CATS: [InquiryCategory, string][] = [['PAYMENT', '결제'], ['DELIVERY', '배송'], ['ACCOUNT', '계정'], ['ETC', '기타']];
-const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘텐츠'], ['stolen', '사진 도용'], ['etc', '기타']];
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
@@ -48,9 +47,6 @@ export default function Inquiries() {
   const [cur, setCur] = useState<InquiryData | null>(null);
   const [form, setForm] = useState<{ cat: InquiryCategory | null; title: string; content: string }>({ cat: null, title: '', content: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reason, setReason] = useState<string | null>(null);
-  const [reported, setReported] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -103,13 +99,6 @@ export default function Inquiries() {
       setSubmitting(false);
     }
   };
-  const submitReport = () => {
-    if (!reason) return showToast('신고 사유를 골라주세요.', 'err');
-    if (reported) return showToast('이미 신고해 주신 내용이에요. 검토 중이니 조금만 기다려 주세요.', 'err');
-    setReportOpen(false); setReason(null); setReported(true);
-    showToast('신고가 접수됐어요. 검토 후 조치할게요. 알려주셔서 고마워요.');
-  };
-
   if (view === 'new') {
     return (
       <div className="container max-w-[820px]">
@@ -224,46 +213,6 @@ export default function Inquiries() {
               </button>
             );
           })}
-        </div>
-      )}
-
-      <div className="mt-[30px] text-center">
-        <button type="button" onClick={() => setReportOpen(true)} className="cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white px-[18px] py-[11px] font-bold text-sub">
-          <span className="material-symbols-outlined text-[17px]">flag</span> 신고 기능 미리보기
-        </button>
-      </div>
-
-      {reportOpen && (
-        <div onClick={() => setReportOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[420px] animate-pop rounded-[20px] bg-white p-6">
-            <h3 className="mb-1 text-[19px] font-extrabold">신고하기</h3>
-            <p className="mb-4 text-[13.5px] text-sub">검토 후 조치할게요. 바로 처리되지는 않아요.</p>
-            <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-[#f6f7f1] p-2.5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#FFCC80] to-[#FF8A65] text-[22px]">🍅</div>
-              <div className="text-[13.5px] text-[#6d7a68]">토실이 · 2026.07.21 일지</div>
-            </div>
-            <div className="mb-3.5 flex flex-col gap-2">
-              {REASONS.map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setReason(k)}
-                  className={`cursor-pointer rounded-[11px] border-[1.5px] px-3.5 py-[11px] text-left font-semibold ${
-                    reason === k ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {reason === 'etc' && (
-              <textarea placeholder="신고 사유를 적어주세요" className="mb-3.5 min-h-[70px] w-full resize-y rounded-xl border-[1.5px] border-line p-3 outline-none" />
-            )}
-            <div className="flex gap-2.5">
-              <button type="button" onClick={submitReport} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">신고 접수</button>
-              <button type="button" onClick={() => setReportOpen(false)} className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-5 py-[13px] font-bold text-sub">닫기</button>
-            </div>
-          </div>
         </div>
       )}
     </div>
