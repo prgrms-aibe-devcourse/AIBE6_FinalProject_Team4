@@ -159,7 +159,9 @@ function NewJournalInner() {
       }
       await refreshWallet();
       if (result.journal.gachaReward.granted && result.journal.gachaReward.drawId) {
-        router.push(`/gacha/open/${result.journal.gachaReward.drawId}`);
+        router.replace(
+          `/gacha/open/${result.journal.gachaReward.drawId}?returnTo=journals`,
+        );
         return;
       }
       setSaved(true);
