@@ -121,6 +121,12 @@ public enum ErrorCode {
 	AI_REQUEST_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."),
 	AI_RESPONSE_INVALID(HttpStatus.BAD_GATEWAY, "AI 서비스로부터 올바르지 않은 응답을 받았습니다."),
 	AI_CHAT_CONVERSATION_INVALID(HttpStatus.CONFLICT, "AI 대화가 만료되었어요. 새 대화를 시작해 주세요."),
+	AI_CHAT_SELECTED_PLANT_MISMATCH(HttpStatus.UNPROCESSABLE_CONTENT,
+			"현재 선택한 식물과 질문 대상이 달라요. 상담할 식물을 변경한 뒤 다시 질문해 주세요."),
+	AI_CHAT_CONTEXT_REQUIRED(HttpStatus.UNPROCESSABLE_CONTENT,
+			"어떤 식물의 어떤 상태인지 알려주세요. 식물명, 증상, 최근 변화를 함께 입력해 주세요."),
+	AI_CHAT_TOPIC_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_CONTENT,
+			"식물 재배·관리와 성장 일지에 관한 질문만 도와드릴 수 있어요."),
 	AI_IMAGE_ANALYSIS_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이 일지에 저장된 사진을 찾을 수 없습니다."),
 	AI_IMAGE_ANALYSIS_IN_PROGRESS(HttpStatus.CONFLICT, "이 사진을 이미 분석하고 있어요. 잠시 후 다시 확인해 주세요."),
 

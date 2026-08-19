@@ -11,6 +11,8 @@ import com.kiwobollae.api.ai.config.AiConfig;
 import com.kiwobollae.api.ai.config.OpenAiProperties;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
+import com.kiwobollae.api.ai.guide.knowledge.ClasspathPlantCareKnowledgeCatalog;
+import com.kiwobollae.api.ai.guide.knowledge.VerifiedPlantCareKnowledgeRetriever;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
@@ -51,20 +53,44 @@ class PlantCareGuideSmokeTest {
     requireConfigured(properties.apiKey(), "ai.openai.api-key");
     requireConfigured(properties.textModel(), "ai.openai.text-model");
 
-    PlantCareGuideService service = serviceBackedByRealOpenAi(properties);
+    PlantCareGuideService service = serviceBackedByRealOpenAi(properties, lettuceSpecies());
 
-    PlantCareGuide guide;
-    try {
-      guide = service.getGuideBySpeciesId(7L, 21L);
-    } catch (BusinessException exception) {
-      throw new AssertionError(
-          "실제 OpenAI 재배 가이드 생성 실패: " + exception.getErrorCode().name(), exception);
-    }
+    PlantCareGuide guide = generateGuide(service, 21L);
 
     System.out.println("=== 생성된 재배 가이드 ===");
     System.out.println(guide);
 
     assertThat(guide.speciesName()).isEqualTo("청상추");
+    assertUsableGuide(guide);
+  }
+
+  @Test
+  void generatesUsableCareGuideForNewSpeciesWithoutRegisteredKnowledge() {
+    OpenAiProperties properties = loadOpenAiProperties();
+    requireConfigured(properties.apiKey(), "ai.openai.api-key");
+    requireConfigured(properties.textModel(), "ai.openai.text-model");
+
+    PlantCareGuideService service = serviceBackedByRealOpenAi(properties, corianderSpecies());
+
+    PlantCareGuide guide = generateGuide(service, 22L);
+
+    System.out.println("=== 근거 없는 새 종 생성 가이드 ===");
+    System.out.println(guide);
+
+    assertThat(guide.speciesName()).isEqualTo("고수");
+    assertUsableGuide(guide);
+  }
+
+  private PlantCareGuide generateGuide(PlantCareGuideService service, Long speciesId) {
+    try {
+      return service.getGuideBySpeciesId(7L, speciesId);
+    } catch (BusinessException exception) {
+      throw new AssertionError(
+          "실제 OpenAI 재배 가이드 생성 실패: " + exception.getErrorCode().name(), exception);
+    }
+  }
+
+  private void assertUsableGuide(PlantCareGuide guide) {
     assertThat(guide.cached()).isFalse();
 
     // strict 모드가 한국어 enum 값을 받아줬는지.
@@ -94,19 +120,12 @@ class PlantCareGuideSmokeTest {
   }
 
   /** 실제 OpenAI 클라이언트만 진짜, 저장소와 호출 제한은 끊는다. */
-  private PlantCareGuideService serviceBackedByRealOpenAi(OpenAiProperties properties) {
+  private PlantCareGuideService serviceBackedByRealOpenAi(
+      OpenAiProperties properties, PlantSpeciesResponse species) {
     OpenAiClient client = RealOpenAiClients.create(properties);
 
     PlantSpeciesService plantSpeciesService = mock(PlantSpeciesService.class);
-    given(plantSpeciesService.getSpecies(21L))
-        .willReturn(
-            new PlantSpeciesResponse(
-                21L,
-                "청상추",
-                "LEAF_VEGETABLE",
-                "서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요. 바깥 잎부터 수확하면 오래 먹을 수 있습니다.",
-                LocalDateTime.now(KST),
-                LocalDateTime.now(KST)));
+    given(plantSpeciesService.getSpecies(species.id())).willReturn(species);
 
     // 저장소는 stub 없이 두면 Mockito가 Optional.empty()를 돌려주므로 항상 캐시 미스가 된다.
     PlantCareGuideGenerationLockStore generationLockStore =
@@ -119,6 +138,8 @@ class PlantCareGuideSmokeTest {
                         invocation.getArgument(0), new Object())));
     return new PlantCareGuideService(
         plantSpeciesService,
+        new VerifiedPlantCareKnowledgeRetriever(
+            new ClasspathPlantCareKnowledgeCatalog(new ObjectMapper())),
         mock(PlantCareGuideCacheRepository.class),
         mock(PlantCareGuideCacheWriter.class),
         client,
@@ -126,6 +147,21 @@ class PlantCareGuideSmokeTest {
         generationLockStore,
         new ObjectMapper(),
         Clock.fixed(Instant.parse("2026-08-05T01:00:00Z"), KST));
+  }
+
+  private PlantSpeciesResponse lettuceSpecies() {
+    return new PlantSpeciesResponse(
+        21L,
+        "청상추",
+        "LEAF_VEGETABLE",
+        "서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요. 바깥 잎부터 수확하면 오래 먹을 수 있습니다.",
+        LocalDateTime.now(KST),
+        LocalDateTime.now(KST));
+  }
+
+  private PlantSpeciesResponse corianderSpecies() {
+    return new PlantSpeciesResponse(
+        22L, "고수", "HERB", null, LocalDateTime.now(KST), LocalDateTime.now(KST));
   }
 
   private OpenAiProperties loadOpenAiProperties() {

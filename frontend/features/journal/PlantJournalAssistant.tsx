@@ -44,8 +44,29 @@ interface PlantJournalAssistantProps {
 }
 
 function toErrorMessage(requestError: unknown): string {
-  if (requestError instanceof ApiError) return requestError.message;
+  if (requestError instanceof ApiError) {
+    if (
+      requestError.code === "COMMON_RATE_LIMITED" &&
+      requestError.retryAfterSeconds !== undefined
+    ) {
+      return `AI 사용 한도에 도달했어요. ${formatRetryAfter(requestError.retryAfterSeconds)} 후 다시 시도할 수 있어요.`;
+    }
+    return requestError.message;
+  }
   return "AI 답변을 불러오지 못했어요. 네트워크 상태를 확인하고 다시 시도해 주세요.";
+}
+
+function formatRetryAfter(retryAfterSeconds: number): string {
+  const totalMinutes = Math.floor(Math.max(1, retryAfterSeconds) / 60);
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return hours > 0 ? `${days}일 ${hours}시간` : `${days}일`;
+  if (hours > 0)
+    return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
+  if (minutes > 0) return `${minutes}분`;
+  return `${Math.ceil(Math.max(1, retryAfterSeconds))}초`;
 }
 
 function AssistantMark({

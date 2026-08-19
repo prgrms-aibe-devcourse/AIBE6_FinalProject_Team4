@@ -413,6 +413,28 @@ describe("PlantJournalAssistant", () => {
     expect(alert.textContent?.match(/다시 시도/g) ?? []).toHaveLength(1);
   });
 
+  it("AI 일일 한도 초과 시 실제 남은 시간을 안내한다", async () => {
+    mockedAskPlantChat.mockRejectedValueOnce(
+      new ApiError(
+        "COMMON_RATE_LIMITED",
+        "AI 호출 횟수 제한에 걸렸어요.",
+        429,
+        86400,
+      ),
+    );
+    renderAssistant();
+    openAssistant();
+    fireEvent.change(
+      screen.getByLabelText("내 식물 기록을 바탕으로 직접 질문하기"),
+      { target: { value: "물을 언제 줘야 하나요?" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 묻기" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "AI 사용 한도에 도달했어요. 1일 후 다시 시도할 수 있어요.",
+    );
+  });
+
   it("대화 세션이 만료되면 이전 화면 대화와 ID를 버리고 새 대화를 준비한다", async () => {
     mockedAskPlantChat
       .mockResolvedValueOnce({

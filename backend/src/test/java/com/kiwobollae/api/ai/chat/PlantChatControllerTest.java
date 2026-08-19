@@ -160,6 +160,56 @@ class PlantChatControllerTest {
         .andExpect(jsonPath("$.code").value("PLANT_PROFILE_NOT_FOUND"));
   }
 
+  @Test
+  void returnsUnprocessableContentForOffTopicQuestion() throws Exception {
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willThrow(new BusinessException(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content("{\"question\":\"청상추를 먹어야 하는데 원숭이 키우는 법을 알려줘\"}"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("AI_CHAT_TOPIC_NOT_ALLOWED"))
+        .andExpect(jsonPath("$.message").value("식물 재배·관리와 성장 일지에 관한 질문만 도와드릴 수 있어요."));
+  }
+
+  @Test
+  void returnsContextRequestForUncertainQuestion() throws Exception {
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willThrow(new BusinessException(ErrorCode.AI_CHAT_CONTEXT_REQUIRED));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content("{\"question\":\"이건 어떻게 해야 하나요?\"}"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("AI_CHAT_CONTEXT_REQUIRED"))
+        .andExpect(
+            jsonPath("$.message").value("어떤 식물의 어떤 상태인지 알려주세요. 식물명, 증상, 최근 변화를 함께 입력해 주세요."));
+  }
+
+  @Test
+  void returnsDedicatedUnprocessableContentForDifferentPlantQuestion() throws Exception {
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willThrow(
+            new BusinessException(
+                ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH,
+                java.util.Map.of("selectedSpeciesName", "바질")));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content("{\"question\":\"원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?\"}"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("AI_CHAT_SELECTED_PLANT_MISMATCH"))
+        .andExpect(jsonPath("$.message").value("현재 선택한 식물과 질문 대상이 달라요. 상담할 식물을 변경한 뒤 다시 질문해 주세요."))
+        .andExpect(jsonPath("$.details.selectedSpeciesName").value("바질"));
+  }
+
   private void authenticateAs(Long userId) {
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken(userId, null, List.of()));

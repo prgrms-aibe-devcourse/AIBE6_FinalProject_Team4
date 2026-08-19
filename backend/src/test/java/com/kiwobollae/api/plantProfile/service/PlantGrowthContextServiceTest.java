@@ -47,7 +47,7 @@ class PlantGrowthContextServiceTest {
 		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
 				.willReturn(journals);
 
-		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 5);
+		PlantGrowthContextResponse context = growthContextService.getJournalHistoryContext(7L, 21L);
 
 		assertThat(context.profileId()).isEqualTo(21L);
 		assertThat(context.nickname()).isEqualTo("바질이");
@@ -61,15 +61,38 @@ class PlantGrowthContextServiceTest {
 
 		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 		verify(plantJournalRepository).findRecentActiveByProfile(eq(7L), eq(21L), pageableCaptor.capture());
-		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(5);
+		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(500);
 		assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
+	}
+
+	@Test
+	void returnsJournalHistoryCandidatesBeyondFiveRecentJournals() {
+		PlantProfile profile = profile();
+		List<PlantJournal> journals = List.of(
+				journal(36L, LocalDate.of(2026, 8, 13), "12345"),
+				journal(35L, LocalDate.of(2026, 8, 12), "67890"),
+				journal(34L, LocalDate.of(2026, 8, 11), "abcde"),
+				journal(33L, LocalDate.of(2026, 8, 10), "fghij"),
+				journal(32L, LocalDate.of(2026, 8, 9), "klmno"),
+				journal(31L, LocalDate.of(2026, 8, 8), "pqrst"),
+				journal(30L, LocalDate.of(2026, 8, 7), "uvwxyz")
+		);
+		given(plantProfileRepository.findByIdAndUserId(21L, 7L)).willReturn(Optional.of(profile));
+		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
+				.willReturn(journals);
+
+		PlantGrowthContextResponse context = growthContextService.getJournalHistoryContext(7L, 21L);
+
+		assertThat(context.recentJournals())
+				.extracting(PlantGrowthContextResponse.RecentJournal::journalId)
+				.containsExactly(36L, 35L, 34L, 33L, 32L, 31L, 30L);
 	}
 
 	@Test
 	void hidesWhetherAnotherUsersProfileExists() {
 		given(plantProfileRepository.findByIdAndUserId(99L, 7L)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 99L, 5))
+		assertThatThrownBy(() -> growthContextService.getJournalHistoryContext(7L, 99L))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 
@@ -77,12 +100,38 @@ class PlantGrowthContextServiceTest {
 	}
 
 	@Test
-	void rejectsOutOfRangeJournalLimitBeforeQuerying() {
-		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 21L, 11))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+	void verifiesOwnershipWithoutReadingJournalHistory() {
+		given(plantProfileRepository.existsByIdAndUserId(21L, 7L)).willReturn(true);
 
-		verifyNoInteractions(plantProfileRepository, plantJournalRepository);
+		growthContextService.verifyOwnership(7L, 21L);
+
+		verify(plantProfileRepository).existsByIdAndUserId(21L, 7L);
+		verifyNoInteractions(plantJournalRepository);
+	}
+
+	@Test
+	void rejectsUnownedProfileBeforeReadingJournalHistory() {
+		given(plantProfileRepository.existsByIdAndUserId(99L, 7L)).willReturn(false);
+
+		assertThatThrownBy(() -> growthContextService.verifyOwnership(7L, 99L))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
+
+		verifyNoInteractions(plantJournalRepository);
+	}
+
+	@Test
+	void limitsRecentGrowthContextToTenJournals() {
+		PlantProfile profile = profile();
+		given(plantProfileRepository.findByIdAndUserId(21L, 7L)).willReturn(Optional.of(profile));
+		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
+				.willReturn(List.of());
+
+		growthContextService.getRecentGrowthContext(7L, 21L);
+
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+		verify(plantJournalRepository).findRecentActiveByProfile(eq(7L), eq(21L), pageableCaptor.capture());
+		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
 	}
 
 	private PlantProfile profile() {

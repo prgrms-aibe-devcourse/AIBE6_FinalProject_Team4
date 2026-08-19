@@ -95,9 +95,15 @@ public class OpenAiClient implements AiClient {
     body.put("model", model);
     body.put("input", createInput(request));
     body.put("text", Map.of("format", createResponseFormat(request.responseSchema())));
-    body.put("max_output_tokens", properties.maxOutputTokens());
+    body.put("max_output_tokens", resolveMaxOutputTokens(request));
     body.put("store", false);
     return body;
+  }
+
+  private int resolveMaxOutputTokens(AiRequest request) {
+    return request.maxOutputTokens() == null
+        ? properties.maxOutputTokens()
+        : Math.min(request.maxOutputTokens(), properties.maxOutputTokens());
   }
 
   private List<Map<String, Object>> createInput(AiRequest request) {

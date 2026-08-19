@@ -56,6 +56,8 @@ public class AiRequestGuard {
             LocalDateTime.now(seoulClock),
             properties.rateLimit().window(),
             properties.rateLimit().maxRequests(),
+            properties.userDailyLimit().window(),
+            properties.userDailyLimit().maxRequests(),
             properties.globalRateLimit().window(),
             properties.globalRateLimit().maxRequests());
         return;

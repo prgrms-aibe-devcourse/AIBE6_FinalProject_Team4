@@ -12,12 +12,27 @@ public final class PlantChatSchema {
 
   public static AiJsonSchema create() {
     Map<String, Object> properties = new LinkedHashMap<>();
-    properties.put("answer", string());
-    properties.put("recommendedActions", array(string()));
-    properties.put("additionalChecks", array(string()));
+    properties.put("scopeDecision", stringEnum("ANSWER", "OTHER_PLANT", "REFUSE", "UNCERTAIN"));
+    properties.put(
+        "scopeIntent",
+        stringEnum(
+            "CARE", "GROWTH_OBSERVATION", "JOURNAL_INTERPRETATION", "DIRECT_FOLLOW_UP", "NONE"));
+    properties.put("answer", string(PlantChatResponseLimits.MAX_ANSWER_LENGTH));
+    properties.put(
+        "recommendedActions",
+        array(
+            string(PlantChatResponseLimits.MAX_LIST_ITEM_LENGTH),
+            PlantChatResponseLimits.MAX_RECOMMENDED_ACTIONS));
+    properties.put(
+        "additionalChecks",
+        array(
+            string(PlantChatResponseLimits.MAX_LIST_ITEM_LENGTH),
+            PlantChatResponseLimits.MAX_ADDITIONAL_CHECKS));
 
     return new AiJsonSchema(
-        "plant_profile_chat", "식물 프로필과 최근 성장 기록을 근거로 한 질문 답변, 권장 행동, 추가 확인사항", object(properties));
+        "plant_profile_chat",
+        "질문의 의미 기반 허용 범위와 선택 식물 일치 여부 판정, 식물 프로필 기반 답변, 권장 행동, 추가 확인사항",
+        object(properties));
   }
 
   private static Map<String, Object> object(Map<String, Object> properties) {
@@ -29,14 +44,19 @@ public final class PlantChatSchema {
     return schema;
   }
 
-  private static Map<String, Object> array(Map<String, Object> items) {
+  private static Map<String, Object> array(Map<String, Object> items, int maxItems) {
     Map<String, Object> schema = new LinkedHashMap<>();
     schema.put("type", "array");
     schema.put("items", items);
+    schema.put("maxItems", maxItems);
     return schema;
   }
 
-  private static Map<String, Object> string() {
-    return Map.of("type", "string");
+  private static Map<String, Object> string(int maxLength) {
+    return Map.of("type", "string", "maxLength", maxLength);
+  }
+
+  private static Map<String, Object> stringEnum(String... values) {
+    return Map.of("type", "string", "enum", List.of(values));
   }
 }
