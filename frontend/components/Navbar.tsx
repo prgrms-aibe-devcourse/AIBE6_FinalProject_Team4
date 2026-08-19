@@ -384,6 +384,7 @@ export default function Navbar() {
               <Link
                 key={b.key}
                 href={b.href}
+                data-tour-id={b.key}
                 onClick={(e) => {
                   guardNavClick(e, b.key);
                   setMoreOpen(false);
@@ -399,6 +400,7 @@ export default function Navbar() {
           })}
           <button
             type="button"
+            data-tour-id="more"
             onClick={() => setMoreOpen((v) => !v)}
             className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-[3px] ${
               moreOpen || active === 'cards' || active === 'account'
@@ -444,6 +446,19 @@ export default function Navbar() {
                   <span className="text-[12px] font-bold">{b.label}</span>
                 </Link>
               ))}
+              {state.authed && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    openOnboardingTour();
+                  }}
+                  className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#F8FAF3] py-4 text-[#5b6a54]"
+                >
+                  <span className="material-symbols-outlined text-2xl">lightbulb</span>
+                  <span className="text-[12px] font-bold">투어 다시보기</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

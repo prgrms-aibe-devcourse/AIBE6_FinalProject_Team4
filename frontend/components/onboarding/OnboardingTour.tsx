@@ -14,7 +14,8 @@ interface TourStep {
   description: string;
 }
 
-const TOUR_STEPS: TourStep[] = [
+// 데스크톱 상단 NAV(Navbar.tsx의 NAV, 8개) 기준 — 각 항목에 data-tour-id={key}가 붙어있다.
+const TOUR_STEPS_DESKTOP: TourStep[] = [
   { targetId: null, title: '환영해요! 🌱', description: '키워볼래가 처음이시죠? 위쪽 메뉴를 하나씩 소개해드릴게요.' },
   { targetId: 'home', title: '홈', description: '오늘의 포인트, 일지, 식물 현황을 한눈에 볼 수 있어요.' },
   { targetId: 'plants', title: '내 식물', description: '반려 식물을 등록하고 성장 상태를 관리해요.' },
@@ -26,6 +27,23 @@ const TOUR_STEPS: TourStep[] = [
   { targetId: 'market', title: '거래소', description: '보유한 카드를 다른 사용자와 거래할 수 있어요.' },
 ];
 
+// 모바일 하단 탭(Navbar.tsx의 BOTTOM, 5개 + 더보기 시트)은 데스크톱 NAV와 구조가 달라
+// 별도 스텝으로 관리한다. 일지는 하단 탭에 자체 항목이 없어(activeKey가 journal일 때도
+// "식물" 탭이 활성 표시됨) plants 탭을 같이 가리키며 설명을 합친다. 쿠폰/거래소/마이페이지는
+// "더보기" 시트 안에 있어 각각 스포트라이트하는 대신 "더보기" 버튼 하나로 안내한다.
+const TOUR_STEPS_MOBILE: TourStep[] = [
+  { targetId: null, title: '환영해요! 🌱', description: '키워볼래가 처음이시죠? 아래 메뉴를 하나씩 소개해드릴게요.' },
+  { targetId: 'home', title: '홈', description: '오늘의 포인트, 일지, 식물 현황을 한눈에 볼 수 있어요.' },
+  { targetId: 'plants', title: '내 식물 · 일지', description: '반려 식물을 등록하고, 매일의 모습을 일지로 기록해요.' },
+  { targetId: 'shop', title: '상점', description: '포인트로 다양한 상품과 가챠 카드팩을 구매해요.' },
+  { targetId: 'gacha', title: '가챠', description: '카드팩을 열어 카드를 모으고 도감을 완성해보세요.' },
+  { targetId: 'board', title: '커뮤니티', description: '다른 사용자들과 식물 이야기를 나눠보세요.' },
+  { targetId: 'more', title: '더보기', description: '쿠폰·거래소·마이페이지는 여기서 찾을 수 있어요.' },
+];
+
+// Navbar.tsx가 데스크톱 NAV/모바일 BOTTOM을 나누는 기준(Tailwind md breakpoint)과 맞춘다.
+const MOBILE_BREAKPOINT_PX = 768;
+
 function seenKey(userId: number): string {
   return `kwb_onboarding_tour_seen_${userId}`;
 }
@@ -36,7 +54,16 @@ export default function OnboardingTour() {
   const { onboardingTourOpen, openOnboardingTour, closeOnboardingTour } = useUI();
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const autoCheckedRef = useRef(false);
+  const steps = isMobile ? TOUR_STEPS_MOBILE : TOUR_STEPS_DESKTOP;
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT_PX);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // 로그인 상태로 메인 화면에 처음 들어왔고, 이 유저가 아직 투어를 본 적 없으면 자동으로 연다.
   // 세션당 한 번만 판단하도록 ref로 막아, 홈을 여러 번 오갈 때마다 재평가하지 않는다.
@@ -49,19 +76,21 @@ export default function OnboardingTour() {
     }
   }, [hydrated, pathname, state.authed, state.user, openOnboardingTour]);
 
+  // 뷰포트가 바뀌면(리사이즈로 데스크톱↔모바일 스텝 배열이 바뀌면) 스텝 길이가 달라질 수
+  // 있으므로 처음부터 다시 보여준다 — 인덱스를 어설프게 클램프하면 순서가 어긋난다.
   useEffect(() => {
     if (onboardingTourOpen) setStepIndex(0);
-  }, [onboardingTourOpen]);
+  }, [onboardingTourOpen, isMobile]);
 
   const updateRect = useCallback(() => {
-    const step = TOUR_STEPS[stepIndex];
-    if (!step.targetId) {
+    const step = steps[stepIndex];
+    if (!step || !step.targetId) {
       setRect(null);
       return;
     }
     const el = document.querySelector(`[data-tour-id="${step.targetId}"]`);
     setRect(el ? el.getBoundingClientRect() : null);
-  }, [stepIndex]);
+  }, [steps, stepIndex]);
 
   useEffect(() => {
     if (!onboardingTourOpen) return;
@@ -77,8 +106,8 @@ export default function OnboardingTour() {
 
   if (!onboardingTourOpen) return null;
 
-  const step = TOUR_STEPS[stepIndex];
-  const isLast = stepIndex === TOUR_STEPS.length - 1;
+  const step = steps[Math.min(stepIndex, steps.length - 1)];
+  const isLast = stepIndex >= steps.length - 1;
 
   const handleNext = () => {
     if (isLast) {
@@ -88,13 +117,15 @@ export default function OnboardingTour() {
     setStepIndex((i) => i + 1);
   };
 
-  // 강조 영역 바로 아래에 카드를 두되, 화면 아래로 넘치면 위쪽에 띄운다.
+  // 좁은 화면에서는 카드 폭을 화면에 맞게 줄인다(모바일 하단 탭은 화면 폭이 320px보다 좁을 수 있음).
+  const cardWidth = Math.min(320, window.innerWidth - 32);
+  // 강조 영역 바로 아래에 카드를 두되, 화면 아래로 넘치면(모바일 하단 탭이 대표적) 위쪽에 띄운다.
   const cardTop = rect
-    ? rect.bottom + 300 <= window.innerHeight
+    ? rect.bottom + 220 <= window.innerHeight
       ? rect.bottom + 16
-      : Math.max(16, rect.top - 176)
+      : Math.max(16, rect.top - 196)
     : undefined;
-  const cardLeft = rect ? Math.min(Math.max(rect.left, 16), window.innerWidth - 320 - 16) : undefined;
+  const cardLeft = rect ? Math.min(Math.max(rect.left, 16), window.innerWidth - cardWidth - 16) : undefined;
 
   return (
     <div className="fixed inset-0 z-[80]">
@@ -114,12 +145,12 @@ export default function OnboardingTour() {
       )}
 
       <div
-        className={`fixed w-[320px] rounded-[18px] bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,.3)] ${
+        className={`fixed rounded-[18px] bg-white p-5 shadow-[0_20px_50px_rgba(0,0,0,.3)] ${
           rect ? '' : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
         }`}
-        style={rect ? { top: cardTop, left: cardLeft } : undefined}
+        style={rect ? { top: cardTop, left: cardLeft, width: cardWidth } : { width: cardWidth }}
       >
-        <div className="mb-1 text-[11px] font-bold text-faint">{stepIndex + 1} / {TOUR_STEPS.length}</div>
+        <div className="mb-1 text-[11px] font-bold text-faint">{stepIndex + 1} / {steps.length}</div>
         <h3 className="mb-1.5 text-lg font-extrabold">{step.title}</h3>
         <p className="mb-4 text-sm leading-[1.6] text-[#6d7a68]">{step.description}</p>
         <div className="flex gap-2.5">
