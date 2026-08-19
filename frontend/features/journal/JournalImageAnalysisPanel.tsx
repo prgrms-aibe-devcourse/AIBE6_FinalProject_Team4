@@ -267,12 +267,6 @@ export default function JournalImageAnalysisPanel({
           )}
           <div className="relative flex h-full min-h-[222px] flex-col justify-between">
             <div className="flex items-center justify-between gap-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/20 px-3 py-1.5 text-[11px] font-bold tracking-[0.14em] backdrop-blur-md">
-                <span className="material-symbols-outlined text-[15px] text-emerald-300">
-                  neurology
-                </span>
-                AI PLANT VISION
-              </span>
               {images.length > 1 && (
                 <span className="rounded-full bg-black/30 px-2.5 py-1 text-[11px] font-semibold backdrop-blur-md">
                   {activeIndex + 1} / {images.length}
