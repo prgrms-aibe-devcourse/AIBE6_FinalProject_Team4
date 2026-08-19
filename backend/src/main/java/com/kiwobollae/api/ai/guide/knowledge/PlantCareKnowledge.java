@@ -22,6 +22,8 @@ public record PlantCareKnowledge(List<PlantCareEvidence> evidence) {
           .append(i + 1)
           .append("] 출처: ")
           .append(item.sourceName())
+          .append(" | URL: ")
+          .append(item.sourceUrl())
           .append(" | 버전: ")
           .append(item.version())
           .append('\n')

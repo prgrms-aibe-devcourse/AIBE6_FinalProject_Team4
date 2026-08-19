@@ -1,0 +1,28 @@
+{
+  "documents": [
+    {
+      "speciesNames": ["스위트 바질", "바질"],
+      "sourceId": "nongsaro-218964",
+      "sourceName": "농촌진흥청 농사로 바질",
+      "sourceUrl": "https://nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=218964&menuId=PS03172&sSeCode=335001&totalSearchYn=Y",
+      "version": "2026-08-19",
+      "content": "바질은 햇볕과 통풍이 좋은 곳에서 기르고 화분 겉흙이 마르면 물을 줍니다. 따뜻한 환경을 좋아하고 추위와 약한 서리에 약하므로 이른 봄 정식은 피합니다."
+    },
+    {
+      "speciesNames": ["청상추", "상추"],
+      "sourceId": "nongsaro-101796",
+      "sourceName": "농촌진흥청 농사로 상추 기르기",
+      "sourceUrl": "https://www.nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=101796&menuId=PS03163&totalSearchYn=Y",
+      "version": "2026-08-19",
+      "content": "상추는 서늘한 봄과 가을에 기르는 잎채소입니다. 베란다처럼 빛이 제한된 환경에서는 웃자람에 유의하고, 가정 재배에는 튼튼한 모종을 활용하는 것이 도움이 됩니다."
+    },
+    {
+      "speciesNames": ["방울토마토"],
+      "sourceId": "nise-cherry-tomato-cultivation",
+      "sourceName": "국립특수교육원 방울토마토 재배 과정",
+      "sourceUrl": "https://www.nise.go.kr/upload/eduable/vedu/docs/vm1/guide/vm1g07.pdf",
+      "version": "2026-08-19",
+      "content": "방울토마토는 지주대를 세워 지지하고 원줄기와 잎 사이에서 나는 곁순을 관리합니다. 과실이 충분히 붉게 익었을 때 수확합니다."
+    }
+  ]
+}

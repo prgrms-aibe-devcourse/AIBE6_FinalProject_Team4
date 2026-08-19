@@ -11,7 +11,8 @@ import com.kiwobollae.api.ai.config.AiConfig;
 import com.kiwobollae.api.ai.config.OpenAiProperties;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
-import com.kiwobollae.api.ai.guide.knowledge.RegisteredOfficialGuideKnowledgeRetriever;
+import com.kiwobollae.api.ai.guide.knowledge.ClasspathPlantCareKnowledgeCatalog;
+import com.kiwobollae.api.ai.guide.knowledge.VerifiedPlantCareKnowledgeRetriever;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
@@ -120,7 +121,8 @@ class PlantCareGuideSmokeTest {
                         invocation.getArgument(0), new Object())));
     return new PlantCareGuideService(
         plantSpeciesService,
-        new RegisteredOfficialGuideKnowledgeRetriever(),
+        new VerifiedPlantCareKnowledgeRetriever(
+            new ClasspathPlantCareKnowledgeCatalog(new ObjectMapper())),
         mock(PlantCareGuideCacheRepository.class),
         mock(PlantCareGuideCacheWriter.class),
         client,

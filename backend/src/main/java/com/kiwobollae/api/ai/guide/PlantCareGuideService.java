@@ -40,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class PlantCareGuideService {
 
-  private static final String KNOWLEDGE_RETRIEVER_VERSION = "registered-official-guide-v1";
+  private static final String KNOWLEDGE_RETRIEVER_VERSION = "verified-knowledge-v1";
 
   private static final String SYSTEM_PROMPT =
       """

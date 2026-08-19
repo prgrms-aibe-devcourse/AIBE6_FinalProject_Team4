@@ -374,6 +374,7 @@ class PlantCareGuideServiceTest {
             new PlantCareEvidence(
                 "plant-species:21:official-care-guide",
                 "서비스 등록 공식 재배 가이드",
+                "internal://plant-species/21/care-guide",
                 "2026-08-01T09:00:00",
                 "서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요.")));
   }
