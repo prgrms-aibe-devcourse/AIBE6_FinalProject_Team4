@@ -41,6 +41,19 @@ export function createReport(
   });
 }
 
+export function getMyReports(
+  accessToken: string,
+  page = 0,
+  size = 20,
+  signal?: AbortSignal,
+): Promise<SpringPage<ReportData>> {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  return request<SpringPage<ReportData>>(`/api/v1/reports?${query.toString()}`, {
+    accessToken,
+    signal,
+  });
+}
+
 // ---- Admin ----
 
 export function getReportsForAdmin(
