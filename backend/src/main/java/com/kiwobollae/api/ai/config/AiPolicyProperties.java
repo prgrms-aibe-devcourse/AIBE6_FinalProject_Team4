@@ -15,10 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "ai.policy")
 public record AiPolicyProperties(
-    int maxInputLength,
-    RateLimit rateLimit,
-    RateLimit userDailyLimit,
-    RateLimit globalRateLimit) {
+    int maxInputLength, RateLimit rateLimit, RateLimit userDailyLimit, RateLimit globalRateLimit) {
   public AiPolicyProperties {
     if (maxInputLength <= 0) {
       throw new IllegalArgumentException("AI 입력 최대 길이는 0보다 커야 합니다.");

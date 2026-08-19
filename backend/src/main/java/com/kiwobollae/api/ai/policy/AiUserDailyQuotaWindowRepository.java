@@ -13,8 +13,8 @@ public interface AiUserDailyQuotaWindowRepository
    * 사용자 창을 아직 없을 때만 만든다. 이미 있으면 아무것도 하지 않는다.
    *
    * <p>{@link AiRateLimitWindowRepository#insertWindowIfAbsent}와 같은 이유다 — 행이 없는 상태에서 조건부 UPDATE를 먼저
-   * 실행하면 InnoDB가 갭 락을 잡고 뒤이은 INSERT의 insert-intention 락과 서로 대기해 동시 요청이 데드락에 빠진다. 행을 먼저 만들어 두면 UPDATE가
-   * 항상 실제 행을 잡으므로 행 락으로 직렬화만 된다.
+   * 실행하면 InnoDB가 갭 락을 잡고 뒤이은 INSERT의 insert-intention 락과 서로 대기해 동시 요청이 데드락에 빠진다. 행을 먼저 만들어 두면
+   * UPDATE가 항상 실제 행을 잡으므로 행 락으로 직렬화만 된다.
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
