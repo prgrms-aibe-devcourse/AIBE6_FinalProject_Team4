@@ -39,16 +39,22 @@ class AiRateLimitStoreMySqlIntegrationTest {
   private static final long WAIT_SECONDS = 10L;
   private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 5, 10, 0);
   private static final Duration WINDOW = Duration.ofMinutes(1);
+  private static final Duration DAY = Duration.ofDays(1);
+  // 일일 총량을 검증하지 않는 기존 테스트가 이 창에 걸리지 않도록 충분히 크게 잡는다.
+  private static final int UNLIMITED_DAILY = 1_000;
 
   @Autowired private AiRateLimitStore rateLimitStore;
 
   @Autowired private AiRateLimitWindowRepository repository;
+
+  @Autowired private AiUserDailyQuotaWindowRepository dailyRepository;
 
   @Autowired private AiGlobalRateLimitWindowRepository globalRepository;
 
   @BeforeEach
   void resetWindows() {
     repository.deleteAllInBatch();
+    dailyRepository.deleteAllInBatch();
     globalRepository.deleteAllInBatch();
   }
 
@@ -95,6 +101,7 @@ class AiRateLimitStoreMySqlIntegrationTest {
             new AiPolicyProperties(
                 2000,
                 new AiPolicyProperties.RateLimit(100, WINDOW),
+                new AiPolicyProperties.RateLimit(UNLIMITED_DAILY, DAY),
                 new AiPolicyProperties.RateLimit(globalLimit, WINDOW)),
             rateLimitStore,
             Clock.fixed(NOW.atZone(KST).toInstant(), KST));
@@ -187,7 +194,8 @@ class AiRateLimitStoreMySqlIntegrationTest {
   void enforcesLimitAtomicallyForConcurrentRequests() throws Exception {
     int threads = 20;
     int limit = 5;
-    rateLimitStore.consume(1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit, WINDOW, 100);
+    rateLimitStore.consume(
+        1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit, DAY, UNLIMITED_DAILY, WINDOW, 100);
 
     CountDownLatch ready = new CountDownLatch(threads);
     CountDownLatch start = new CountDownLatch(1);
@@ -203,7 +211,15 @@ class AiRateLimitStoreMySqlIntegrationTest {
                           start.await(WAIT_SECONDS, TimeUnit.SECONDS);
                           try {
                             rateLimitStore.consume(
-                                1L, AiFeature.PLANT_CHAT, NOW, WINDOW, limit, WINDOW, 100);
+                                1L,
+                                AiFeature.PLANT_CHAT,
+                                NOW,
+                                WINDOW,
+                                limit,
+                                DAY,
+                                UNLIMITED_DAILY,
+                                WINDOW,
+                                100);
                             return true;
                           } catch (AiQuotaExceededException exception) {
                             return false;
@@ -253,6 +269,7 @@ class AiRateLimitStoreMySqlIntegrationTest {
             new AiPolicyProperties(
                 2000,
                 new AiPolicyProperties.RateLimit(limit, WINDOW),
+                new AiPolicyProperties.RateLimit(UNLIMITED_DAILY, DAY),
                 new AiPolicyProperties.RateLimit(100, WINDOW)),
             rateLimitStore,
             Clock.fixed(NOW.atZone(KST).toInstant(), KST));
@@ -303,6 +320,97 @@ class AiRateLimitStoreMySqlIntegrationTest {
     }
   }
 
+  // 이 창이 없으면 계정 하나가 짧은 창을 반복해서 채우는 것만으로 전역 예산을 통째로 소진할 수
+  // 있었다. 기능별로 세지 않고 합산하는 것이 핵심이다 — 기능별로 세면 사용자가 기능을 번갈아
+  // 호출해 한도를 기능 수만큼 곱해 쓸 수 있어 방어가 무의미해진다.
+  @Test
+  void capsDailyTotalAcrossFeaturesForOneUser() {
+    int dailyLimit = 3;
+
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, dailyLimit)).isEmpty();
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CARE_GUIDE, NOW, dailyLimit)).isEmpty();
+    assertThat(consumeWithDailyLimit(1L, AiFeature.JOURNAL_IMAGE_ANALYSIS, NOW, dailyLimit))
+        .isEmpty();
+
+    // 네 번째는 어떤 기능으로 와도 거부되고, 하루가 끝날 때까지 남은 시간을 돌려준다.
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, dailyLimit))
+        .contains(DAY.toSeconds());
+    assertThat(dailyRepository.findById(1L))
+        .get()
+        .satisfies(window -> assertThat(window.getConsumed()).isEqualTo(dailyLimit));
+  }
+
+  // 이 방어의 존재 이유. 한 계정이 하루 한도를 다 써도 전역 예산은 남아 다른 사용자가 계속
+  // 쓸 수 있어야 한다. 그러지 않으면 계정 하나가 서비스 전체의 AI 기능을 그날 내내 멈출 수 있다.
+  @Test
+  void keepsOneUsersDailyExhaustionFromBlockingOthers() {
+    int dailyLimit = 2;
+    int globalLimit = 10;
+
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, dailyLimit, globalLimit))
+        .isEmpty();
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, dailyLimit, globalLimit))
+        .isEmpty();
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, dailyLimit, globalLimit))
+        .contains(DAY.toSeconds());
+
+    // 거부된 요청은 전역 예산을 소모하지 않는다 — 트랜잭션이 통째로 롤백된다.
+    assertThat(globalRepository.findById(AiGlobalRateLimitWindow.GLOBAL_WINDOW_ID))
+        .get()
+        .satisfies(window -> assertThat(window.getConsumed()).isEqualTo(dailyLimit));
+
+    // 남은 전역 예산으로 다른 사용자는 그대로 서비스된다.
+    assertThat(consumeWithDailyLimit(2L, AiFeature.PLANT_CHAT, NOW, dailyLimit, globalLimit))
+        .isEmpty();
+  }
+
+  @Test
+  void opensNewDailyWindowAfterTheDayPasses() {
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, 1)).isEmpty();
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, 1)).isPresent();
+
+    LocalDateTime nextDay = NOW.plus(DAY);
+
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, nextDay, 1)).isEmpty();
+    assertThat(dailyRepository.findById(1L))
+        .get()
+        .satisfies(
+            window -> {
+              assertThat(window.getConsumed()).isEqualTo(1);
+              assertThat(window.getWindowStartedAt()).isEqualTo(nextDay);
+            });
+  }
+
+  // 기능별 짧은 창은 사용자 단위로만 세므로 일일 창을 도입해도 사용자끼리 섞이지 않아야 한다.
+  @Test
+  void countsDailyTotalsSeparatelyPerUser() {
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, 1)).isEmpty();
+
+    assertThat(consumeWithDailyLimit(2L, AiFeature.PLANT_CHAT, NOW, 1)).isEmpty();
+    assertThat(consumeWithDailyLimit(1L, AiFeature.PLANT_CHAT, NOW, 1)).isPresent();
+  }
+
+  private Optional<Long> consumeWithDailyLimit(
+      Long userId, AiFeature feature, LocalDateTime now, int dailyMaxRequests) {
+    return consumeWithDailyLimit(userId, feature, now, dailyMaxRequests, 100);
+  }
+
+  // 짧은 창(기능별)은 넉넉히 두어 일일 총량만 검증한다.
+  private Optional<Long> consumeWithDailyLimit(
+      Long userId,
+      AiFeature feature,
+      LocalDateTime now,
+      int dailyMaxRequests,
+      int globalMaxRequests) {
+    try {
+      rateLimitStore.consume(
+          userId, feature, now, WINDOW, 100, DAY, dailyMaxRequests, WINDOW, globalMaxRequests);
+      return Optional.empty();
+    } catch (AiQuotaExceededException exception) {
+      return Optional.of(exception.retryAfterSeconds());
+    }
+  }
+
   private Optional<Long> consume(Long userId, AiFeature feature, LocalDateTime now) {
     return consume(userId, feature, now, 100);
   }
@@ -310,7 +418,8 @@ class AiRateLimitStoreMySqlIntegrationTest {
   private Optional<Long> consume(
       Long userId, AiFeature feature, LocalDateTime now, int globalMaxRequests) {
     try {
-      rateLimitStore.consume(userId, feature, now, WINDOW, 2, WINDOW, globalMaxRequests);
+      rateLimitStore.consume(
+          userId, feature, now, WINDOW, 2, DAY, UNLIMITED_DAILY, WINDOW, globalMaxRequests);
       return Optional.empty();
     } catch (AiQuotaExceededException exception) {
       return Optional.of(exception.retryAfterSeconds());
