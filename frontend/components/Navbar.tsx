@@ -172,6 +172,7 @@ export default function Navbar() {
               <Link
                 key={n.key}
                 href={n.href}
+                data-tour-id={n.key}
                 onClick={(e) => guardNavClick(e, n.key)}
                 className={`whitespace-nowrap rounded-[10px] px-3 py-2 text-[15px] font-bold transition-colors duration-150 ${
                   active === n.key
@@ -374,6 +375,7 @@ export default function Navbar() {
               <Link
                 key={b.key}
                 href={b.href}
+                data-tour-id={b.key}
                 onClick={(e) => {
                   guardNavClick(e, b.key);
                   setMoreOpen(false);
@@ -389,6 +391,7 @@ export default function Navbar() {
           })}
           <button
             type="button"
+            data-tour-id="more"
             onClick={() => setMoreOpen((v) => !v)}
             className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-[3px] ${
               moreOpen || active === 'cards' || active === 'account'
@@ -469,6 +472,7 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
