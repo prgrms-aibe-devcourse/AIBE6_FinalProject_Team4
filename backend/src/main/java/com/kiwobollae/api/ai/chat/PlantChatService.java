@@ -239,7 +239,8 @@ public class PlantChatService {
           throw new BusinessException(
               ErrorCode.AI_CHAT_SELECTED_PLANT_MISMATCH,
               Map.of("selectedSpeciesName", selectedSpeciesName));
-      case REFUSE, UNCERTAIN -> throw new BusinessException(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED);
+      case REFUSE -> throw new BusinessException(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED);
+      case UNCERTAIN -> throw new BusinessException(ErrorCode.AI_CHAT_CONTEXT_REQUIRED);
       case ANSWER -> {
         // 아래에서 ANSWER 응답의 intent와 사용자 노출 필드를 검증한다.
       }

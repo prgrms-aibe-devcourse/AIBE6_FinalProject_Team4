@@ -176,6 +176,22 @@ class PlantChatControllerTest {
   }
 
   @Test
+  void returnsContextRequestForUncertainQuestion() throws Exception {
+    given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
+        .willThrow(new BusinessException(ErrorCode.AI_CHAT_CONTEXT_REQUIRED));
+
+    mockMvc
+        .perform(
+            post("/api/v1/ai/plant-profiles/21/chat")
+                .contentType(APPLICATION_JSON)
+                .content("{\"question\":\"이건 어떻게 해야 하나요?\"}"))
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.code").value("AI_CHAT_CONTEXT_REQUIRED"))
+        .andExpect(
+            jsonPath("$.message").value("어떤 식물의 어떤 상태인지 알려주세요. 식물명, 증상, 최근 변화를 함께 입력해 주세요."));
+  }
+
+  @Test
   void returnsDedicatedUnprocessableContentForDifferentPlantQuestion() throws Exception {
     given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
         .willThrow(

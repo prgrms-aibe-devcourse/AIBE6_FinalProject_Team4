@@ -433,7 +433,8 @@ class PlantChatServiceTest {
   }
 
   @Test
-  void rejectsUncertainScopeWithoutExposingOrSavingGeneratedContent() throws Exception {
+  void requestsMoreContextForUncertainScopeWithoutExposingOrSavingGeneratedContent()
+      throws Exception {
     given(
             growthContextQuery.getGrowthContext(
                 7L, 21L, PlantChatService.JOURNAL_CONTEXT_CHAR_BUDGET))
@@ -467,8 +468,7 @@ class PlantChatServiceTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.AI_CHAT_TOPIC_NOT_ALLOWED));
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_CHAT_CONTEXT_REQUIRED));
 
     PlantChatResponse resumed =
         plantChatService.chat(
