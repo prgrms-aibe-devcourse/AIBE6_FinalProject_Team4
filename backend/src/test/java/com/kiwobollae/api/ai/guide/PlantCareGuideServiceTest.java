@@ -190,21 +190,26 @@ class PlantCareGuideServiceTest {
   }
 
   @Test
-  void rejectsGuideGenerationWithoutVerifiedKnowledgeBeforeCallingAi() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+  void generatesGuideForNewSpeciesWithoutVerifiedKnowledge() {
+    given(plantSpeciesService.getSpecies(21L)).willReturn(species("고수"));
     given(knowledgeRetriever.retrieve(any())).willReturn(new PlantCareKnowledge(List.of()));
+    given(
+            cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
+                eq("고수"), eq(PlantCareGuideSchema.VERSION), anyString()))
+        .willReturn(Optional.empty());
+    given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
 
-    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            exception ->
-                assertThat(exception.getErrorCode())
-                    .isEqualTo(ErrorCode.AI_CARE_GUIDE_SOURCE_NOT_FOUND));
+    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
 
-    verifyNoInteractions(aiClient);
-    verifyNoInteractions(requestGuard);
-    verifyNoInteractions(cacheRepository);
-    verifyNoInteractions(generationLockStore);
+    assertThat(guide.cached()).isFalse();
+    verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CARE_GUIDE);
+
+    ArgumentCaptor<AiRequest> requestCaptor = ArgumentCaptor.forClass(AiRequest.class);
+    verify(aiClient).generate(requestCaptor.capture());
+    assertThat(requestCaptor.getValue().userPrompt())
+        .contains("식물 종: 고수")
+        .contains("서비스에서 검증한 재배 근거: 없음");
+    verify(cacheWriter).save(any(PlantCareGuideCache.class));
   }
 
   // 캐시 키는 정규화된 이름이다. 앞뒤·연속 공백만 정리하고 내부 공백은 남긴다.

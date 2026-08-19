@@ -49,9 +49,10 @@ public class PlantCareGuideService {
 
       규칙:
       - 한국의 기후와 아파트 베란다·실내 창가 환경을 기준으로 설명합니다.
-      - 공식 재배 가이드가 함께 주어지면 그 내용과 모순되지 않게 작성하고, 부족한 부분만 보완합니다.
-      - 제공된 재배 근거를 최우선으로 사용합니다. 근거에 없는 정확한 수치나 방법을 단정하지 마세요.
+      - 공식 재배 가이드와 검증 재배 근거가 함께 주어지면 그 내용과 모순되지 않게 작성하고, 부족한 부분만 보완합니다.
+      - 재배 근거가 제공되면 이를 최우선으로 사용합니다. 근거에 없는 정확한 수치나 방법을 단정하지 마세요.
       - 재배 근거와 일반 지식이 다를 수 있으면 재배 근거를 따르세요.
+      - 재배 근거가 없을 수 있습니다. 이 경우 일반 지식으로 작성하되, 출처를 확인한 사실인 것처럼 말하거나 존재하지 않는 출처를 만들지 마세요.
       - 확실하지 않은 수치는 단정하지 말고 범위로 표현합니다.
       - 모든 문장은 한국어 존댓말로, 초보자가 바로 실행할 수 있게 씁니다.
       - stages는 파종·새싹·성장·수확 네 단계를 모두 포함합니다.
@@ -120,9 +121,6 @@ public class PlantCareGuideService {
         knowledgeRetriever.retrieve(
             new PlantCareKnowledgeQuery(
                 sourceSpeciesId, speciesName, category, officialGuide, sourceUpdatedAt));
-    if (knowledge.isEmpty()) {
-      throw new BusinessException(ErrorCode.AI_CARE_GUIDE_SOURCE_NOT_FOUND);
-    }
     String sourceContextHash = sourceContextHash(category, knowledge);
 
     return findCachedGuide(speciesName, sourceContextHash)
@@ -239,7 +237,11 @@ public class PlantCareGuideService {
     if (category != null && !category.isBlank()) {
       userPrompt.append("분류: ").append(category).append('\n');
     }
-    userPrompt.append("서비스에서 검증한 재배 근거:\n").append(knowledge.promptContext());
+    if (knowledge.isEmpty()) {
+      userPrompt.append("서비스에서 검증한 재배 근거: 없음\n");
+    } else {
+      userPrompt.append("서비스에서 검증한 재배 근거:\n").append(knowledge.promptContext());
+    }
     userPrompt.append("위 종을 가정에서 키우기 위한 재배 가이드를 작성해 주세요.");
 
     return new AiRequest(
