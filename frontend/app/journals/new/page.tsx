@@ -108,7 +108,8 @@ function NewJournalInner() {
         return showToast('5MB 이하 사진만 올릴 수 있어요.', 'err');
       }
     }
-    setPhotos((prev) => [...prev, ...Array.from(files).map((file) => ({ file, preview: URL.createObjectURL(file) }))]);
+    const added = Array.from(files).map((file) => ({ file, preview: URL.createObjectURL(file) }));
+    setPhotos((prev) => [...prev, ...added]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
