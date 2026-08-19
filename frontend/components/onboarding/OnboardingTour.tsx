@@ -187,7 +187,22 @@ export default function OnboardingTour() {
     closeOnboardingTour();
   }, [state.user, closeOnboardingTour]);
 
-  if (!onboardingTourOpen) return null;
+  if (!onboardingTourOpen) {
+    // 이 온보딩은 메인 화면 전용이라, 재실행 버튼도 메인 화면에서만 보여준다 — 다른 화면(예:
+    // 일지의 AI 도우미 런처)에 있는 고정 위치 버튼과 겹칠 일이 아예 없어진다.
+    if (pathname !== "/" || !state.authed) return null;
+    return (
+      <button
+        type="button"
+        title="온보딩 투어 다시 보기"
+        aria-label="온보딩 투어 다시 보기"
+        onClick={openOnboardingTour}
+        className="fixed bottom-[82px] right-4 z-[44] flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_20px_rgba(85,139,47,.35)] transition-colors duration-150 hover:bg-brand-dark md:bottom-6 md:right-6"
+      >
+        <span className="material-symbols-outlined text-2xl">lightbulb</span>
+      </button>
+    );
+  }
 
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const isLast = stepIndex >= steps.length - 1;

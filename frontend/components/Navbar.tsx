@@ -82,7 +82,7 @@ export default function Navbar() {
   const pathname = usePathname() || '/';
   const router = useRouter();
   const { balance, state, hydrated, logout, unreadCount, markNotifRead, markAllNotifsRead } = useStore();
-  const { showToast, openOnboardingTour } = useUI();
+  const { showToast } = useUI();
   const active = activeKey(pathname);
   const cartCount = state.cartCount;
   const isAdmin = state.user?.role === 'ADMIN';
@@ -473,17 +473,6 @@ export default function Navbar() {
         </div>
       )}
 
-      {state.authed && (
-        <button
-          type="button"
-          title="온보딩 투어 다시 보기"
-          aria-label="온보딩 투어 다시 보기"
-          onClick={openOnboardingTour}
-          className="fixed bottom-[82px] right-4 z-[44] flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-brand text-white shadow-[0_8px_20px_rgba(85,139,47,.35)] transition-colors duration-150 hover:bg-brand-dark md:bottom-6 md:right-6"
-        >
-          <span className="material-symbols-outlined text-2xl">lightbulb</span>
-        </button>
-      )}
     </div>
   );
 }
