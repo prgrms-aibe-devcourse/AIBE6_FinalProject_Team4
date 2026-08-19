@@ -5,6 +5,7 @@ import com.kiwobollae.api.ai.chat.PlantChatConversationStore.ConversationMessage
 import com.kiwobollae.api.ai.chat.dto.PlantChatGeneratedResponse;
 import com.kiwobollae.api.ai.chat.dto.PlantChatRequest;
 import com.kiwobollae.api.ai.chat.dto.PlantChatResponse;
+import com.kiwobollae.api.ai.chat.dto.PlantChatResponseLimits;
 import com.kiwobollae.api.ai.chat.dto.PlantChatSchema;
 import com.kiwobollae.api.ai.chat.dto.PlantChatScopeDecision;
 import com.kiwobollae.api.ai.chat.dto.PlantChatScopeIntent;
@@ -40,10 +41,6 @@ public class PlantChatService {
   static final int JOURNAL_CONTEXT_CHAR_BUDGET = JOURNAL_HISTORY_FETCH_LIMIT;
 
   private static final int CHAT_MAX_OUTPUT_TOKENS = 800;
-  private static final int MAX_ANSWER_LENGTH = 2000;
-  private static final int MAX_RECOMMENDED_ACTIONS = 3;
-  private static final int MAX_ADDITIONAL_CHECKS = 3;
-  private static final int MAX_LIST_ITEM_LENGTH = 300;
 
   private static final String SYSTEM_PROMPT =
       """
@@ -77,9 +74,9 @@ public class PlantChatService {
       - 공식 관리 가이드가 있으면 우선 근거로 사용하고, 최근 기록과 충돌하면 그 차이를 명시하세요.
       - 일지를 저장·수정했거나 실제 식물을 관찰했다고 말하지 마세요. 이 API는 조언만 제공합니다.
       - 모든 문장은 한국어 존댓말로 작성하세요.
-      - answer는 간결하고 구체적으로 작성하세요.
-      - ANSWER일 때만 recommendedActions는 지금 실행할 수 있는 행동 1~3개를, additionalChecks는 더 살펴볼 사항
-        0~3개를 담으세요.
+      - answer는 핵심 원인과 대응을 320자 이내로 간결하고 구체적으로 작성하세요.
+      - ANSWER일 때만 recommendedActions는 지금 실행할 수 있는 행동 1~2개를, additionalChecks는 더 살펴볼 사항
+        0~2개를 각 80자 이내로 담으세요.
       """;
 
   private final PlantGrowthContextQuery growthContextQuery;
@@ -250,9 +247,11 @@ public class PlantChatService {
     if (response.scopeIntent() == PlantChatScopeIntent.NONE) {
       throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
     }
-    if (invalidText(response.answer(), MAX_ANSWER_LENGTH)
-        || invalidList(response.recommendedActions(), 1, MAX_RECOMMENDED_ACTIONS)
-        || invalidList(response.additionalChecks(), 0, MAX_ADDITIONAL_CHECKS)) {
+    if (invalidText(response.answer(), PlantChatResponseLimits.MAX_ANSWER_LENGTH)
+        || invalidList(
+            response.recommendedActions(), 1, PlantChatResponseLimits.MAX_RECOMMENDED_ACTIONS)
+        || invalidList(
+            response.additionalChecks(), 0, PlantChatResponseLimits.MAX_ADDITIONAL_CHECKS)) {
       throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
     }
     return new PlantChatGeneratedResponse(
@@ -288,7 +287,8 @@ public class PlantChatService {
     return items == null
         || items.size() < minSize
         || items.size() > maxSize
-        || items.stream().anyMatch(item -> invalidText(item, MAX_LIST_ITEM_LENGTH));
+        || items.stream()
+            .anyMatch(item -> invalidText(item, PlantChatResponseLimits.MAX_LIST_ITEM_LENGTH));
   }
 
   private boolean invalidText(String value, int maxLength) {

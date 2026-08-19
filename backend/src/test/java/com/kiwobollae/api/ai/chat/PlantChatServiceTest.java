@@ -93,6 +93,7 @@ class PlantChatServiceTest {
     assertThat(aiRequest.responseSchema().name()).isEqualTo("plant_profile_chat");
     assertThat(objectMapper.writeValueAsString(aiRequest.responseSchema().schema()))
         .contains("scopeDecision", "ANSWER", "OTHER_PLANT", "REFUSE", "UNCERTAIN")
+        .contains("\"maxLength\":320", "\"maxLength\":80", "\"maxItems\":2")
         .contains(
             "scopeIntent",
             "CARE",

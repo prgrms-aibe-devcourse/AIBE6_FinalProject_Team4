@@ -17,9 +17,17 @@ public final class PlantChatSchema {
         "scopeIntent",
         stringEnum(
             "CARE", "GROWTH_OBSERVATION", "JOURNAL_INTERPRETATION", "DIRECT_FOLLOW_UP", "NONE"));
-    properties.put("answer", string());
-    properties.put("recommendedActions", array(string()));
-    properties.put("additionalChecks", array(string()));
+    properties.put("answer", string(PlantChatResponseLimits.MAX_ANSWER_LENGTH));
+    properties.put(
+        "recommendedActions",
+        array(
+            string(PlantChatResponseLimits.MAX_LIST_ITEM_LENGTH),
+            PlantChatResponseLimits.MAX_RECOMMENDED_ACTIONS));
+    properties.put(
+        "additionalChecks",
+        array(
+            string(PlantChatResponseLimits.MAX_LIST_ITEM_LENGTH),
+            PlantChatResponseLimits.MAX_ADDITIONAL_CHECKS));
 
     return new AiJsonSchema(
         "plant_profile_chat",
@@ -36,15 +44,16 @@ public final class PlantChatSchema {
     return schema;
   }
 
-  private static Map<String, Object> array(Map<String, Object> items) {
+  private static Map<String, Object> array(Map<String, Object> items, int maxItems) {
     Map<String, Object> schema = new LinkedHashMap<>();
     schema.put("type", "array");
     schema.put("items", items);
+    schema.put("maxItems", maxItems);
     return schema;
   }
 
-  private static Map<String, Object> string() {
-    return Map.of("type", "string");
+  private static Map<String, Object> string(int maxLength) {
+    return Map.of("type", "string", "maxLength", maxLength);
   }
 
   private static Map<String, Object> stringEnum(String... values) {
