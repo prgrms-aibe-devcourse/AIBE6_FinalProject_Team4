@@ -36,7 +36,8 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class PlantChatService {
 
-  static final int JOURNAL_CONTEXT_CHAR_BUDGET = 20_000;
+  static final int JOURNAL_HISTORY_FETCH_LIMIT = 500;
+  static final int JOURNAL_CONTEXT_CHAR_BUDGET = JOURNAL_HISTORY_FETCH_LIMIT;
 
   private static final int CHAT_MAX_OUTPUT_TOKENS = 800;
   private static final int MAX_ANSWER_LENGTH = 2000;
@@ -60,7 +61,7 @@ public class PlantChatService {
         하나라도 있으면 다른 판정보다 우선하여 REFUSE로 설정하세요.
       - 질문 전체가 위 식물 상담 범위이지만 상담 대상이 SELECTED_PLANT와 명확히 다른 식물이거나, 다른 식물의
         관리 정보가 필요한 비교 요청이면 scopeDecision을 OTHER_PLANT로 설정하세요.
-      - 선택한 식물의 재배·관리, 성장 상태 관찰, 최근 성장 일지 해석 또는 직전 허용 답변의 직접적인 후속 질문일 때만
+      - 선택한 식물의 재배·관리, 성장 상태 관찰, 제공된 성장 일지 해석 또는 직전 허용 답변의 직접적인 후속 질문일 때만
         scopeDecision을 ANSWER로 설정하고 scopeIntent를 각각 CARE, GROWTH_OBSERVATION, JOURNAL_INTERPRETATION,
         DIRECT_FOLLOW_UP 중 가장 직접적인 하나로 설정하세요.
       - 질문의 상담 대상이나 요청 행위 자체를 제공된 문맥으로 확정할 수 없을 때만 UNCERTAIN으로 설정하세요.
@@ -85,13 +86,16 @@ public class PlantChatService {
   private final AiClient aiClient;
   private final AiRequestGuard requestGuard;
   private final PlantChatConversationStore conversationStore;
+  private final PlantChatJournalContextSelector journalContextSelector;
   private final ObjectMapper objectMapper;
   private final Clock seoulClock;
 
   public PlantChatResponse chat(Long userId, Long profileId, PlantChatRequest request) {
     String question = validateRequest(request);
     PlantGrowthContextResponse growthContext =
-        growthContextQuery.getGrowthContext(userId, profileId, JOURNAL_CONTEXT_CHAR_BUDGET);
+        growthContextQuery.getGrowthContext(userId, profileId, JOURNAL_HISTORY_FETCH_LIMIT);
+    PlantGrowthContextResponse selectedJournalContext =
+        withSelectedJournalContext(growthContext, question);
 
     try (ConversationHandle conversation =
         conversationStore.open(request.conversationId(), userId, profileId)) {
@@ -101,7 +105,8 @@ public class PlantChatService {
       AiResponse response =
           aiClient.generate(
               buildAiRequest(
-                  growthContext, new ValidatedRequest(question, conversation.recentMessages())));
+                  selectedJournalContext,
+                  new ValidatedRequest(question, conversation.recentMessages())));
       PlantChatGeneratedResponse generated =
           deserializeAndValidate(response, growthContext.speciesName());
       return toApiResponse(conversation.complete(question, assistantContext(generated)), generated);
@@ -115,6 +120,20 @@ public class PlantChatService {
 
     requestGuard.validateUserInput(request.question());
     return request.question().strip();
+  }
+
+  private PlantGrowthContextResponse withSelectedJournalContext(
+      PlantGrowthContextResponse context, String question) {
+    return new PlantGrowthContextResponse(
+        context.profileId(),
+        context.nickname(),
+        context.startDate(),
+        context.status(),
+        context.speciesId(),
+        context.speciesName(),
+        context.speciesCategory(),
+        context.officialCareGuide(),
+        journalContextSelector.select(context.recentJournals(), question));
   }
 
   private AiRequest buildAiRequest(
@@ -144,7 +163,7 @@ public class PlantChatService {
     Map<String, Object> root = new LinkedHashMap<>();
     root.put("requestDate", LocalDate.now(seoulClock).toString());
     root.put("plantProfile", profileContext(context));
-    root.put("recentJournals", journalContext(context.recentJournals()));
+    root.put("journalContext", journalContext(context.recentJournals()));
     root.put("recentConversation", conversationContext(request.recentConversation()));
     root.put("question", request.question());
 

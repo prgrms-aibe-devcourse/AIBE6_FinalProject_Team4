@@ -63,6 +63,7 @@ class PlantChatServiceTest {
             aiClient,
             requestGuard,
             conversationStore,
+            new PlantChatJournalContextSelector(),
             objectMapper,
             FIXED_KST_CLOCK);
   }

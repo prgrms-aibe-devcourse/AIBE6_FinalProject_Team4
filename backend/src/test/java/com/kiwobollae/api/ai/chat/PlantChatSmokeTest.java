@@ -168,6 +168,7 @@ class PlantChatSmokeTest {
         countingClient,
         mock(AiRequestGuard.class),
         new PlantChatConversationStore(FIXED_KST_CLOCK),
+        new PlantChatJournalContextSelector(),
         new ObjectMapper(),
         FIXED_KST_CLOCK);
   }

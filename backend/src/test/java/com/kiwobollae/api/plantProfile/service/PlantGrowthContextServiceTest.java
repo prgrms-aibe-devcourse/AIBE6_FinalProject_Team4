@@ -47,7 +47,7 @@ class PlantGrowthContextServiceTest {
 		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
 				.willReturn(journals);
 
-		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 20_000);
+		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 500);
 
 		assertThat(context.profileId()).isEqualTo(21L);
 		assertThat(context.nickname()).isEqualTo("바질이");
@@ -61,12 +61,12 @@ class PlantGrowthContextServiceTest {
 
 		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 		verify(plantJournalRepository).findRecentActiveByProfile(eq(7L), eq(21L), pageableCaptor.capture());
-		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
+		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(500);
 		assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
 	}
 
 	@Test
-	void includesMoreThanFiveRecentJournalsUntilContentBudgetIsFilled() {
+	void returnsJournalHistoryCandidatesBeyondFiveRecentJournals() {
 		PlantProfile profile = profile();
 		List<PlantJournal> journals = List.of(
 				journal(36L, LocalDate.of(2026, 8, 13), "12345"),
@@ -81,18 +81,18 @@ class PlantGrowthContextServiceTest {
 		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
 				.willReturn(journals);
 
-		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 30);
+		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 500);
 
 		assertThat(context.recentJournals())
 				.extracting(PlantGrowthContextResponse.RecentJournal::journalId)
-				.containsExactly(36L, 35L, 34L, 33L, 32L, 31L);
+				.containsExactly(36L, 35L, 34L, 33L, 32L, 31L, 30L);
 	}
 
 	@Test
 	void hidesWhetherAnotherUsersProfileExists() {
 		given(plantProfileRepository.findByIdAndUserId(99L, 7L)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 99L, 20_000))
+		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 99L, 500))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 
@@ -100,8 +100,8 @@ class PlantGrowthContextServiceTest {
 	}
 
 	@Test
-	void rejectsOutOfRangeJournalContentBudgetBeforeQuerying() {
-		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 21L, 20_001))
+	void rejectsOutOfRangeJournalHistoryFetchLimitBeforeQuerying() {
+		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 21L, 501))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
 
