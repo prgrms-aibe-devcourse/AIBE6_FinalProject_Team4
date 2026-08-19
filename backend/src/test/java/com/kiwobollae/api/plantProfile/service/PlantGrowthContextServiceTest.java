@@ -47,7 +47,7 @@ class PlantGrowthContextServiceTest {
 		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
 				.willReturn(journals);
 
-		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 500);
+		PlantGrowthContextResponse context = growthContextService.getJournalHistoryContext(7L, 21L);
 
 		assertThat(context.profileId()).isEqualTo(21L);
 		assertThat(context.nickname()).isEqualTo("바질이");
@@ -81,7 +81,7 @@ class PlantGrowthContextServiceTest {
 		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
 				.willReturn(journals);
 
-		PlantGrowthContextResponse context = growthContextService.getGrowthContext(7L, 21L, 500);
+		PlantGrowthContextResponse context = growthContextService.getJournalHistoryContext(7L, 21L);
 
 		assertThat(context.recentJournals())
 				.extracting(PlantGrowthContextResponse.RecentJournal::journalId)
@@ -92,7 +92,7 @@ class PlantGrowthContextServiceTest {
 	void hidesWhetherAnotherUsersProfileExists() {
 		given(plantProfileRepository.findByIdAndUserId(99L, 7L)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 99L, 500))
+		assertThatThrownBy(() -> growthContextService.getJournalHistoryContext(7L, 99L))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 
@@ -121,12 +121,17 @@ class PlantGrowthContextServiceTest {
 	}
 
 	@Test
-	void rejectsOutOfRangeJournalHistoryFetchLimitBeforeQuerying() {
-		assertThatThrownBy(() -> growthContextService.getGrowthContext(7L, 21L, 501))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+	void limitsRecentGrowthContextToTenJournals() {
+		PlantProfile profile = profile();
+		given(plantProfileRepository.findByIdAndUserId(21L, 7L)).willReturn(Optional.of(profile));
+		given(plantJournalRepository.findRecentActiveByProfile(eq(7L), eq(21L), org.mockito.ArgumentMatchers.any()))
+				.willReturn(List.of());
 
-		verifyNoInteractions(plantProfileRepository, plantJournalRepository);
+		growthContextService.getRecentGrowthContext(7L, 21L);
+
+		ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+		verify(plantJournalRepository).findRecentActiveByProfile(eq(7L), eq(21L), pageableCaptor.capture());
+		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
 	}
 
 	private PlantProfile profile() {

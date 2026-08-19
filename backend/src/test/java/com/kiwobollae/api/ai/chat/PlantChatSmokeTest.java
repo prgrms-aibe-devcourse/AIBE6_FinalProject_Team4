@@ -158,10 +158,7 @@ class PlantChatSmokeTest {
         };
 
     PlantGrowthContextQuery growthContextQuery = mock(PlantGrowthContextQuery.class);
-    given(
-            growthContextQuery.getGrowthContext(
-                7L, 21L, PlantChatService.JOURNAL_HISTORY_FETCH_LIMIT))
-        .willReturn(growthContext);
+    given(growthContextQuery.getJournalHistoryContext(7L, 21L)).willReturn(growthContext);
 
     return new PlantChatService(
         growthContextQuery,

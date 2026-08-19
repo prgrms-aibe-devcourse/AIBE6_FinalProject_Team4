@@ -37,8 +37,6 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class PlantChatService {
 
-  static final int JOURNAL_HISTORY_FETCH_LIMIT = 500;
-
   private static final int CHAT_MAX_OUTPUT_TOKENS = 800;
 
   private static final String SYSTEM_PROMPT =
@@ -97,7 +95,7 @@ public class PlantChatService {
       // 서버는 ANSWER 판정만 노출·저장한다.
       requestGuard.checkRateLimit(userId, AiFeature.PLANT_CHAT);
       PlantGrowthContextResponse growthContext =
-          growthContextQuery.getGrowthContext(userId, profileId, JOURNAL_HISTORY_FETCH_LIMIT);
+          growthContextQuery.getJournalHistoryContext(userId, profileId);
       PlantGrowthContextResponse selectedJournalContext =
           withSelectedJournalContext(growthContext, question);
       AiResponse response =

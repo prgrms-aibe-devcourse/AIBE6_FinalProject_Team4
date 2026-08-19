@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PlantGrowthContextService implements PlantGrowthContextQuery {
 
+	private static final int RECENT_JOURNAL_LIMIT = 10;
 	private static final int MAX_JOURNAL_HISTORY_FETCH_LIMIT = 500;
 
 	private final PlantProfileRepository plantProfileRepository;
@@ -32,17 +33,23 @@ public class PlantGrowthContextService implements PlantGrowthContextQuery {
 	}
 
 	@Override
-	public PlantGrowthContextResponse getGrowthContext(Long userId, Long profileId, int journalHistoryFetchLimit) {
+	public PlantGrowthContextResponse getRecentGrowthContext(Long userId, Long profileId) {
+		return loadGrowthContext(userId, profileId, RECENT_JOURNAL_LIMIT);
+	}
+
+	@Override
+	public PlantGrowthContextResponse getJournalHistoryContext(Long userId, Long profileId) {
+		return loadGrowthContext(userId, profileId, MAX_JOURNAL_HISTORY_FETCH_LIMIT);
+	}
+
+	private PlantGrowthContextResponse loadGrowthContext(Long userId, Long profileId, int journalFetchLimit) {
 		validateIds(userId, profileId);
-		if (journalHistoryFetchLimit < 1 || journalHistoryFetchLimit > MAX_JOURNAL_HISTORY_FETCH_LIMIT) {
-			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "일지 이력 조회 개수가 올바르지 않습니다.");
-		}
 
 		// 타인의 프로필도 같은 404로 응답해 프로필 존재 여부를 노출하지 않는다.
 		PlantProfile profile = plantProfileRepository.findByIdAndUserId(profileId, userId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_PROFILE_NOT_FOUND));
 		List<PlantJournal> recentJournals = plantJournalRepository.findRecentActiveByProfile(
-				userId, profileId, PageRequest.of(0, journalHistoryFetchLimit));
+				userId, profileId, PageRequest.of(0, journalFetchLimit));
 
 		return PlantGrowthContextResponse.from(profile, recentJournals);
 	}
