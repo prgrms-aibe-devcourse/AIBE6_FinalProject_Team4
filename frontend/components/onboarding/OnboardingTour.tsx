@@ -122,7 +122,9 @@ export default function OnboardingTour() {
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const autoCheckedRef = useRef(false);
+  // 마지막으로 자동 노출 여부를 판단한 userId — boolean 하나로 막으면 같은 탭에서
+  // A로 로그인해 판단이 끝난 뒤 B로 로그인해도 재평가가 안 되는 문제가 있어, 유저별로 추적한다.
+  const autoCheckedUserIdRef = useRef<number | null>(null);
   const steps = isMobile ? TOUR_STEPS_MOBILE : TOUR_STEPS_DESKTOP;
 
   useEffect(() => {
@@ -133,11 +135,14 @@ export default function OnboardingTour() {
   }, []);
 
   // 로그인 상태로 메인 화면에 처음 들어왔고, 이 유저가 아직 투어를 본 적 없으면 자동으로 연다.
-  // 세션당 한 번만 판단하도록 ref로 막아, 홈을 여러 번 오갈 때마다 재평가하지 않는다.
+  // 같은 유저에 대해서는 한 번만 판단하도록 ref로 막아, 홈을 여러 번 오갈 때마다 재평가하지
+  // 않는다 — 단, 같은 탭에서 다른 계정으로 로그인하면(state.user.id가 바뀌면) 그 계정 기준으로
+  // 다시 판단해야 하므로, "이미 확인한 userId"를 기억하는 방식으로 막는다.
   useEffect(() => {
-    if (!hydrated || autoCheckedRef.current) return;
+    if (!hydrated) return;
     if (pathname !== "/" || !state.authed || !state.user) return;
-    autoCheckedRef.current = true;
+    if (autoCheckedUserIdRef.current === state.user.id) return;
+    autoCheckedUserIdRef.current = state.user.id;
     if (!localStorage.getItem(seenKey(state.user.id))) {
       openOnboardingTour();
     }
