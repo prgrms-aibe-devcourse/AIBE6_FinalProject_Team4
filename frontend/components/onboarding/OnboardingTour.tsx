@@ -20,7 +20,7 @@ const TOUR_STEPS: TourStep[] = [
   { targetId: 'plants', title: '내 식물', description: '반려 식물을 등록하고 성장 상태를 관리해요.' },
   { targetId: 'journal', title: '일지', description: '매일 식물의 모습을 기록하면 포인트를 받아요.' },
   { targetId: 'shop', title: '상점', description: '포인트로 다양한 상품과 가챠 카드팩을 구매해요.' },
-  { targetId: 'cards', title: '쿠폰', description: '모은 카드를 쿠폰으로 교환할 수 있어요.' },
+  { targetId: 'cards', title: '쿠폰', description: '포인트로 얻은 카드를 모아 실제 농작물 쿠폰으로 교환해요.' },
   { targetId: 'gacha', title: '가챠', description: '카드팩을 열어 카드를 모으고 도감을 완성해보세요.' },
   { targetId: 'board', title: '커뮤니티', description: '다른 사용자들과 식물 이야기를 나눠보세요.' },
   { targetId: 'market', title: '거래소', description: '보유한 카드를 다른 사용자와 거래할 수 있어요.' },

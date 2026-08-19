@@ -82,7 +82,7 @@ export default function Navbar() {
   const pathname = usePathname() || '/';
   const router = useRouter();
   const { balance, state, hydrated, logout, unreadCount, markNotifRead, markAllNotifsRead } = useStore();
-  const { showToast } = useUI();
+  const { showToast, openOnboardingTour } = useUI();
   const active = activeKey(pathname);
   const cartCount = state.cartCount;
   const isAdmin = state.user?.role === 'ADMIN';
@@ -172,6 +172,7 @@ export default function Navbar() {
               <Link
                 key={n.key}
                 href={n.href}
+                data-tour-id={n.key}
                 onClick={(e) => guardNavClick(e, n.key)}
                 className={`whitespace-nowrap rounded-[10px] px-3 py-2 text-[15px] font-bold transition-colors duration-150 ${
                   active === n.key
@@ -199,6 +200,15 @@ export default function Navbar() {
                   관리자 콘솔
                 </Link>
               )}
+              <button
+                type="button"
+                title="온보딩 투어 다시 보기"
+                aria-label="온보딩 투어 다시 보기"
+                onClick={openOnboardingTour}
+                className="hidden h-10 w-10 cursor-pointer place-items-center rounded-xl border border-line bg-white text-[#5b6a54] transition-colors duration-150 hover:border-brand hover:bg-brand-soft hover:text-brand-dark md:grid"
+              >
+                <span className="material-symbols-outlined text-[21px]">lightbulb</span>
+              </button>
               <Link
                 href="/cart"
                 title="장바구니"

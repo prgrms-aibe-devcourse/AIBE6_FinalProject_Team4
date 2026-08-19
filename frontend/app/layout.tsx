@@ -5,6 +5,7 @@ import { UIProvider } from '@/lib/ui';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { GachaCosmeticsProvider } from '@/features/gacha/use-gacha-cosmetics';
+import OnboardingTour from '@/components/onboarding/OnboardingTour';
 
 export const metadata = {
   title: '키워볼래 🌱',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <GachaCosmeticsProvider>
             <UIProvider>
               <Navbar />
+              <OnboardingTour />
               {/* min-height keeps the footer's top half in view even on short pages, instead of it sitting flush under a tiny amount of content */}
               <main className="min-h-[calc(100vh-62px-120px)] flex-1">{children}</main>
               <Footer />
