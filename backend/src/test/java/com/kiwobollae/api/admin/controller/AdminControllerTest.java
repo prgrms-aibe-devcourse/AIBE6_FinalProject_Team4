@@ -17,6 +17,8 @@ import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
+import com.kiwobollae.api.journal.service.PlantJournalService;
+import com.kiwobollae.api.report.service.ReportService;
 import com.kiwobollae.api.species.dto.request.PlantSpeciesRequest;
 import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -45,6 +47,8 @@ class AdminControllerTest {
 	@Mock private PlantSpeciesManagementService plantSpeciesManagementService;
 	@Mock private BoardPostService boardPostService;
 	@Mock private BoardCommentService boardCommentService;
+	@Mock private PlantJournalService plantJournalService;
+	@Mock private ReportService reportService;
 
 	private MockMvc mockMvc;
 	private final ObjectMapper objectMapper = new ObjectMapper();
@@ -53,7 +57,7 @@ class AdminControllerTest {
 	void setUp() {
 		AdminController adminController = new AdminController(
 				exchangeManagementService, orderManagementService, plantSpeciesManagementService,
-				boardPostService, boardCommentService);
+				boardPostService, boardCommentService, plantJournalService, reportService);
 		mockMvc = MockMvcBuilders.standaloneSetup(adminController)
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())

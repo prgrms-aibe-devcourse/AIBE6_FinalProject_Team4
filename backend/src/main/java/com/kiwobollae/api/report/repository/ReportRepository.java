@@ -36,6 +36,8 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 	boolean existsWithStatus(@Param("reporterId") Long reporterId, @Param("targetType") ReportTargetType targetType,
 			@Param("targetId") Long targetId, @Param("status") ReportStatus status);
 
+	boolean existsByTargetTypeAndTargetId(ReportTargetType targetType, Long targetId);
+
 	@Modifying
 	@Query("update Report r set r.processedAdmin = :admin, r.actionType = :actionType, "
 			+ "r.actionDetail = :actionDetail, r.processedAt = :now, r.status = :newStatus "

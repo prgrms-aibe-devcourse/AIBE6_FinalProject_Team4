@@ -7,6 +7,7 @@ import {
   InquiryCategory,
   InquiryData,
 } from '@/lib/inquiry-api';
+import { getMyReports, ReportData, ReportTargetType } from '@/lib/report-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 
@@ -14,6 +15,14 @@ const CAT: Record<InquiryCategory, string> = { PAYMENT: '결제', DELIVERY: '배
 const STAT: Record<InquiryData['status'], [string, string]> = {
   OPEN: ['대기', 'bg-[#f0f1ea] text-[#8a8a8a]'],
   ANSWERED: ['답변완료', 'bg-[#E8F3D8] text-brand-text'],
+};
+const REPORT_TARGET: Record<ReportTargetType, string> = {
+  JOURNAL: '일지', USER: '사용자', POST: '게시글', COMMENT: '댓글',
+};
+const REPORT_STAT: Record<ReportData['status'], [string, string]> = {
+  PENDING: ['검토중', 'bg-[#f0f1ea] text-[#8a8a8a]'],
+  COMPLETED: ['처리완료', 'bg-[#E8F3D8] text-brand-text'],
+  REJECTED: ['반려됨', 'bg-[#FBEDE3] text-[#b5771a]'],
 };
 
 function formatDate(value: string): string {
@@ -31,7 +40,6 @@ function formatDateTime(value: string): string {
 }
 
 const CATS: [InquiryCategory, string][] = [['PAYMENT', '결제'], ['DELIVERY', '배송'], ['ACCOUNT', '계정'], ['ETC', '기타']];
-const REASONS = [['spam', '스팸/광고'], ['inappropriate', '부적절한 콘텐츠'], ['stolen', '사진 도용'], ['etc', '기타']];
 
 const FIELD = 'w-full rounded-xl border-[1.5px] border-line px-[13px] py-3 outline-none';
 const LABEL = 'text-[13px] font-bold text-[#6d7a68]';
@@ -48,9 +56,11 @@ export default function Inquiries() {
   const [cur, setCur] = useState<InquiryData | null>(null);
   const [form, setForm] = useState<{ cat: InquiryCategory | null; title: string; content: string }>({ cat: null, title: '', content: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reason, setReason] = useState<string | null>(null);
-  const [reported, setReported] = useState(false);
+  const [section, setSection] = useState<'inquiry' | 'report'>('inquiry');
+  const [reports, setReports] = useState<ReportData[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportsError, setReportsError] = useState('');
+  const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -78,6 +88,34 @@ export default function Inquiries() {
     return () => controller.abort();
   }, [hydrated, state.accessToken]);
 
+  // "신고 내역" 탭을 처음 열 때만 조회한다 — 문의 탭만 보는 사용자에게 불필요한 요청을 보내지
+  // 않기 위해 section에 따라 지연 로딩한다.
+  useEffect(() => {
+    if (!hydrated || !state.accessToken || section !== 'report') return;
+    const accessToken = state.accessToken;
+
+    const controller = new AbortController();
+    setReportsLoading(true);
+    setReportsError('');
+
+    getMyReports(accessToken, 0, 50, controller.signal)
+      .then((page) => setReports(page.content))
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+        setReports([]);
+        setReportsError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : '신고 내역을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setReportsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [hydrated, state.accessToken, section]);
+
   const submit = async () => {
     if (!form.cat) return showToast('문의 유형을 골라주세요.', 'err');
     if (!form.title.trim()) return showToast('제목을 입력해 주세요.', 'err');
@@ -103,13 +141,6 @@ export default function Inquiries() {
       setSubmitting(false);
     }
   };
-  const submitReport = () => {
-    if (!reason) return showToast('신고 사유를 골라주세요.', 'err');
-    if (reported) return showToast('이미 신고해 주신 내용이에요. 검토 중이니 조금만 기다려 주세요.', 'err');
-    setReportOpen(false); setReason(null); setReported(true);
-    showToast('신고가 접수됐어요. 검토 후 조치할게요. 알려주셔서 고마워요.');
-  };
-
   if (view === 'new') {
     return (
       <div className="container max-w-[820px]">
@@ -192,79 +223,116 @@ export default function Inquiries() {
 
   return (
     <div className="container max-w-[820px]">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2.5">
-        <h1 className="text-[26px] font-extrabold">1:1 문의</h1>
-        <button type="button" onClick={() => setView('new')} className="cursor-pointer rounded-xl bg-brand px-5 py-[11px] font-bold text-white">문의하기</button>
-      </div>
-      <p className="mb-[22px] text-sub">궁금하거나 불편한 점이 있으면 편하게 남겨주세요. 정성껏 답해드릴게요 💌</p>
-
-      {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">문의 내역을 불러오고 있어요 💌</div>
-      ) : error ? (
-        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
-      ) : inquiries.length === 0 ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">아직 등록한 문의가 없어요.</div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {inquiries.map((q) => {
-            const st = STAT[q.status];
-            return (
-              <button
-                key={q.id}
-                type="button"
-                onClick={() => { setCur(q); setView('detail'); }}
-                className="flex flex-wrap items-center gap-3.5 rounded-2xl bg-white px-5 py-[18px] text-left shadow-card"
-              >
-                <span className={CHIP_CAT}>{CAT[q.category]}</span>
-                <div className="min-w-[150px] flex-1">
-                  <div className="font-bold">{q.title}</div>
-                  <div className="mt-[3px] text-[12.5px] text-faint">{formatDate(q.createdAt)}</div>
-                </div>
-                <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="mt-[30px] text-center">
-        <button type="button" onClick={() => setReportOpen(true)} className="cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white px-[18px] py-[11px] font-bold text-sub">
-          <span className="material-symbols-outlined text-[17px]">flag</span> 신고 기능 미리보기
-        </button>
+      <div className="mb-4 flex w-fit gap-1.5 rounded-[14px] bg-[#F0F2E8] p-[5px]">
+        {(
+          [
+            ['inquiry', '1:1 문의'],
+            ['report', '신고 내역'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSection(key)}
+            className={`cursor-pointer rounded-[11px] px-[18px] py-[9px] text-sm font-bold transition-colors duration-150 ${
+              section === key
+                ? 'bg-white text-ink shadow-[0_2px_8px_rgba(0,0,0,.06)]'
+                : 'bg-transparent text-sub hover:bg-white/70 hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {reportOpen && (
-        <div onClick={() => setReportOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[420px] animate-pop rounded-[20px] bg-white p-6">
-            <h3 className="mb-1 text-[19px] font-extrabold">신고하기</h3>
-            <p className="mb-4 text-[13.5px] text-sub">검토 후 조치할게요. 바로 처리되지는 않아요.</p>
-            <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-[#f6f7f1] p-2.5">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-gradient-to-br from-[#FFCC80] to-[#FF8A65] text-[22px]">🍅</div>
-              <div className="text-[13.5px] text-[#6d7a68]">토실이 · 2026.07.21 일지</div>
-            </div>
-            <div className="mb-3.5 flex flex-col gap-2">
-              {REASONS.map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setReason(k)}
-                  className={`cursor-pointer rounded-[11px] border-[1.5px] px-3.5 py-[11px] text-left font-semibold ${
-                    reason === k ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {reason === 'etc' && (
-              <textarea placeholder="신고 사유를 적어주세요" className="mb-3.5 min-h-[70px] w-full resize-y rounded-xl border-[1.5px] border-line p-3 outline-none" />
-            )}
-            <div className="flex gap-2.5">
-              <button type="button" onClick={submitReport} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">신고 접수</button>
-              <button type="button" onClick={() => setReportOpen(false)} className="cursor-pointer rounded-xl border-[1.5px] border-line bg-white px-5 py-[13px] font-bold text-sub">닫기</button>
-            </div>
+      {section === 'inquiry' ? (
+        <>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2.5">
+            <h1 className="text-[26px] font-extrabold">1:1 문의</h1>
+            <button type="button" onClick={() => setView('new')} className="cursor-pointer rounded-xl bg-brand px-5 py-[11px] font-bold text-white">문의하기</button>
           </div>
-        </div>
+          <p className="mb-[22px] text-sub">궁금하거나 불편한 점이 있으면 편하게 남겨주세요. 정성껏 답해드릴게요 💌</p>
+
+          {loading ? (
+            <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">문의 내역을 불러오고 있어요 💌</div>
+          ) : error ? (
+            <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
+          ) : inquiries.length === 0 ? (
+            <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">아직 등록한 문의가 없어요.</div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {inquiries.map((q) => {
+                const st = STAT[q.status];
+                return (
+                  <button
+                    key={q.id}
+                    type="button"
+                    onClick={() => { setCur(q); setView('detail'); }}
+                    className="flex flex-wrap items-center gap-3.5 rounded-2xl bg-white px-5 py-[18px] text-left shadow-card"
+                  >
+                    <span className={CHIP_CAT}>{CAT[q.category]}</span>
+                    <div className="min-w-[150px] flex-1">
+                      <div className="font-bold">{q.title}</div>
+                      <div className="mt-[3px] text-[12.5px] text-faint">{formatDate(q.createdAt)}</div>
+                    </div>
+                    <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <h1 className="mb-1.5 text-[26px] font-extrabold">신고 내역</h1>
+          <p className="mb-[22px] text-sub">내가 접수한 신고의 처리 상태를 확인할 수 있어요.</p>
+
+          {reportsLoading ? (
+            <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">신고 내역을 불러오고 있어요</div>
+          ) : reportsError ? (
+            <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{reportsError}</div>
+          ) : reports.length === 0 ? (
+            <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">아직 접수한 신고가 없어요.</div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {reports.map((r) => {
+                const st = REPORT_STAT[r.status];
+                const expanded = expandedReportId === r.id;
+                return (
+                  <div key={r.id} className="rounded-2xl bg-white px-5 py-[18px] shadow-card">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedReportId(expanded ? null : r.id)}
+                      className="flex w-full flex-wrap items-center gap-3.5 text-left"
+                    >
+                      <span className={CHIP_CAT}>{REPORT_TARGET[r.targetType]}</span>
+                      <div className="min-w-[150px] flex-1">
+                        <div className="font-bold">{r.reason}</div>
+                        <div className="mt-[3px] text-[12.5px] text-faint">{formatDate(r.createdAt)}</div>
+                      </div>
+                      <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
+                    </button>
+                    {expanded && r.status !== 'PENDING' && (
+                      <div className="mt-3.5 rounded-xl bg-[#f6f7f1] p-3.5">
+                        <div className="mb-1 text-xs font-bold text-sub">
+                          {r.processedAdminName ?? '관리자'}
+                          {r.processedAt ? ` · ${formatDateTime(r.processedAt)}` : ''}
+                        </div>
+                        <p className="text-sm font-bold">{r.actionType}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-[1.6]">{r.actionDetail}</p>
+                      </div>
+                    )}
+                    {expanded && r.status === 'PENDING' && (
+                      <div className="mt-3.5 rounded-xl bg-[#f6f7f1] p-3.5 text-sm text-sub">
+                        아직 검토 중이에요. 처리되면 여기서 확인할 수 있어요.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

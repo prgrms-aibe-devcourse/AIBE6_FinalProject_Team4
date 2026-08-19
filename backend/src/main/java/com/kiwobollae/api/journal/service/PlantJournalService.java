@@ -160,6 +160,15 @@ public class PlantJournalService {
 		return PlantJournalResponse.from(journal, journalImageRepository.findByJournalId(journalId));
 	}
 
+	// 신고 검토 화면에서 관리자가 신고된 일지 원문을 확인할 때 쓴다. getPublicSnapshot과 달리
+	// deletedAt을 걸러내지 않는다 — 작성자가 신고 접수 후 일지를 삭제해도 관리자는 신고 당시
+	// 내용을 볼 수 있어야 한다(getPublicSnapshot은 공개 열람용이라 그대로 두고 별도 메서드로 뺀다).
+	public PlantJournalResponse getForAdmin(Long journalId) {
+		PlantJournal journal = plantJournalRepository.findById(journalId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
+		return PlantJournalResponse.from(journal, journalImageRepository.findByJournalId(journalId));
+	}
+
 	@Transactional
 	public PlantJournalResponse updateJournal(Long userId, Long journalId, PlantJournalUpdateRequest request) {
 		PlantJournal journal = plantJournalRepository.findOwnedActive(journalId, userId)

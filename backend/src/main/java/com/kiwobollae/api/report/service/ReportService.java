@@ -81,6 +81,14 @@ public class ReportService {
 		return reportRepository.search(status, pageable).map(ReportResponse::from);
 	}
 
+	// 신고 검토용 콘텐츠 상세 조회(일지/댓글) 앞단에서 쓰는 인가 체크. 대상이 실제로 신고된 적
+	// 있는지(상태 무관) 확인하지 않으면, ADMIN은 ID만 알면 신고와 무관한 비공개 일지도 열람할 수
+	// 있게 된다 — getPublicSnapshot/getForAdmin류가 원래 "호출부가 정당한 접근인지 검증한다"는
+	// 전제로 만들어졌기 때문에, 그 검증을 여기서 대신 해준다.
+	public boolean existsReportForTarget(ReportTargetType targetType, Long targetId) {
+		return reportRepository.existsByTargetTypeAndTargetId(targetType, targetId);
+	}
+
 	@Transactional
 	public ReportResponse completeReport(Long adminId, Long reportId, ReportActionRequest request) {
 		return processReport(adminId, reportId, request, ReportStatus.COMPLETED);

@@ -129,6 +129,17 @@ public class BoardCommentService {
 		boardPostRepository.decrementCommentCount(comment.getPost().getId());
 	}
 
+	// 신고 검토 화면에서 관리자가 신고된 댓글의 원문/게시글을 확인할 때 쓴다. findActiveComment와
+	// 달리 상태를 ACTIVE로 제한하지 않는다 — 신고를 완료 처리하면 먼저 댓글을 HIDDEN으로 바꾸고,
+	// 작성자가 직접 삭제해도 HIDDEN이 되므로, ACTIVE만 허용하면 "완료된 신고"의 상세 보기가 항상
+	// 실패한다. BoardCommentResponse.from이 HIDDEN이면 nickname/content를 이미 null로 가려주므로
+	// 그대로 반환해도 안전하다.
+	public BoardCommentResponse getForAdmin(Long commentId) {
+		BoardComment comment = boardCommentRepository.findByIdWithUser(commentId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.BOARD_COMMENT_NOT_FOUND));
+		return BoardCommentResponse.from(comment);
+	}
+
 	@Transactional
 	public void adminHideComment(Long commentId) {
 		BoardComment comment = findActiveComment(commentId);
