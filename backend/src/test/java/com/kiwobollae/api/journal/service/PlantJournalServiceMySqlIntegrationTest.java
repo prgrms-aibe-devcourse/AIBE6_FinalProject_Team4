@@ -11,12 +11,10 @@ import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.journal.dto.request.JournalImageRequest;
 import com.kiwobollae.api.journal.dto.request.PlantJournalRequest;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
@@ -58,9 +56,6 @@ class PlantJournalServiceMySqlIntegrationTest {
 	private PlantProfileRepository plantProfileRepository;
 
 	@Autowired
-	private PlantSpeciesRepository plantSpeciesRepository;
-
-	@Autowired
 	private PointTransactionRepository pointTransactionRepository;
 
 	@Autowired
@@ -91,14 +86,10 @@ class PlantJournalServiceMySqlIntegrationTest {
 				.build());
 		userId = user.getId();
 
-		PlantSpecies species = plantSpeciesRepository.saveAndFlush(PlantSpecies.builder()
-				.name("바질")
-				.category("HERB")
-				.build());
 		PlantProfile profile = plantProfileRepository.saveAndFlush(
 				PlantProfile.create(
 						user,
-						species,
+						"바질",
 						"롤백 바질",
 						LocalDate.now(),
 						null
@@ -143,7 +134,6 @@ class PlantJournalServiceMySqlIntegrationTest {
 		journalImageRepository.deleteAllInBatch();
 		plantJournalRepository.deleteAllInBatch();
 		plantProfileRepository.deleteAllInBatch();
-		plantSpeciesRepository.deleteAllInBatch();
 		walletRepository.deleteAllInBatch();
 		userRepository.deleteAllInBatch();
 	}

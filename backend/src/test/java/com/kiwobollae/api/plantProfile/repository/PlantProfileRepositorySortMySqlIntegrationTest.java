@@ -9,8 +9,6 @@ import com.kiwobollae.api.auth.entity.enums.UserStatus;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
-import com.kiwobollae.api.species.entity.PlantSpecies;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,9 +34,6 @@ class PlantProfileRepositorySortMySqlIntegrationTest {
 
 	@Autowired
 	private PlantProfileRepository plantProfileRepository;
-
-	@Autowired
-	private PlantSpeciesRepository plantSpeciesRepository;
 
 	@Autowired
 	private UserRepository userRepository;
@@ -69,18 +64,13 @@ class PlantProfileRepositorySortMySqlIntegrationTest {
 
 	@Test
 	void ordersByStatusPriorityThenByCreatedAtDescWithinEachStatus() {
-		PlantSpecies species = plantSpeciesRepository.saveAndFlush(PlantSpecies.builder()
-				.name("바질")
-				.category("HERB")
-				.build());
-
 		LocalDateTime base = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
 
 		// 생성 순서를 우선순위와 반대로 섞어서, 단순 createdAt 정렬로는 통과할 수 없게 만든다.
-		PlantProfile failed = savePlant(species, "실패한 식물", PlantStatus.FAILED, base.plusMinutes(3));
-		PlantProfile harvested = savePlant(species, "수확한 식물", PlantStatus.HARVESTED, base.plusMinutes(2));
-		PlantProfile growingOld = savePlant(species, "먼저 심은 식물", PlantStatus.GROWING, base);
-		PlantProfile growingNew = savePlant(species, "나중에 심은 식물", PlantStatus.GROWING, base.plusMinutes(1));
+		PlantProfile failed = savePlant("실패한 식물", PlantStatus.FAILED, base.plusMinutes(3));
+		PlantProfile harvested = savePlant("수확한 식물", PlantStatus.HARVESTED, base.plusMinutes(2));
+		PlantProfile growingOld = savePlant("먼저 심은 식물", PlantStatus.GROWING, base);
+		PlantProfile growingNew = savePlant("나중에 심은 식물", PlantStatus.GROWING, base.plusMinutes(1));
 
 		List<PlantProfile> result = plantProfileRepository
 				.findAllByUserIdAndStatus(userId, null, PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt")))
@@ -94,10 +84,10 @@ class PlantProfileRepositorySortMySqlIntegrationTest {
 						failed.getId());
 	}
 
-	private PlantProfile savePlant(PlantSpecies species, String name, PlantStatus status, LocalDateTime createdAt) {
+	private PlantProfile savePlant(String name, PlantStatus status, LocalDateTime createdAt) {
 		PlantProfile profile = PlantProfile.builder()
 				.user(userRepository.getReferenceById(userId))
-				.species(species)
+				.speciesName("바질")
 				.plantName(name)
 				.startDate(LocalDate.now())
 				.status(status)
@@ -108,7 +98,6 @@ class PlantProfileRepositorySortMySqlIntegrationTest {
 
 	private void clearData() {
 		plantProfileRepository.deleteAllInBatch();
-		plantSpeciesRepository.deleteAllInBatch();
 		userRepository.deleteAllInBatch();
 	}
 }

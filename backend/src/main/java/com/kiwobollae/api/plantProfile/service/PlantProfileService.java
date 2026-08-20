@@ -8,12 +8,10 @@ import com.kiwobollae.api.plantProfile.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.journal.entity.JournalImage;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.journal.service.JournalImageUploadService;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.timelapse.repository.PlantTimelapseRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
@@ -38,7 +36,6 @@ public class PlantProfileService {
 	private static final String EMOJI_THUMBNAIL_PREFIX = "emoji:";
 
 	private final PlantProfileRepository plantProfileRepository;
-	private final PlantSpeciesRepository plantSpeciesRepository;
 	private final PlantJournalRepository plantJournalRepository;
 	private final JournalImageRepository journalImageRepository;
 	private final PlantTimelapseRepository plantTimelapseRepository;
@@ -49,11 +46,10 @@ public class PlantProfileService {
 
 	@Transactional
 	public PlantProfileResponse createProfile(Long userId, PlantProfileRequest request) {
-		PlantSpecies species = plantSpeciesRepository.findById(request.speciesId())
-				.orElseThrow(() -> new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
 		User user = userRepository.getReferenceById(userId);
 		PlantProfile saved = plantProfileRepository.save(
-				PlantProfile.create(user, species, request.nickname(), request.startDate(), request.thumbnailUrl()));
+				PlantProfile.create(user, request.speciesName(), request.nickname(), request.startDate(),
+						request.thumbnailUrl()));
 		return PlantProfileResponse.from(saved);
 	}
 

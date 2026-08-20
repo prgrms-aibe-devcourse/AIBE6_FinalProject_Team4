@@ -176,10 +176,7 @@ class PlantChatSmokeTest {
         "테스트 바질",
         LocalDate.of(2026, 7, 1),
         PlantStatus.GROWING,
-        3L,
         "바질",
-        "허브",
-        "바질은 햇빛이 잘 들고 통풍되는 곳에서 키우며, 겉흙이 마르면 물을 충분히 줍니다.",
         List.of(
             new RecentJournal(31L, LocalDate.of(2026, 8, 8), "새 잎 끝이 조금 말랐습니다."),
             new RecentJournal(30L, LocalDate.of(2026, 8, 5), "물을 충분히 주고 받침의 물을 비웠습니다.")));
@@ -191,10 +188,7 @@ class PlantChatSmokeTest {
         "꼬리 선인장",
         LocalDate.of(2026, 7, 1),
         PlantStatus.GROWING,
-        4L,
         "원숭이꼬리선인장",
-        "선인장",
-        "배수가 잘되는 흙에 심고 흙이 충분히 마른 뒤 물을 줍니다.",
         List.of(new RecentJournal(31L, LocalDate.of(2026, 8, 8), "줄기가 조금 자랐습니다.")));
   }
 

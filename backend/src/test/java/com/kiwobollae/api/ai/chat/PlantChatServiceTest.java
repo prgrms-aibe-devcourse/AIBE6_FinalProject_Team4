@@ -109,7 +109,7 @@ class PlantChatServiceTest {
     assertThat(aiRequest.userPrompt())
         .contains("2026-08-10")
         .contains("바질이")
-        .contains("바질은 겉흙이 마르면 물을 줍니다.")
+        .contains("\"speciesName\":\"바질\"")
         .contains("2026-08-08")
         .contains("새 잎이 조금 말렸어요.")
         .contains("잎 끝이 갈색인데 어떻게 해야 하나요?")
@@ -494,10 +494,7 @@ class PlantChatServiceTest {
         "바질이",
         LocalDate.of(2026, 7, 1),
         PlantStatus.GROWING,
-        3L,
         "바질",
-        "허브",
-        "바질은 겉흙이 마르면 물을 줍니다.",
         List.of(
             new RecentJournal(31L, LocalDate.of(2026, 8, 8), "새 잎이 조금 말렸어요."),
             new RecentJournal(30L, LocalDate.of(2026, 8, 5), "물을 충분히 줬어요.")));
@@ -509,10 +506,7 @@ class PlantChatServiceTest {
         "바질이",
         LocalDate.of(2026, 7, 1),
         PlantStatus.GROWING,
-        3L,
         "바질",
-        "허브",
-        "바질은 겉흙이 마르면 물을 줍니다.",
         List.of(
             new RecentJournal(37L, LocalDate.of(2026, 8, 8), "오늘은 새 잎이 한 장 나왔어요."),
             new RecentJournal(36L, LocalDate.of(2026, 8, 7), "물을 주고 창가로 옮겼어요."),
@@ -529,10 +523,7 @@ class PlantChatServiceTest {
         "꼬리 선인장",
         LocalDate.of(2026, 7, 1),
         PlantStatus.GROWING,
-        4L,
         "원숭이꼬리선인장",
-        "선인장",
-        "배수가 잘되는 흙에 심고 흙이 충분히 마른 뒤 물을 줍니다.",
         List.of(new RecentJournal(31L, LocalDate.of(2026, 8, 8), "줄기가 조금 자랐어요.")));
   }
 

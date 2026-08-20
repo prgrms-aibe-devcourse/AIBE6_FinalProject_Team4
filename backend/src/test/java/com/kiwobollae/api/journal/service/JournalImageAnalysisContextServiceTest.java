@@ -15,7 +15,6 @@ import com.kiwobollae.api.journal.entity.PlantJournal;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -34,7 +33,6 @@ class JournalImageAnalysisContextServiceTest {
   @Mock private PlantJournal recentJournal;
   @Mock private JournalImage image;
   @Mock private PlantProfile profile;
-  @Mock private PlantSpecies species;
 
   @Test
   void validatesOwnedCurrentImageWithoutLoadingFullJournalContext() {
@@ -70,10 +68,7 @@ class JournalImageAnalysisContextServiceTest {
     given(journal.getContent()).willReturn("아래쪽 잎을 관찰했어요.");
     given(profile.getId()).willReturn(21L);
     given(profile.getPlantName()).willReturn("바질이");
-    given(profile.getSpecies()).willReturn(species);
-    given(species.getName()).willReturn("스위트 바질");
-    given(species.getCategory()).willReturn("허브");
-    given(species.getCareGuide()).willReturn("겉흙이 마르면 물을 주세요.");
+    given(profile.getSpeciesName()).willReturn("스위트 바질");
     given(image.getImageUrl()).willReturn("/api/v1/journals/images/7/basil.webp");
     given(image.getImageHash()).willReturn("a".repeat(64));
     given(image.isRepresentative()).willReturn(true);

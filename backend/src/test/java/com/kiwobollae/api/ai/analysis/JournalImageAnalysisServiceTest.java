@@ -109,11 +109,7 @@ class JournalImageAnalysisServiceTest {
     assertThat(request.images())
         .containsExactly(
             new AiImageInput("/api/v1/journals/images/7/basil.webp", AiImageInput.Detail.HIGH));
-    assertThat(request.userPrompt())
-        .contains("바질이")
-        .contains("스위트 바질")
-        .contains("겉흙이 마르면")
-        .contains("새 잎이 두 장 자랐어요");
+    assertThat(request.userPrompt()).contains("바질이").contains("스위트 바질").contains("새 잎이 두 장 자랐어요");
   }
 
   @Test
@@ -215,8 +211,6 @@ class JournalImageAnalysisServiceTest {
         21L,
         "바질이",
         "스위트 바질",
-        "허브",
-        "밝은 곳에서 키우고 겉흙이 마르면 물을 주세요.",
         LocalDate.of(2026, 8, 13),
         "아래 잎 끝이 조금 옅어 보여요.",
         List.of(

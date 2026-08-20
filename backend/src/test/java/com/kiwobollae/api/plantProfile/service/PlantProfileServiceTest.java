@@ -11,12 +11,10 @@ import com.kiwobollae.api.plantProfile.dto.response.PlantProfileResponse;
 import com.kiwobollae.api.journal.entity.JournalImage;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.journal.service.JournalImageUploadService;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.timelapse.repository.PlantTimelapseRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,7 +40,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class PlantProfileServiceTest {
 
 	@Mock private PlantProfileRepository plantProfileRepository;
-	@Mock private PlantSpeciesRepository plantSpeciesRepository;
 	@Mock private PlantJournalRepository plantJournalRepository;
 	@Mock private JournalImageRepository journalImageRepository;
 	@Mock private PlantTimelapseRepository plantTimelapseRepository;
@@ -304,7 +301,7 @@ class PlantProfileServiceTest {
 	private PlantProfile profile(Long id, User user, String plantImage) {
 		PlantProfile profile = PlantProfile.builder()
 				.user(user)
-				.species(PlantSpecies.builder().name("바질").build())
+				.speciesName("바질")
 				.plantName("바질이")
 				.startDate(LocalDate.now())
 				.plantImage(plantImage)

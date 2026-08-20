@@ -9,8 +9,6 @@ public record JournalImageAnalysisContext(
 		Long plantProfileId,
 		String plantNickname,
 		String speciesName,
-		String speciesCategory,
-		String officialCareGuide,
 		LocalDate writtenDate,
 		String journalContent,
 		List<Image> images,

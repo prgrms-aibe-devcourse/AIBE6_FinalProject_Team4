@@ -16,8 +16,6 @@ import com.kiwobollae.api.journal.dto.response.PlantJournalCreateResponse;
 import com.kiwobollae.api.journal.service.PlantJournalService;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.entity.PlantSpecies;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +41,6 @@ class GachaJournalRewardMySqlIntegrationTest {
 
   @Autowired private PlantJournalService plantJournalService;
   @Autowired private UserRepository userRepository;
-  @Autowired private PlantSpeciesRepository plantSpeciesRepository;
   @Autowired private PlantProfileRepository plantProfileRepository;
   @Autowired private TradingCardRepository tradingCardRepository;
   @Autowired private GachaDrawRepository gachaDrawRepository;
@@ -53,15 +50,14 @@ class GachaJournalRewardMySqlIntegrationTest {
   @Test
   void firstJournalRewardCreatesAndCompletesOneFiveCardDraw() {
     User user = userRepository.findByEmail("test@test.com").orElseThrow();
-    PlantSpecies species =
-        plantSpeciesRepository.save(
-            PlantSpecies.builder().name("가챠 QA 식물").category("QA").careGuide("통합 테스트용").build());
     PlantProfile firstProfile =
         plantProfileRepository.save(
-            PlantProfile.create(user, species, "첫 번째 QA 식물", LocalDate.now().minusDays(3), null));
+            PlantProfile.create(
+                user, "가챠 QA 식물", "첫 번째 QA 식물", LocalDate.now().minusDays(3), null));
     PlantProfile secondProfile =
         plantProfileRepository.save(
-            PlantProfile.create(user, species, "두 번째 QA 식물", LocalDate.now().minusDays(2), null));
+            PlantProfile.create(
+                user, "가챠 QA 식물", "두 번째 QA 식물", LocalDate.now().minusDays(2), null));
 
     PlantJournalCreateResponse first =
         plantJournalService.createJournal(

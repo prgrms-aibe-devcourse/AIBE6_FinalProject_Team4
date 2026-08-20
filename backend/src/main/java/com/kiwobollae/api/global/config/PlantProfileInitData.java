@@ -3,14 +3,9 @@ package com.kiwobollae.api.global.config;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import java.time.LocalDate;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
@@ -26,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
  * users on a fresh DB — useful while journal image upload (and thus real profile
  * registration end-to-end) is still blocked.
  *
- * <p>Depends on InitData (users, @Order(1)) and ProductInitData (plant species,
- * @Order(2)) having already run; skips silently if either is missing.
+ * <p>Depends on InitData (users, @Order(1)) having already run; skips silently if missing.
+ * 종은 더 이상 별도 카탈로그를 참조하지 않고 사용자가 직접 입력하는 것과 동일하게 이름 문자열을 그대로 넣는다.
  *
  * <p>Disable without changing code by setting {@code app.seed.plant-profile.enabled=false}.
  */
@@ -39,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PlantProfileInitData implements ApplicationRunner {
 
 	private final UserRepository userRepository;
-	private final PlantSpeciesRepository plantSpeciesRepository;
 	private final PlantProfileRepository plantProfileRepository;
 
 	@Override
@@ -54,26 +48,17 @@ public class PlantProfileInitData implements ApplicationRunner {
 			return;
 		}
 
-		Map<String, PlantSpecies> species = plantSpeciesRepository.findAll().stream()
-				.collect(Collectors.toMap(PlantSpecies::getName, Function.identity(), (a, b) -> a));
-		if (species.isEmpty()) {
-			return;
-		}
-
 		plantProfileRepository.saveAll(Stream.of(
-				profile(testUser, species.get("방울토마토"), "토실이", LocalDate.now().minusDays(42), PlantStatus.GROWING),
-				profile(testUser, species.get("스위트 바질"), "바질이", LocalDate.now().minusDays(15), PlantStatus.GROWING),
-				profile(testUser, species.get("청상추"), "쌈싸리", LocalDate.now().minusDays(8), PlantStatus.GROWING),
-				profile(testUser, species.get("설향 딸기"), "딸기공주", LocalDate.now().minusDays(120), PlantStatus.HARVESTED),
-				profile(testUser, species.get("로즈마리"), "로즈랑이", LocalDate.now().minusDays(30), PlantStatus.FAILED)
-		).filter(p -> p != null).toList());
+				profile(testUser, "방울토마토", "토실이", LocalDate.now().minusDays(42), PlantStatus.GROWING),
+				profile(testUser, "스위트 바질", "바질이", LocalDate.now().minusDays(15), PlantStatus.GROWING),
+				profile(testUser, "청상추", "쌈싸리", LocalDate.now().minusDays(8), PlantStatus.GROWING),
+				profile(testUser, "설향 딸기", "딸기공주", LocalDate.now().minusDays(120), PlantStatus.HARVESTED),
+				profile(testUser, "로즈마리", "로즈랑이", LocalDate.now().minusDays(30), PlantStatus.FAILED)
+		).toList());
 	}
 
-	private PlantProfile profile(User user, PlantSpecies species, String nickname, LocalDate startDate, PlantStatus status) {
-		if (species == null) {
-			return null;
-		}
-		PlantProfile plantProfile = PlantProfile.create(user, species, nickname, startDate, null);
+	private PlantProfile profile(User user, String speciesName, String nickname, LocalDate startDate, PlantStatus status) {
+		PlantProfile plantProfile = PlantProfile.create(user, speciesName, nickname, startDate, null);
 		if (status != PlantStatus.GROWING) {
 			plantProfile.updateProfile(null, null, status);
 		}

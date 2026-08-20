@@ -70,7 +70,7 @@ class PlantControllerTest {
 
 	private PlantProfileResponse sampleResponse(Long id, PlantStatus status) {
 		return new PlantProfileResponse(
-				id, 7L, 1L, "바질", "정중앙에서 촬영하세요.", "바질이", LocalDate.now(), null, status,
+				id, 7L, "바질", "바질이", LocalDate.now(), null, status,
 				LocalDateTime.now()
 		);
 	}
@@ -119,7 +119,21 @@ class PlantControllerTest {
 	@Test
 	void createProfileRejectsNicknameWithSpecialCharacters() throws Exception {
 		authenticateAs(7L);
-		PlantProfileRequest request = new PlantProfileRequest(1L, "바질#", LocalDate.now(), null);
+		PlantProfileRequest request = new PlantProfileRequest("바질", "바질#", LocalDate.now(), null);
+
+		mockMvc.perform(post("/api/v1/plants")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(request)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"));
+
+		verify(plantProfileService, never()).createProfile(any(), any());
+	}
+
+	@Test
+	void createProfileRejectsSpeciesNameWithSpecialCharacters() throws Exception {
+		authenticateAs(7L);
+		PlantProfileRequest request = new PlantProfileRequest("바질123", "바질이", LocalDate.now(), null);
 
 		mockMvc.perform(post("/api/v1/plants")
 						.contentType(MediaType.APPLICATION_JSON)

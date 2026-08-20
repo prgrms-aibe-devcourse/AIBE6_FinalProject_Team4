@@ -3,7 +3,6 @@ package com.kiwobollae.api.plantProfile.dto.response;
 import com.kiwobollae.api.journal.entity.PlantJournal;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -13,10 +12,7 @@ public record PlantGrowthContextResponse(
 		String nickname,
 		LocalDate startDate,
 		PlantStatus status,
-		Long speciesId,
 		String speciesName,
-		String speciesCategory,
-		String officialCareGuide,
 		List<RecentJournal> recentJournals
 ) {
 	public PlantGrowthContextResponse {
@@ -24,16 +20,12 @@ public record PlantGrowthContextResponse(
 	}
 
 	public static PlantGrowthContextResponse from(PlantProfile profile, List<PlantJournal> journals) {
-		PlantSpecies species = profile.getSpecies();
 		return new PlantGrowthContextResponse(
 				profile.getId(),
 				profile.getPlantName(),
 				profile.getStartDate(),
 				profile.getStatus(),
-				species.getId(),
-				species.getName(),
-				species.getCategory(),
-				species.getCareGuide(),
+				profile.getSpeciesName(),
 				journals.stream().map(RecentJournal::from).toList()
 		);
 	}

@@ -8,9 +8,7 @@ import java.time.LocalDateTime;
 public record PlantProfileResponse(
 		Long id,
 		Long userId,
-		Long speciesId,
 		String speciesName,
-		String careGuide,
 		String nickname,
 		LocalDate startDate,
 		String thumbnailUrl,
@@ -21,9 +19,7 @@ public record PlantProfileResponse(
 		return new PlantProfileResponse(
 				plantProfile.getId(),
 				plantProfile.getUser().getId(),
-				plantProfile.getSpecies().getId(),
-				plantProfile.getSpecies().getName(),
-				plantProfile.getSpecies().getCareGuide(),
+				plantProfile.getSpeciesName(),
 				plantProfile.getPlantName(),
 				plantProfile.getStartDate(),
 				plantProfile.getPlantImage(),

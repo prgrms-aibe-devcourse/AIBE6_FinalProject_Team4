@@ -8,7 +8,6 @@ import com.kiwobollae.api.journal.entity.PlantJournal;
 import com.kiwobollae.api.journal.repository.JournalImageRepository;
 import com.kiwobollae.api.journal.repository.PlantJournalRepository;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -48,7 +47,6 @@ public class JournalImageAnalysisContextService implements JournalImageAnalysisC
 				.orElseThrow(() -> new BusinessException(ErrorCode.JOURNAL_NOT_FOUND));
 		List<JournalImage> images = journalImageRepository.findByJournalId(journalId);
 		PlantProfile profile = journal.getPlantProfile();
-		PlantSpecies species = profile.getSpecies();
 		List<PlantJournal> recentJournals = plantJournalRepository.findRecentActiveByProfileExcluding(
 				userId,
 				profile.getId(),
@@ -60,9 +58,7 @@ public class JournalImageAnalysisContextService implements JournalImageAnalysisC
 				journal.getId(),
 				profile.getId(),
 				profile.getPlantName(),
-				species.getName(),
-				species.getCategory(),
-				species.getCareGuide(),
+				profile.getSpeciesName(),
 				journal.getWrittenDate(),
 				journal.getContent(),
 				images.stream()

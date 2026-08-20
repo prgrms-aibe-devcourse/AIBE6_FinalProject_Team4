@@ -7,7 +7,9 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 public record PlantProfileRequest(
-		@NotNull Long speciesId,
+		@NotBlank @Size(max = 100)
+		@Pattern(regexp = "[가-힣a-zA-Z ]+", message = "종 이름에는 한글/영문/공백만 사용할 수 있습니다.")
+		String speciesName,
 		@NotBlank @Size(max = 50)
 		@Pattern(regexp = "[가-힣a-zA-Z0-9 ]*", message = "별명에는 한글/영문/숫자/공백만 사용할 수 있습니다.")
 		String nickname,

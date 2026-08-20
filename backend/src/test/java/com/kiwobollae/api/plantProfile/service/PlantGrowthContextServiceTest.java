@@ -15,7 +15,6 @@ import com.kiwobollae.api.plantProfile.dto.response.PlantGrowthContextResponse;
 import com.kiwobollae.api.plantProfile.entity.PlantProfile;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.plantProfile.repository.PlantProfileRepository;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -51,10 +50,7 @@ class PlantGrowthContextServiceTest {
 
 		assertThat(context.profileId()).isEqualTo(21L);
 		assertThat(context.nickname()).isEqualTo("바질이");
-		assertThat(context.speciesId()).isEqualTo(3L);
 		assertThat(context.speciesName()).isEqualTo("바질");
-		assertThat(context.speciesCategory()).isEqualTo("허브");
-		assertThat(context.officialCareGuide()).isEqualTo("겉흙이 마르면 물을 주세요.");
 		assertThat(context.recentJournals())
 				.extracting(PlantGrowthContextResponse.RecentJournal::journalId)
 				.containsExactly(32L, 31L);
@@ -135,15 +131,8 @@ class PlantGrowthContextServiceTest {
 	}
 
 	private PlantProfile profile() {
-		PlantSpecies species = PlantSpecies.builder()
-				.name("바질")
-				.category("허브")
-				.careGuide("겉흙이 마르면 물을 주세요.")
-				.build();
-		ReflectionTestUtils.setField(species, "id", 3L);
-
 		PlantProfile profile = PlantProfile.builder()
-				.species(species)
+				.speciesName("바질")
 				.plantName("바질이")
 				.startDate(LocalDate.of(2026, 7, 1))
 				.status(PlantStatus.GROWING)

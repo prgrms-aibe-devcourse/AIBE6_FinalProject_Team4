@@ -3,7 +3,6 @@ package com.kiwobollae.api.plantProfile.entity;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.plantProfile.entity.enums.PlantStatus;
 import com.kiwobollae.api.global.common.BaseEntity;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -24,8 +23,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "plant_profile", indexes = {
-		@Index(name = "idx_plant_profile_user_id", columnList = "user_id"),
-		@Index(name = "idx_plant_profile_species_id", columnList = "specie_id")
+		@Index(name = "idx_plant_profile_user_id", columnList = "user_id")
 })
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -36,9 +34,10 @@ public class PlantProfile extends BaseEntity {
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "specie_id", nullable = false)
-	private PlantSpecies species;
+	// AI 도입 전 관리자가 직접 관리하던 종(PlantSpecies) 카탈로그를 없애고, 사용자가 등록 시 직접 입력한
+	// 이름을 그대로 저장한다. 한글/영문/공백만 허용하는 검증은 PlantProfileRequest에서 수행한다.
+	@Column(name = "species_name", nullable = false, length = 100)
+	private String speciesName;
 
 	@Column(name = "plant_name", nullable = false, length = 50)
 	private String plantName;
@@ -56,11 +55,11 @@ public class PlantProfile extends BaseEntity {
 	@Column(name = "created_at", nullable = false)
 	private LocalDateTime createdAt;
 
-	public static PlantProfile create(User user, PlantSpecies species,
+	public static PlantProfile create(User user, String speciesName,
 			String plantName, LocalDate startDate, String plantImage) {
 		return PlantProfile.builder()
 				.user(user)
-				.species(species)
+				.speciesName(speciesName)
 				.plantName(plantName)
 				.startDate(startDate)
 				.plantImage(plantImage)
