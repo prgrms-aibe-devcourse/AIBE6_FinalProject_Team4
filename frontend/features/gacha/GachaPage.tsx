@@ -38,6 +38,27 @@ import {
   getMyGachaCollection,
 } from "@/lib/gacha-api";
 import { useStore } from "@/lib/store";
+import { useSpotlightTour } from "@/lib/onboarding/useSpotlightTour";
+import SpotlightTour, { TourStep } from "@/components/onboarding/SpotlightTour";
+
+const GACHA_TOUR_STEPS: TourStep[] = [
+  {
+    targetId: "gacha-catalog-tab",
+    title: "전체 도감",
+    description:
+      "카드팩은 상점에서 포인트로 구매하고, 여기서는 모은 카드를 도감으로 확인할 수 있어요.",
+  },
+  {
+    targetId: "gacha-mine-tab",
+    title: "내 카드 갤러리",
+    description: "지금까지 모은 카드만 모아서 볼 수 있어요.",
+  },
+  {
+    targetId: "gacha-history-tab",
+    title: "개봉 내역",
+    description: "그동안 열어본 카드팩 기록을 확인할 수 있어요.",
+  },
+];
 
 type Tab = "catalog" | "mine" | "workshop" | "history";
 type GachaSearchParams = {
@@ -67,6 +88,7 @@ export default function GachaPage({
   searchParams?: GachaSearchParams;
 }) {
   const { state, hydrated } = useStore();
+  const tour = useSpotlightTour("gacha", GACHA_TOUR_STEPS.length);
   const router = useRouter();
   const urlTab = initialTab(searchParams);
   const urlHistoryPage = parseOneBasedPage(searchParams?.page);
@@ -298,9 +320,20 @@ export default function GachaPage({
           <p className="mb-2 text-sm font-bold text-[#dce9c8]">
             SEASON 01 · 봄의 수호자
           </p>
-          <h1 className="text-[30px] font-black tracking-[-0.04em] md:text-[38px]">
-            오늘의 기록이 카드가 돼요
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-[30px] font-black tracking-[-0.04em] md:text-[38px]">
+              오늘의 기록이 카드가 돼요
+            </h1>
+            <button
+              type="button"
+              title="온보딩 투어 다시 보기"
+              aria-label="온보딩 투어 다시 보기"
+              onClick={tour.start}
+              className="flex h-5 w-5 flex-none cursor-pointer items-center justify-center rounded-full bg-white text-[11px] font-bold text-[#45643b] hover:bg-[#f2cf59]"
+            >
+              ?
+            </button>
+          </div>
           <p className="mt-3 max-w-[560px] text-sm leading-6 text-white/80">
             획득한 카드만 원본 일러스트가 해금됩니다. 도감을 채우고 나만의 카드
             갤러리를 완성해 보세요.
@@ -335,6 +368,7 @@ export default function GachaPage({
           <button
             key={key}
             type="button"
+            data-tour-id={`gacha-${key}-tab`}
             disabled={key !== "catalog" && !state.accessToken}
             onClick={() => selectTab(key)}
             className={`flex min-h-14 items-center justify-center gap-2 rounded-xl px-2 text-xs font-extrabold transition sm:text-sm ${
@@ -353,6 +387,14 @@ export default function GachaPage({
           </button>
         ))}
       </nav>
+      {tour.open && (
+        <SpotlightTour
+          steps={GACHA_TOUR_STEPS}
+          stepIndex={tour.stepIndex}
+          onNext={tour.next}
+          onSkip={tour.skip}
+        />
+      )}
 
       {loading ? (
         <div className="rounded-2xl bg-white p-12 text-center text-sub">

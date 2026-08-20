@@ -11,6 +11,26 @@ import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
 import { nickValid } from '@/lib/plant-validation';
 import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
+import { useSpotlightTour } from '@/lib/onboarding/useSpotlightTour';
+import SpotlightTour, { TourStep } from '@/components/onboarding/SpotlightTour';
+
+const PLANTS_TOUR_STEPS: TourStep[] = [
+  {
+    targetId: 'plants-new-btn',
+    title: '새 식물 등록하기',
+    description: '여기를 눌러 반려 식물을 등록하고 성장을 기록해보세요.',
+  },
+  {
+    targetId: 'plants-select-btn',
+    title: '상태 변경하기',
+    description: '이 버튼으로 식물을 선택한 뒤, 재배중·수확완료·실패 중 원하는 상태로 한 번에 바꿀 수 있어요.',
+  },
+  {
+    targetId: 'plants-written-today-checkbox',
+    title: '오늘 일지 안 쓴 것만 보기',
+    description: '체크하면 오늘 아직 일지를 안 쓴 식물만 골라 보여줘요.',
+  },
+];
 
 const FILTERS = [['all', '전체'], ['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
 const BULK_STATUS_OPTIONS: [PlantStatus, string][] = [['GROWING', '재배중'], ['HARVESTED', '수확완료'], ['FAILED', '실패']];
@@ -30,6 +50,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function PlantsPage() {
   const { state, hydrated, refreshPlantStats } = useStore();
   const { showToast, askConfirm } = useUI();
+  const tour = useSpotlightTour('plants', PLANTS_TOUR_STEPS.length);
   const [plants, setPlants] = useState<PlantProfileData[]>([]);
   // "오늘 일지 안 쓴 것만 보기"일 때만 쓰는, 필터링 전 GROWING 전체 목록.
   const [rawGrowing, setRawGrowing] = useState<PlantProfileData[]>([]);
@@ -348,10 +369,22 @@ export default function PlantsPage() {
   return (
     <div className="container">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[27px] font-extrabold">내 식물</h1>
+        <div className="flex items-center gap-1.5">
+          <h1 className="text-[27px] font-extrabold">내 식물</h1>
+          <button
+            type="button"
+            title="온보딩 투어 다시 보기"
+            aria-label="온보딩 투어 다시 보기"
+            onClick={tour.start}
+            className="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white hover:bg-brand-dark"
+          >
+            ?
+          </button>
+        </div>
         {!selectMode && (
           <button
             type="button"
+            data-tour-id="plants-new-btn"
             onClick={() => setOpen(true)}
             className="cursor-pointer rounded-xl bg-brand px-5 py-3 text-[15px] font-bold text-white"
           >
@@ -360,6 +393,14 @@ export default function PlantsPage() {
         )}
       </div>
       <p className="mb-5 text-sub">함께 자라는 친구들을 한눈에 살펴보세요.</p>
+      {tour.open && (
+        <SpotlightTour
+          steps={PLANTS_TOUR_STEPS}
+          stepIndex={tour.stepIndex}
+          onNext={tour.next}
+          onSkip={tour.skip}
+        />
+      )}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-[9px]">
         <div className="flex flex-wrap items-center gap-[9px]">
@@ -385,6 +426,7 @@ export default function PlantsPage() {
         </div>
         <button
           type="button"
+          data-tour-id="plants-select-btn"
           onClick={() => {
             setSelectMode(!selectMode);
             setSelectedIds(new Set());
@@ -399,6 +441,7 @@ export default function PlantsPage() {
 
       <div className="mb-[22px] flex flex-wrap items-center gap-2">
         <label
+          data-tour-id="plants-written-today-checkbox"
           className={`flex w-fit items-center gap-2 text-[13.5px] font-bold text-[#6d7a68] ${
             todayWrittenError ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
           }`}

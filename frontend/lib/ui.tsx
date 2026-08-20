@@ -19,13 +19,6 @@ interface ConfirmOpts {
 interface UIContextValue {
   showToast: (msg: string, tone?: 'ok' | 'err') => void;
   askConfirm: (opts: ConfirmOpts) => void;
-  // 온보딩 스포트라이트 투어(Navbar의 전구 아이콘, 최초 로그인 자동 노출)가 열려있는지 —
-  // Navbar와 OnboardingTour가 서로 다른 컴포넌트라 이 컨텍스트를 통해 트리거를 주고받는다.
-  // store.tsx(kwb_store_v1)는 상태 전체를 localStorage에 직렬화해서 여기 넣으면 새로고침
-  // 전 열림 상태가 그대로 남는 부작용이 있어, 영속 저장 없는 이 컨텍스트를 쓴다.
-  onboardingTourOpen: boolean;
-  openOnboardingTour: () => void;
-  closeOnboardingTour: () => void;
 }
 
 const UICtx = createContext<UIContextValue | null>(null);
@@ -33,7 +26,6 @@ const UICtx = createContext<UIContextValue | null>(null);
 export function UIProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const [confirm, setConfirm] = useState<ConfirmOpts | null>(null);
-  const [onboardingTourOpen, setOnboardingTourOpen] = useState(false);
 
   const showToast = useCallback((msg: string, tone: 'ok' | 'err' = 'ok') => {
     setToast({ msg, tone });
@@ -41,11 +33,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const askConfirm = useCallback((opts: ConfirmOpts) => setConfirm(opts), []);
-  const openOnboardingTour = useCallback(() => setOnboardingTourOpen(true), []);
-  const closeOnboardingTour = useCallback(() => setOnboardingTourOpen(false), []);
 
   return (
-    <UICtx.Provider value={{ showToast, askConfirm, onboardingTourOpen, openOnboardingTour, closeOnboardingTour }}>
+    <UICtx.Provider value={{ showToast, askConfirm }}>
       {children}
       {toast && (
         <div
