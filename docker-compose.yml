@@ -34,6 +34,37 @@ services:
       timeout: 5s
       retries: 10
 
+  # k6 부하 테스트 중 백엔드(host.docker.internal:8080/actuator/prometheus)를 스크레이프해
+  # 응답시간·처리량·에러율을 수집한다. 운영(infra/main.tf)에는 배포하지 않는 테스트 전용 스택.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: kiwobollae-prometheus
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: kiwobollae-grafana
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Seoul
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-admin}"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
 volumes:
   mysql_data:
   redis_data:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # 로컬에서 실행 중인 백엔드(gradle bootRun 등)를 스크레이프한다.
+  # Docker Desktop(Windows/Mac)은 host.docker.internal로 호스트에 접근 가능.
+  - job_name: kiwobollae-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]

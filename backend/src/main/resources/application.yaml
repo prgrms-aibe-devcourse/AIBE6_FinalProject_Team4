@@ -54,7 +54,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # prometheus: k6 부하 테스트 중 Prometheus가 스크레이프할 메트릭 엔드포인트
+        include: health,prometheus
   endpoint:
     health:
       show-details: never
