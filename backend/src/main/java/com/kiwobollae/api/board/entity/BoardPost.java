@@ -98,6 +98,14 @@ public class BoardPost extends BaseTimeEntity {
 		this.hiddenAt = hiddenAt;
 	}
 
+	// 관리자가 숨김을 되돌릴 때 쓴다. 첨부 이미지는 숨김 처리 시점에 이미 S3에서 삭제됐으므로
+	// (hidePostAndCleanImages 참고) 복원해도 이미지 없이 본문만 되돌아온다.
+	public void restore() {
+		this.status = BoardStatus.ACTIVE;
+		this.hiddenBy = null;
+		this.hiddenAt = null;
+	}
+
 	// board_post_likes/board_comments를 매번 COUNT하지 않도록 비정규화 캐시로 둔다. 증감은
 	// 엔티티 메서드가 아니라 BoardPostRepository의 원자적 UPDATE로만 한다 — "로드한 값 + 1"을
 	// dirty checking으로 반영하면 동시 요청에서 갱신 유실(Lost Update)이 생긴다.

@@ -35,13 +35,14 @@ public class AdminReportController {
 
 	private final ReportService reportService;
 
-	@Operation(summary = "신고 전체 목록 조회", description = "상태(선택)로 필터링해 전체 신고를 조회합니다.")
+	@Operation(summary = "신고 전체 목록 조회", description = "상태(선택), 신고 대상 유저(선택)로 필터링해 전체 신고를 조회합니다.")
 	@GetMapping
 	public ResponseEntity<ApiResponse<Page<ReportResponse>>> getReports(
 			@RequestParam(required = false) ReportStatus status,
+			@RequestParam(required = false) Long targetUserId,
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success(reportService.getReportsForAdmin(status, pageable)));
+		return ResponseEntity.ok(ApiResponse.success(reportService.getReportsForAdmin(status, targetUserId, pageable)));
 	}
 
 	@Operation(summary = "신고 완료 처리", description = "신고를 검토해 조치를 완료 처리합니다.")

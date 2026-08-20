@@ -4,7 +4,9 @@ import AdminAssetKeyField from "@/components/admin/AdminAssetKeyField";
 import AdminCouponPanel from "@/components/admin/AdminCouponPanel";
 import AdminGachaOperationsPanel from "@/components/admin/AdminGachaOperationsPanel";
 import AdminInquiryPanel from "@/components/admin/AdminInquiryPanel";
-import AdminReportPanel from "@/components/admin/AdminReportPanel";
+import AdminReportPanel, { AdminReportTargetUserFilter } from "@/components/admin/AdminReportPanel";
+import AdminBoardPanel from "@/components/admin/AdminBoardPanel";
+import AdminUserPanel from "@/components/admin/AdminUserPanel";
 import AdminCardMarketRevenuePanel from "@/components/admin/AdminCardMarketRevenuePanel";
 import AdminChargeProductPanel from "@/features/payment/AdminChargeProductPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
@@ -42,6 +44,8 @@ import {
   PlantSpeciesData,
   updateSpecies,
 } from "@/lib/species-api";
+import { getAdminUsers } from "@/features/admin/user-api";
+import { getReportsForAdmin } from "@/lib/report-api";
 import { fmt, useStore } from "@/lib/store";
 import { couponName } from "@/lib/coupon-label";
 import { ProductCategory } from "@/lib/product-api";
@@ -70,27 +74,28 @@ const exMeta: Record<string, [string, string, string]> = {
   CANCELLED: ["취소됨", "bg-[#f0f1ea] text-[#8a8a8a]", "취소됨"],
 };
 
-const KPIS = [
-  {
-    label: "오늘 주문",
-    value: "12건",
-    delta: "▲ 어제 대비 +3",
-    dc: "text-brand-text",
-  },
-  { label: "교환 신청", value: "5건", delta: "대기 2건", dc: "text-gold-text" },
-  {
-    label: "활성 사용자",
-    value: "184명",
-    delta: "▲ +12",
-    dc: "text-brand-text",
-  },
-  {
-    label: "미처리 신고",
-    value: "2건",
-    delta: "검토 필요",
-    dc: "text-[#b5502f]",
-  },
-];
+interface DashboardKpis {
+  todayOrders: number;
+  yesterdayOrders: number;
+  pendingExchanges: number;
+  activeUsers: number;
+  totalUsers: number;
+  pendingReports: number;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+// 브라우저 로컬 시각 기준 자정을 백엔드가 기대하는 ISO_LOCAL_DATE_TIME(오프셋 없음) 문자열로
+// 만든다 — Date.toISOString()은 UTC로 변환돼 관리자가 보는 "오늘"과 날짜가 어긋날 수 있다.
+function localMidnightIso(baseDate: Date, offsetDays: number): string {
+  const d = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + offsetDays);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T00:00:00`;
+}
+
+function formatDelta(diff: number): string {
+  if (diff > 0) return `▲ 어제 대비 +${diff}`;
+  if (diff < 0) return `▼ 어제 대비 ${diff}`;
+  return "어제와 동일";
+}
 
 const PANEL = "overflow-hidden rounded-[18px] bg-white shadow-card";
 const HEAD =
@@ -152,6 +157,8 @@ const ADMIN_TABS = [
   ["inquiries", "문의 관리"],
   ["charge-products", "충전 상품 관리"],
   ["reports", "신고 관리"],
+  ["board", "게시판 관리"],
+  ["users", "유저 관리"],
   ["species", "종 관리"],
 ] as const;
 
@@ -178,6 +185,8 @@ export default function Admin({
   const [tab, setTab] = useState(() =>
     ADMIN_TABS.some(([key]) => key === requestedTab) ? requestedTab! : "orders",
   );
+  // 유저 관리 탭의 "누적 신고수"를 누르면 신고 관리 탭으로 전환하면서 이 값을 채운다.
+  const [reportsUserFilter, setReportsUserFilter] = useState<AdminReportTargetUserFilter | null>(null);
 
   useEffect(() => {
     setTab(
@@ -188,6 +197,79 @@ export default function Admin({
   }, [requestedTab]);
   useEffect(() => setAdminPage(urlPage), [urlPage]);
   const { state, hydrated } = useStore();
+
+  const [kpis, setKpis] = useState<DashboardKpis | null>(null);
+  const [kpisLoading, setKpisLoading] = useState(true);
+
+  useEffect(() => {
+    if (!state.accessToken) return;
+    const accessToken = state.accessToken;
+    const controller = new AbortController();
+    setKpisLoading(true);
+    const now = new Date();
+    const todayStart = localMidnightIso(now, 0);
+    const tomorrowStart = localMidnightIso(now, 1);
+    const yesterdayStart = localMidnightIso(now, -1);
+
+    Promise.all([
+      getOrdersForAdmin(accessToken, { from: todayStart, to: tomorrowStart }, 0, 1, controller.signal),
+      getOrdersForAdmin(accessToken, { from: yesterdayStart, to: todayStart }, 0, 1, controller.signal),
+      getExchangesForAdmin(accessToken, "REQUESTED", 0, 1, controller.signal),
+      getAdminUsers({ accessToken, status: "ACTIVE", page: 0, size: 1, signal: controller.signal }),
+      getAdminUsers({ accessToken, page: 0, size: 1, signal: controller.signal }),
+      getReportsForAdmin(accessToken, "PENDING", 0, 1, controller.signal),
+    ])
+      .then(([todayOrders, yesterdayOrders, exchanges, activeUsers, allUsers, reports]) => {
+        setKpis({
+          todayOrders: todayOrders.totalElements,
+          yesterdayOrders: yesterdayOrders.totalElements,
+          pendingExchanges: exchanges.totalElements,
+          activeUsers: activeUsers.totalElements,
+          totalUsers: allUsers.totalElements,
+          pendingReports: reports.totalElements,
+        });
+      })
+      .catch((requestError) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setKpis(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setKpisLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [state.accessToken]);
+
+  const dashboardKpis = [
+    {
+      label: "오늘 주문",
+      value: kpisLoading || !kpis ? "-" : `${kpis.todayOrders}건`,
+      delta: kpisLoading || !kpis ? "" : formatDelta(kpis.todayOrders - kpis.yesterdayOrders),
+      dc: !kpis || kpis.todayOrders >= kpis.yesterdayOrders ? "text-brand-text" : "text-[#b5502f]",
+      tab: "orders",
+    },
+    {
+      label: "교환 신청",
+      value: kpisLoading || !kpis ? "-" : `${kpis.pendingExchanges}건`,
+      delta: kpisLoading || !kpis ? "" : "승인 대기 중",
+      dc: "text-gold-text",
+      tab: "exchanges",
+    },
+    {
+      label: "활성 사용자",
+      value: kpisLoading || !kpis ? "-" : `${kpis.activeUsers}명`,
+      delta: kpisLoading || !kpis ? "" : `전체 ${kpis.totalUsers}명 중`,
+      dc: "text-brand-text",
+      tab: "users",
+    },
+    {
+      label: "미처리 신고",
+      value: kpisLoading || !kpis ? "-" : `${kpis.pendingReports}건`,
+      delta: kpisLoading || !kpis ? "" : kpis.pendingReports > 0 ? "검토 필요" : "검토 완료",
+      dc: "text-[#b5502f]",
+      tab: "reports",
+    },
+  ];
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [orderItemsById, setOrderItemsById] = useState<
     Record<number, OrderItemData[]>
@@ -787,16 +869,24 @@ export default function Admin({
         <h1 className="text-[26px] font-extrabold">관리자 콘솔</h1>
       </div>
       <p className="mb-[22px] text-sub">
-        서비스 운영 현황을 한눈에. (데모 화면)
+        서비스 운영 현황을 한눈에.
       </p>
 
       <div className="mb-7 grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
-        {KPIS.map((k) => (
-          <div key={k.label} className="rounded-2xl bg-white p-5 shadow-card">
+        {dashboardKpis.map((k) => (
+          <button
+            key={k.label}
+            type="button"
+            onClick={() => {
+              if (k.tab === "reports") setReportsUserFilter(null);
+              changeTab(k.tab);
+            }}
+            className="cursor-pointer rounded-2xl bg-white p-5 text-left shadow-card transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,.08)]"
+          >
             <div className="text-[13px] font-bold text-sub">{k.label}</div>
             <div className="mt-1.5 text-[26px] font-extrabold">{k.value}</div>
             <div className={`mt-1 text-xs font-bold ${k.dc}`}>{k.delta}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -1610,8 +1700,26 @@ export default function Admin({
         </div>
       )}
 
+      {tab === "board" && state.accessToken && (
+        <AdminBoardPanel accessToken={state.accessToken} />
+      )}
+
+      {tab === "users" && state.accessToken && (
+        <AdminUserPanel
+          accessToken={state.accessToken}
+          onViewReports={(userId, label) => {
+            setReportsUserFilter({ id: userId, label });
+            changeTab("reports");
+          }}
+        />
+      )}
+
       {tab === "reports" && state.accessToken && (
-        <AdminReportPanel accessToken={state.accessToken} />
+        <AdminReportPanel
+          accessToken={state.accessToken}
+          targetUser={reportsUserFilter}
+          onClearTargetUser={() => setReportsUserFilter(null)}
+        />
       )}
     </div>
   );

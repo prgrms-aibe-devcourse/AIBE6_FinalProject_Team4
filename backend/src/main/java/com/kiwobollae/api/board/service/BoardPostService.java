@@ -103,9 +103,11 @@ public class BoardPostService {
 	}
 
 	@Transactional
-	public BoardPostResponse getPost(Long id, Long userId, String viewerIp) {
-		BoardPost post = findActivePost(id);
-		if (viewerIp != null && !viewerIp.isBlank()) {
+	public BoardPostResponse getPost(Long id, Long userId, String viewerIp, boolean isAdmin) {
+		// 관리자는 게시판 관리 화면(숨김 목록)에서 "상세 보기"로 넘어와 숨겨진 글도 확인할 수
+		// 있어야 하므로 상태 체크를 건너뛴다. 일반 사용자는 그대로 ACTIVE만 볼 수 있다.
+		BoardPost post = findViewablePost(id, isAdmin);
+		if (viewerIp != null && !viewerIp.isBlank() && post.getStatus() == BoardStatus.ACTIVE) {
 			recordViewOnce(post, viewerIp);
 		}
 		boolean likedByMe = userId != null && boardPostLikeRepository.existsByPostIdAndUserId(id, userId);
@@ -128,6 +130,18 @@ public class BoardPostService {
 			return;
 		}
 		boardPostRepository.incrementViewCount(post.getId());
+	}
+
+	// 관리자 전용 — 상태(기본 HIDDEN)로 필터링한 게시글 목록. 신고 여부와 무관하게 관리자가
+	// 게시판을 둘러보다 숨긴 글까지 전부 확인할 수 있어야 하므로 소유권/신고 체크를 하지 않는다.
+	public Page<BoardPostResponse> getPostsForAdmin(BoardStatus status, Pageable pageable) {
+		Page<BoardPost> posts = boardPostRepository.search(status, null, null, null, null, pageable);
+		if (posts.isEmpty()) {
+			return posts.map(post -> BoardPostResponse.from(post, List.of()));
+		}
+		List<Long> postIds = posts.map(BoardPost::getId).toList();
+		Map<Long, List<BoardPostImage>> imagesByPost = loadImagesByPost(postIds);
+		return posts.map(post -> BoardPostResponse.from(post, imagesByPost.getOrDefault(post.getId(), List.of())));
 	}
 
 	public Page<BoardPostResponse> getMyPosts(Long userId, Pageable pageable) {
@@ -184,11 +198,37 @@ public class BoardPostService {
 		hidePostAndCleanImages(post, BoardHiddenBy.ADMIN, post.getUser().getId());
 	}
 
-	// 숨김 처리는 복구 API가 없어 사실상 영구 삭제와 같으므로, 더 이상 어떤 게시글도 참조하지
-	// 않는 S3 객체를 이 시점에 정리한다(성장 일지의 deleteJournal과 동일한 컨벤션).
+	// 첨부 이미지는 숨김 처리 시점에 이미 S3에서 삭제돼 복원되지 않으므로(BoardPost.restore
+	// 참고), 이 API는 본문/상태만 되돌린다 — 이미지가 있던 글은 복원 후에도 이미지 없이 보인다.
+	//
+	// hiddenBy가 AUTHOR인 글은 복원 대상에서 제외한다 — 작성자가 스스로 삭제를 선택한 것이라
+	// "관리자가 숨긴 글을 되돌린다"는 이 API의 취지와 다르고, 관리 화면에 모아 보여주다 보면
+	// 관리자가 신고 검토 중이던 글과 헷갈려 실수로 재오픈시킬 위험이 있다.
+	@Transactional
+	public void adminRestorePost(Long id) {
+		BoardPost post = boardPostRepository.findByIdWithUser(id)
+				.orElseThrow(() -> new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND));
+		if (post.getStatus() != BoardStatus.HIDDEN) {
+			throw new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND);
+		}
+		if (post.getHiddenBy() != BoardHiddenBy.ADMIN) {
+			throw new BusinessException(
+					ErrorCode.COMMON_VALIDATION_FAILED, "작성자가 직접 삭제한 게시글은 복원할 수 없습니다.");
+		}
+		post.restore();
+	}
+
+	// 숨김 처리는 관리자가 숨긴 경우에만 복구 API로 되돌릴 수 있어, 그 외(작성자 자진 삭제)에는
+	// 사실상 영구 삭제와 같으므로, 더 이상 어떤 게시글도 참조하지 않는 S3 객체를 이 시점에
+	// 정리한다(성장 일지의 deleteJournal과 동일한 컨벤션).
 	private void hidePostAndCleanImages(BoardPost post, BoardHiddenBy hiddenBy, Long ownerUserId) {
 		List<BoardPostImage> images = boardPostImageRepository.findByPostIdOrderBySortOrderAsc(post.getId());
 		post.hide(hiddenBy, LocalDateTime.now(KST));
+		// existsByImageUrl로 참조 여부를 확인하는 delete()가 실제로 S3에서 지우게 하려면
+		// BoardPostImage 행을 먼저 없애야 한다 — 지우지 않으면 이 URL이 여전히 "참조 중"으로
+		// 보여 delete()가 매번 정리를 거부하고, 복원 API/안내 문구가 말하는 "이미지는 이미
+		// S3에서 삭제됐다"가 실제로는 지켜지지 않는다.
+		boardPostImageRepository.deleteByPostId(post.getId());
 		images.forEach(image -> boardImageUploadService.delete(image.getImageUrl(), ownerUserId));
 	}
 
@@ -244,9 +284,13 @@ public class BoardPostService {
 	}
 
 	private BoardPost findActivePost(Long id) {
+		return findViewablePost(id, false);
+	}
+
+	private BoardPost findViewablePost(Long id, boolean allowHidden) {
 		BoardPost post = boardPostRepository.findByIdWithUser(id)
 				.orElseThrow(() -> new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND));
-		if (post.getStatus() != BoardStatus.ACTIVE) {
+		if (post.getStatus() != BoardStatus.ACTIVE && !allowHidden) {
 			throw new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND);
 		}
 		return post;

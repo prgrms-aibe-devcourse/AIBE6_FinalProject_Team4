@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kiwobollae.api.admin.service.AdminUserManagementService;
 import com.kiwobollae.api.auth.dto.response.AdminUserSummaryResponse;
 import com.kiwobollae.api.auth.entity.enums.UserRole;
 import com.kiwobollae.api.auth.entity.enums.UserStatus;
@@ -29,12 +30,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class AdminUserControllerTest {
 
 	@Mock private AdminUserQueryService adminUserQueryService;
+	@Mock private AdminUserManagementService adminUserManagementService;
 
 	private MockMvc mockMvc;
 
 	@BeforeEach
 	void setUp() {
-		mockMvc = MockMvcBuilders.standaloneSetup(new AdminUserController(adminUserQueryService))
+		mockMvc = MockMvcBuilders.standaloneSetup(
+						new AdminUserController(adminUserQueryService, adminUserManagementService))
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
 				.build();
@@ -49,7 +52,10 @@ class AdminUserControllerTest {
 				"김초록",
 				UserRole.USER,
 				UserStatus.ACTIVE,
-				LocalDateTime.of(2026, 8, 1, 10, 0)
+				null,
+				null,
+				LocalDateTime.of(2026, 8, 1, 10, 0),
+				3L
 		);
 		given(adminUserQueryService.search(eq("초록"), eq(UserStatus.ACTIVE), any()))
 				.willReturn(new PageImpl<>(List.of(user), PageRequest.of(0, 20), 1));
@@ -64,6 +70,7 @@ class AdminUserControllerTest {
 				.andExpect(jsonPath("$.data.content[0].email").value("green@example.com"))
 				.andExpect(jsonPath("$.data.content[0].nickname").value("초록"))
 				.andExpect(jsonPath("$.data.content[0].status").value("ACTIVE"))
+				.andExpect(jsonPath("$.data.content[0].reportCount").value(3))
 				.andExpect(jsonPath("$.data.content[0].phoneNumber").doesNotExist());
 	}
 }

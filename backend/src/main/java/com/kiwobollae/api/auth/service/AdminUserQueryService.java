@@ -4,10 +4,14 @@ import com.kiwobollae.api.auth.dto.response.AdminUserSummaryResponse;
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.auth.entity.enums.UserStatus;
 import com.kiwobollae.api.auth.repository.AdminUserQueryRepository;
+import com.kiwobollae.api.report.repository.ReportRepository;
+import com.kiwobollae.api.report.repository.UserReportCountProjection;
 import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +29,7 @@ public class AdminUserQueryService {
 	private static final int MAX_PAGE_SIZE = 100;
 
 	private final AdminUserQueryRepository adminUserQueryRepository;
+	private final ReportRepository reportRepository;
 
 	public Page<AdminUserSummaryResponse> search(
 			String keyword,
@@ -37,9 +42,22 @@ public class AdminUserQueryService {
 				Math.min(pageable.getPageSize(), MAX_PAGE_SIZE),
 				Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
 		);
-		return adminUserQueryRepository
-				.findAll(matches(normalizedKeyword, status), safePageable)
-				.map(AdminUserSummaryResponse::from);
+		Page<User> users = adminUserQueryRepository.findAll(matches(normalizedKeyword, status), safePageable);
+		Map<Long, Long> reportCountsByUserId = countReportsByUserId(users.getContent());
+		return users.map(user ->
+				AdminUserSummaryResponse.from(user, reportCountsByUserId.getOrDefault(user.getId(), 0L)));
+	}
+
+	// report.target_id는 FK가 아닌 폴리모픽 참조라(신고 유형별로 다른 테이블을 가리킴), 이 유저를
+	// 겨냥한 신고 수는 별도 네이티브 집계 쿼리로만 구할 수 있다 — 빈 id 목록으로 IN ()을 그대로
+	// 나가면 DB에 따라 문법 오류가 나므로 미리 걸러낸다.
+	private Map<Long, Long> countReportsByUserId(List<User> users) {
+		List<Long> userIds = users.stream().map(User::getId).toList();
+		if (userIds.isEmpty()) {
+			return Map.of();
+		}
+		return reportRepository.countReportsAgainstUsers(userIds).stream()
+				.collect(Collectors.toMap(UserReportCountProjection::getUserId, UserReportCountProjection::getReportCount));
 	}
 
 	private Specification<User> matches(String keyword, UserStatus status) {

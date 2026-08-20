@@ -220,7 +220,7 @@ class BoardPostServiceTest {
 		given(boardPostViewRepository.existsByPostIdAndIpAddress(10L, "1.2.3.4")).willReturn(false);
 		stubUniqueInsertGuardSucceeds();
 
-		BoardPostResponse response = boardPostService.getPost(10L, null, "1.2.3.4");
+		BoardPostResponse response = boardPostService.getPost(10L, null, "1.2.3.4", false);
 
 		assertThat(response.id()).isEqualTo(10L);
 		assertThat(response.likedByMe()).isFalse();
@@ -234,7 +234,7 @@ class BoardPostServiceTest {
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
 		given(boardPostViewRepository.existsByPostIdAndIpAddress(10L, "1.2.3.4")).willReturn(true);
 
-		boardPostService.getPost(10L, null, "1.2.3.4");
+		boardPostService.getPost(10L, null, "1.2.3.4", false);
 
 		verify(boardPostRepository, never()).incrementViewCount(any());
 	}
@@ -247,7 +247,7 @@ class BoardPostServiceTest {
 		given(boardPostLikeRepository.existsByPostIdAndUserId(10L, 2L)).willReturn(true);
 		given(boardPostViewRepository.existsByPostIdAndIpAddress(10L, "1.2.3.4")).willReturn(false);
 
-		BoardPostResponse response = boardPostService.getPost(10L, 2L, "1.2.3.4");
+		BoardPostResponse response = boardPostService.getPost(10L, 2L, "1.2.3.4", false);
 
 		assertThat(response.likedByMe()).isTrue();
 	}
@@ -258,7 +258,7 @@ class BoardPostServiceTest {
 		BoardPost post = mockPost(10L, user, BoardStatus.HIDDEN);
 		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
 
-		assertThatThrownBy(() -> boardPostService.getPost(10L, null, "1.2.3.4"))
+		assertThatThrownBy(() -> boardPostService.getPost(10L, null, "1.2.3.4", false))
 				.isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_POST_NOT_FOUND);
@@ -269,10 +269,22 @@ class BoardPostServiceTest {
 	void getPostFailsWhenNotFound() {
 		given(boardPostRepository.findByIdWithUser(404L)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> boardPostService.getPost(404L, null, "1.2.3.4"))
+		assertThatThrownBy(() -> boardPostService.getPost(404L, null, "1.2.3.4", false))
 				.isInstanceOf(BusinessException.class)
 				.extracting(ex -> ((BusinessException) ex).getErrorCode())
 				.isEqualTo(ErrorCode.BOARD_POST_NOT_FOUND);
+	}
+
+	@Test
+	void getPostReturnsHiddenPostForAdminWithoutIncrementingViewCount() {
+		User user = mockUser(1L, UserRole.USER);
+		BoardPost post = mockPost(10L, user, BoardStatus.HIDDEN);
+		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
+
+		BoardPostResponse response = boardPostService.getPost(10L, null, "1.2.3.4", true);
+
+		assertThat(response.id()).isEqualTo(10L);
+		verify(boardPostRepository, never()).incrementViewCount(any());
 	}
 
 	@Test
@@ -381,6 +393,47 @@ class BoardPostServiceTest {
 		boardPostService.adminHidePost(10L);
 
 		verify(post).hide(eq(BoardHiddenBy.ADMIN), any());
+	}
+
+	@Test
+	void adminRestorePostRestoresPostHiddenByAdmin() {
+		User user = mockUser(1L, UserRole.USER);
+		BoardPost post = mockPost(10L, user, BoardStatus.HIDDEN);
+		lenient().when(post.getHiddenBy()).thenReturn(BoardHiddenBy.ADMIN);
+		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
+
+		boardPostService.adminRestorePost(10L);
+
+		verify(post).restore();
+	}
+
+	// 작성자가 스스로 삭제한 글까지 관리자가 관리 화면에서 실수로 되살릴 수 있으면 안 된다 —
+	// hiddenBy가 ADMIN이 아니면 복원 자체를 거부한다.
+	@Test
+	void adminRestorePostFailsWhenHiddenByAuthor() {
+		User user = mockUser(1L, UserRole.USER);
+		BoardPost post = mockPost(10L, user, BoardStatus.HIDDEN);
+		lenient().when(post.getHiddenBy()).thenReturn(BoardHiddenBy.AUTHOR);
+		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
+
+		assertThatThrownBy(() -> boardPostService.adminRestorePost(10L))
+				.isInstanceOf(BusinessException.class)
+				.extracting(ex -> ((BusinessException) ex).getErrorCode())
+				.isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED);
+		verify(post, never()).restore();
+	}
+
+	@Test
+	void adminRestorePostFailsWhenPostNotHidden() {
+		User user = mockUser(1L, UserRole.USER);
+		BoardPost post = mockPost(10L, user, BoardStatus.ACTIVE);
+		given(boardPostRepository.findByIdWithUser(10L)).willReturn(Optional.of(post));
+
+		assertThatThrownBy(() -> boardPostService.adminRestorePost(10L))
+				.isInstanceOf(BusinessException.class)
+				.extracting(ex -> ((BusinessException) ex).getErrorCode())
+				.isEqualTo(ErrorCode.BOARD_POST_NOT_FOUND);
+		verify(post, never()).restore();
 	}
 
 	@Test

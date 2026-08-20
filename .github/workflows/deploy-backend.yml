@@ -126,6 +126,11 @@ jobs:
             echo "blue(now): ${BLUE}, green(next): ${GREEN}"
 
             docker rm -f "${GREEN}" >/dev/null 2>&1 || true
+            # REDIS_HOST/PORT/PASSWORD는 실제 Redis 인스턴스가 준비되기 전까지는 EC2의
+            # /etc/environment에 값이 없다 — 기본값(localhost:6379, 빈 비밀번호)으로 두면
+            # UserStatusCache가 접속을 못 해도 예외를 삼키고 캐시 미스로 동작하므로 인증 자체는
+            # 그대로 된다. Redis 인스턴스가 준비되면 EC2의 /etc/environment에 실제 값을
+            # 채워 넣기만 하면 이 배포 스크립트는 그대로 그 값을 실어 나른다.
             # AI_*/OPENAI_MAX_OUTPUT_TOKENS의 기본값은 application.yaml과 같은 값으로 유지한다.
             # 빈 문자열을 넘기면 yaml의 ${VAR:default}가 "설정됨"으로 보고 Duration/int 바인딩에
             # 실패하므로, 값을 안 넘기는 대신 반드시 :- 로 기본값을 채워 넘긴다.
@@ -141,6 +146,9 @@ jobs:
               -e JWT_SECRET="${JWT_SECRET}" \
               -e JWT_ACCESS_EXPIRATION=3600000 \
               -e JWT_REFRESH_EXPIRATION=1209600000 \
+              -e REDIS_HOST="${REDIS_HOST:-localhost}" \
+              -e REDIS_PORT="${REDIS_PORT:-6379}" \
+              -e REDIS_PASSWORD="${REDIS_PASSWORD:-}" \
               -e COOKIE_SECURE=true \
               -e CORS_ALLOWED_ORIGINS="${CORS_ALLOWED_ORIGINS:-https://kiwor.site,https://www.kiwor.site}" \
               -e MAIL_ENABLED="${MAIL_ENABLED:-false}" \

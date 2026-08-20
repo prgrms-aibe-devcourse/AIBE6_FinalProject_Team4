@@ -62,9 +62,11 @@ export function getReportsForAdmin(
   page = 0,
   size = 20,
   signal?: AbortSignal,
+  targetUserId?: number,
 ): Promise<SpringPage<ReportData>> {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) query.set('status', status);
+  if (targetUserId != null) query.set('targetUserId', String(targetUserId));
   return request<SpringPage<ReportData>>(`/api/v1/admin/reports?${query.toString()}`, {
     accessToken,
     signal,

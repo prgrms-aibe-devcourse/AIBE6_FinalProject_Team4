@@ -38,6 +38,14 @@ spring:
         # 보내 DB 부하를 유발하지 않도록 애플리케이션 전체 Pageable 엔드포인트에 적용되는 상한을
         # 둔다. 개별 컨트롤러마다 같은 클램핑 로직을 반복하지 않기 위한 전역 설정.
         max-page-size: 100
+    redis:
+      # UserStatusCache 전용 — JwtAuthenticationFilter가 매 요청마다 나가던 계정 상태 조회를
+      # 짧은 TTL로 캐싱한다(UserStatusCache 참고). Redis가 없거나 응답하지 않으면 캐시를 그냥
+      # 건너뛰고 DB로 폴백하도록 짜여 있어, 이 설정이 없거나 Redis가 죽어도 인증 자체는 계속 된다.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:300ms}
 
 server:
   port: 8080

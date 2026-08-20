@@ -10,7 +10,10 @@ export interface AdminUserSummary {
   name: string;
   role: AdminUserRole;
   status: AdminUserStatus;
+  suspendedReason: string | null;
+  withdrawnAt: string | null;
   createdAt: string;
+  reportCount: number;
 }
 
 interface AdminUserSearchParams {
@@ -37,5 +40,24 @@ export function getAdminUsers({
   return request<SpringPage<AdminUserSummary>>(`/api/v1/admin/user?${query.toString()}`, {
     accessToken,
     signal,
+  });
+}
+
+export function suspendAdminUser(
+  userId: number,
+  reason: string,
+  accessToken: string,
+): Promise<void> {
+  return request<void>(`/api/v1/admin/user/${userId}/suspend`, {
+    method: 'PATCH',
+    accessToken,
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function reactivateAdminUser(userId: number, accessToken: string): Promise<void> {
+  return request<void>(`/api/v1/admin/user/${userId}/reactivate`, {
+    method: 'PATCH',
+    accessToken,
   });
 }

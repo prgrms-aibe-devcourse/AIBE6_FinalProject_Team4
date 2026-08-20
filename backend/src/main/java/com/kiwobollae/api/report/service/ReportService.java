@@ -15,6 +15,7 @@ import com.kiwobollae.api.report.entity.enums.ReportStatus;
 import com.kiwobollae.api.report.entity.enums.ReportTargetType;
 import com.kiwobollae.api.report.repository.ReportRepository;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -77,8 +78,15 @@ public class ReportService {
 		return ReportResponse.from(report);
 	}
 
-	public Page<ReportResponse> getReportsForAdmin(ReportStatus status, Pageable pageable) {
-		return reportRepository.search(status, pageable).map(ReportResponse::from);
+	public Page<ReportResponse> getReportsForAdmin(ReportStatus status, Long targetUserId, Pageable pageable) {
+		if (targetUserId == null) {
+			return reportRepository.search(status, pageable).map(ReportResponse::from);
+		}
+		List<Long> reportIds = reportRepository.findReportIdsAgainstUser(targetUserId);
+		if (reportIds.isEmpty()) {
+			return Page.empty(pageable);
+		}
+		return reportRepository.findByIdInAndStatus(reportIds, status, pageable).map(ReportResponse::from);
 	}
 
 	// 신고 검토용 콘텐츠 상세 조회(일지/댓글) 앞단에서 쓰는 인가 체크. 대상이 실제로 신고된 적

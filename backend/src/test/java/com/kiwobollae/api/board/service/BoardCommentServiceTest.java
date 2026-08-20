@@ -237,7 +237,7 @@ class BoardCommentServiceTest {
 		given(boardCommentRepository.findAllByPostId(10L))
 				.willReturn(List.of(comment));
 
-		List<BoardCommentResponse> responses = boardCommentService.getComments(10L, null);
+		List<BoardCommentResponse> responses = boardCommentService.getComments(10L, null, false);
 
 		assertThat(responses).hasSize(1);
 		assertThat(responses.get(0).id()).isEqualTo(100L);
@@ -254,7 +254,7 @@ class BoardCommentServiceTest {
 				.willReturn(List.of(comment));
 		given(boardCommentLikeRepository.findLikedCommentIds(2L, List.of(100L))).willReturn(List.of(100L));
 
-		List<BoardCommentResponse> responses = boardCommentService.getComments(10L, 2L);
+		List<BoardCommentResponse> responses = boardCommentService.getComments(10L, 2L, false);
 
 		assertThat(responses.get(0).likedByMe()).isTrue();
 	}

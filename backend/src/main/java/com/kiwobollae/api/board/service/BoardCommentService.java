@@ -96,8 +96,9 @@ public class BoardCommentService {
 				.orElse(false);
 	}
 
-	public List<BoardCommentResponse> getComments(Long postId, Long userId) {
-		findActivePost(postId);
+	public List<BoardCommentResponse> getComments(Long postId, Long userId, boolean isAdmin) {
+		// 게시글 상세와 마찬가지로, 관리자가 숨김 처리된 글의 댓글까지 확인할 수 있어야 한다.
+		findViewablePost(postId, isAdmin);
 		// HIDDEN 댓글도 함께 가져온다 — 부모가 숨겨져도 그 아래 ACTIVE 답글은 트리에서 계속 보여야
 		// 하는데, ACTIVE만 가져오면 부모 노드가 없어 답글이 화면에서 통째로 사라져 버린다.
 		List<BoardComment> comments = boardCommentRepository.findAllByPostId(postId);
@@ -201,9 +202,13 @@ public class BoardCommentService {
 	}
 
 	private BoardPost findActivePost(Long postId) {
+		return findViewablePost(postId, false);
+	}
+
+	private BoardPost findViewablePost(Long postId, boolean allowHidden) {
 		BoardPost post = boardPostRepository.findById(postId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND));
-		if (post.getStatus() != BoardStatus.ACTIVE) {
+		if (post.getStatus() != BoardStatus.ACTIVE && !allowHidden) {
 			throw new BusinessException(ErrorCode.BOARD_POST_NOT_FOUND);
 		}
 		return post;
