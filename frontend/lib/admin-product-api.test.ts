@@ -17,7 +17,7 @@ const input = {
   category: "KIT" as const,
   pointPrice: 800,
   stock: 5,
-  plantId: null,
+  speciesName: null,
   description: null,
   imageUrl: null,
 };

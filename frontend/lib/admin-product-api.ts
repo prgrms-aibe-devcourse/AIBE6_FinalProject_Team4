@@ -11,7 +11,7 @@ export interface AdminProduct {
   stock: number;
   unlimitedStock: boolean;
   soldOut: boolean;
-  plantId: number | null;
+  speciesName: string | null;
   description: string | null;
   imageKey: string | null;
   imageUrl: string | null;
@@ -25,7 +25,7 @@ export interface AdminProductInput {
   category: ProductCategory;
   pointPrice: number;
   stock: number;
-  plantId: number | null;
+  speciesName: string | null;
   description: string | null;
   imageUrl: string | null;
 }

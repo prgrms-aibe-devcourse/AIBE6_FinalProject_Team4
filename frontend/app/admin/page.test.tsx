@@ -5,7 +5,6 @@ import Admin from "./page";
 const mocks = vi.hoisted(() => ({
   getProducts: vi.fn(),
   changeStatus: vi.fn(),
-  getSpecies: vi.fn(),
   getExchanges: vi.fn(),
   showToast: vi.fn(),
   askConfirm: vi.fn(),
@@ -35,11 +34,6 @@ vi.mock("@/lib/admin-product-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/admin-product-api")>()),
   getAdminProducts: mocks.getProducts,
   changeAdminProductStatus: mocks.changeStatus,
-}));
-
-vi.mock("@/lib/species-api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/species-api")>()),
-  getSpecies: mocks.getSpecies,
 }));
 
 vi.mock("@/lib/exchange-api", async (importOriginal) => ({
@@ -79,7 +73,6 @@ describe("Admin product management", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.replaceState({}, "", "/admin");
-    mocks.getSpecies.mockResolvedValue([]);
     mocks.getExchanges.mockResolvedValue({ content: [] });
     mocks.getProducts.mockResolvedValue([
       {
@@ -90,7 +83,7 @@ describe("Admin product management", () => {
         stock: 3,
         unlimitedStock: false,
         soldOut: false,
-        plantId: null,
+        speciesName: null,
         description: null,
         imageUrl: null,
         status: "ACTIVE",
@@ -105,7 +98,7 @@ describe("Admin product management", () => {
         stock: 0,
         unlimitedStock: true,
         soldOut: false,
-        plantId: null,
+        speciesName: null,
         description: null,
         imageUrl: null,
         status: "ACTIVE",
