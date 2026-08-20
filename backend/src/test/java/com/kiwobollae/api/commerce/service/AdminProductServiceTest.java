@@ -12,7 +12,6 @@ import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.asset.AssetUrlResolver;
 import java.util.Optional;
@@ -30,7 +29,6 @@ class AdminProductServiceTest {
     service =
         new AdminProductService(
             productRepository,
-            mock(PlantSpeciesRepository.class),
             new CommerceAssetKeyValidator(),
             new AssetUrlResolver("https://assets.example.com/"),
             mock(CommerceAssetStorageService.class));

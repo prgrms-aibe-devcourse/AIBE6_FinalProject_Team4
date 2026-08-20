@@ -9,8 +9,6 @@ import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
-import com.kiwobollae.api.species.entity.PlantSpecies;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,18 +23,12 @@ class ProductInitDataTest {
 	@Mock
 	private ProductRepository productRepository;
 
-	@Mock
-	private PlantSpeciesRepository plantSpeciesRepository;
-
 	@InjectMocks
 	private ProductInitData productInitData;
 
 	@Test
 	void seedsTenActiveProductsWhenProductsAreEmpty() {
 		given(productRepository.count()).willReturn(0L);
-		given(plantSpeciesRepository.findAll()).willReturn(List.of());
-		given(plantSpeciesRepository.save(org.mockito.ArgumentMatchers.any(PlantSpecies.class)))
-				.willAnswer(invocation -> invocation.getArgument(0));
 
 		productInitData.run(null);
 
@@ -53,7 +45,7 @@ class ProductInitDataTest {
 		assertThat(products)
 				.filteredOn(product -> product.getCategory() == ProductCategory.SEEDLING)
 				.hasSize(5)
-				.allMatch(product -> product.getPlant() != null);
+				.allMatch(product -> product.getSpeciesName() != null);
 	}
 
 	@Test
@@ -62,7 +54,6 @@ class ProductInitDataTest {
 
 		productInitData.run(null);
 
-		verify(plantSpeciesRepository, never()).findAll();
 		verify(productRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
 	}
 }

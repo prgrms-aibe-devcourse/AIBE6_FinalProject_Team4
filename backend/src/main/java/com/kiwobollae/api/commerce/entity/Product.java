@@ -2,17 +2,13 @@ package com.kiwobollae.api.commerce.entity;
 
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.global.common.BaseTimeEntity;
 import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -49,9 +45,9 @@ public class Product extends BaseTimeEntity {
 	@Column(nullable = false)
 	private Integer stock;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "plant_species_id")
-	private PlantSpecies plant;
+	// SEEDLING 상품에서만 사용하는 자유텍스트 종 이름. 관리자가 관리하던 종 카탈로그가 사라져 FK 없이 문자열로 보관한다.
+	@Column(name = "species_name", length = 100)
+	private String speciesName;
 
 	@Column(length = 2000)
 	private String description;
@@ -68,7 +64,7 @@ public class Product extends BaseTimeEntity {
 			ProductCategory category,
 			Long pointPrice,
 			Integer stock,
-			PlantSpecies plant,
+			String speciesName,
 			String description,
 			String imageUrl
 	) {
@@ -76,7 +72,7 @@ public class Product extends BaseTimeEntity {
 		this.category = category;
 		this.pointPrice = pointPrice;
 		this.stock = stock;
-		this.plant = plant;
+		this.speciesName = speciesName;
 		this.description = description;
 		this.imageUrl = imageUrl;
 	}

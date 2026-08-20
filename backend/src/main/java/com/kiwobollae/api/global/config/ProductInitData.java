@@ -4,13 +4,7 @@ import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
-import com.kiwobollae.api.species.entity.PlantSpecies;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -24,9 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
  * Local-only sample products for shop development.
  *
  * <p>Disable without changing code by setting {@code app.seed.product.enabled=false}.
- *
- * <p>Ordered before PlantProfileInitData (see @Order) so the plant species it
- * seeds here already exist when profiles are created against them.
  */
 @Component
 @Profile({"local", "prod"})
@@ -36,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductInitData implements ApplicationRunner {
 
 	private final ProductRepository productRepository;
-	private final PlantSpeciesRepository plantSpeciesRepository;
 
 	@Override
 	@Transactional
@@ -44,8 +34,6 @@ public class ProductInitData implements ApplicationRunner {
 		if (productRepository.count() > 0) {
 			return;
 		}
-
-		Map<String, PlantSpecies> plants = preparePlantSpecies();
 
 		productRepository.saveAll(List.of(
 				product(
@@ -98,7 +86,7 @@ public class ProductInitData implements ApplicationRunner {
 						ProductCategory.SEEDLING,
 						900L,
 						20,
-						plants.get("스위트 바질"),
+						"스위트 바질",
 						"향이 풍부하고 생육이 빠른 스위트 바질 모종입니다.",
 						"products/6/26484928-4c05-592b-a3fc-cb3e76ad3578.png"
 				),
@@ -107,7 +95,7 @@ public class ProductInitData implements ApplicationRunner {
 						ProductCategory.SEEDLING,
 						1200L,
 						12,
-						plants.get("방울토마토"),
+						"방울토마토",
 						"햇빛이 드는 베란다에서 키우기 좋은 방울토마토 모종입니다.",
 						"products/7/682bcb8b-1814-52a4-ba81-d513ea2fcbeb.png"
 				),
@@ -116,7 +104,7 @@ public class ProductInitData implements ApplicationRunner {
 						ProductCategory.SEEDLING,
 						700L,
 						35,
-						plants.get("청상추"),
+						"청상추",
 						"수확까지 비교적 짧아 처음 텃밭을 시작할 때 좋은 청상추 모종입니다.",
 						"products/8/64645cda-841a-55f3-893c-cab4715edc87.png"
 				),
@@ -125,7 +113,7 @@ public class ProductInitData implements ApplicationRunner {
 						ProductCategory.SEEDLING,
 						1100L,
 						8,
-						plants.get("로즈마리"),
+						"로즈마리",
 						"요리와 방향용으로 활용할 수 있는 향긋한 로즈마리 모종입니다.",
 						"products/9/86294710-c193-5d62-8f4c-2dc50356355f.png"
 				),
@@ -134,68 +122,10 @@ public class ProductInitData implements ApplicationRunner {
 						ProductCategory.SEEDLING,
 						1500L,
 						10,
-						plants.get("설향 딸기"),
+						"설향 딸기",
 						"가정에서 달콤한 열매를 수확해 볼 수 있는 설향 딸기 모종입니다.",
 						"products/10/15e4d877-7091-5900-842e-6365fc9892c2.png"
 				)
-		));
-	}
-
-	private Map<String, PlantSpecies> preparePlantSpecies() {
-		Map<String, PlantSpecies> plants = plantSpeciesRepository.findAll().stream()
-				.collect(Collectors.toMap(
-						PlantSpecies::getName,
-						Function.identity(),
-						(existing, ignored) -> existing,
-						LinkedHashMap::new
-				));
-
-		addPlantIfMissing(
-				plants,
-				"스위트 바질",
-				"HERB",
-				"햇빛이 잘 드는 곳에 두고 겉흙이 마르면 물을 주세요. 잎 끝을 자주 수확하면 풍성해집니다."
-		);
-		addPlantIfMissing(
-				plants,
-				"방울토마토",
-				"FRUIT_VEGETABLE",
-				"하루 6시간 이상 햇빛을 보여주고 흙이 마르기 전에 충분히 물을 주세요. 자라면 지지대를 세워주세요."
-		);
-		addPlantIfMissing(
-				plants,
-				"청상추",
-				"LEAF_VEGETABLE",
-				"서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요. 바깥 잎부터 수확하면 오래 먹을 수 있습니다."
-		);
-		addPlantIfMissing(
-				plants,
-				"로즈마리",
-				"HERB",
-				"통풍과 햇빛이 좋은 곳에 두고 흙이 충분히 마른 뒤 물을 주세요. 과습에 특히 주의하세요."
-		);
-		addPlantIfMissing(
-				plants,
-				"설향 딸기",
-				"FRUIT",
-				"햇빛이 잘 드는 곳에서 키우고 꽃이 피면 가볍게 흔들어 수분을 도와주세요. 흙은 촉촉하게 유지하세요."
-		);
-
-		return plants;
-	}
-
-	private void addPlantIfMissing(
-			Map<String, PlantSpecies> plants,
-			String name,
-			String category,
-			String careGuide
-	) {
-		plants.computeIfAbsent(name, ignored -> plantSpeciesRepository.save(
-				PlantSpecies.builder()
-						.name(name)
-						.category(category)
-						.careGuide(careGuide)
-						.build()
 		));
 	}
 
@@ -204,7 +134,7 @@ public class ProductInitData implements ApplicationRunner {
 			ProductCategory category,
 			Long pointPrice,
 			Integer stock,
-			PlantSpecies plant,
+			String speciesName,
 			String description,
 			String imageKey
 	) {
@@ -213,7 +143,7 @@ public class ProductInitData implements ApplicationRunner {
 				.category(category)
 				.pointPrice(pointPrice)
 				.stock(stock)
-				.plant(plant)
+				.speciesName(speciesName)
 				.description(description)
 				.imageUrl(imageKey)
 				.status(ProductStatus.ACTIVE)

@@ -6,8 +6,6 @@ import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
-import com.kiwobollae.api.species.entity.PlantSpecies;
-import com.kiwobollae.api.species.repository.PlantSpeciesRepository;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.asset.AssetUrlResolver;
@@ -27,7 +25,6 @@ public class AdminProductService {
       List.of(ProductCategory.KIT, ProductCategory.SEEDLING, ProductCategory.GACHA_PACK);
 
   private final ProductRepository productRepository;
-  private final PlantSpeciesRepository plantSpeciesRepository;
   private final CommerceAssetKeyValidator assetKeyValidator;
   private final AssetUrlResolver assetUrlResolver;
   private final CommerceAssetStorageService assetStorageService;
@@ -48,7 +45,7 @@ public class AdminProductService {
                 .category(values.category())
                 .pointPrice(values.pointPrice())
                 .stock(values.stock())
-                .plant(values.plant())
+                .speciesName(values.speciesName())
                 .description(values.description())
                 .status(ProductStatus.ACTIVE)
                 .build());
@@ -58,7 +55,7 @@ public class AdminProductService {
         product.getCategory(),
         product.getPointPrice(),
         product.getStock(),
-        product.getPlant(),
+        product.getSpeciesName(),
         product.getDescription(),
         imageKey);
     return response(product);
@@ -76,7 +73,7 @@ public class AdminProductService {
         values.category(),
         values.pointPrice(),
         product.getStock(),
-        values.plant(),
+        values.speciesName(),
         values.description(),
         assetKeyValidator.validate(values.imageUrl(), "products", productId));
     return response(product);
@@ -128,20 +125,15 @@ public class AdminProductService {
     if (request.category() == ProductCategory.GACHA_PACK && request.pointPrice() < 1) {
       throw invalid("pointPrice", request.pointPrice(), "가챠 팩 가격은 1P 이상이어야 합니다.");
     }
-    PlantSpecies plant = null;
-    if (request.category() == ProductCategory.SEEDLING && request.plantId() != null) {
-      plant =
-          plantSpeciesRepository
-              .findById(request.plantId())
-              .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
-    }
+    String speciesName =
+        request.category() == ProductCategory.SEEDLING ? trimToNull(request.speciesName()) : null;
     int stock = request.category() == ProductCategory.GACHA_PACK ? 0 : request.stock();
     return new ValidatedProduct(
         request.name().trim(),
         request.category(),
         request.pointPrice(),
         stock,
-        plant,
+        speciesName,
         trimToNull(request.description()),
         trimToNull(request.imageUrl()));
   }
@@ -190,7 +182,7 @@ public class AdminProductService {
       ProductCategory category,
       Long pointPrice,
       Integer stock,
-      PlantSpecies plant,
+      String speciesName,
       String description,
       String imageUrl) {}
 }

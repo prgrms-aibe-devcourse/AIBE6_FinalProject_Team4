@@ -15,7 +15,6 @@ import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
 import com.kiwobollae.api.commerce.entity.enums.ProductStatus;
 import com.kiwobollae.api.commerce.repository.ProductRepository;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.asset.AssetUrlResolver;
@@ -171,20 +170,14 @@ class ProductServiceTest {
 
 	@Test
 	void getProductIncludesPlantGuideForSeedling() {
-		PlantSpecies plantSpecies = org.mockito.Mockito.mock(PlantSpecies.class);
-		given(plantSpecies.getId()).willReturn(11L);
-		given(plantSpecies.getName()).willReturn("방울토마토");
-		given(plantSpecies.getCategory()).willReturn("VEGETABLE");
-		given(plantSpecies.getCareGuide()).willReturn("햇빛이 잘 드는 곳에서 키워주세요.");
-		Product product = product(3L, ProductCategory.SEEDLING, 5, plantSpecies);
+		Product product = product(3L, ProductCategory.SEEDLING, 5, "방울토마토");
 		given(productRepository.findByIdAndStatus(3L, ProductStatus.ACTIVE))
 				.willReturn(Optional.of(product));
 
 		ProductDetailResponse response = productService.getProduct(3L);
 
 		assertThat(response.plantGuide()).isNotNull();
-		assertThat(response.plantGuide().plantSpeciesId()).isEqualTo(11L);
-		assertThat(response.plantGuide().careGuide()).isEqualTo("햇빛이 잘 드는 곳에서 키워주세요.");
+		assertThat(response.plantGuide().speciesName()).isEqualTo("방울토마토");
 	}
 
 	@Test
@@ -197,7 +190,7 @@ class ProductServiceTest {
 						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PRODUCT_NOT_FOUND));
 	}
 
-	private Product product(Long id, ProductCategory category, int stock, PlantSpecies plantSpecies) {
+	private Product product(Long id, ProductCategory category, int stock, String speciesName) {
 		Product product = org.mockito.Mockito.mock(Product.class);
 		given(product.getId()).willReturn(id);
 		given(product.getName()).willReturn("테스트 상품");
@@ -205,8 +198,8 @@ class ProductServiceTest {
 		given(product.getPointPrice()).willReturn(1000L);
 		given(product.getStock()).willReturn(stock);
 		given(product.getImageUrl()).willReturn("https://example.com/product.png");
-		if (plantSpecies != null) {
-			given(product.getPlant()).willReturn(plantSpecies);
+		if (speciesName != null) {
+			given(product.getSpeciesName()).willReturn(speciesName);
 		}
 		return product;
 	}

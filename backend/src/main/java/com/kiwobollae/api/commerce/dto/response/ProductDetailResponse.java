@@ -2,7 +2,6 @@ package com.kiwobollae.api.commerce.dto.response;
 
 import com.kiwobollae.api.commerce.entity.Product;
 import com.kiwobollae.api.commerce.entity.enums.ProductCategory;
-import com.kiwobollae.api.species.entity.PlantSpecies;
 import java.time.LocalDateTime;
 
 public record ProductDetailResponse(
@@ -20,7 +19,7 @@ public record ProductDetailResponse(
 ) {
 	public static ProductDetailResponse from(Product product, String imageUrl) {
 		PlantGuideResponse plantGuide = product.getCategory() == ProductCategory.SEEDLING
-				? PlantGuideResponse.from(product.getPlant())
+				? PlantGuideResponse.from(product.getSpeciesName())
 				: null;
 
 		return new ProductDetailResponse(
@@ -38,22 +37,14 @@ public record ProductDetailResponse(
 		);
 	}
 
-	public record PlantGuideResponse(
-			Long plantSpeciesId,
-			String name,
-			String category,
-			String careGuide
-	) {
-		public static PlantGuideResponse from(PlantSpecies plantSpecies) {
-			if (plantSpecies == null) {
+	// category/careGuide 본문은 더 이상 여기서 내려주지 않는다. 프론트가 speciesName으로
+	// /api/v1/ai/plants/care-guide를 별도 호출해 AI 재배 가이드를 받아온다.
+	public record PlantGuideResponse(String speciesName) {
+		public static PlantGuideResponse from(String speciesName) {
+			if (speciesName == null) {
 				return null;
 			}
-			return new PlantGuideResponse(
-					plantSpecies.getId(),
-					plantSpecies.getName(),
-					plantSpecies.getCategory(),
-					plantSpecies.getCareGuide()
-			);
+			return new PlantGuideResponse(speciesName);
 		}
 	}
 }
