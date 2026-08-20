@@ -13,8 +13,13 @@ import {
   ReportTargetType,
 } from "@/lib/report-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAdminPaginatedList } from "./use-admin-paginated-list";
+
+export interface AdminReportTargetUserFilter {
+  id: number;
+  label: string;
+}
 
 type TargetPreview =
   | { type: "comment"; data: BoardCommentData }
@@ -29,6 +34,8 @@ const TARGET: Record<ReportTargetType, string> = {
 // 관리자 숨김 API가 있는 대상만 "완료 처리"가 실제로 콘텐츠를 숨긴다. JOURNAL/USER는 대응하는
 // 숨김 기능이 백엔드에 없어, 완료 처리해도 신고 조치 기록만 남고 콘텐츠는 그대로 노출된다.
 const HIDEABLE_TARGETS: ReportTargetType[] = ["POST", "COMMENT"];
+
+const ACTION_TYPE_OPTIONS = ["콘텐츠 숨김", "경고 조치", "계정 정지", "조치 없음", "기타"];
 
 const STAT: Record<ReportStatus, [string, string]> = {
   PENDING: ["검토 대기", "bg-[#FBEDE3] text-[#b5771a]"],
@@ -51,8 +58,13 @@ function formatDateTime(value: string): string {
 
 export default function AdminReportPanel({
   accessToken,
+  targetUser = null,
+  onClearTargetUser,
 }: {
   accessToken: string;
+  // 유저 관리 탭의 "누적 신고수"를 눌러 넘어온 경우, 그 유저를 겨냥한 신고만 필터링해 보여준다.
+  targetUser?: AdminReportTargetUserFilter | null;
+  onClearTargetUser?: () => void;
 }) {
   const { showToast } = useUI();
   const [status, setStatus] = useState<ReportStatus | "">("");
@@ -70,8 +82,8 @@ export default function AdminReportPanel({
 
   const fetchPage = useCallback(
     (page: number, signal?: AbortSignal) =>
-      getReportsForAdmin(accessToken, status || undefined, page, 20, signal),
-    [accessToken, status],
+      getReportsForAdmin(accessToken, status || undefined, page, 20, signal, targetUser?.id),
+    [accessToken, status, targetUser?.id],
   );
   const {
     page,
@@ -84,6 +96,13 @@ export default function AdminReportPanel({
     reload,
   } = useAdminPaginatedList(fetchPage, "신고 목록을 불러오지 못했어요.");
 
+  // 유저 관리 탭에서 다른 유저의 누적 신고수를 눌러 targetUser가 바뀌면(패널이 이미 열려 있는
+  // 상태여도) 1페이지부터 다시 보여준다.
+  useEffect(() => {
+    setPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetUser?.id]);
+
   const changeStatus = (next: ReportStatus | "") => {
     setStatus(next);
     setPage(0);
@@ -91,7 +110,7 @@ export default function AdminReportPanel({
 
   const openReport = (report: ReportData) => {
     setSelected(report);
-    setActionType("");
+    setActionType(HIDEABLE_TARGETS.includes(report.targetType) ? ACTION_TYPE_OPTIONS[0] : ACTION_TYPE_OPTIONS[3]);
     setActionDetail("");
     setPreview(null);
     setPreviewError("");
@@ -125,8 +144,7 @@ export default function AdminReportPanel({
 
   const submitAction = async (kind: "complete" | "reject") => {
     if (!selected || submitting) return;
-    if (!actionType.trim()) return showToast("조치 유형을 입력해 주세요.", "err");
-    if (!actionDetail.trim()) return showToast("조치 내용을 입력해 주세요.", "err");
+    if (!actionType.trim()) return showToast("조치 유형을 선택해 주세요.", "err");
 
     setSubmitting(true);
     try {
@@ -177,6 +195,20 @@ export default function AdminReportPanel({
         <p className="mt-1 text-sm text-sub">
           회원이 접수한 신고를 확인하고 조치합니다.
         </p>
+
+        {targetUser && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-brand-soft px-3 py-2 text-xs font-bold text-brand-dark">
+            <span className="material-symbols-outlined text-[16px]">filter_alt</span>
+            {targetUser.label}님을 대상으로 한 신고만 보는 중
+            <button
+              type="button"
+              onClick={onClearTargetUser}
+              className="ml-auto cursor-pointer rounded-md border border-brand-dark/30 bg-white px-2 py-0.5 text-[11px] font-bold text-brand-dark"
+            >
+              필터 해제
+            </button>
+          </div>
+        )}
 
         <div className="mt-4 flex gap-2">
           {(
@@ -244,7 +276,20 @@ export default function AdminReportPanel({
                 return (
                   <tr key={report.id} className="border-t border-[#f2f3ec]">
                     <td className="px-5 py-3.5 font-bold">
-                      {TARGET[report.targetType]} #{report.targetId}
+                      {report.targetType === "POST" ? (
+                        <Link
+                          href={`/board/${report.targetId}`}
+                          target="_blank"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-brand hover:text-brand-dark hover:underline"
+                        >
+                          {TARGET[report.targetType]} #{report.targetId}
+                        </Link>
+                      ) : (
+                        <>
+                          {TARGET[report.targetType]} #{report.targetId}
+                        </>
+                      )}
                     </td>
                     <td className="max-w-[220px] truncate px-4 py-3.5 text-sub">
                       {report.reason}
@@ -384,18 +429,22 @@ export default function AdminReportPanel({
                     ? "완료 처리 시 해당 게시글/댓글이 즉시 숨겨져요."
                     : "이 신고 유형은 자동 숨김을 지원하지 않아요 — 완료 처리해도 조치 기록만 남습니다."}
                 </p>
-                <input
+                <select
                   value={actionType}
                   onChange={(e) => setActionType(e.target.value)}
-                  maxLength={50}
-                  placeholder="조치 유형 (예: 콘텐츠 숨김, 경고)"
-                  className="mb-2.5 w-full rounded-xl border-[1.5px] border-line p-3.5 text-sm outline-none"
-                />
+                  className="mb-2.5 w-full rounded-xl border-[1.5px] border-line bg-white p-3.5 text-sm outline-none"
+                >
+                  {ACTION_TYPE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 <textarea
                   value={actionDetail}
                   onChange={(e) => setActionDetail(e.target.value)}
                   maxLength={500}
-                  placeholder="조치 내용을 입력해 주세요."
+                  placeholder="조치 내용을 입력해 주세요. (선택)"
                   className="mb-4 min-h-[120px] w-full resize-y rounded-xl border-[1.5px] border-line p-3.5 text-sm leading-[1.6] outline-none"
                 />
                 <div className="flex gap-2.5">

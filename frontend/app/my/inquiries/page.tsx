@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import {
@@ -312,6 +313,16 @@ export default function Inquiries() {
                       </div>
                       <span className={`${CHIP_STAT} ${st[1]}`}>{st[0]}</span>
                     </button>
+                    {expanded && r.targetType === 'POST' && (
+                      <Link
+                        href={`/board/${r.targetId}`}
+                        target="_blank"
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-3.5 inline-block text-[13px] font-bold text-brand hover:text-brand-dark"
+                      >
+                        신고한 게시글 보기 →
+                      </Link>
+                    )}
                     {expanded && r.status !== 'PENDING' && (
                       <div className="mt-3.5 rounded-xl bg-[#f6f7f1] p-3.5">
                         <div className="mb-1 text-xs font-bold text-sub">

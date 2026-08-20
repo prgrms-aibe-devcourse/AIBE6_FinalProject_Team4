@@ -103,4 +103,14 @@ public class User extends BaseTimeEntity {
 		this.status = UserStatus.WITHDRAWN;
 		this.withdrawnAt = LocalDateTime.now();
 	}
+
+	public void suspend(String reason) {
+		this.status = UserStatus.SUSPENDED;
+		this.suspendedReason = reason;
+	}
+
+	public void reactivate() {
+		this.status = UserStatus.ACTIVE;
+		this.suspendedReason = null;
+	}
 }

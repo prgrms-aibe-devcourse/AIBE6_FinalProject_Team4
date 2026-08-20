@@ -21,6 +21,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -76,9 +78,14 @@ public class BoardController {
 	public ResponseEntity<ApiResponse<BoardPostResponse>> getPost(
 			@AuthenticationPrincipal Long userId,
 			@PathVariable Long id,
-			HttpServletRequest request
+			HttpServletRequest request,
+			Authentication authentication
 	) {
-		return ResponseEntity.ok(ApiResponse.success(boardPostService.getPost(id, userId, resolveClientIp(request))));
+		boolean isAdmin = authentication != null && authentication.getAuthorities().stream()
+				.map(GrantedAuthority::getAuthority)
+				.anyMatch("ROLE_ADMIN"::equals);
+		return ResponseEntity.ok(ApiResponse.success(
+				boardPostService.getPost(id, userId, resolveClientIp(request), isAdmin)));
 	}
 
 	// 이 앱 앞에는 리버스 프록시(NPM/nginx)가 정확히 한 홉만 있고, nginx는 X-Forwarded-For에

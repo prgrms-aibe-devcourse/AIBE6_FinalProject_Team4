@@ -19,6 +19,7 @@ import {
   getBoardComments,
   getBoardPost,
   getBoardPostJournal,
+  hideBoardPostAsAdmin,
   likeBoardComment,
   likeBoardPost,
   unlikeBoardComment,
@@ -37,6 +38,9 @@ const CATEGORY_TEXT: Record<BoardCategory, string> = {
   FREE: 'text-[#3a76a8]',
   PLANT_QNA: 'text-brand-dark',
 };
+
+const REPORT_REASON_OPTIONS = ['스팸/광고', '욕설/비방', '음란물/선정성', '허위 정보', '개인정보 노출', '기타'];
+const OTHER_REPORT_REASON = '기타';
 
 function representativeImage(journal: PlantJournalData): string | null {
   const url = journal.images.find((img) => img.representative)?.imageUrl || journal.images[0]?.imageUrl || null;
@@ -75,6 +79,8 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
   const [editDraft, setEditDraft] = useState('');
   const [reportingComment, setReportingComment] = useState<number | null>(null);
   const [reportingPost, setReportingPost] = useState(false);
+  const [reportReason, setReportReason] = useState(REPORT_REASON_OPTIONS[0]);
+  const [reportReasonDetail, setReportReasonDetail] = useState('');
 
   useEffect(() => {
     if (!hydrated || Number.isNaN(postId)) return;
@@ -82,6 +88,11 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
     setLoading(true);
     setError('');
 
+    // state.accessToken을 직접 넘긴다 — lib/api.ts의 store-synced 토큰(currentAccessToken)은
+    // StoreProvider의 별도 useEffect가 갱신하는데, 자식(이 페이지)의 effect가 부모의 effect보다
+    // 먼저 실행되는 React 커밋 순서상 방금 갱신된 값을 아직 못 받아온 시점에 요청이 나갈 수 있다.
+    // 만료된 토큰은 store 쪽에서 hydration 시점에 이미 선제적으로 갱신해두므로(useStore 참고),
+    // 여기서는 그 결과인 state.accessToken을 그대로 쓰는 게 가장 안전하다.
     Promise.all([
       getBoardPost(postId, state.accessToken, controller.signal),
       getBoardComments(postId, state.accessToken, controller.signal),
@@ -293,13 +304,39 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
     });
   };
 
+  const hidePostAsAdmin = () => {
+    if (!state.accessToken) return;
+    const accessToken = state.accessToken;
+    askConfirm({
+      icon: 'visibility_off',
+      title: '이 게시글을 숨김 처리할까요?',
+      ok: '숨김 처리',
+      danger: true,
+      body: '작성자에게는 삭제된 것처럼 보이고, 관리자 목록에서는 계속 확인할 수 있어요.',
+      onOk: async () => {
+        try {
+          await hideBoardPostAsAdmin(postId, accessToken);
+          showToast('게시글을 숨김 처리했어요.');
+          goToBoardList();
+        } catch (requestError) {
+          showToast(
+            requestError instanceof ApiError ? requestError.message : '숨김 처리에 실패했어요.',
+            'err',
+          );
+        }
+      },
+    });
+  };
+
+  const resolveReportReason = () =>
+    reportReason === OTHER_REPORT_REASON ? reportReasonDetail.trim() : reportReason;
+
   const submitPostReport = async () => {
     if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
+    const reason = resolveReportReason();
+    if (!reason) return showToast('신고 사유를 입력해 주세요.', 'err');
     try {
-      await createReport(
-        { targetType: 'POST', targetId: postId, reason: '부적절한 게시글' },
-        state.accessToken,
-      );
+      await createReport({ targetType: 'POST', targetId: postId, reason }, state.accessToken);
       setReportingPost(false);
       showToast('신고가 접수됐어요. 검토 후 조치할게요.');
     } catch (requestError) {
@@ -313,11 +350,10 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
   const submitCommentReport = async () => {
     if (reportingComment == null) return;
     if (!state.accessToken) return showToast('로그인이 필요해요.', 'err');
+    const reason = resolveReportReason();
+    if (!reason) return showToast('신고 사유를 입력해 주세요.', 'err');
     try {
-      await createReport(
-        { targetType: 'COMMENT', targetId: reportingComment, reason: '부적절한 댓글' },
-        state.accessToken,
-      );
+      await createReport({ targetType: 'COMMENT', targetId: reportingComment, reason }, state.accessToken);
       setReportingComment(null);
       showToast('신고가 접수됐어요. 검토 후 조치할게요.');
     } catch (requestError) {
@@ -418,7 +454,11 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
               ) : (
                 <button
                   type="button"
-                  onClick={() => setReportingComment(comment.id)}
+                  onClick={() => {
+                    setReportReason(REPORT_REASON_OPTIONS[0]);
+                    setReportReasonDetail('');
+                    setReportingComment(comment.id);
+                  }}
                   className="cursor-pointer text-xs font-bold text-faint hover:text-[#b5502f]"
                 >
                   신고
@@ -496,6 +536,8 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
   }
 
   const isPostMine = state.user?.id === post.userId;
+  const isAdmin = state.user?.role === 'ADMIN';
+  const isHidden = post.status === 'HIDDEN';
   const journalImage = journal ? representativeImage(journal) : null;
 
   return (
@@ -509,6 +551,12 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
       </button>
 
       <div className="mt-4 rounded-[20px] bg-white p-6 shadow-card sm:p-7">
+        {isHidden && (
+          <div className="mb-4 flex items-center gap-2 rounded-[11px] bg-[#FBF3EF] px-4 py-3 text-[13px] font-bold text-[#b5502f]">
+            <span className="material-symbols-outlined text-[18px]">visibility_off</span>
+            관리자에 의해 숨김 처리된 게시글이에요. 관리자에게만 보이며, 좋아요·댓글 작성은 비활성화돼요.
+          </div>
+        )}
         <div className="mb-2.5 flex items-center gap-2">
           <span className={`text-sm font-extrabold ${CATEGORY_TEXT[post.category]}`}>
             [{CATEGORY_LABEL[post.category]}]
@@ -576,49 +624,68 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
 
         <p className="mb-6 whitespace-pre-wrap text-[15px] leading-[1.75] text-ink">{post.content}</p>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={toggleLike}
-            disabled={likePending}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] px-[18px] py-[11px] font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
-              liked ? 'border-[#e8bdad] bg-[#FBF3EF] text-[#b5502f]' : 'border-line bg-white text-sub'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[17px]">favorite</span> 좋아요 {likeCount}
-          </button>
-          {isPostMine ? (
-            <>
-              <Link
-                href={`/board/${post.id}/edit`}
-                className="flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] border-line bg-white px-4 py-[11px] font-bold text-sub hover:text-sub"
-              >
-                <span className="material-symbols-outlined text-[17px]">edit</span> 수정
-              </Link>
-              <button
-                type="button"
-                onClick={removePost}
-                className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[11px] font-bold text-[#b5502f]"
-              >
-                <span className="material-symbols-outlined text-[17px]">delete</span> 삭제
-              </button>
-            </>
-          ) : (
+        {!isHidden && (
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setReportingPost(true)}
-              className="cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white px-4 py-[11px] font-bold text-sub"
+              onClick={toggleLike}
+              disabled={likePending}
+              className={`flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] px-[18px] py-[11px] font-bold disabled:cursor-not-allowed disabled:opacity-60 ${
+                liked ? 'border-[#e8bdad] bg-[#FBF3EF] text-[#b5502f]' : 'border-line bg-white text-sub'
+              }`}
             >
-              <span className="material-symbols-outlined text-[17px]">flag</span> 신고
+              <span className="material-symbols-outlined text-[17px]">favorite</span> 좋아요 {likeCount}
             </button>
-          )}
-        </div>
+            {isPostMine ? (
+              <>
+                <Link
+                  href={`/board/${post.id}/edit`}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] border-line bg-white px-4 py-[11px] font-bold text-sub hover:text-sub"
+                >
+                  <span className="material-symbols-outlined text-[17px]">edit</span> 수정
+                </Link>
+                <button
+                  type="button"
+                  onClick={removePost}
+                  className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[11px] font-bold text-[#b5502f]"
+                >
+                  <span className="material-symbols-outlined text-[17px]">delete</span> 삭제
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setReportReason(REPORT_REASON_OPTIONS[0]);
+                  setReportReasonDetail('');
+                  setReportingPost(true);
+                }}
+                className="cursor-pointer rounded-[11px] border-[1.5px] border-line bg-white px-4 py-[11px] font-bold text-sub"
+              >
+                <span className="material-symbols-outlined text-[17px]">flag</span> 신고
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={hidePostAsAdmin}
+                className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[11px] font-bold text-[#b5502f]"
+              >
+                <span className="material-symbols-outlined text-[17px]">visibility_off</span> 숨김 처리
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mt-5 rounded-[20px] bg-white p-6 shadow-card sm:p-7">
         <h2 className="mb-4 text-[17px] font-extrabold">댓글 {comments.length}개</h2>
 
-        {state.accessToken ? (
+        {isHidden ? (
+          <div className="mb-5 rounded-[11px] bg-[#F8FAF3] px-4 py-3 text-sm text-sub">
+            숨김 처리된 게시글에는 댓글을 남길 수 없어요.
+          </div>
+        ) : state.accessToken ? (
           <div className="mb-5 flex gap-2.5">
             <input
               value={commentDraft}
@@ -655,8 +722,29 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
         >
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[380px] animate-pop rounded-[20px] bg-white p-6">
             <h3 className="mb-1 text-[18px] font-extrabold">게시글 신고하기</h3>
-            <p className="mb-5 text-[13px] text-sub">검토 후 조치할게요. 바로 처리되지는 않아요.</p>
-            <div className="flex gap-2.5">
+            <p className="mb-4 text-[13px] text-sub">검토 후 조치할게요. 바로 처리되지는 않아요.</p>
+            <select
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              className="mb-2.5 w-full rounded-xl border-[1.5px] border-line bg-white p-3 text-sm outline-none"
+            >
+              {REPORT_REASON_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            {reportReason === OTHER_REPORT_REASON && (
+              <input
+                autoFocus
+                value={reportReasonDetail}
+                onChange={(e) => setReportReasonDetail(e.target.value)}
+                maxLength={200}
+                placeholder="신고 사유를 입력해 주세요."
+                className="mb-2.5 w-full rounded-xl border-[1.5px] border-line p-3 text-sm outline-none"
+              />
+            )}
+            <div className="mt-1.5 flex gap-2.5">
               <button
                 type="button"
                 onClick={submitPostReport}
@@ -683,8 +771,29 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
         >
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[380px] animate-pop rounded-[20px] bg-white p-6">
             <h3 className="mb-1 text-[18px] font-extrabold">댓글 신고하기</h3>
-            <p className="mb-5 text-[13px] text-sub">검토 후 조치할게요. 바로 처리되지는 않아요.</p>
-            <div className="flex gap-2.5">
+            <p className="mb-4 text-[13px] text-sub">검토 후 조치할게요. 바로 처리되지는 않아요.</p>
+            <select
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              className="mb-2.5 w-full rounded-xl border-[1.5px] border-line bg-white p-3 text-sm outline-none"
+            >
+              {REPORT_REASON_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            {reportReason === OTHER_REPORT_REASON && (
+              <input
+                autoFocus
+                value={reportReasonDetail}
+                onChange={(e) => setReportReasonDetail(e.target.value)}
+                maxLength={200}
+                placeholder="신고 사유를 입력해 주세요."
+                className="mb-2.5 w-full rounded-xl border-[1.5px] border-line p-3 text-sm outline-none"
+              />
+            )}
+            <div className="mt-1.5 flex gap-2.5">
               <button
                 type="button"
                 onClick={submitCommentReport}

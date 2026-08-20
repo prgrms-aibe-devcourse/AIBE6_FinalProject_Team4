@@ -4,6 +4,8 @@ import com.kiwobollae.api.admin.service.ExchangeManagementService;
 import com.kiwobollae.api.admin.service.OrderManagementService;
 import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
 import com.kiwobollae.api.board.dto.response.BoardCommentResponse;
+import com.kiwobollae.api.board.dto.response.BoardPostResponse;
+import com.kiwobollae.api.board.entity.enums.BoardStatus;
 import com.kiwobollae.api.board.service.BoardCommentService;
 import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.journal.dto.response.PlantJournalResponse;
@@ -167,6 +169,22 @@ public class AdminController {
 	public ResponseEntity<Void> hideBoardPost(@PathVariable Long id) {
 		boardPostService.adminHidePost(id);
 		return ResponseEntity.noContent().build();
+	}
+
+	@Operation(summary = "게시글 숨김 해제", description = "관리자가 숨긴 게시글을 다시 노출합니다. 삭제된 첨부 이미지는 복원되지 않습니다.")
+	@PatchMapping("/board/posts/{id}/restore")
+	public ResponseEntity<Void> restoreBoardPost(@PathVariable Long id) {
+		boardPostService.adminRestorePost(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@Operation(summary = "게시글 상태별 목록 조회", description = "관리자가 상태별(기본 숨김 처리된 글)로 게시글 목록을 조회합니다.")
+	@GetMapping("/board/posts")
+	public ResponseEntity<ApiResponse<Page<BoardPostResponse>>> getBoardPostsForAdmin(
+			@RequestParam(defaultValue = "HIDDEN") BoardStatus status,
+			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+			Pageable pageable) {
+		return ResponseEntity.ok(ApiResponse.success(boardPostService.getPostsForAdmin(status, pageable)));
 	}
 
 	@Operation(summary = "댓글 숨김 처리", description = "부적절한 댓글을 관리자가 숨깁니다. 물리 삭제는 하지 않습니다.")

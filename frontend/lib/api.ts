@@ -94,7 +94,14 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
   const body = await res.json().catch(() => null);
 
   if (!res.ok) {
-    if (res.status === 401 && !isCredentialEndpoint && typeof window !== 'undefined') {
+    // AUTH_ACCOUNT_NOT_ACTIVE is a 403 (not 401), thrown when JwtAuthenticationFilter
+    // re-checks DB status per request and finds the account is no longer ACTIVE (e.g. an
+    // admin suspended it mid-session, before the access token naturally expired). Treat it
+    // the same as an expired session — force logout — rather than leaving the user stuck
+    // retrying the same blocked action forever. Checked by `code`, not status, so a normal
+    // 403 (AUTH_ACCESS_DENIED — e.g. a non-admin hitting an admin route) does NOT log out.
+    const isSessionInvalidated = res.status === 401 || body?.code === 'AUTH_ACCOUNT_NOT_ACTIVE';
+    if (isSessionInvalidated && !isCredentialEndpoint && typeof window !== 'undefined') {
       window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
     }
     const code = body?.code || 'UNKNOWN_ERROR';
@@ -110,6 +117,24 @@ export async function request<T>(path: string, options: ApiRequestOptions = {}, 
   // 204 No Content (delete/cancel/confirm 등)처럼 응답 본문이 없는 성공 응답은 body가 null이라
   // body.data에 접근하면 TypeError가 나서 성공한 요청이 실패로 보인다.
   return (body ? body.data : undefined) as T;
+}
+
+// Reads the JWT payload's `exp` claim (seconds since epoch) without verifying the
+// signature — this is a client-side convenience check only, never a security boundary.
+// Used to proactively refresh a stale access token *before* firing requests instead of
+// waiting for a 401 that a permitAll endpoint may never send: an expired/garbage bearer
+// token on a public endpoint (e.g. board post detail) is silently treated as "no token"
+// by the backend, so it degrades to an anonymous view rather than erroring — a hidden
+// post an admin should be able to see then looks exactly like "not found".
+export function isAccessTokenExpired(token: string, skewSeconds = 30): boolean {
+  try {
+    const payload = token.split('.')[1];
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof json.exp !== 'number') return false;
+    return json.exp * 1000 <= Date.now() + skewSeconds * 1000;
+  } catch {
+    return true;
+  }
 }
 
 function resolveRetryAfterSeconds(

@@ -8,7 +8,7 @@
 // (kept in sync via setAccessToken below) purely so it can attach the
 // Authorization header without importing the store.
 import { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
-import { ApiError, AUTH_EXPIRED_EVENT, reissue, logout as apiLogout, setAccessToken, setUnauthorizedHandler } from '@/lib/api';
+import { ApiError, AUTH_EXPIRED_EVENT, isAccessTokenExpired, reissue, logout as apiLogout, setAccessToken, setUnauthorizedHandler } from '@/lib/api';
 import { getWallet } from '@/features/point/api';
 import { getCart } from '@/lib/order-api';
 import { getMyPlants } from '@/lib/plant-api';
@@ -23,6 +23,11 @@ import {
 } from '@/lib/notification-api';
 
 const KEY = 'kwb_store_v1';
+
+// 새로고침 시 만료된 토큰을 재발급받는 동안 서버가 느리거나 응답이 없으면 hydrated가
+// 영원히 false로 남아 화면이 계속 로딩 상태처럼 보인다 — 이 시간을 넘기면 재발급 실패와
+// 동일하게 처리해 hydration이 항상 끝나도록 한다.
+const HYDRATION_REISSUE_TIMEOUT_MS = 5000;
 
 export interface Wallet {
   free: number;
@@ -134,20 +139,63 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        setState({
-          ...DEFAULTS,
-          ...JSON.parse(raw),
-          wallet: EMPTY_WALLET,
-          readyCards: 0,
-          notifications: [],
-          unreadNotificationCount: 0,
-        });
+    (async () => {
+      let restored: StoreState = DEFAULTS;
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) {
+          restored = {
+            ...DEFAULTS,
+            ...JSON.parse(raw),
+            wallet: EMPTY_WALLET,
+            readyCards: 0,
+            notifications: [],
+            unreadNotificationCount: 0,
+          };
+        }
+      } catch (e) {}
+
+      // A permitAll endpoint (e.g. board post detail) silently treats an expired/garbage
+      // bearer token as "no token" instead of erroring, so waiting for a 401 to trigger
+      // the usual silent-refresh flow never happens there. Refresh proactively here,
+      // before hydrated flips true and any page's fetch effects fire with a stale token.
+      //
+      // This round trip has no timeout of its own, so a slow/unresponsive server would leave
+      // hydrated stuck at false indefinitely — the navbar stays a gray bar and auth-gated pages
+      // render blank, which looks like "the app won't load" rather than an auth problem. Race it
+      // against a hard deadline and treat a timeout the same as a failed refresh (logged out) so
+      // hydration always completes.
+      if (restored.accessToken && isAccessTokenExpired(restored.accessToken)) {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const res = await Promise.race([
+            reissue(),
+            new Promise<never>((_, reject) => {
+              timeoutId = setTimeout(() => reject(new Error('reissue timed out')), HYDRATION_REISSUE_TIMEOUT_MS);
+            }),
+          ]);
+          restored = {
+            ...restored,
+            authed: true,
+            accessToken: res.accessToken,
+            user: {
+              id: res.user.id,
+              email: res.user.email,
+              nickname: res.user.nickname,
+              role: res.user.role,
+              level: res.user.level,
+            },
+          };
+        } catch {
+          restored = { ...restored, authed: false, accessToken: null, user: null };
+        } finally {
+          clearTimeout(timeoutId);
+        }
       }
-    } catch (e) {}
-    setHydrated(true);
+
+      setState(restored);
+      setHydrated(true);
+    })();
   }, []);
 
   // Keep lib/api.ts's in-memory copy of the token in sync with whatever was

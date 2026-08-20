@@ -17,5 +17,23 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: kiwobollae-redis
+    # 운영(infra/main.tf의 redis_1 컨테이너)과 동일하게 별도 Redis 비밀번호를 두지 않고
+    # DB 비밀번호를 그대로 재사용한다.
+    command: redis-server --requirepass "${MYSQL_ROOT_PASSWORD}"
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${MYSQL_ROOT_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   mysql_data:
+  redis_data:
