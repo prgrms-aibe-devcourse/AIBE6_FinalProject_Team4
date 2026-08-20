@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PointPrice from '@/components/PointPrice';
 import { useProductDetail } from '@/features/shop/use-product-detail';
-import { withTopicParticle } from '@/lib/korean';
+import { useStore } from '@/lib/store';
+import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 
 export default function ProductDetail({
   params,
@@ -14,6 +15,7 @@ export default function ProductDetail({
   searchParams?: { returnTo?: string | string[] };
 }) {
   const router = useRouter();
+  const { state } = useStore();
   const {
     product,
     qty,
@@ -111,13 +113,12 @@ export default function ProductDetail({
           )}
 
           {product.category === 'SEEDLING' && product.plantGuide && (
-            <div className="mb-5 rounded-2xl bg-[#F6F9EF] px-[18px] py-4">
-              <div className="mb-1.5 font-extrabold">
-                {withTopicParticle(product.plantGuide.name)} 이렇게 키워요 🌿
-              </div>
-              <p className="text-[13.5px] leading-[1.65] text-[#6d7a68]">
-                {product.plantGuide.careGuide || '식물 가이드를 준비하고 있어요.'}
-              </p>
+            <div className="mb-5">
+              <PlantCareGuidePanel
+                speciesName={product.plantGuide.speciesName}
+                accessToken={state.accessToken}
+                variant="inline"
+              />
             </div>
           )}
 

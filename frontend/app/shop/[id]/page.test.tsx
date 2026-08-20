@@ -138,6 +138,31 @@ describe("shop gacha pack detail", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("모종 상품은 종 이름으로 AI 재배가이드 패널을 보여준다", async () => {
+    mockedGetProduct.mockResolvedValueOnce({
+      id: 11,
+      name: "방울토마토 모종",
+      category: "SEEDLING",
+      pointPrice: 1200,
+      stock: 12,
+      soldOut: false,
+      description: "햇빛이 드는 베란다에서 키우기 좋은 방울토마토 모종입니다.",
+      imageUrl: null,
+      plantGuide: { speciesName: "방울토마토" },
+      createdAt: "2026-07-31T00:00:00",
+      updatedAt: "2026-07-31T00:00:00",
+    });
+
+    render(<ProductDetail params={{ id: "11" }} />);
+
+    expect(
+      await screen.findByText("방울토마토 재배법을 AI가 정리해 드려요."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "재배 가이드 보기" }),
+    ).toBeInTheDocument();
+  });
+
   it("구매 사이에 가격이 바뀌면 차감하지 않고 최신 가격을 다시 표시한다", async () => {
     mockedPurchase.mockRejectedValueOnce(
       new (await import("@/lib/api")).ApiError(

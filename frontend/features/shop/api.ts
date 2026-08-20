@@ -23,11 +23,10 @@ export interface ProductPage {
   last: boolean;
 }
 
+// category/careGuide 본문은 여기서 내려주지 않는다 — SEEDLING 상품 상세에서는 speciesName으로
+// PlantCareGuidePanel을 띄워 AI 재배가이드를 별도로 받아온다.
 export interface PlantGuide {
-  plantSpeciesId: number;
-  name: string;
-  category: string | null;
-  careGuide: string | null;
+  speciesName: string;
 }
 
 export interface ProductDetail {
