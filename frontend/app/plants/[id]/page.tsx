@@ -370,7 +370,6 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       </div>
 
       <PlantCareGuidePanel
-        speciesId={plant.speciesId}
         speciesName={plant.speciesName}
         accessToken={state.accessToken}
       />

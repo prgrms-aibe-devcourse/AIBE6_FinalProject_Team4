@@ -5,7 +5,6 @@ export type PlantStatus = 'GROWING' | 'HARVESTED' | 'FAILED';
 export interface PlantProfileData {
   id: number;
   userId: number;
-  speciesId: number;
   speciesName: string;
   nickname: string;
   startDate: string;
@@ -15,7 +14,7 @@ export interface PlantProfileData {
 }
 
 export interface PlantProfileRequest {
-  speciesId: number;
+  speciesName: string;
   nickname: string;
   startDate: string;
   thumbnailUrl?: string;

@@ -7,9 +7,9 @@ import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
 import { getProfileIdsWrittenToday } from '@/lib/journal-api';
-import { getSpecies, PlantSpeciesData } from '@/lib/species-api';
+import { searchPlantCareGuideSpecies } from '@/lib/care-guide-api';
 import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
-import { nickValid } from '@/lib/plant-validation';
+import { nickValid, speciesNameValid } from '@/lib/plant-validation';
 import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 import { useSpotlightTour } from '@/lib/onboarding/useSpotlightTour';
 import SpotlightTour, { TourStep } from '@/components/onboarding/SpotlightTour';
@@ -58,21 +58,19 @@ export default function PlantsPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [speciesList, setSpeciesList] = useState<PlantSpeciesData[]>([]);
-  const [speciesLoading, setSpeciesLoading] = useState(true);
-  const [speciesError, setSpeciesError] = useState('');
+  const [speciesSuggestions, setSpeciesSuggestions] = useState<string[]>([]);
+  const [speciesSearchLoading, setSpeciesSearchLoading] = useState(false);
   const [filter, setFilter] = useState('all');
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [reg, setReg] = useState<{ nick: string; speciesId: number | null; photoIdx: number; startDate: string }>({
-    nick: '', speciesId: null, photoIdx: 0, startDate: today(),
+  const [reg, setReg] = useState<{ nick: string; speciesName: string; photoIdx: number; startDate: string }>({
+    nick: '', speciesName: '', photoIdx: 0, startDate: today(),
   });
   const [todayWrittenIds, setTodayWrittenIds] = useState<Set<number>>(new Set());
   const [todayWrittenError, setTodayWrittenError] = useState(false);
   const [writtenTodayOnly, setWrittenTodayOnly] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [query, setQuery] = useState('');
   const [photoMode, setPhotoMode] = useState<'upload' | 'emoji'>('upload');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -144,30 +142,35 @@ export default function PlantsPage() {
     setPlants(filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE));
   }, [writtenTodayFilterActive, rawGrowing, todayWrittenIds, page]);
 
+  // 이미 가이드가 생성된 종 이름만 자동완성으로 보여준다 — 새로운 종은 검색되지 않고 사용자가
+  // 직접 입력하면 그대로 등록된다. 입력마다 부르면 과하니 살짝 debounce한다.
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
+    const trimmed = reg.speciesName.trim();
+    if (!trimmed) {
+      setSpeciesSuggestions([]);
+      return;
+    }
     const accessToken = state.accessToken;
     const controller = new AbortController();
-    setSpeciesLoading(true);
-    setSpeciesError('');
+    const timer = setTimeout(() => {
+      setSpeciesSearchLoading(true);
+      searchPlantCareGuideSpecies(trimmed, accessToken, controller.signal)
+        .then((results) => setSpeciesSuggestions(results))
+        .catch((requestError) => {
+          if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
+          setSpeciesSuggestions([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSpeciesSearchLoading(false);
+        });
+    }, 300);
 
-    getSpecies(accessToken, controller.signal)
-      .then((data) => setSpeciesList(data))
-      .catch((requestError) => {
-        if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
-        setSpeciesList([]);
-        setSpeciesError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : '식물 종 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setSpeciesLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [hydrated, state.accessToken]);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [hydrated, state.accessToken, reg.speciesName]);
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -201,16 +204,7 @@ export default function PlantsPage() {
     });
   }, [plants]);
   const regV = nickValid(reg.nick);
-  const spResults = speciesList.filter((sp) => !query.trim() || sp.name.includes(query.trim()));
-  const selectedSpecies = speciesList.find((sp) => sp.id === reg.speciesId) || null;
-
-  const handleSpeciesQueryChange = (value: string) => {
-    setQuery(value);
-    const selected = speciesList.find((sp) => sp.id === reg.speciesId);
-    if (selected && selected.name !== value) {
-      setReg({ ...reg, speciesId: null });
-    }
-  };
+  const speciesV = speciesNameValid(reg.speciesName);
 
   const toggleSelected = (plantId: number) => {
     setSelectedIds((prev) => {
@@ -263,11 +257,6 @@ export default function PlantsPage() {
     });
   };
 
-  const clearSpeciesSelection = () => {
-    setReg({ ...reg, speciesId: null });
-    setQuery('');
-  };
-
   const pickPhoto = (file: File | null) => {
     if (!file) return;
     if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
@@ -283,8 +272,8 @@ export default function PlantsPage() {
 
   const resetRegisterForm = () => {
     if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setReg({ nick: '', speciesId: null, photoIdx: 0, startDate: today() });
-    setQuery('');
+    setReg({ nick: '', speciesName: '', photoIdx: 0, startDate: today() });
+    setSpeciesSuggestions([]);
     setPhotoMode('upload');
     setPhotoFile(null);
     setPhotoPreview(null);
@@ -292,7 +281,7 @@ export default function PlantsPage() {
   };
 
   const closeRegisterModal = () => {
-    const hasInput = reg.nick.trim() !== '' || reg.speciesId !== null || photoFile !== null;
+    const hasInput = reg.nick.trim() !== '' || reg.speciesName.trim() !== '' || photoFile !== null;
     if (!hasInput) {
       setOpen(false);
       return;
@@ -310,7 +299,7 @@ export default function PlantsPage() {
   const submit = async () => {
     if (!state.accessToken) return;
     if (!regV.ok) return showToast(regV.msg, 'err');
-    if (!reg.speciesId) return showToast('식물 종을 골라주세요 🌱', 'err');
+    if (!speciesV.ok) return showToast(speciesV.msg, 'err');
     if (!reg.startDate) return showToast('재배 시작일을 선택해 주세요.', 'err');
 
     setSubmitting(true);
@@ -328,7 +317,7 @@ export default function PlantsPage() {
       try {
         created = await createPlant(
           {
-            speciesId: reg.speciesId,
+            speciesName: reg.speciesName.trim(),
             nickname: reg.nick,
             startDate: reg.startDate,
             ...(thumbnailUrl ? { thumbnailUrl } : {}),
@@ -612,56 +601,44 @@ export default function PlantsPage() {
 
             <label className={LABEL}>식물 종 <span className="text-[#e5533b]">*</span></label>
             <input
-              value={query}
-              onChange={(e) => handleSpeciesQueryChange(e.target.value)}
-              placeholder="종을 검색하세요 (예: 토마토)"
-              className={`${FIELD} mb-2.5 mt-1.5`}
+              value={reg.speciesName}
+              onChange={(e) => setReg({ ...reg, speciesName: e.target.value })}
+              placeholder="예: 방울토마토 (한글/영문/공백만)"
+              className={`mb-[5px] mt-1.5 w-full rounded-xl border-[1.5px] px-[13px] py-3 outline-none ${
+                reg.speciesName ? (speciesV.ok ? 'border-[#AED581]' : 'border-[#f0c9a0]') : 'border-line'
+              }`}
             />
-            {speciesLoading ? (
-              <div className="mb-[18px] text-[13.5px] text-faint">종 목록을 불러오고 있어요 🌱</div>
-            ) : speciesError ? (
-              <div className="mb-[18px] text-[13.5px] text-faint">{speciesError}</div>
-            ) : spResults.length === 0 && query.trim() ? (
-              <div className="mb-[18px] text-[13.5px] text-faint">
-                일치하는 종이 없어요. 다른 이름으로 검색해 보세요.
-              </div>
-            ) : (
+            <div className={`mb-2.5 text-xs ${reg.speciesName ? (speciesV.ok ? 'text-brand' : 'text-[#e08a3c]') : 'text-faint'}`}>
+              {reg.speciesName ? speciesV.msg || '좋아요! 🌿' : '한글/영문/공백만 사용해 지어주세요.'}
+            </div>
+            {speciesSearchLoading ? (
+              <div className="mb-[18px] text-[13.5px] text-faint">비슷한 종을 찾고 있어요 🌱</div>
+            ) : speciesSuggestions.length > 0 ? (
               <div className="mb-[18px] flex flex-wrap gap-2">
-                {spResults.map((sp) => {
-                  const selected = reg.speciesId === sp.id;
+                {speciesSuggestions.map((name) => {
+                  const selected = reg.speciesName === name;
                   return (
                     <button
-                      key={sp.id}
+                      key={name}
                       type="button"
-                      onClick={() => { setReg({ ...reg, speciesId: sp.id }); setQuery(sp.name); }}
+                      onClick={() => setReg({ ...reg, speciesName: name })}
                       className={`cursor-pointer rounded-[10px] border-[1.5px] px-[13px] py-2 text-[13.5px] font-bold ${
                         selected ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
                       }`}
                     >
-                      {plantVisual(sp.name).emoji} {sp.name}
-                      {selected && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => { e.stopPropagation(); clearSpeciesSelection(); }}
-                          className="ml-1.5 text-[#a9b3a0]"
-                        >
-                          ×
-                        </span>
-                      )}
+                      {plantVisual(name).emoji} {name}
                     </button>
                   );
                 })}
               </div>
-            )}
+            ) : null}
 
             {/* 등록 전에 "이 종을 내가 키울 수 있나"를 확인할 수 있는 자리 — 가이드 요청은 AI 호출이라
-                자동으로 부르지 않고, 종을 고른 뒤 사용자가 버튼을 눌렀을 때만 나간다. */}
-            {selectedSpecies && (
+                자동으로 부르지 않고, 이름을 다 입력한 뒤 사용자가 버튼을 눌렀을 때만 나간다. */}
+            {speciesV.ok && (
               <div className="mb-[18px]">
                 <PlantCareGuidePanel
-                  speciesId={selectedSpecies.id}
-                  speciesName={selectedSpecies.name}
+                  speciesName={reg.speciesName.trim()}
                   accessToken={state.accessToken}
                   variant="inline"
                 />

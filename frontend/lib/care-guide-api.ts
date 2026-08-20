@@ -1,4 +1,4 @@
-import { request } from '@/lib/api';
+import { request } from "@/lib/api";
 
 export interface PlantCareGuideEnvironment {
   sunlight: string;
@@ -34,12 +34,25 @@ export interface PlantCareGuideData {
 // GET이지만 저장본이 없으면 서버가 그 자리에서 AI로 생성한다 — 캐시 미스인 첫 요청은 수 초에서
 // 수십 초까지 걸릴 수 있으므로 호출부는 반드시 로딩 상태를 보여줘야 한다.
 export function getPlantCareGuide(
-  speciesId: number,
+  speciesName: string,
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<PlantCareGuideData> {
-  return request<PlantCareGuideData>(`/api/v1/ai/plants/species/${speciesId}/care-guide`, {
-    accessToken,
-    signal,
-  });
+  return request<PlantCareGuideData>(
+    `/api/v1/ai/plants/care-guide?speciesName=${encodeURIComponent(speciesName)}`,
+    { accessToken, signal },
+  );
+}
+
+// 이미 가이드가 생성된 종 이름 중 검색어를 포함하는 이름만 돌아온다. 처음 보는 종은 검색되지 않으며,
+// 사용자가 이름을 직접 입력해 조회하면 그때 새로 생성된다.
+export function searchPlantCareGuideSpecies(
+  query: string,
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  return request<string[]>(
+    `/api/v1/ai/plants/care-guide/search?query=${encodeURIComponent(query)}`,
+    { accessToken, signal },
+  );
 }

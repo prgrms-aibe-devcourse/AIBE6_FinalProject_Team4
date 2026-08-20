@@ -3,7 +3,6 @@ import { request } from "@/lib/api";
 export interface PlantProfileData {
   id: number;
   userId: number;
-  speciesId: number;
   speciesName: string;
   nickname: string;
   startDate: string;
