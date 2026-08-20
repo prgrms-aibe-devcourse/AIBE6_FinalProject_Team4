@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GachaOpenPage from "./page";
 import { getGachaDraw, markGachaDrawViewed } from "@/lib/gacha-api";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const navigation = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn() }));
 const store = vi.hoisted(() => ({ refreshNotifications: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
@@ -107,20 +107,23 @@ describe("GachaOpenPage", () => {
     }
     fireEvent.click(screen.getByRole("button", { name: "전체 결과 보기" }));
     expect(
-      await screen.findByRole("link", { name: "카드팩 구매하기" }),
-    ).toHaveAttribute("href", "/shop?category=GACHA_PACK&sort=new&page=1");
+      await screen.findByRole("button", { name: "뒤로가기" }),
+    ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "일지 보러 가기" }),
-    ).toHaveAttribute("href", "/journals");
-    expect(
-      screen.getByRole("link", { name: "다른 개봉 내역 보기" }),
-    ).toHaveAttribute("href", "/gacha?tab=history");
+      screen.getByRole("button", { name: "내 카드 보기" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("일지 보러 가기")).not.toBeInTheDocument();
+    expect(screen.queryByText("카드팩 구매하기")).not.toBeInTheDocument();
+    expect(screen.queryByText("다른 개봉 내역 보기")).not.toBeInTheDocument();
+    expect(screen.queryByText("개봉 연출 다시 보기")).not.toBeInTheDocument();
+    expect(screen.queryByText(/사운드|음소거/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("link", { name: "일지 보러 가기" }));
+    fireEvent.click(screen.getByRole("button", { name: "뒤로가기" }));
     await waitFor(() =>
       expect(store.refreshNotifications).toHaveBeenCalledTimes(1),
     );
-    expect(navigation.push).toHaveBeenCalledWith("/journals");
+    expect(navigation.replace).toHaveBeenCalledWith("/gacha");
+    expect(navigation.back).not.toHaveBeenCalled();
   });
 
   it("환불된 팩은 포인트 반환 안내 후 대기를 종료한다", async () => {
@@ -146,5 +149,46 @@ describe("GachaOpenPage", () => {
     expect(
       screen.queryByText("카드 5장을 준비하고 있어요"),
     ).not.toBeInTheDocument();
+  });
+
+  it("일지 보상으로 진입하면 뒤로가기 시 성장일지 목록으로 이동한다", async () => {
+    mockedGetDraw.mockResolvedValue({
+      drawId: 23,
+      status: "COMPLETED",
+      sourceType: "LOG_REWARD",
+      rateVersion: 1,
+      createdAt: "2026-07-30T03:00:00Z",
+      completedAt: "2026-07-30T03:00:01Z",
+      resultViewedAt: "2026-07-30T03:00:02Z",
+      items: Array.from({ length: 5 }, (_, index) => ({
+        sequence: index + 1,
+        cardId: index + 1,
+        code: `JOURNAL_CARD_${index + 1}`,
+        name: `일지 카드 ${index + 1}`,
+        imageUrl: `/cards/${index + 1}/journal-card.png`,
+        rolledRarity: "COMMON" as const,
+        finalRarity: "COMMON" as const,
+        downgraded: false,
+        new: false,
+        ownedCountAfter: 2,
+        nextMilestone: 3,
+        goldenOriginRank: null,
+      })),
+    });
+
+    render(
+      <GachaOpenPage
+        params={{ drawId: "23" }}
+        searchParams={{ returnTo: "journals" }}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "뒤로가기" }));
+
+    await waitFor(() =>
+      expect(store.refreshNotifications).toHaveBeenCalledTimes(1),
+    );
+    expect(navigation.replace).toHaveBeenCalledWith("/journals");
+    expect(navigation.back).not.toHaveBeenCalled();
   });
 });

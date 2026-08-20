@@ -1,22 +1,47 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
 import { useStore } from "@/lib/store";
 
-export function useGachaOpenNavigation() {
+const GACHA_FALLBACK_PATH = "/gacha";
+
+function hasSameOriginHistory() {
+  if (
+    typeof window === "undefined" ||
+    typeof document === "undefined" ||
+    window.history.length <= 1 ||
+    !document.referrer
+  ) {
+    return false;
+  }
+
+  try {
+    return new URL(document.referrer).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function useGachaOpenNavigation(returnTo?: "journals") {
   const router = useRouter();
   const { refreshNotifications } = useStore();
 
-  const moveToJournals = async (event: MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
+  const moveBack = async () => {
     await refreshNotifications();
-    router.push("/journals");
+    if (returnTo === "journals") {
+      router.replace("/journals");
+      return;
+    }
+    if (hasSameOriginHistory()) {
+      router.back();
+      return;
+    }
+    router.replace(GACHA_FALLBACK_PATH);
   };
 
   const moveToCollection = () => {
     router.replace("/gacha?tab=mine");
   };
 
-  return { moveToJournals, moveToCollection };
+  return { moveBack, moveToCollection };
 }

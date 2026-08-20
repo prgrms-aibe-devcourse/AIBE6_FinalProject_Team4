@@ -15,7 +15,8 @@ import {
   markGachaDrawViewed,
 } from "@/lib/gacha-api";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const navigation = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn() }));
+const store = vi.hoisted(() => ({ refreshNotifications: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => navigation,
@@ -31,6 +32,7 @@ vi.mock("@/lib/store", () => ({
   useStore: () => ({
     state: { accessToken: "access-token" },
     hydrated: true,
+    refreshNotifications: store.refreshNotifications,
   }),
 }));
 
@@ -124,13 +126,20 @@ describe("GachaBatchOpenPage", () => {
     ).toEqual(["골든 카드", "커먼 카드"]);
     expect(screen.getAllByText("+5")).toHaveLength(2);
     expect(
-      screen.getByRole("link", { name: "카드팩 구매하기" }),
-    ).toHaveAttribute("href", "/shop?category=GACHA_PACK&sort=new&page=1");
+      screen.getByRole("button", { name: "뒤로가기" }),
+    ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "일지 보러 가기" }),
-    ).toHaveAttribute("href", "/journals");
-    expect(
-      screen.getByRole("link", { name: "다른 개봉 내역 보기" }),
-    ).toHaveAttribute("href", "/gacha?tab=history");
+      screen.getByRole("button", { name: "내 카드 보기" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("일지 보러 가기")).not.toBeInTheDocument();
+    expect(screen.queryByText("카드팩 구매하기")).not.toBeInTheDocument();
+    expect(screen.queryByText("다른 개봉 내역 보기")).not.toBeInTheDocument();
+    expect(screen.queryByText(/사운드|음소거/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "뒤로가기" }));
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/gacha"),
+    );
+    expect(navigation.back).not.toHaveBeenCalled();
   });
 });

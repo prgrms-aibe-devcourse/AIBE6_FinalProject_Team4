@@ -12,27 +12,23 @@ import { useStore } from "@/lib/store";
 
 export default function GachaOpenPage({
   params,
+  searchParams,
 }: {
   params: { drawId: string };
+  searchParams?: { returnTo?: string };
 }) {
   const drawId = Number(params.drawId);
   const { state, hydrated } = useStore();
-  const { moveToJournals, moveToCollection } = useGachaOpenNavigation();
+  const { moveBack, moveToCollection } = useGachaOpenNavigation(
+    searchParams?.returnTo === "journals" ? "journals" : undefined,
+  );
   const [muted, setMuted] = useState(false);
-  const {
-    detail,
-    stage,
-    setStage,
-    revealedIndex,
-    error,
-    load,
-    revealNext,
-    replay,
-  } = useGachaOpenDraw({
-    drawId,
-    accessToken: state.accessToken,
-    hydrated,
-  });
+  const { detail, stage, setStage, revealedIndex, error, load, revealNext } =
+    useGachaOpenDraw({
+      drawId,
+      accessToken: state.accessToken,
+      hydrated,
+    });
 
   const confirm = () => {
     moveToCollection();
@@ -89,15 +85,17 @@ export default function GachaOpenPage({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0d140f] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(91,130,71,.32),transparent_38%),linear-gradient(180deg,rgba(255,255,255,.025),transparent_35%)]" />
       <div className="relative mx-auto flex min-h-full max-w-[1100px] flex-col px-4 py-5">
-        <div className="flex items-center justify-end">
-          <button
-            type="button"
-            onClick={() => setMuted((value) => !value)}
-            className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
-          >
-            {muted ? "🔇 음소거" : "🔊 사운드"}
-          </button>
-        </div>
+        {stage !== "summary" && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setMuted((value) => !value)}
+              className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
+            >
+              {muted ? "🔇 음소거" : "🔊 사운드"}
+            </button>
+          </div>
+        )}
 
         {stage !== "summary" && (
           <button
@@ -171,31 +169,12 @@ export default function GachaOpenPage({
                 ))}
               </div>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <Link
-                  href="/journals"
-                  onClick={moveToJournals}
-                  className="rounded-xl border border-white/25 px-5 py-3 text-sm font-bold"
-                >
-                  일지 보러 가기
-                </Link>
-                <Link
-                  href="/shop?category=GACHA_PACK&sort=new&page=1"
-                  className="rounded-xl border border-[#dfca72]/60 px-5 py-3 text-sm font-bold text-[#f3dc82] transition hover:bg-[#dfca72]/10"
-                >
-                  카드팩 구매하기
-                </Link>
-                <Link
-                  href="/gacha?tab=history"
-                  className="rounded-xl border border-white/25 px-5 py-3 text-sm font-bold"
-                >
-                  다른 개봉 내역 보기
-                </Link>
                 <button
                   type="button"
-                  onClick={replay}
+                  onClick={() => void moveBack()}
                   className="rounded-xl border border-white/25 px-5 py-3 text-sm font-bold"
                 >
-                  개봉 연출 다시 보기
+                  뒤로가기
                 </button>
                 <button
                   type="button"

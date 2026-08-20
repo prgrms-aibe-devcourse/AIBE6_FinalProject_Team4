@@ -100,7 +100,8 @@ export function useGachaOpenDraw({
       Boolean(accessToken) &&
       Number.isInteger(drawId) &&
       drawId > 0 &&
-      !error,
+      !error &&
+      stage !== "summary",
   );
 
   const revealNext = () => {
@@ -122,11 +123,6 @@ export function useGachaOpenDraw({
     }
   };
 
-  const replay = () => {
-    setRevealedIndex(0);
-    setStage("pack");
-  };
-
   return {
     detail,
     stage,
@@ -135,6 +131,5 @@ export function useGachaOpenDraw({
     error,
     load,
     revealNext,
-    replay,
   };
 }

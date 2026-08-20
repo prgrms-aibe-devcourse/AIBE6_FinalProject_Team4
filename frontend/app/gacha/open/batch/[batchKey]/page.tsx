@@ -16,7 +16,7 @@ export default function GachaBatchOpenPage({
   params: { batchKey: string };
 }) {
   const { state, hydrated } = useStore();
-  const { moveToJournals, moveToCollection } = useGachaOpenNavigation();
+  const { moveBack, moveToCollection } = useGachaOpenNavigation();
   const [muted, setMuted] = useState(false);
   const {
     drawIds,
@@ -38,6 +38,11 @@ export default function GachaBatchOpenPage({
   const confirm = () => {
     removeGachaBatch(params.batchKey);
     moveToCollection();
+  };
+
+  const goBack = async () => {
+    removeGachaBatch(params.batchKey);
+    await moveBack();
   };
 
   if (!hydrated) {
@@ -95,15 +100,15 @@ export default function GachaBatchOpenPage({
     <main className="relative min-h-screen overflow-x-hidden overflow-y-auto bg-[#0d140f] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(116,145,76,.32),transparent_38%),linear-gradient(180deg,rgba(255,255,255,.025),transparent_35%)]" />
       <div className="relative mx-auto flex min-h-screen max-w-[1180px] flex-col px-4 py-5">
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setMuted((value) => !value)}
-            className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
-          >
-            {muted ? "🔇 음소거" : "🔊 사운드"}
-          </button>
-          {stage !== "summary" && (
+        {stage !== "summary" && (
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setMuted((value) => !value)}
+              className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
+            >
+              {muted ? "🔇 음소거" : "🔊 사운드"}
+            </button>
             <button
               type="button"
               onClick={() => setStage("summary")}
@@ -111,8 +116,8 @@ export default function GachaBatchOpenPage({
             >
               연출 건너뛰기
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="flex flex-1 flex-col items-center justify-center py-10">
           {stage === "pack" && (
@@ -156,25 +161,13 @@ export default function GachaBatchOpenPage({
               <GachaBatchResultGrid results={groupedResults} />
 
               <div className="mt-10 flex flex-wrap justify-center gap-3">
-                <Link
-                  href="/journals"
-                  onClick={moveToJournals}
+                <button
+                  type="button"
+                  onClick={() => void goBack()}
                   className="rounded-full border border-white/20 px-8 py-3.5 font-black text-white/80 transition hover:-translate-y-0.5 hover:bg-white/10"
                 >
-                  일지 보러 가기
-                </Link>
-                <Link
-                  href="/shop?category=GACHA_PACK&sort=new&page=1"
-                  className="rounded-full border border-[#d7c266]/60 px-8 py-3.5 font-black text-[#f2dc83] transition hover:-translate-y-0.5 hover:bg-[#d7c266]/10"
-                >
-                  카드팩 구매하기
-                </Link>
-                <Link
-                  href="/gacha?tab=history"
-                  className="rounded-full border border-white/20 px-8 py-3.5 font-black text-white/80 transition hover:-translate-y-0.5 hover:bg-white/10"
-                >
-                  다른 개봉 내역 보기
-                </Link>
+                  뒤로가기
+                </button>
                 <button
                   type="button"
                   onClick={confirm}
