@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kiwobollae.api.admin.service.ExchangeManagementService;
 import com.kiwobollae.api.admin.service.OrderManagementService;
-import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
 import com.kiwobollae.api.board.service.BoardCommentService;
 import com.kiwobollae.api.board.service.BoardPostService;
 import com.kiwobollae.api.commerce.dto.request.ExchangeCancelRequest;
@@ -19,8 +18,6 @@ import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.journal.service.PlantJournalService;
 import com.kiwobollae.api.report.service.ReportService;
-import com.kiwobollae.api.species.dto.request.PlantSpeciesRequest;
-import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
@@ -44,7 +41,6 @@ class AdminControllerTest {
 
 	@Mock private ExchangeManagementService exchangeManagementService;
 	@Mock private OrderManagementService orderManagementService;
-	@Mock private PlantSpeciesManagementService plantSpeciesManagementService;
 	@Mock private BoardPostService boardPostService;
 	@Mock private BoardCommentService boardCommentService;
 	@Mock private PlantJournalService plantJournalService;
@@ -56,60 +52,12 @@ class AdminControllerTest {
 	@BeforeEach
 	void setUp() {
 		AdminController adminController = new AdminController(
-				exchangeManagementService, orderManagementService, plantSpeciesManagementService,
+				exchangeManagementService, orderManagementService,
 				boardPostService, boardCommentService, plantJournalService, reportService);
 		mockMvc = MockMvcBuilders.standaloneSetup(adminController)
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
 				.build();
-	}
-
-	@Test
-	void createSpeciesReturnsCreatedSpecies() throws Exception {
-		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라", "관엽식물", "적당량의 물을 준다");
-		given(plantSpeciesManagementService.createSpecies(request))
-				.willReturn(new PlantSpeciesResponse(1L, "몬스테라", "관엽식물", "적당량의 물을 준다", null, null));
-
-		mockMvc.perform(post("/api/v1/admin/plants/species")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(objectMapper.writeValueAsString(request)))
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.data.name").value("몬스테라"));
-	}
-
-	@Test
-	void createSpeciesRejectsBlankName() throws Exception {
-		PlantSpeciesRequest request = new PlantSpeciesRequest(" ", "관엽식물", null);
-
-		mockMvc.perform(post("/api/v1/admin/plants/species")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(objectMapper.writeValueAsString(request)))
-				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	void updateSpeciesReturnsUpdatedSpecies() throws Exception {
-		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라 디럭스", "대형 관엽식물", "물을 자주 준다");
-		given(plantSpeciesManagementService.updateSpecies(1L, request))
-				.willReturn(new PlantSpeciesResponse(1L, "몬스테라 디럭스", "대형 관엽식물", "물을 자주 준다", null, null));
-
-		mockMvc.perform(patch("/api/v1/admin/plants/species/1")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(objectMapper.writeValueAsString(request)))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.name").value("몬스테라 디럭스"));
-	}
-
-	@Test
-	void updateSpeciesReturnsNotFoundError() throws Exception {
-		PlantSpeciesRequest request = new PlantSpeciesRequest("몬스테라", null, null);
-		given(plantSpeciesManagementService.updateSpecies(99L, request))
-				.willThrow(new BusinessException(ErrorCode.PLANT_SPECIES_NOT_FOUND));
-
-		mockMvc.perform(patch("/api/v1/admin/plants/species/99")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(objectMapper.writeValueAsString(request)))
-				.andExpect(status().isNotFound());
 	}
 
 	private ExchangeOrderResponse sampleResponse(Long id, ExchangeStatus status) {

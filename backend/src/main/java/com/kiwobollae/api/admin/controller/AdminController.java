@@ -2,7 +2,6 @@ package com.kiwobollae.api.admin.controller;
 
 import com.kiwobollae.api.admin.service.ExchangeManagementService;
 import com.kiwobollae.api.admin.service.OrderManagementService;
-import com.kiwobollae.api.admin.service.PlantSpeciesManagementService;
 import com.kiwobollae.api.board.dto.response.BoardCommentResponse;
 import com.kiwobollae.api.board.dto.response.BoardPostResponse;
 import com.kiwobollae.api.board.entity.enums.BoardStatus;
@@ -22,8 +21,6 @@ import com.kiwobollae.api.commerce.dto.response.OrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.DeliveryStatus;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
-import com.kiwobollae.api.species.dto.request.PlantSpeciesRequest;
-import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
@@ -63,27 +60,10 @@ public class AdminController {
 
 	private final ExchangeManagementService exchangeManagementService;
 	private final OrderManagementService orderManagementService;
-	private final PlantSpeciesManagementService plantSpeciesManagementService;
 	private final BoardPostService boardPostService;
 	private final BoardCommentService boardCommentService;
 	private final PlantJournalService plantJournalService;
 	private final ReportService reportService;
-
-	@Operation(summary = "식물 종 추가", description = "새로운 식물 종을 등록합니다.")
-	@PostMapping("/plants/species")
-	public ResponseEntity<ApiResponse<PlantSpeciesResponse>> createSpecies(
-			@Valid @RequestBody PlantSpeciesRequest request) {
-		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(ApiResponse.success(plantSpeciesManagementService.createSpecies(request)));
-	}
-
-	@Operation(summary = "식물 종 수정", description = "기존 식물 종의 이름/카테고리/관리 가이드를 수정합니다.")
-	@PatchMapping("/plants/species/{id}")
-	public ResponseEntity<ApiResponse<PlantSpeciesResponse>> updateSpecies(
-			@PathVariable Long id,
-			@Valid @RequestBody PlantSpeciesRequest request) {
-		return ResponseEntity.ok(ApiResponse.success(plantSpeciesManagementService.updateSpecies(id, request)));
-	}
 
 	@Operation(summary = "주문 전체 목록 조회", description = "주문 상태·배송 상태·유저·기간(선택)으로 필터링해 전체 주문을 조회합니다. 각 주문의 구매 상품 목록을 함께 반환합니다.")
 	@GetMapping("/order")
