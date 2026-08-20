@@ -96,6 +96,14 @@ public class PlantCareGuideService {
         .orElseGet(() -> generateAndCache(userId, speciesName, knowledge, sourceContextHash));
   }
 
+  /** 이미 캐시된 가이드의 종 이름 중 입력 문자열을 포함하는 이름을 검색한다. */
+  public List<String> searchSpeciesNames(String rawQuery) {
+    if (rawQuery == null || rawQuery.isBlank()) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "검색어가 필요합니다.");
+    }
+    return cacheRepository.findDistinctSpeciesNamesContaining(rawQuery.trim());
+  }
+
   private PlantCareGuide generateAndCache(
       Long userId, String speciesName, PlantCareKnowledge knowledge, String sourceContextHash) {
     PlantCareGuideGenerationKey key =

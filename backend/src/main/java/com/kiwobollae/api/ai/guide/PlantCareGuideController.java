@@ -5,6 +5,7 @@ import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,5 +34,14 @@ public class PlantCareGuideController {
       @AuthenticationPrincipal Long userId, @RequestParam String speciesName) {
     return ResponseEntity.ok(
         ApiResponse.success(plantCareGuideService.getGuideBySpeciesName(userId, speciesName)));
+  }
+
+  @Operation(
+      summary = "재배 가이드 종 이름 검색",
+      description = "이미 가이드가 생성된 종 이름 중 검색어를 포함하는 이름을 반환합니다. 아직 가이드가 없는 새 종은 검색되지 않습니다.")
+  @GetMapping("/care-guide/search")
+  public ResponseEntity<ApiResponse<List<String>>> searchCareGuideSpecies(
+      @RequestParam String query) {
+    return ResponseEntity.ok(ApiResponse.success(plantCareGuideService.searchSpeciesNames(query)));
   }
 }

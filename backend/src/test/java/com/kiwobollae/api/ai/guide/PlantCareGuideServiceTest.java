@@ -232,6 +232,26 @@ class PlantCareGuideServiceTest {
   }
 
   @Test
+  void searchesCachedSpeciesNamesContainingQuery() {
+    given(cacheRepository.findDistinctSpeciesNamesContaining("토마토"))
+        .willReturn(List.of("방울토마토", "대추토마토"));
+
+    List<String> results = service().searchSpeciesNames("토마토");
+
+    assertThat(results).containsExactly("방울토마토", "대추토마토");
+  }
+
+  @Test
+  void rejectsBlankSearchQuery() {
+    assertThatThrownBy(() -> service().searchSpeciesNames("  "))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
+    verifyNoInteractions(cacheRepository);
+  }
+
+  @Test
   void rejectsConcurrentCacheMissWithoutCallingAi() {
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
