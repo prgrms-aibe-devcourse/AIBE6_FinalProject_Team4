@@ -58,6 +58,9 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, ApiVersion.V1 + "/plants/timelapse-videos/**").permitAll()
 						.requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
 						.requestMatchers("/actuator/health").permitAll()
+						// k6 부하 테스트용 Prometheus 스크레이프 엔드포인트. 운영(application-prod.yaml)에서는
+						// management.endpoints.web.exposure.include에서 제외되어 애초에 경로 자체가 없다.
+						.requestMatchers("/actuator/prometheus").permitAll()
 						.anyRequest().authenticated()
 				)
 				.exceptionHandling(ex -> ex
