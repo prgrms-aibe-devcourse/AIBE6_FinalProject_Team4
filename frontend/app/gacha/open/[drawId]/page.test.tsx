@@ -122,7 +122,8 @@ describe("GachaOpenPage", () => {
     await waitFor(() =>
       expect(store.refreshNotifications).toHaveBeenCalledTimes(1),
     );
-    expect(navigation.back).toHaveBeenCalledOnce();
+    expect(navigation.replace).toHaveBeenCalledWith("/gacha");
+    expect(navigation.back).not.toHaveBeenCalled();
   });
 
   it("환불된 팩은 포인트 반환 안내 후 대기를 종료한다", async () => {

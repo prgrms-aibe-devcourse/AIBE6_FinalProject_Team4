@@ -137,6 +137,9 @@ describe("GachaBatchOpenPage", () => {
     expect(screen.queryByText(/사운드|음소거/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "뒤로가기" }));
-    await waitFor(() => expect(navigation.back).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/gacha"),
+    );
+    expect(navigation.back).not.toHaveBeenCalled();
   });
 });
