@@ -9,7 +9,6 @@ import java.util.List;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -20,21 +19,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	boolean existsByCategory(ProductCategory category);
 
-	@EntityGraph(attributePaths = "plant")
 	List<Product> findAllByCategoryInOrderByCreatedAtDesc(Collection<ProductCategory> categories);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@Query("select p from Product p left join fetch p.plant where p.id = :id")
+	@Query("select p from Product p where p.id = :id")
 	Optional<Product> findByIdForUpdate(@Param("id") Long id);
 
-	@EntityGraph(attributePaths = "plant")
 	Page<Product> findAllByStatusAndCategoryIn(
 			ProductStatus status,
 			Collection<ProductCategory> categories,
 			Pageable pageable
 	);
 
-	@EntityGraph(attributePaths = "plant")
 	Optional<Product> findByIdAndStatus(Long id, ProductStatus status);
 
 	@Modifying
