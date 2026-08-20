@@ -9,11 +9,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "AI 재배 가이드", description = "선택한 식물 종의 재배 가이드 제공 API")
+@Tag(name = "AI 재배 가이드", description = "입력한 식물 종의 재배 가이드 제공 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiVersion.V1 + "/ai/plants")
@@ -26,12 +26,12 @@ public class PlantCareGuideController {
   @Operation(
       summary = "식물 종 재배 가이드 조회",
       description =
-          "선택한 종의 등록 재배 자료가 있으면 이를 근거로 가이드를 반환합니다. 저장된 가이드가 없으면 AI로 생성한 뒤 저장합니다. "
-              + "등록 자료가 없는 새 종도 일반 재배 지식을 바탕으로 생성합니다. cached=false면 이번 요청에서 생성된 결과입니다.")
-  @GetMapping("/species/{speciesId}/care-guide")
+          "입력한 종의 검증 재배 자료가 있으면 이를 근거로 가이드를 반환합니다. 저장된 가이드가 없으면 AI로 생성한 뒤 저장합니다. "
+              + "검증 자료가 없는 새 종도 일반 재배 지식을 바탕으로 생성합니다. cached=false면 이번 요청에서 생성된 결과입니다.")
+  @GetMapping("/care-guide")
   public ResponseEntity<ApiResponse<PlantCareGuide>> getCareGuide(
-      @AuthenticationPrincipal Long userId, @PathVariable Long speciesId) {
+      @AuthenticationPrincipal Long userId, @RequestParam String speciesName) {
     return ResponseEntity.ok(
-        ApiResponse.success(plantCareGuideService.getGuideBySpeciesId(userId, speciesId)));
+        ApiResponse.success(plantCareGuideService.getGuideBySpeciesName(userId, speciesName)));
   }
 }

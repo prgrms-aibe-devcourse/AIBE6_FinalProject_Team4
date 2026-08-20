@@ -27,8 +27,6 @@ import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
-import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
-import com.kiwobollae.api.species.service.PlantSpeciesService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -75,7 +73,6 @@ class PlantCareGuideServiceTest {
       }
       """;
 
-  @Mock private PlantSpeciesService plantSpeciesService;
   @Mock private PlantCareKnowledgeRetriever knowledgeRetriever;
   @Mock private PlantCareGuideCacheRepository cacheRepository;
   @Mock private PlantCareGuideCacheWriter cacheWriter;
@@ -99,7 +96,6 @@ class PlantCareGuideServiceTest {
 
   private PlantCareGuideService service() {
     return new PlantCareGuideService(
-        plantSpeciesService,
         knowledgeRetriever,
         cacheRepository,
         cacheWriter,
@@ -113,13 +109,12 @@ class PlantCareGuideServiceTest {
   // 이 기능의 핵심 이점. 저장본이 있으면 AI를 부르지 않고, 따라서 호출 제한도 소모하지 않는다.
   @Test
   void servesStoredGuideWithoutCallingAiOrConsumingRateLimit() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.of(cache("청상추")));
 
-    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+    PlantCareGuide guide = service().getGuideBySpeciesName(7L, "청상추");
 
     assertThat(guide.cached()).isTrue();
     assertThat(guide.speciesName()).isEqualTo("청상추");
@@ -134,14 +129,13 @@ class PlantCareGuideServiceTest {
 
   @Test
   void generatesAndStoresGuideOnCacheMiss() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.empty());
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
 
-    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+    PlantCareGuide guide = service().getGuideBySpeciesName(7L, "청상추");
 
     assertThat(guide.cached()).isFalse();
     assertThat(guide.harvestTarget()).isEqualTo("파종 후 약 5주");
@@ -151,47 +145,39 @@ class PlantCareGuideServiceTest {
         ArgumentCaptor.forClass(PlantCareGuideCache.class);
     verify(cacheWriter).save(cacheCaptor.capture());
     assertThat(cacheCaptor.getValue().getSpeciesName()).isEqualTo("청상추");
-    assertThat(cacheCaptor.getValue().getSourceSpeciesId()).isEqualTo(21L);
     assertThat(cacheCaptor.getValue().getGuideVersion()).isEqualTo(PlantCareGuideSchema.VERSION);
     assertThat(cacheCaptor.getValue().getModel()).isEqualTo("text-model");
     assertThat(cacheCaptor.getValue().getCreatedAt())
         .isEqualTo(LocalDateTime.of(2026, 8, 5, 10, 0));
   }
 
-  // 공식 가이드는 환각을 줄이는 근거로 넣는다. 텍스트 모델이므로 이미지 입력은 없어야 한다.
+  // 검증 재배 자료는 환각을 줄이는 근거로 넣는다. 텍스트 모델이므로 이미지 입력은 없어야 한다.
   @Test
-  void groundsPromptOnRegisteredOfficialGuide() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
+  void groundsPromptOnVerifiedKnowledge() {
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 anyString(), anyInt(), anyString()))
         .willReturn(Optional.empty());
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
 
-    service().getGuideBySpeciesId(7L, 21L);
+    service().getGuideBySpeciesName(7L, "청상추");
 
     ArgumentCaptor<AiRequest> requestCaptor = ArgumentCaptor.forClass(AiRequest.class);
     verify(aiClient).generate(requestCaptor.capture());
     AiRequest request = requestCaptor.getValue();
     assertThat(request.modelRole()).isEqualTo(AiModelRole.TEXT);
     assertThat(request.images()).isEmpty();
-    assertThat(request.userPrompt())
-        .contains("청상추")
-        .contains("서비스 등록 공식 재배 가이드")
-        .contains("서늘하고 밝은 곳");
+    assertThat(request.userPrompt()).contains("청상추").contains("검증 재배 자료").contains("서늘하고 밝은 곳");
     assertThat(request.responseSchema().name()).isEqualTo("plant_care_guide");
 
     ArgumentCaptor<PlantCareKnowledgeQuery> queryCaptor =
         ArgumentCaptor.forClass(PlantCareKnowledgeQuery.class);
     verify(knowledgeRetriever).retrieve(queryCaptor.capture());
-    assertThat(queryCaptor.getValue().speciesId()).isEqualTo(21L);
     assertThat(queryCaptor.getValue().speciesName()).isEqualTo("청상추");
-    assertThat(queryCaptor.getValue().officialGuide()).contains("서늘하고 밝은 곳");
   }
 
   @Test
   void generatesGuideForNewSpeciesWithoutVerifiedKnowledge() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("고수"));
     given(knowledgeRetriever.retrieve(any())).willReturn(new PlantCareKnowledge(List.of()));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
@@ -199,7 +185,7 @@ class PlantCareGuideServiceTest {
         .willReturn(Optional.empty());
     given(aiClient.generate(any(AiRequest.class))).willReturn(aiResponse());
 
-    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+    PlantCareGuide guide = service().getGuideBySpeciesName(7L, "고수");
 
     assertThat(guide.cached()).isFalse();
     verify(requestGuard).checkRateLimit(7L, AiFeature.PLANT_CARE_GUIDE);
@@ -212,24 +198,22 @@ class PlantCareGuideServiceTest {
     verify(cacheWriter).save(any(PlantCareGuideCache.class));
   }
 
-  // 캐시 키는 정규화된 이름이다. 앞뒤·연속 공백만 정리하고 내부 공백은 남긴다.
+  // 캐시 키는 정규화된 이름이다. 공백을 전부 제거해 "스위트 바질"과 "스위트바질"을 같은 종으로 묶는다.
   @Test
-  void normalizesSpeciesNameForCacheKey() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("  스위트   바질  "));
+  void normalizesSpeciesNameByRemovingWhitespace() {
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
-                eq("스위트 바질"), eq(PlantCareGuideSchema.VERSION), anyString()))
-        .willReturn(Optional.of(cache("스위트 바질")));
+                eq("스위트바질"), eq(PlantCareGuideSchema.VERSION), anyString()))
+        .willReturn(Optional.of(cache("스위트바질")));
 
-    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+    PlantCareGuide guide = service().getGuideBySpeciesName(7L, "  스위트   바질  ");
 
-    assertThat(guide.speciesName()).isEqualTo("스위트 바질");
+    assertThat(guide.speciesName()).isEqualTo("스위트바질");
   }
 
   // lease 만료 뒤의 극히 드문 중복 저장도 캐시 유니크 제약으로 안전하게 수습한다.
   @Test
   void fallsBackToExistingRowWhenConcurrentRequestStoredFirst() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
@@ -241,7 +225,7 @@ class PlantCareGuideServiceTest {
         .when(cacheWriter)
         .save(any(PlantCareGuideCache.class));
 
-    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+    PlantCareGuide guide = service().getGuideBySpeciesName(7L, "청상추");
 
     assertThat(guide.difficulty()).isEqualTo("초급");
     assertThat(guide.cached()).isTrue();
@@ -249,7 +233,6 @@ class PlantCareGuideServiceTest {
 
   @Test
   void rejectsConcurrentCacheMissWithoutCallingAi() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
@@ -257,7 +240,7 @@ class PlantCareGuideServiceTest {
     given(generationLockStore.tryAcquire(any(PlantCareGuideGenerationKey.class)))
         .willReturn(Optional.empty());
 
-    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
+    assertThatThrownBy(() -> service().getGuideBySpeciesName(7L, "청상추"))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception -> {
@@ -273,14 +256,13 @@ class PlantCareGuideServiceTest {
 
   @Test
   void servesGuideSavedWhileGenerationLeaseWasAcquired() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), eq(PlantCareGuideSchema.VERSION), anyString()))
         .willReturn(Optional.empty())
         .willReturn(Optional.of(cache("청상추")));
 
-    PlantCareGuide guide = service().getGuideBySpeciesId(7L, 21L);
+    PlantCareGuide guide = service().getGuideBySpeciesName(7L, "청상추");
 
     assertThat(guide.cached()).isTrue();
     verifyNoInteractions(aiClient);
@@ -289,20 +271,18 @@ class PlantCareGuideServiceTest {
   }
 
   @Test
-  void rejectsInvalidSpeciesId() {
-    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 0L))
+  void rejectsBlankSpeciesName() {
+    assertThatThrownBy(() -> service().getGuideBySpeciesName(7L, "  "))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_VALIDATION_FAILED));
-    verifyNoInteractions(plantSpeciesService);
     verifyNoInteractions(aiClient);
   }
 
   // 스키마를 바꿨는데 guide_version을 올리지 않으면 옛 저장본을 읽다 깨진다. 조용히 넘기지 않는다.
   @Test
   void rejectsStoredGuideThatNoLongerMatchesSchema() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), anyInt(), anyString()))
@@ -317,7 +297,7 @@ class PlantCareGuideServiceTest {
                     .createdAt(LocalDateTime.of(2026, 8, 5, 10, 0))
                     .build()));
 
-    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
+    assertThatThrownBy(() -> service().getGuideBySpeciesName(7L, "청상추"))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
@@ -326,7 +306,6 @@ class PlantCareGuideServiceTest {
 
   @Test
   void rejectsStoredGuideThatViolatesContentRules() {
-    given(plantSpeciesService.getSpecies(21L)).willReturn(species("청상추"));
     given(
             cacheRepository.findBySpeciesNameAndGuideVersionAndSourceContextHash(
                 eq("청상추"), anyInt(), anyString()))
@@ -334,7 +313,6 @@ class PlantCareGuideServiceTest {
             Optional.of(
                 PlantCareGuideCache.builder()
                     .speciesName("청상추")
-                    .sourceSpeciesId(21L)
                     .sourceContextHash("test-hash")
                     .guideVersion(PlantCareGuideSchema.VERSION)
                     .model("text-model")
@@ -344,27 +322,16 @@ class PlantCareGuideServiceTest {
                     .createdAt(LocalDateTime.of(2026, 8, 5, 10, 0))
                     .build()));
 
-    assertThatThrownBy(() -> service().getGuideBySpeciesId(7L, 21L))
+    assertThatThrownBy(() -> service().getGuideBySpeciesName(7L, "청상추"))
         .isInstanceOfSatisfying(
             BusinessException.class,
             exception ->
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
   }
 
-  private PlantSpeciesResponse species(String name) {
-    return new PlantSpeciesResponse(
-        21L,
-        name,
-        "LEAF_VEGETABLE",
-        "서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요.",
-        LocalDateTime.of(2026, 8, 1, 9, 0),
-        LocalDateTime.of(2026, 8, 1, 9, 0));
-  }
-
   private PlantCareGuideCache cache(String speciesName) {
     return PlantCareGuideCache.builder()
         .speciesName(speciesName)
-        .sourceSpeciesId(21L)
         .guideVersion(PlantCareGuideSchema.VERSION)
         .sourceContextHash("test-hash")
         .model("text-model")
@@ -377,9 +344,9 @@ class PlantCareGuideServiceTest {
     return new PlantCareKnowledge(
         List.of(
             new PlantCareEvidence(
-                "plant-species:21:official-care-guide",
-                "서비스 등록 공식 재배 가이드",
-                "internal://plant-species/21/care-guide",
+                "nongsaro-218964",
+                "검증 재배 자료",
+                "https://nongsaro.go.kr",
                 "2026-08-01T09:00:00",
                 "서늘하고 밝은 곳에서 키우며 흙을 촉촉하게 유지하세요.")));
   }

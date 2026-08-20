@@ -11,8 +11,8 @@ import java.util.Map;
  * <p>OpenAI structured outputs를 strict 모드로 쓰므로 두 규칙을 지켜야 한다. 모든 객체에 {@code additionalProperties:
  * false}를 두고, 모든 속성을 {@code required}에 넣는다(선택 필드를 만들 수 없다).
  *
- * <p>배열 길이 제약({@code minItems}/{@code maxItems})은 현재 structured outputs에서 지원한다. 다만 이 가이드는 항목
- * 개수 자체가 API 계약이 아니므로 "실패 원인 2~3개" 같은 요구는 프롬프트로 전달한다.
+ * <p>배열 길이 제약({@code minItems}/{@code maxItems})은 현재 structured outputs에서 지원한다. 다만 이 가이드는 항목 개수 자체가
+ * API 계약이 아니므로 "실패 원인 2~3개" 같은 요구는 프롬프트로 전달한다.
  *
  * <p>속성 순서를 {@link LinkedHashMap}으로 고정한다. {@code Map.of}는 순회 순서가 정해지지 않아 직렬화된 스키마가 실행마다 달라지고, 그러면
  * OpenAI가 같은 스키마를 매번 새로 컴파일한다.

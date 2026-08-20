@@ -14,8 +14,6 @@ import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
-import com.kiwobollae.api.species.dto.response.PlantSpeciesResponse;
-import com.kiwobollae.api.species.service.PlantSpeciesService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -59,7 +57,6 @@ public class PlantCareGuideService {
       - pitfalls는 초보자가 가장 자주 겪는 문제 두세 개만 담습니다.
       """;
 
-  private final PlantSpeciesService plantSpeciesService;
   private final PlantCareKnowledgeRetriever knowledgeRetriever;
   private final PlantCareGuideCacheRepository cacheRepository;
   private final PlantCareGuideCacheWriter cacheWriter;
@@ -70,7 +67,6 @@ public class PlantCareGuideService {
   private final Clock seoulClock;
 
   public PlantCareGuideService(
-      PlantSpeciesService plantSpeciesService,
       PlantCareKnowledgeRetriever knowledgeRetriever,
       PlantCareGuideCacheRepository cacheRepository,
       PlantCareGuideCacheWriter cacheWriter,
@@ -79,7 +75,6 @@ public class PlantCareGuideService {
       PlantCareGuideGenerationLockStore generationLockStore,
       ObjectMapper objectMapper,
       Clock seoulClock) {
-    this.plantSpeciesService = plantSpeciesService;
     this.knowledgeRetriever = knowledgeRetriever;
     this.cacheRepository = cacheRepository;
     this.cacheWriter = cacheWriter;
@@ -90,53 +85,19 @@ public class PlantCareGuideService {
     this.seoulClock = seoulClock;
   }
 
-  /** 등록된 종 id로 가이드를 조회한다. 저장본이 없으면 AI를 호출해 생성하고 저장한다. */
-  public PlantCareGuide getGuideBySpeciesId(Long userId, Long speciesId) {
-    PlantSpeciesResponse species = requireSpecies(speciesId);
-    return resolveGuide(
-        userId,
-        species.name(),
-        speciesId,
-        species.category(),
-        species.careGuide(),
-        species.updatedAt());
-  }
-
-  private PlantSpeciesResponse requireSpecies(Long speciesId) {
-    if (speciesId == null || speciesId < 1) {
-      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "식물 종 ID가 필요합니다.");
-    }
-    return plantSpeciesService.getSpecies(speciesId);
-  }
-
-  private PlantCareGuide resolveGuide(
-      Long userId,
-      String rawName,
-      Long sourceSpeciesId,
-      String category,
-      String officialGuide,
-      LocalDateTime sourceUpdatedAt) {
-    String speciesName = normalizeSpeciesName(rawName);
+  /** 종 이름으로 가이드를 조회한다. 저장본이 없으면 AI를 호출해 생성하고 저장한다. */
+  public PlantCareGuide getGuideBySpeciesName(Long userId, String rawSpeciesName) {
+    String speciesName = normalizeSpeciesName(rawSpeciesName);
     PlantCareKnowledge knowledge =
-        knowledgeRetriever.retrieve(
-            new PlantCareKnowledgeQuery(
-                sourceSpeciesId, speciesName, category, officialGuide, sourceUpdatedAt));
-    String sourceContextHash = sourceContextHash(category, knowledge);
+        knowledgeRetriever.retrieve(new PlantCareKnowledgeQuery(speciesName));
+    String sourceContextHash = sourceContextHash(knowledge);
 
     return findCachedGuide(speciesName, sourceContextHash)
-        .orElseGet(
-            () ->
-                generateAndCache(
-                    userId, speciesName, sourceSpeciesId, category, knowledge, sourceContextHash));
+        .orElseGet(() -> generateAndCache(userId, speciesName, knowledge, sourceContextHash));
   }
 
   private PlantCareGuide generateAndCache(
-      Long userId,
-      String speciesName,
-      Long sourceSpeciesId,
-      String category,
-      PlantCareKnowledge knowledge,
-      String sourceContextHash) {
+      Long userId, String speciesName, PlantCareKnowledge knowledge, String sourceContextHash) {
     PlantCareGuideGenerationKey key =
         new PlantCareGuideGenerationKey(
             speciesName, PlantCareGuideSchema.VERSION, sourceContextHash);
@@ -158,8 +119,7 @@ public class PlantCareGuideService {
       if (cached.isPresent()) {
         return cached.get();
       }
-      return generateAndStore(
-          userId, speciesName, sourceSpeciesId, category, knowledge, sourceContextHash);
+      return generateAndStore(userId, speciesName, knowledge, sourceContextHash);
     } finally {
       // 만료라는 안전망이 없으므로 어떤 경로로 빠져나가든 반드시 반납한다. 반납이 누락되면 그 종은
       // 프로세스가 살아 있는 내내 409만 돌려주게 된다.
@@ -168,22 +128,16 @@ public class PlantCareGuideService {
   }
 
   private PlantCareGuide generateAndStore(
-      Long userId,
-      String speciesName,
-      Long sourceSpeciesId,
-      String category,
-      PlantCareKnowledge knowledge,
-      String sourceContextHash) {
+      Long userId, String speciesName, PlantCareKnowledge knowledge, String sourceContextHash) {
     // 저장본을 쓰지 않고 외부 호출이 확정된 지점이므로 여기서만 사용자별·전역 예산을 함께 예약한다.
     requestGuard.checkRateLimit(userId, AiFeature.PLANT_CARE_GUIDE);
 
-    AiResponse response = aiClient.generate(buildRequest(speciesName, category, knowledge));
+    AiResponse response = aiClient.generate(buildRequest(speciesName, knowledge));
     PlantCareGuideContent generated = validateGuide(deserialize(response.result().toString()));
     try {
       cacheWriter.save(
           PlantCareGuideCache.builder()
               .speciesName(speciesName)
-              .sourceSpeciesId(sourceSpeciesId)
               .sourceContextHash(sourceContextHash)
               .guideVersion(PlantCareGuideSchema.VERSION)
               .model(response.model())
@@ -216,27 +170,22 @@ public class PlantCareGuideService {
   /**
    * 캐시 키로 쓸 종 이름 정규화.
    *
-   * <p>앞뒤 공백을 없애고 연속 공백을 하나로 줄이는 수준만 한다. "방울 토마토"와 "방울토마토"를 같은 것으로 묶는 식의 공백 제거까지 하면 서로 다른 종이 한 캐시를
-   * 공유할 위험이 있어 하지 않는다.
+   * <p>공백을 전부 제거해 "방울 토마토"와 "방울토마토"를 같은 종으로 묶는다.
    */
   private String normalizeSpeciesName(String rawName) {
     if (rawName == null || rawName.isBlank()) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "식물 종 이름이 필요합니다.");
     }
-    String normalized = rawName.trim().replaceAll("\\s+", " ");
+    String normalized = rawName.replaceAll("\\s+", "");
     if (normalized.length() > 100) {
       throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, "식물 종 이름이 너무 깁니다.");
     }
     return normalized;
   }
 
-  private AiRequest buildRequest(
-      String speciesName, String category, PlantCareKnowledge knowledge) {
+  private AiRequest buildRequest(String speciesName, PlantCareKnowledge knowledge) {
     StringBuilder userPrompt = new StringBuilder();
     userPrompt.append("식물 종: ").append(speciesName).append('\n');
-    if (category != null && !category.isBlank()) {
-      userPrompt.append("분류: ").append(category).append('\n');
-    }
     if (knowledge.isEmpty()) {
       userPrompt.append("서비스에서 검증한 재배 근거: 없음\n");
     } else {
@@ -296,13 +245,8 @@ public class PlantCareGuideService {
     return value == null || value.isBlank();
   }
 
-  private String sourceContextHash(String category, PlantCareKnowledge knowledge) {
-    String source =
-        KNOWLEDGE_RETRIEVER_VERSION
-            + "\n"
-            + (category == null ? "" : category)
-            + "\n"
-            + knowledge.fingerprintMaterial();
+  private String sourceContextHash(PlantCareKnowledge knowledge) {
+    String source = KNOWLEDGE_RETRIEVER_VERSION + "\n" + knowledge.fingerprintMaterial();
     try {
       return HexFormat.of()
           .formatHex(

@@ -68,11 +68,13 @@ public class ClasspathPlantCareKnowledgeCatalog {
     }
   }
 
+  // PlantCareGuideService#normalizeSpeciesName과 동일하게 공백을 완전히 제거해야 "방울 토마토"처럼
+  // 사용자가 띄어 쓴 입력도 "방울토마토" 문서와 매칭된다.
   private String normalize(String speciesName) {
     if (speciesName == null || speciesName.isBlank()) {
       throw new IllegalArgumentException("식물 종명이 필요합니다.");
     }
-    return speciesName.trim().replaceAll("\\s+", " ");
+    return speciesName.replaceAll("\\s+", "");
   }
 
   public record KnowledgeCatalogFile(List<KnowledgeDocument> documents) {}

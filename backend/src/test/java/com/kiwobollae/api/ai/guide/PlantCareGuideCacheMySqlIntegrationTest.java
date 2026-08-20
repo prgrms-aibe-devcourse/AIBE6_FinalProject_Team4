@@ -85,7 +85,6 @@ class PlantCareGuideCacheMySqlIntegrationTest {
       String speciesName, String guideJson, String sourceContextHash) {
     return PlantCareGuideCache.builder()
         .speciesName(speciesName)
-        .sourceSpeciesId(21L)
         .sourceContextHash(sourceContextHash)
         .guideVersion(PlantCareGuideSchema.VERSION)
         .model("text-model")
