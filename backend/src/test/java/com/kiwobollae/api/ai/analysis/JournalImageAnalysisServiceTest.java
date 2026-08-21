@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -18,6 +19,13 @@ import com.kiwobollae.api.ai.client.AiImageInput;
 import com.kiwobollae.api.ai.client.AiModelRole;
 import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
+import com.kiwobollae.api.ai.knowledge.PlantCareAdviceSafetyPolicy;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidence;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceScope;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledge;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeMetadataCodec;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeRetriever;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -30,6 +38,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -62,8 +71,16 @@ class JournalImageAnalysisServiceTest {
   @Mock private JournalImageAnalysisStore store;
   @Mock private AiClient aiClient;
   @Mock private AiRequestGuard requestGuard;
+  @Mock private PlantCareKnowledgeRetriever knowledgeRetriever;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
+  private final PlantCareKnowledgeMetadataCodec knowledgeMetadataCodec =
+      new PlantCareKnowledgeMetadataCodec(objectMapper);
+
+  @BeforeEach
+  void setUpKnowledge() {
+    lenient().when(knowledgeRetriever.retrieve(any())).thenReturn(verifiedKnowledge());
+  }
 
   @Test
   void reusesCompletedResultWithoutConsumingRateLimitOrCallingAi() {
@@ -75,6 +92,7 @@ class JournalImageAnalysisServiceTest {
     assertThat(response.imageHash()).isEqualTo(IMAGE_HASH);
     assertThat(response.summary()).contains("아래쪽 잎");
     assertThat(response.analyzedAt()).isEqualTo(ANALYZED_AT);
+    assertThat(response.grounding().status()).isEqualTo(PlantCareEvidenceStatus.VERIFIED);
     verify(contextQuery).validateAnalysisTarget(7L, 31L, IMAGE_HASH);
     verify(contextQuery, never()).getAnalysisContext(any(), any(), anyInt());
     verifyNoInteractions(requestGuard, aiClient);
@@ -94,6 +112,11 @@ class JournalImageAnalysisServiceTest {
                 eq("claim-token"),
                 any(String.class),
                 eq("vision-model"),
+                eq(PlantCareEvidenceStatus.VERIFIED),
+                eq(PlantCareEvidenceScope.EXACT_SPECIES),
+                eq("바질"),
+                any(String.class),
+                any(String.class),
                 eq(ANALYZED_AT)))
         .willAnswer(
             invocation -> completedAnalysis(IMAGE_HASH, invocation.getArgument(3, String.class)));
@@ -109,7 +132,12 @@ class JournalImageAnalysisServiceTest {
     assertThat(request.images())
         .containsExactly(
             new AiImageInput("/api/v1/journals/images/7/basil.webp", AiImageInput.Detail.HIGH));
-    assertThat(request.userPrompt()).contains("바질이").contains("스위트 바질").contains("새 잎이 두 장 자랐어요");
+    assertThat(request.userPrompt())
+        .contains("바질이")
+        .contains("스위트 바질")
+        .contains("새 잎이 두 장 자랐어요")
+        .contains("\"plantCareKnowledge\":{\"evidenceStatus\":\"VERIFIED\"")
+        .contains("official-basil");
   }
 
   @Test
@@ -180,7 +208,55 @@ class JournalImageAnalysisServiceTest {
                 assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
 
     verify(store).fail(31L, IMAGE_HASH, "claim-token");
-    verify(store, never()).complete(eq(31L), eq(IMAGE_HASH), any(), any(), any(), any());
+    verify(store, never())
+        .complete(
+            eq(31L),
+            eq(IMAGE_HASH),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any());
+  }
+
+  @Test
+  void rejectsUnsafePrescriptionForGeneralFallbackAndReleasesClaim() throws Exception {
+    given(contextQuery.getAnalysisContext(7L, 31L, 5)).willReturn(context());
+    given(store.claim(31L, IMAGE_HASH)).willReturn(Claim.owner("claim-token"));
+    given(knowledgeRetriever.retrieve(any()))
+        .willReturn(
+            PlantCareKnowledge.fallback(
+                "스위트바질", "스위트바질", "test-retriever-v1"));
+    String unsafeResult =
+        RESULT_JSON.replace("흙이 마른 정도를 먼저 확인해 주세요.", "살충제를 잎에 뿌리세요.");
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(
+            new AiResponse("response-id", "vision-model", objectMapper.readTree(unsafeResult)));
+
+    assertThatThrownBy(() -> service().analyze(7L, 31L, IMAGE_HASH))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+
+    verify(store).fail(31L, IMAGE_HASH, "claim-token");
+    verify(store, never())
+        .complete(
+            eq(31L),
+            eq(IMAGE_HASH),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any(),
+            any());
   }
 
   @Test
@@ -202,7 +278,15 @@ class JournalImageAnalysisServiceTest {
 
   private JournalImageAnalysisService service() {
     return new JournalImageAnalysisService(
-        contextQuery, store, aiClient, requestGuard, objectMapper, FIXED_KST_CLOCK);
+        contextQuery,
+        store,
+        aiClient,
+        requestGuard,
+        knowledgeRetriever,
+        knowledgeMetadataCodec,
+        new PlantCareAdviceSafetyPolicy(),
+        objectMapper,
+        FIXED_KST_CLOCK);
   }
 
   private JournalImageAnalysisContext context() {
@@ -228,8 +312,27 @@ class JournalImageAnalysisServiceTest {
         .status(JournalImageAnalysisStatus.COMPLETED)
         .resultJson(resultJson)
         .model("vision-model")
+        .evidenceStatus(PlantCareEvidenceStatus.VERIFIED)
+        .evidenceScope(PlantCareEvidenceScope.EXACT_SPECIES)
+        .evidenceSpeciesName("바질")
+        .sourceContextHash(verifiedKnowledge().sourceContextHash())
+        .evidenceSourcesJson(knowledgeMetadataCodec.serializeSources(verifiedKnowledge()))
         .createdAt(ANALYZED_AT.minusMinutes(1))
         .updatedAt(ANALYZED_AT)
         .build();
+  }
+
+  private PlantCareKnowledge verifiedKnowledge() {
+    return PlantCareKnowledge.verified(
+        "스위트바질",
+        "바질",
+        "test-retriever-v1",
+        List.of(
+            new PlantCareEvidence(
+                "official-basil",
+                "공식 바질 재배 문서",
+                "https://example.test/basil",
+                "2026-08-21",
+                "바질은 햇빛과 통풍이 좋은 곳에서 기릅니다.")));
   }
 }

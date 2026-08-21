@@ -10,6 +10,12 @@ import com.kiwobollae.api.ai.client.AiImageInput;
 import com.kiwobollae.api.ai.client.AiModelRole;
 import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
+import com.kiwobollae.api.ai.knowledge.PlantCareAdviceSafetyPolicy;
+import com.kiwobollae.api.ai.knowledge.PlantCareGrounding;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledge;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeMetadataCodec;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeQuery;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeRetriever;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -51,6 +57,13 @@ public class JournalImageAnalysisService {
       - recommendedActions는 지금 안전하게 실행할 수 있는 행동 1~3개를 작성하세요.
       - additionalChecks에는 잎 뒷면, 흙, 줄기처럼 사용자가 추가로 확인할 항목을 0~3개 작성하세요.
       - 농약 사용이나 과도한 비료 투입을 바로 권하지 말고 먼저 추가 관찰을 안내하세요.
+      - context_json.plantCareKnowledge의 공식 문서 근거가 있으면 사진에서 관찰한 사실과 구분해 우선 참고하세요.
+      - plantCareKnowledge.evidenceStatus가 GENERAL_FALLBACK이면 공식 근거가 없는 일반 AI 지식입니다.
+        이때 정확한 투입량·희석 배수·처리 주기, 농약·살충제·살균제·비료 제품이나 성분을 처방하지 말고
+        관찰 기준과 제품 표시사항·공공기관·전문가 확인 방법을 우선 안내하세요.
+      - GENERAL_FALLBACK에서는 출처를 확인한 사실인 것처럼 말하거나 존재하지 않는 출처를 만들지 마세요.
+      - plantCareKnowledge.evidenceScope가 BASE_SPECIES이면 입력 품종 전용 근거가 아니라
+        resolvedSpeciesName 기준 작물의 공통 근거입니다. 품종 고유 특성을 공식 근거처럼 단정하지 마세요.
       - 모든 설명은 간결한 한국어 존댓말로 작성하세요.
       """;
 
@@ -58,6 +71,9 @@ public class JournalImageAnalysisService {
   private final JournalImageAnalysisStore store;
   private final AiClient aiClient;
   private final AiRequestGuard requestGuard;
+  private final PlantCareKnowledgeRetriever knowledgeRetriever;
+  private final PlantCareKnowledgeMetadataCodec knowledgeMetadataCodec;
+  private final PlantCareAdviceSafetyPolicy adviceSafetyPolicy;
   private final ObjectMapper objectMapper;
   private final Clock seoulClock;
 
@@ -77,9 +93,11 @@ public class JournalImageAnalysisService {
       JournalImageAnalysisContext context =
           contextQuery.getAnalysisContext(userId, journalId, RECENT_JOURNAL_LIMIT);
       JournalImageAnalysisContext.Image image = findImage(context, imageHash);
+      PlantCareKnowledge knowledge = retrieveKnowledge(context.speciesName());
       requestGuard.checkRateLimit(userId, AiFeature.JOURNAL_IMAGE_ANALYSIS);
-      AiResponse aiResponse = aiClient.generate(buildRequest(context, image));
+      AiResponse aiResponse = aiClient.generate(buildRequest(context, image, knowledge));
       JournalImageAnalysisResult result = deserializeAndValidate(aiResponse);
+      adviceSafetyPolicy.validate(knowledge.evidenceStatus(), adviceTexts(result));
       LocalDateTime completedAt = LocalDateTime.now(seoulClock);
       JournalImageAnalysis completed =
           store.complete(
@@ -88,6 +106,11 @@ public class JournalImageAnalysisService {
               claim.claimToken(),
               serialize(result),
               validateModel(aiResponse.model()),
+              knowledge.evidenceStatus(),
+              knowledge.evidenceScope(),
+              knowledge.resolvedSpeciesName(),
+              knowledge.sourceContextHash(),
+              knowledgeMetadataCodec.serializeSources(knowledge),
               completedAt);
       if (completed == null) {
         throw new BusinessException(ErrorCode.AI_IMAGE_ANALYSIS_IN_PROGRESS);
@@ -111,10 +134,13 @@ public class JournalImageAnalysisService {
   }
 
   private AiRequest buildRequest(
-      JournalImageAnalysisContext context, JournalImageAnalysisContext.Image image) {
+      JournalImageAnalysisContext context,
+      JournalImageAnalysisContext.Image image,
+      PlantCareKnowledge knowledge) {
     Map<String, Object> promptContext = new LinkedHashMap<>();
     promptContext.put("plantNickname", context.plantNickname());
     promptContext.put("speciesName", context.speciesName());
+    promptContext.put("plantCareKnowledge", knowledge.promptPayload());
     promptContext.put("journalWrittenDate", context.writtenDate().toString());
     promptContext.put("journalContent", context.journalContent());
     promptContext.put("recentJournals", recentJournalContext(context.recentJournals()));
@@ -246,6 +272,12 @@ public class JournalImageAnalysisService {
 
   private JournalImageAnalysisResponse toResponse(
       JournalImageAnalysis analysis, JournalImageAnalysisResult result) {
+    PlantCareGrounding grounding =
+        knowledgeMetadataCodec.deserializeGrounding(
+            analysis.getEvidenceStatus(),
+            analysis.getEvidenceScope(),
+            analysis.getEvidenceSpeciesName(),
+            analysis.getEvidenceSourcesJson());
     return new JournalImageAnalysisResponse(
         analysis.getId(),
         analysis.getJournalId(),
@@ -257,6 +289,25 @@ public class JournalImageAnalysisService {
         result.possibleCauses(),
         result.recommendedActions(),
         result.additionalChecks(),
+        grounding,
         analysis.getUpdatedAt());
+  }
+
+  private PlantCareKnowledge retrieveKnowledge(String speciesName) {
+    try {
+      return knowledgeRetriever.retrieve(new PlantCareKnowledgeQuery(speciesName));
+    } catch (IllegalArgumentException exception) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, exception.getMessage());
+    }
+  }
+
+  private List<String> adviceTexts(JournalImageAnalysisResult result) {
+    java.util.ArrayList<String> texts = new java.util.ArrayList<>();
+    texts.add(result.summary());
+    texts.addAll(result.observations());
+    texts.addAll(result.possibleCauses());
+    texts.addAll(result.recommendedActions());
+    texts.addAll(result.additionalChecks());
+    return texts;
   }
 }

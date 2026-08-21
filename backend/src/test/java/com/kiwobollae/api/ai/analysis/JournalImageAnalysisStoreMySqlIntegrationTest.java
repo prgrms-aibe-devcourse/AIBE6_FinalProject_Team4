@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kiwobollae.api.ai.analysis.JournalImageAnalysisStore.Claim;
 import com.kiwobollae.api.ai.analysis.JournalImageAnalysisStore.ClaimStatus;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceScope;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -66,6 +68,11 @@ class JournalImageAnalysisStoreMySqlIntegrationTest {
             owner.claimToken(),
             "{\"summary\":\"stored\"}",
             "vision-model",
+            PlantCareEvidenceStatus.GENERAL_FALLBACK,
+            PlantCareEvidenceScope.NONE,
+            null,
+            "a".repeat(64),
+            "[]",
             completedAt);
 
     Claim replay = store.claim(JOURNAL_ID, IMAGE_HASH);
@@ -73,6 +80,10 @@ class JournalImageAnalysisStoreMySqlIntegrationTest {
     assertThat(completed).isNotNull();
     assertThat(replay.status()).isEqualTo(ClaimStatus.COMPLETED);
     assertThat(replay.completed().getResultJson()).contains("stored");
+    assertThat(replay.completed().getEvidenceStatus())
+        .isEqualTo(PlantCareEvidenceStatus.GENERAL_FALLBACK);
+    assertThat(replay.completed().getEvidenceScope()).isEqualTo(PlantCareEvidenceScope.NONE);
+    assertThat(replay.completed().getSourceContextHash()).isEqualTo("a".repeat(64));
     assertThat(repository.count()).isEqualTo(1);
   }
 

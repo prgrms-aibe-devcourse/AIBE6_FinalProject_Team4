@@ -1,5 +1,6 @@
 package com.kiwobollae.api.ai.analysis.dto;
 
+import com.kiwobollae.api.ai.knowledge.PlantCareGrounding;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,4 +15,5 @@ public record JournalImageAnalysisResponse(
     List<String> possibleCauses,
     List<String> recommendedActions,
     List<String> additionalChecks,
+    PlantCareGrounding grounding,
     LocalDateTime analyzedAt) {}

@@ -37,7 +37,9 @@ public interface JournalImageAnalysisRepository extends JpaRepository<JournalIma
           """
           update ai_journal_image_analyses
              set status = 'PENDING', claim_token = :claimToken,
-                 result_json = null, model = null, updated_at = :now
+                 result_json = null, model = null, evidence_status = null,
+                 evidence_scope = null, evidence_species_name = null,
+                 source_context_hash = null, evidence_sources_json = null, updated_at = :now
            where journal_id = :journalId
              and image_hash = :imageHash
              and (status = 'FAILED' or (status = 'PENDING' and updated_at < :staleBefore))
@@ -56,6 +58,11 @@ public interface JournalImageAnalysisRepository extends JpaRepository<JournalIma
           """
           update ai_journal_image_analyses
              set status = 'COMPLETED', result_json = :resultJson, model = :model,
+                 evidence_status = :evidenceStatus,
+                 evidence_scope = :evidenceScope,
+                 evidence_species_name = :evidenceSpeciesName,
+                 source_context_hash = :sourceContextHash,
+                 evidence_sources_json = :evidenceSourcesJson,
                  claim_token = null, updated_at = :now
            where journal_id = :journalId
              and image_hash = :imageHash
@@ -69,6 +76,11 @@ public interface JournalImageAnalysisRepository extends JpaRepository<JournalIma
       @Param("claimToken") String claimToken,
       @Param("resultJson") String resultJson,
       @Param("model") String model,
+      @Param("evidenceStatus") String evidenceStatus,
+      @Param("evidenceScope") String evidenceScope,
+      @Param("evidenceSpeciesName") String evidenceSpeciesName,
+      @Param("sourceContextHash") String sourceContextHash,
+      @Param("evidenceSourcesJson") String evidenceSourcesJson,
       @Param("now") LocalDateTime now);
 
   @Modifying(flushAutomatically = true, clearAutomatically = true)

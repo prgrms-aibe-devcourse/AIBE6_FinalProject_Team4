@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kiwobollae.api.ai.analysis.dto.JournalImageAnalysisResponse;
 import com.kiwobollae.api.ai.analysis.dto.JournalImageAnalysisResult.ImageQuality;
 import com.kiwobollae.api.ai.analysis.dto.JournalImageAnalysisResult.PlantCondition;
+import com.kiwobollae.api.ai.knowledge.PlantCareGrounding;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
@@ -67,7 +68,8 @@ class JournalImageAnalysisControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.journalId").value(31))
         .andExpect(jsonPath("$.data.imageHash").value(IMAGE_HASH))
-        .andExpect(jsonPath("$.data.condition").value("NEEDS_ATTENTION"));
+        .andExpect(jsonPath("$.data.condition").value("NEEDS_ATTENTION"))
+        .andExpect(jsonPath("$.data.grounding.status").value("GENERAL_FALLBACK"));
   }
 
   @Test
@@ -122,6 +124,7 @@ class JournalImageAnalysisControllerTest {
         List.of("물주기 간격의 영향일 수 있어요."),
         List.of("흙이 마른 정도를 확인해 주세요."),
         List.of("잎 뒷면을 살펴봐 주세요."),
+        PlantCareGrounding.fallback(),
         LocalDateTime.of(2026, 8, 13, 10, 30));
   }
 }

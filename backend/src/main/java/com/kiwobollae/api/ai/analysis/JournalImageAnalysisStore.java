@@ -1,5 +1,7 @@
 package com.kiwobollae.api.ai.analysis;
 
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceScope;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -58,9 +60,25 @@ public class JournalImageAnalysisStore {
       String claimToken,
       String resultJson,
       String model,
+      PlantCareEvidenceStatus evidenceStatus,
+      PlantCareEvidenceScope evidenceScope,
+      String evidenceSpeciesName,
+      String sourceContextHash,
+      String evidenceSourcesJson,
       LocalDateTime completedAt) {
     int updated =
-        repository.complete(journalId, imageHash, claimToken, resultJson, model, completedAt);
+        repository.complete(
+            journalId,
+            imageHash,
+            claimToken,
+            resultJson,
+            model,
+            evidenceStatus.name(),
+            evidenceScope.name(),
+            evidenceSpeciesName,
+            sourceContextHash,
+            evidenceSourcesJson,
+            completedAt);
     if (updated != 1) {
       return null;
     }

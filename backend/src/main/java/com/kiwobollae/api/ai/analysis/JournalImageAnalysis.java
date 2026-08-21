@@ -1,5 +1,7 @@
 package com.kiwobollae.api.ai.analysis;
 
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceScope;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,6 +50,28 @@ public class JournalImageAnalysis extends BaseEntity {
 
   @Column(length = 100)
   private String model;
+
+  /** 분석에 사용한 공식 문서 근거 상태. PENDING·FAILED에서는 null이고 COMPLETED에서는 필수다. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "evidence_status", length = 30)
+  private PlantCareEvidenceStatus evidenceStatus;
+
+  /** 요청 종명에 대한 공식 근거 적용 범위. PENDING·FAILED에서는 null이다. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "evidence_scope", length = 30)
+  private PlantCareEvidenceScope evidenceScope;
+
+  /** 공식 근거가 실제로 설명하는 기준 종명. fallback 및 PENDING·FAILED에서는 null일 수 있다. */
+  @Column(name = "evidence_species_name", length = 100)
+  private String evidenceSpeciesName;
+
+  /** 검색기 버전과 공식 문서 내용으로 계산한 fingerprint다. */
+  @Column(name = "source_context_hash", length = 64)
+  private String sourceContextHash;
+
+  /** 분석에 사용한 출처·버전·내용 해시 목록. 원문 본문은 중복 저장하지 않는다. */
+  @Column(name = "evidence_sources_json", columnDefinition = "longtext")
+  private String evidenceSourcesJson;
 
   @Column(name = "claim_token", length = 36)
   private String claimToken;

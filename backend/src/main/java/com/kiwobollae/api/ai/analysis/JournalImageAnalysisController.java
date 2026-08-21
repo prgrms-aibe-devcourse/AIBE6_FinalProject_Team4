@@ -26,7 +26,10 @@ public class JournalImageAnalysisController {
 
   private final JournalImageAnalysisService analysisService;
 
-  @Operation(summary = "저장된 사진 분석", description = "일지에 저장된 사진만 분석하며 동일한 사진 해시는 완료 결과를 재사용합니다.")
+  @Operation(
+      summary = "저장된 사진 분석",
+      description =
+          "일지에 저장된 사진만 분석하며 동일한 사진 해시는 완료 결과를 재사용합니다. 응답의 grounding으로 공식 재배 근거 사용 여부, 적용 범위, 기준 종명과 출처를 확인할 수 있습니다.")
   @PostMapping("/{journalId}/image-analysis")
   public ResponseEntity<ApiResponse<JournalImageAnalysisResponse>> analyze(
       @AuthenticationPrincipal Long userId,
@@ -36,7 +39,9 @@ public class JournalImageAnalysisController {
         ApiResponse.success(analysisService.analyze(userId, journalId, request.imageHash())));
   }
 
-  @Operation(summary = "저장된 사진 분석 결과 목록", description = "현재 일지에 연결된 사진들의 완료된 분석 결과만 반환합니다.")
+  @Operation(
+      summary = "저장된 사진 분석 결과 목록",
+      description = "현재 일지에 연결된 사진들의 완료된 분석 결과와 생성 당시의 공식 재배 근거 상태·적용 범위·기준 종명·출처를 반환합니다.")
   @GetMapping("/{journalId}/image-analysis")
   public ResponseEntity<ApiResponse<List<JournalImageAnalysisResponse>>> getCompleted(
       @AuthenticationPrincipal Long userId, @PathVariable Long journalId) {
