@@ -7,6 +7,14 @@ spring:
     hibernate:
       ddl-auto: update
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # prometheus는 k6 부하 테스트용 로컬 전용 엔드포인트(SecurityConfig에서 permitAll)라
+        # 운영에는 노출하지 않는다 — 공통 설정(application.yaml)의 include를 여기서 다시 좁힘.
+        include: health
+
 jwt:
   secret: ${JWT_SECRET}
   access-expiration: ${JWT_ACCESS_EXPIRATION}
