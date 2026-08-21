@@ -223,4 +223,42 @@ class IdempotencyServiceTest {
 								.isEqualTo(ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS)
 				);
 	}
+
+	@Test
+	void locksInProgressKeyForCompletion() {
+		IdempotencyKey key = mock(IdempotencyKey.class);
+		given(key.getRequestHash()).willReturn("request-hash");
+		given(key.getStatus()).willReturn(IdempotencyStatus.IN_PROGRESS);
+		given(idempotencyKeyRepository.findForUpdate(7L, "PAYMENT_CONFIRM", "confirm-key"))
+				.willReturn(Optional.of(key));
+
+		IdempotencyExecution execution = idempotencyService.lockForCompletion(
+				7L,
+				"PAYMENT_CONFIRM",
+				"confirm-key",
+				"request-hash"
+		);
+
+		assertThat(execution.replay()).isFalse();
+		assertThat(execution.key()).isSameAs(key);
+	}
+
+	@Test
+	void replaysKeyCompletedBeforeFinalizationLock() {
+		IdempotencyKey key = mock(IdempotencyKey.class);
+		given(key.getRequestHash()).willReturn("request-hash");
+		given(key.getStatus()).willReturn(IdempotencyStatus.SUCCEEDED);
+		given(idempotencyKeyRepository.findForUpdate(7L, "PAYMENT_CONFIRM", "confirm-key"))
+				.willReturn(Optional.of(key));
+
+		IdempotencyExecution execution = idempotencyService.lockForCompletion(
+				7L,
+				"PAYMENT_CONFIRM",
+				"confirm-key",
+				"request-hash"
+		);
+
+		assertThat(execution.replay()).isTrue();
+		assertThat(execution.key()).isSameAs(key);
+	}
 }

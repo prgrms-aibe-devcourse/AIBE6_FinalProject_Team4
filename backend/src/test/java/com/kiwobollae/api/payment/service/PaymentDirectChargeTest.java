@@ -19,7 +19,6 @@ import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
-import com.kiwobollae.api.point.service.PointCreditService;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,9 +37,8 @@ class PaymentDirectChargeTest {
 	@Mock private PaymentRefundRepository paymentRefundRepository;
 	@Mock private UserRepository userRepository;
 	@Mock private PaymentProvider paymentProvider;
-	@Mock private PointCreditService pointCreditService;
 	@Mock private IdempotencyService idempotencyService;
-	@Mock private PaymentStateService paymentStateService;
+	@Mock private PaymentConfirmationTransactionService paymentConfirmationTransactionService;
 	@Mock private ObjectMapper objectMapper;
 
 	private PaymentService paymentService;
@@ -52,9 +50,8 @@ class PaymentDirectChargeTest {
 				paymentRefundRepository,
 				userRepository,
 				paymentProvider,
-				pointCreditService,
 				idempotencyService,
-				paymentStateService,
+				paymentConfirmationTransactionService,
 				objectMapper
 		);
 	}

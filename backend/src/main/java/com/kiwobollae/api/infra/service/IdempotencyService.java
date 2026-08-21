@@ -72,6 +72,27 @@ public class IdempotencyService {
 		return start(userId, apiType, clientKey, requestHash, compatibleRequestHash);
 	}
 
+	public IdempotencyExecution lockForCompletion(
+			Long userId,
+			String apiType,
+			String clientKey,
+			String requestHash
+	) {
+		IdempotencyKey existing = idempotencyKeyRepository
+				.findForUpdate(userId, apiType, clientKey)
+				.orElseThrow(() -> new IllegalStateException("완료할 멱등키를 조회할 수 없습니다."));
+		if (!existing.getRequestHash().equals(requestHash)) {
+			throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT);
+		}
+		if (existing.getStatus() == IdempotencyStatus.SUCCEEDED) {
+			return new IdempotencyExecution(existing, true);
+		}
+		if (existing.getStatus() != IdempotencyStatus.IN_PROGRESS) {
+			throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS);
+		}
+		return new IdempotencyExecution(existing, false);
+	}
+
 	private IdempotencyExecution start(
 			Long userId,
 			String apiType,

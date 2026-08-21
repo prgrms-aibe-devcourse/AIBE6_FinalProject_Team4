@@ -13,14 +13,11 @@ import com.kiwobollae.api.payment.dto.response.PaymentHistoryResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentResponse;
 import com.kiwobollae.api.payment.entity.Payment;
-import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
-import com.kiwobollae.api.payment.provider.PaymentConfirmCommand;
 import com.kiwobollae.api.payment.provider.PaymentConfirmResult;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
-import com.kiwobollae.api.point.service.PointCreditService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -40,7 +38,6 @@ import tools.jackson.databind.ObjectMapper;
 public class PaymentService {
 
 	private static final String CHARGE_API_TYPE = "PAYMENT_CHARGE";
-	private static final String CONFIRM_API_TYPE = "PAYMENT_CONFIRM";
 	private static final String FAILURE_API_TYPE = "PAYMENT_FAILURE";
 	private static final String USER_CANCELED_CODE = "PAY_PROCESS_CANCELED";
 	public static final long MIN_CHARGE_AMOUNT = 1_000L;
@@ -51,9 +48,8 @@ public class PaymentService {
 	private final PaymentRefundRepository paymentRefundRepository;
 	private final UserRepository userRepository;
 	private final PaymentProvider paymentProvider;
-	private final PointCreditService pointCreditService;
 	private final IdempotencyService idempotencyService;
-	private final PaymentStateService paymentStateService;
+	private final PaymentConfirmationTransactionService paymentConfirmationTransactionService;
 	private final ObjectMapper objectMapper;
 
 	@Transactional
@@ -87,59 +83,22 @@ public class PaymentService {
 		return response;
 	}
 
-	@Transactional
+	@Transactional(propagation = Propagation.NOT_SUPPORTED)
 	public PaymentResponse confirmPayment(Long userId, String idempotencyKey, PaymentConfirmRequest request) {
-		User user = userRepository.getReferenceById(userId);
 		validateIdempotencyKey(idempotencyKey);
-		IdempotencyExecution idempotency = idempotencyService.start(
+		String requestHash = sha256(normalizedConfirmRequest(request));
+		PaymentConfirmationPreparation preparation = paymentConfirmationTransactionService.prepare(
 				userId,
-				CONFIRM_API_TYPE,
 				idempotencyKey,
-				sha256(normalizedConfirmRequest(request))
+				requestHash,
+				request
 		);
-		if (idempotency.replay()) {
-			return readSnapshot(idempotency.key().getResponseSnapshot());
+		if (preparation.replay()) {
+			return preparation.replayResponse();
 		}
 
-		Payment payment = paymentRepository
-				.findDetailsByProviderOrderIdAndUserId(request.providerOrderId(), userId)
-				.orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
-		if (payment.getStatus() != PaymentStatus.PENDING) {
-			throw new BusinessException(ErrorCode.PAYMENT_INVALID_STATE);
-		}
-		validateTossPayment(payment);
-
-		if (!payment.getCashAmount().equals(request.amount())) {
-			paymentStateService.failPendingPayment(payment.getId());
-			throw new BusinessException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
-		}
-
-		PaymentConfirmResult confirmResult = paymentProvider.confirm(new PaymentConfirmCommand(
-				request.providerOrderId(),
-				request.paymentKey(),
-				request.amount()
-		));
-
-		if (!confirmResult.successful()) {
-			return finishWithoutCredit(
-					payment,
-					PaymentStatus.FAILED,
-					null,
-					confirmResult.message(),
-					idempotency
-			);
-		}
-
-		LocalDateTime approvedAt = LocalDateTime.now();
-		changePendingStatus(payment.getId(), PaymentStatus.COMPLETED, request.paymentKey(), approvedAt);
-		pointCreditService.creditPaidPoint(userId, payment.getPointAmount(), payment.getId());
-
-		PaymentResponse response = PaymentResponse.from(
-				getPaymentDetails(payment.getId()),
-				confirmResult.message()
-		);
-		completeIdempotency(idempotency, 200, response, payment.getId());
-		return response;
+		PaymentConfirmResult confirmResult = paymentProvider.confirm(preparation.command());
+		return paymentConfirmationTransactionService.complete(preparation, confirmResult);
 	}
 
 	@Transactional
@@ -187,14 +146,6 @@ public class PaymentService {
 				.toList();
 	}
 
-	private PaymentResponse finishWithoutCredit(Payment payment, PaymentStatus status, String paymentKey,
-			String message, IdempotencyExecution idempotency) {
-		changePendingStatus(payment.getId(), status, paymentKey, null);
-		PaymentResponse response = PaymentResponse.from(getPaymentDetails(payment.getId()), message);
-		completeIdempotency(idempotency, 200, response, payment.getId());
-		return response;
-	}
-
 	private void changePendingStatus(Long paymentId, PaymentStatus targetStatus,
 			String paymentKey, LocalDateTime approvedAt) {
 		int updated = paymentRepository.updateStatusIfCurrent(
@@ -222,16 +173,6 @@ public class PaymentService {
 		return "providerOrderId=" + request.providerOrderId()
 				+ "&paymentKey=" + request.paymentKey()
 				+ "&amount=" + request.amount();
-	}
-
-	private void validateTossPayment(Payment payment) {
-		if (payment.getProvider() != PaymentProviderType.TOSS
-				|| paymentProvider.getType() != PaymentProviderType.TOSS) {
-			throw new BusinessException(
-					ErrorCode.PAYMENT_INVALID_STATE,
-					"Toss 결제만 승인할 수 있습니다."
-			);
-		}
 	}
 
 	private void validateIdempotencyKey(String idempotencyKey) {
