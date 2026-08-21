@@ -12,6 +12,10 @@ import com.kiwobollae.api.ai.client.OpenAiClient;
 import com.kiwobollae.api.ai.client.RealOpenAiClients;
 import com.kiwobollae.api.ai.config.AiConfig;
 import com.kiwobollae.api.ai.config.OpenAiProperties;
+import com.kiwobollae.api.ai.knowledge.ClasspathOfficialPlantCareDocumentCorpus;
+import com.kiwobollae.api.ai.knowledge.OfficialDocumentPlantCareKnowledgeRetriever;
+import com.kiwobollae.api.ai.knowledge.PlantCareAdviceSafetyPolicy;
+import com.kiwobollae.api.ai.knowledge.PlantSpeciesNameNormalizer;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
@@ -159,6 +163,8 @@ class PlantChatSmokeTest {
 
     PlantGrowthContextQuery growthContextQuery = mock(PlantGrowthContextQuery.class);
     given(growthContextQuery.getJournalHistoryContext(7L, 21L)).willReturn(growthContext);
+    ObjectMapper objectMapper = new ObjectMapper();
+    PlantSpeciesNameNormalizer speciesNameNormalizer = new PlantSpeciesNameNormalizer();
 
     return new PlantChatService(
         growthContextQuery,
@@ -166,7 +172,11 @@ class PlantChatSmokeTest {
         mock(AiRequestGuard.class),
         new PlantChatConversationStore(FIXED_KST_CLOCK),
         new PlantChatJournalContextSelector(),
-        new ObjectMapper(),
+        new OfficialDocumentPlantCareKnowledgeRetriever(
+            speciesNameNormalizer,
+            new ClasspathOfficialPlantCareDocumentCorpus(objectMapper, speciesNameNormalizer)),
+        new PlantCareAdviceSafetyPolicy(),
+        objectMapper,
         FIXED_KST_CLOCK);
   }
 

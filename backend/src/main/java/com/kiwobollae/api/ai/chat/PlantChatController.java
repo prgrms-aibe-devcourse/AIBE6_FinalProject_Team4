@@ -27,7 +27,7 @@ public class PlantChatController {
   @Operation(
       summary = "식물 프로필별 AI 질문 답변",
       description =
-          "URL로 선택한 식물의 재배·관리와 성장 일지에 관한 질문만 식물 종·프로필·최근 일지 및 서버의 임시 대화 세션을 근거로 답변합니다. 다른 식물 질문은 해당 식물 프로필을 선택하도록 안내합니다. 대화 세션은 DB에 저장하지 않으며 30분 후 만료됩니다.")
+          "URL로 선택한 식물의 재배·관리와 성장 일지에 관한 질문만 공식 재배 문서, 식물 프로필, 최근 일지 및 서버의 임시 대화 세션을 근거로 답변합니다. 응답의 grounding으로 공식 근거 사용 여부, 적용 범위, 기준 종명과 출처를 확인할 수 있습니다. 다른 식물 질문은 해당 식물 프로필을 선택하도록 안내합니다. 대화 세션은 DB에 저장하지 않으며 30분 후 만료됩니다.")
   @PostMapping("/{profileId}/chat")
   public ResponseEntity<ApiResponse<PlantChatResponse>> chat(
       @AuthenticationPrincipal Long userId,

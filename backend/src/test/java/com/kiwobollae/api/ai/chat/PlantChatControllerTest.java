@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kiwobollae.api.ai.chat.dto.PlantChatRequest;
 import com.kiwobollae.api.ai.chat.dto.PlantChatResponse;
+import com.kiwobollae.api.ai.knowledge.PlantCareGrounding;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
@@ -62,7 +63,8 @@ class PlantChatControllerTest {
                 conversationId,
                 "물을 주기 전에 흙을 확인해 주세요.",
                 List.of("겉흙 2cm를 확인하세요."),
-                List.of("배수구를 확인하세요.")));
+                List.of("배수구를 확인하세요."),
+                PlantCareGrounding.fallback()));
 
     mockMvc
         .perform(
@@ -79,7 +81,9 @@ class PlantChatControllerTest {
         .andExpect(jsonPath("$.data.conversationId").value(conversationId.toString()))
         .andExpect(jsonPath("$.data.answer").value("물을 주기 전에 흙을 확인해 주세요."))
         .andExpect(jsonPath("$.data.recommendedActions[0]").value("겉흙 2cm를 확인하세요."))
-        .andExpect(jsonPath("$.data.additionalChecks[0]").value("배수구를 확인하세요."));
+        .andExpect(jsonPath("$.data.additionalChecks[0]").value("배수구를 확인하세요."))
+        .andExpect(jsonPath("$.data.grounding.status").value("GENERAL_FALLBACK"))
+        .andExpect(jsonPath("$.data.grounding.sources").isEmpty());
 
     ArgumentCaptor<PlantChatRequest> requestCaptor =
         ArgumentCaptor.forClass(PlantChatRequest.class);
@@ -106,7 +110,12 @@ class PlantChatControllerTest {
     UUID conversationId = UUID.fromString("30a508b8-bffc-43c3-8dd0-539a2068500a");
     given(plantChatService.chat(eq(7L), eq(21L), any(PlantChatRequest.class)))
         .willReturn(
-            new PlantChatResponse(conversationId, "이어진 답변입니다.", List.of("관찰하세요."), List.of()));
+            new PlantChatResponse(
+                conversationId,
+                "이어진 답변입니다.",
+                List.of("관찰하세요."),
+                List.of(),
+                PlantCareGrounding.fallback()));
     mockMvc
         .perform(
             post("/api/v1/ai/plant-profiles/21/chat")

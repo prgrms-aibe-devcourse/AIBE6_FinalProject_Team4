@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,11 @@ import com.kiwobollae.api.ai.client.AiClient;
 import com.kiwobollae.api.ai.client.AiModelRole;
 import com.kiwobollae.api.ai.client.AiRequest;
 import com.kiwobollae.api.ai.client.AiResponse;
+import com.kiwobollae.api.ai.knowledge.PlantCareAdviceSafetyPolicy;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidence;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledge;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeRetriever;
 import com.kiwobollae.api.ai.policy.AiFeature;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
@@ -49,6 +55,7 @@ class PlantChatServiceTest {
   @Mock private PlantGrowthContextQuery growthContextQuery;
   @Mock private AiClient aiClient;
   @Mock private AiRequestGuard requestGuard;
+  @Mock private PlantCareKnowledgeRetriever knowledgeRetriever;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
   private PlantChatConversationStore conversationStore;
@@ -56,6 +63,7 @@ class PlantChatServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(knowledgeRetriever.retrieve(any())).thenReturn(verifiedKnowledge("바질"));
     conversationStore = new PlantChatConversationStore(FIXED_KST_CLOCK);
     plantChatService =
         new PlantChatService(
@@ -64,6 +72,8 @@ class PlantChatServiceTest {
             requestGuard,
             conversationStore,
             new PlantChatJournalContextSelector(),
+            knowledgeRetriever,
+            new PlantCareAdviceSafetyPolicy(),
             objectMapper,
             FIXED_KST_CLOCK);
   }
@@ -80,6 +90,7 @@ class PlantChatServiceTest {
     assertThat(response.answer()).isEqualTo("과습과 건조가 반복됐을 가능성이 있어요.");
     assertThat(response.recommendedActions()).containsExactly("겉흙 2cm가 마른 뒤 충분히 물을 주세요.");
     assertThat(response.additionalChecks()).containsExactly("화분 배수구가 막히지 않았는지 확인하세요.");
+    assertThat(response.grounding().status()).isEqualTo(PlantCareEvidenceStatus.VERIFIED);
 
     ArgumentCaptor<AiRequest> aiRequestCaptor = ArgumentCaptor.forClass(AiRequest.class);
     verify(aiClient, times(1)).generate(aiRequestCaptor.capture());
@@ -110,6 +121,8 @@ class PlantChatServiceTest {
         .contains("2026-08-10")
         .contains("바질이")
         .contains("\"speciesName\":\"바질\"")
+        .contains("\"plantCareKnowledge\":{\"evidenceStatus\":\"VERIFIED\"")
+        .contains("official-basil")
         .contains("2026-08-08")
         .contains("새 잎이 조금 말렸어요.")
         .contains("잎 끝이 갈색인데 어떻게 해야 하나요?")
@@ -130,6 +143,8 @@ class PlantChatServiceTest {
 
   @Test
   void answersCareQuestionWhenCompoundSpeciesIsTheSelectedPlant() throws Exception {
+    given(knowledgeRetriever.retrieve(any()))
+        .willReturn(PlantCareKnowledge.fallback("원숭이꼬리선인장", "원숭이꼬리선인장", "test-retriever-v1"));
     given(growthContextQuery.getJournalHistoryContext(7L, 21L))
         .willReturn(compoundSpeciesGrowthContext());
     given(aiClient.generate(any(AiRequest.class)))
@@ -152,10 +167,13 @@ class PlantChatServiceTest {
         plantChatService.chat(7L, 21L, new PlantChatRequest("원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?", null));
 
     assertThat(response.answer()).isNotBlank();
+    assertThat(response.grounding().status()).isEqualTo(PlantCareEvidenceStatus.GENERAL_FALLBACK);
     ArgumentCaptor<AiRequest> captor = ArgumentCaptor.forClass(AiRequest.class);
     verify(aiClient).generate(captor.capture());
     assertThat(captor.getValue().userPrompt())
         .contains("\"speciesName\":\"원숭이꼬리선인장\"")
+        .contains("\"evidenceStatus\":\"GENERAL_FALLBACK\"")
+        .contains("fallbackSafetyPolicy")
         .contains("원숭이꼬리선인장은 물을 얼마나 자주 줘야 하나요?");
     assertThat(captor.getValue().systemPrompt())
         .contains("값 전체를 하나의")
@@ -473,6 +491,37 @@ class PlantChatServiceTest {
   }
 
   @Test
+  void rejectsUnsafePrescriptionForGeneralFallbackKnowledge() throws Exception {
+    given(growthContextQuery.getJournalHistoryContext(7L, 21L)).willReturn(growthContext());
+    given(knowledgeRetriever.retrieve(any()))
+        .willReturn(PlantCareKnowledge.fallback("바질", "바질", "test-retriever-v1"));
+    given(aiClient.generate(any(AiRequest.class)))
+        .willReturn(
+            new AiResponse(
+                "resp-unsafe",
+                "text-model",
+                objectMapper.readTree(
+                    """
+                    {
+                      "scopeDecision": "ANSWER",
+                      "scopeIntent": "CARE",
+                      "answer": "해충일 가능성이 있습니다.",
+                      "recommendedActions": ["살충제를 잎에 뿌리세요."],
+                      "additionalChecks": ["잎 뒷면을 확인하세요."]
+                    }
+                    """)));
+
+    assertThatThrownBy(
+            () ->
+                plantChatService.chat(
+                    7L, 21L, new PlantChatRequest("잎의 벌레를 어떻게 없애나요?", null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            exception ->
+                assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.AI_RESPONSE_INVALID));
+  }
+
+  @Test
   void propagatesAiProviderFailureWithoutRetrying() {
     given(growthContextQuery.getJournalHistoryContext(7L, 21L)).willReturn(growthContext());
     given(aiClient.generate(any(AiRequest.class)))
@@ -557,6 +606,20 @@ class PlantChatServiceTest {
               "additionalChecks": []
             }
             """));
+  }
+
+  private PlantCareKnowledge verifiedKnowledge(String speciesName) {
+    return PlantCareKnowledge.verified(
+        speciesName,
+        speciesName,
+        "test-retriever-v1",
+        List.of(
+            new PlantCareEvidence(
+                "official-basil",
+                "공식 바질 재배 문서",
+                "https://example.test/basil",
+                "2026-08-21",
+                "바질은 햇빛과 통풍이 좋은 곳에서 기릅니다.")));
   }
 
   private AiResponse otherPlantAiResponse() throws Exception {
