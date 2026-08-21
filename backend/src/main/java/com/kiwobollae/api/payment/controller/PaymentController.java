@@ -8,7 +8,6 @@ import com.kiwobollae.api.payment.dto.request.PaymentConfirmRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRequest;
-import com.kiwobollae.api.payment.dto.response.ChargeProductResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentHistoryResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentResponse;
@@ -40,14 +39,8 @@ public class PaymentController {
 	private final PaymentService paymentService;
 	private final PaymentRefundService paymentRefundService;
 
-	@Operation(summary = "충전 상품 목록 조회", description = "판매 중인 정액 충전 상품을 조회합니다. [PAY-01]")
-	@GetMapping("/products")
-	public ResponseEntity<ApiResponse<List<ChargeProductResponse>>> getChargeProducts() {
-		return ResponseEntity.ok(ApiResponse.success(paymentService.getChargeProducts()));
-	}
-
 	@Operation(summary = "포인트 충전 요청",
-			description = "상품 가격과 지급 포인트를 서버에서 확정하고 PENDING 결제를 생성합니다. [PAY-02]")
+			description = "1원=1P로 1,000~300,000P 범위의 10P 단위 PENDING 결제를 생성합니다. [PAY-02]")
 	@PostMapping("/charge")
 	public ResponseEntity<ApiResponse<PaymentResponse>> requestCharge(
 			@AuthenticationPrincipal Long userId,

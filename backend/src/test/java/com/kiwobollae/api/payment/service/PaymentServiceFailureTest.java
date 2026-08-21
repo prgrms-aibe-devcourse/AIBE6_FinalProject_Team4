@@ -11,12 +11,10 @@ import com.kiwobollae.api.infra.service.IdempotencyExecution;
 import com.kiwobollae.api.infra.service.IdempotencyService;
 import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentResponse;
-import com.kiwobollae.api.payment.entity.ChargeProduct;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
-import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.service.PointCreditService;
@@ -32,7 +30,6 @@ import tools.jackson.databind.ObjectMapper;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceFailureTest {
 
-	@Mock private ChargeProductRepository chargeProductRepository;
 	@Mock private PaymentRepository paymentRepository;
 	@Mock private PaymentRefundRepository paymentRefundRepository;
 	@Mock private UserRepository userRepository;
@@ -47,7 +44,6 @@ class PaymentServiceFailureTest {
 	@BeforeEach
 	void setUp() {
 		paymentService = new PaymentService(
-				chargeProductRepository,
 				paymentRepository,
 				paymentRefundRepository,
 				userRepository,
@@ -109,12 +105,10 @@ class PaymentServiceFailureTest {
 	private Payment payment(PaymentStatus status) {
 		Payment payment = org.mockito.Mockito.mock(Payment.class);
 		User user = org.mockito.Mockito.mock(User.class);
-		ChargeProduct chargeProduct = org.mockito.Mockito.mock(ChargeProduct.class);
 		given(payment.getId()).willReturn(21L);
 		given(payment.getUser()).willReturn(user);
 		given(user.getId()).willReturn(7L);
-		given(payment.getChargeProduct()).willReturn(chargeProduct);
-		given(chargeProduct.getId()).willReturn(3L);
+		given(payment.getChargeProductId()).willReturn(null);
 		given(payment.getChargeProductName()).willReturn("1,000P 충전");
 		given(payment.getCashAmount()).willReturn(1_000L);
 		given(payment.getPointAmount()).willReturn(1_000L);

@@ -13,14 +13,12 @@ import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.infra.repository.IdempotencyKeyRepository;
 import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
-import com.kiwobollae.api.payment.entity.ChargeProduct;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentRefundResult;
-import com.kiwobollae.api.payment.repository.ChargeProductRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.entity.PointTransaction;
@@ -69,9 +67,6 @@ class PaymentRefundServiceMySqlIntegrationTest {
 	private PaymentRefundRepository paymentRefundRepository;
 
 	@Autowired
-	private ChargeProductRepository chargeProductRepository;
-
-	@Autowired
 	private WalletRepository walletRepository;
 
 	@Autowired
@@ -108,17 +103,10 @@ class PaymentRefundServiceMySqlIntegrationTest {
 				.build());
 		userId = user.getId();
 
-		ChargeProduct chargeProduct = chargeProductRepository.saveAndFlush(
-				ChargeProduct.builder()
-						.name("5,000P 충전")
-						.price(5_000L)
-						.pointAmount(5_000L)
-						.isActive(true)
-						.build()
-		);
 		Payment payment = paymentRepository.saveAndFlush(Payment.builder()
 				.user(user)
-				.chargeProduct(chargeProduct)
+				.chargeProductId(null)
+				.chargeProductName("5,000P 충전")
 				.cashAmount(5_000L)
 				.pointAmount(5_000L)
 				.status(PaymentStatus.COMPLETED)
@@ -146,7 +134,6 @@ class PaymentRefundServiceMySqlIntegrationTest {
 		pointTransactionRepository.deleteAllInBatch();
 		paymentRefundRepository.deleteAllInBatch();
 		paymentRepository.deleteAllInBatch();
-		chargeProductRepository.deleteAllInBatch();
 		walletRepository.deleteAllInBatch();
 		userRepository.deleteAllInBatch();
 	}

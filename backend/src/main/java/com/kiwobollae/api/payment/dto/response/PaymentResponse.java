@@ -28,7 +28,7 @@ public record PaymentResponse(
 		return new PaymentResponse(
 				payment.getId(),
 				payment.getUser().getId(),
-				payment.getChargeProduct().getId(),
+				payment.getChargeProductId(),
 				payment.getChargeProductName(),
 				payment.getCashAmount(),
 				payment.getPointAmount(),

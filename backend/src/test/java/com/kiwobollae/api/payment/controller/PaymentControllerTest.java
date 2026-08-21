@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kiwobollae.api.global.exception.GlobalExceptionHandler;
 import com.kiwobollae.api.payment.dto.request.PaymentFailureRequest;
+import com.kiwobollae.api.payment.dto.request.PaymentRequest;
 import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.dto.response.PaymentResponse;
@@ -52,6 +53,53 @@ class PaymentControllerTest {
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new AuthenticatedUserArgumentResolver())
 				.build();
+	}
+
+	@Test
+	void chargeAcceptsDirectPointAmount() throws Exception {
+		PaymentResponse response = new PaymentResponse(
+				21L,
+				7L,
+				null,
+				"12,340P 충전",
+				12_340L,
+				12_340L,
+				PaymentStatus.PENDING,
+				PaymentProviderType.TOSS,
+				"KWB-order-21",
+				null,
+				null,
+				LocalDateTime.of(2026, 8, 21, 10, 0),
+				"결제 요청이 생성되었습니다."
+		);
+		given(paymentService.requestCharge(7L, "charge-key", new PaymentRequest(12_340L)))
+				.willReturn(response);
+
+		mockMvc.perform(post("/api/v1/payments/charge")
+						.header("Idempotency-Key", "charge-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"pointAmount":12340}
+								"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.chargeProductId").doesNotExist())
+				.andExpect(jsonPath("$.data.cashAmount").value(12340))
+				.andExpect(jsonPath("$.data.pointAmount").value(12340));
+
+		verify(paymentService).requestCharge(7L, "charge-key", new PaymentRequest(12_340L));
+	}
+
+	@Test
+	void chargeRejectsAmountBelowMinimum() throws Exception {
+		mockMvc.perform(post("/api/v1/payments/charge")
+						.header("Idempotency-Key", "charge-key")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"pointAmount":999}
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("COMMON_VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("pointAmount"));
 	}
 
 	@Test

@@ -106,9 +106,8 @@ public enum ErrorCode {
 	POINT_DUPLICATE_TRANSACTION(HttpStatus.CONFLICT, "이미 처리된 포인트 거래입니다."),
 	POINT_SELF_ADJUSTMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "관리자는 자신의 포인트를 조정할 수 없습니다."),
 
-	PAYMENT_CHARGE_PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "충전 상품을 찾을 수 없습니다."),
-	PAYMENT_CHARGE_PRODUCT_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_CONTENT, "현재 구매할 수 없는 충전 상품입니다."),
-	PAYMENT_CHARGE_PRODUCT_POINT_RATE_INVALID(HttpStatus.BAD_REQUEST, "지급 포인트는 결제 금액의 100% 이상 150% 이하여야 합니다."),
+	PAYMENT_CHARGE_AMOUNT_INVALID(HttpStatus.BAD_REQUEST,
+			"충전 금액은 1,000원 이상 300,000원 이하의 10P 단위여야 합니다."),
 	PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 건을 찾을 수 없습니다."),
 	PAYMENT_INVALID_STATE(HttpStatus.CONFLICT, "현재 상태에서는 결제를 처리할 수 없습니다."),
 	PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "승인 금액이 결제 요청 금액과 일치하지 않습니다."),

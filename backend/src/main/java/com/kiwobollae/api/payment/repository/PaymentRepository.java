@@ -15,19 +15,19 @@ import org.springframework.data.repository.query.Param;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-	@EntityGraph(attributePaths = {"user", "chargeProduct"})
+	@EntityGraph(attributePaths = {"user"})
 	@Query("SELECT p FROM Payment p WHERE p.providerOrderId = :providerOrderId AND p.user.id = :userId")
 	Optional<Payment> findDetailsByProviderOrderIdAndUserId(
 			@Param("providerOrderId") String providerOrderId,
 			@Param("userId") Long userId
 	);
 
-	@EntityGraph(attributePaths = {"user", "chargeProduct"})
+	@EntityGraph(attributePaths = {"user"})
 	@Query("SELECT p FROM Payment p WHERE p.id = :paymentId")
 	Optional<Payment> findDetailsById(@Param("paymentId") Long paymentId);
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
-	@EntityGraph(attributePaths = {"user", "chargeProduct"})
+	@EntityGraph(attributePaths = {"user"})
 	@Query("""
 			SELECT p
 			FROM Payment p
@@ -39,7 +39,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 			@Param("userId") Long userId
 	);
 
-	@EntityGraph(attributePaths = {"user", "chargeProduct"})
+	@EntityGraph(attributePaths = {"user"})
 	List<Payment> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
 
 	@Modifying(clearAutomatically = true, flushAutomatically = true)

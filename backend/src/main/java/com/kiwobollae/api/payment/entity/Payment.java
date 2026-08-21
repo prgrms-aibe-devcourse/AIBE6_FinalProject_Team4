@@ -5,6 +5,7 @@ import com.kiwobollae.api.global.common.BaseTimeEntity;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -33,6 +34,10 @@ import lombok.NoArgsConstructor;
 		indexes = {
 				@Index(name = "idx_payment_user_id_created_at", columnList = "user_id, created_at"),
 				@Index(name = "idx_payment_status", columnList = "status")
+		},
+		check = {
+				@CheckConstraint(name = "ck_payments_direct_charge_amount",
+						constraint = "charge_product_id is not null or (cash_amount = point_amount and cash_amount between 1000 and 300000 and mod(cash_amount, 10) = 0)")
 		})
 // JPA Auditing에 더해 Asia/Seoul DB 세션 기준 ON UPDATE 안전망(공용 BaseTimeEntity는 건드리지 않고 override).
 @AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
@@ -46,15 +51,12 @@ public class Payment extends BaseTimeEntity {
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "charge_product_id", nullable = false)
-	private ChargeProduct chargeProduct;
+	// 기존 정액 충전 상품으로 생성된 결제 이력을 식별하기 위한 legacy 참조다.
+	// 신규 직접 충전 결제에는 null을 저장하며 애플리케이션에서는 엔티티 연관으로 사용하지 않는다.
+	@Column(name = "charge_product_id")
+	private Long chargeProductId;
 
-	// Blue/Green 배포 중 구버전 인스턴스는 이 컬럼을 쓰지 않으므로 expand 단계에서는 nullable로
-	// 유지한다. 신규 결제는 서비스와 @PrePersist에서 항상 스냅샷을 기록하고, legacy null/blank는
-	// 조회 시 chargeProduct의 현재 이름으로 호환한다. NOT NULL 전환은 구버전 종료와 backfill을
-	// 확인한 후 별도 contract migration에서 수행한다.
-	@Column(name = "charge_product_name", length = 50)
+	@Column(name = "charge_product_name", nullable = false, length = 50)
 	private String chargeProductName;
 
 	@Column(name = "cash_amount", nullable = false)
@@ -81,16 +83,10 @@ public class Payment extends BaseTimeEntity {
 	@Column(name = "approved_at")
 	private LocalDateTime approvedAt;
 
-	public String getChargeProductName() {
-		return chargeProductName != null && !chargeProductName.isBlank()
-				? chargeProductName
-				: chargeProduct.getName();
-	}
-
 	@PrePersist
 	private void ensureChargeProductNameSnapshot() {
-		if ((chargeProductName == null || chargeProductName.isBlank()) && chargeProduct != null) {
-			chargeProductName = chargeProduct.getName();
+		if ((chargeProductName == null || chargeProductName.isBlank()) && pointAmount != null) {
+			chargeProductName = String.format("%,dP 충전", pointAmount);
 		}
 	}
 }
