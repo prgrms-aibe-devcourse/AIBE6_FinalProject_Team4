@@ -4,7 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -31,9 +34,11 @@ public class TossPaymentProvider implements PaymentProvider {
 	@Autowired
 	public TossPaymentProvider(
 			@Value("${payment.toss.base-url:https://api.tosspayments.com}") String baseUrl,
-			@Value("${payment.toss.secret-key:}") String secretKey
+			@Value("${payment.toss.secret-key:}") String secretKey,
+			@Value("${payment.toss.connect-timeout:3s}") Duration connectTimeout,
+			@Value("${payment.toss.read-timeout:30s}") Duration readTimeout
 	) {
-		this(RestClient.builder(), baseUrl, secretKey);
+		this(createRestClientBuilder(connectTimeout, readTimeout), baseUrl, secretKey);
 	}
 
 	TossPaymentProvider(
@@ -50,6 +55,26 @@ public class TossPaymentProvider implements PaymentProvider {
 				.defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + basicCredential)
 				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
 				.build();
+	}
+
+	private static RestClient.Builder createRestClientBuilder(
+			Duration connectTimeout,
+			Duration readTimeout
+	) {
+		validateTimeout("연결", connectTimeout);
+		validateTimeout("응답", readTimeout);
+		HttpClient httpClient = HttpClient.newBuilder()
+				.connectTimeout(connectTimeout)
+				.build();
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+		requestFactory.setReadTimeout(readTimeout);
+		return RestClient.builder().requestFactory(requestFactory);
+	}
+
+	private static void validateTimeout(String type, Duration timeout) {
+		if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+			throw new IllegalArgumentException("Toss Payments " + type + " 타임아웃은 0보다 커야 합니다.");
+		}
 	}
 
 	@Override
