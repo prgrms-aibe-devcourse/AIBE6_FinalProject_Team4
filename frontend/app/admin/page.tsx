@@ -10,7 +10,6 @@ import AdminReportPanel, {
 import AdminBoardPanel from "@/components/admin/AdminBoardPanel";
 import AdminUserPanel from "@/components/admin/AdminUserPanel";
 import AdminCardMarketRevenuePanel from "@/components/admin/AdminCardMarketRevenuePanel";
-import AdminChargeProductPanel from "@/features/payment/AdminChargeProductPanel";
 import AdminPointAdjustmentPanel from "@/features/point/AdminPointAdjustmentPanel";
 import { formatPhone } from "@/components/AddressForm";
 import {
@@ -156,7 +155,6 @@ const ADMIN_TABS = [
   ["card-market-revenue", "거래소 수익"],
   ["points", "포인트 관리"],
   ["inquiries", "문의 관리"],
-  ["charge-products", "충전 상품 관리"],
   ["reports", "신고 관리"],
   ["board", "게시판 관리"],
   ["users", "유저 관리"],
@@ -1414,13 +1412,6 @@ export default function Admin({
 
       {tab === "points" && state.accessToken && state.user && (
         <AdminPointAdjustmentPanel
-          accessToken={state.accessToken}
-          adminUserId={state.user.id}
-        />
-      )}
-
-      {tab === "charge-products" && state.accessToken && state.user && (
-        <AdminChargeProductPanel
           accessToken={state.accessToken}
           adminUserId={state.user.id}
         />

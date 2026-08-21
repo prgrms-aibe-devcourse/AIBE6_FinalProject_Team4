@@ -1,21 +1,12 @@
 import { request } from "@/lib/api";
 
-export interface ChargeProduct {
-  id: number;
-  version: number;
-  name: string;
-  price: number;
-  pointAmount: number;
-  isActive: boolean;
-}
-
 export type PaymentStatus =
   "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED";
 
 export interface PaymentData {
   id: number;
   userId: number;
-  chargeProductId: number;
+  chargeProductId?: number | null;
   chargeProductName: string;
   cashAmount: number;
   pointAmount: number;
@@ -47,26 +38,16 @@ export interface PaymentHistory {
   refunds: PaymentRefundData[];
 }
 
-export function getChargeProducts(
-  accessToken: string,
-  signal?: AbortSignal,
-): Promise<ChargeProduct[]> {
-  return request<ChargeProduct[]>("/api/v1/payments/products", {
-    accessToken,
-    signal,
-  });
-}
-
 export function requestCharge(
   accessToken: string,
-  chargeProductId: number,
+  pointAmount: number,
   idempotencyKey: string,
 ): Promise<PaymentData> {
   return request<PaymentData>("/api/v1/payments/charge", {
     method: "POST",
     accessToken,
     headers: { "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify({ chargeProductId }),
+    body: JSON.stringify({ pointAmount }),
   });
 }
 

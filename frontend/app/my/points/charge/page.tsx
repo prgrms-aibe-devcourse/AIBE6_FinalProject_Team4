@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getChargeProducts, reportPaymentFailure, requestCharge } from "@/features/payment/api";
-import type { ChargeProduct } from "@/features/payment/api";
+import { reportPaymentFailure, requestCharge } from "@/features/payment/api";
 import {
   getTossPaymentErrorCode,
   requestTossPayment,
@@ -14,67 +14,54 @@ import { ApiError } from "@/lib/api";
 import { fmt, useStore } from "@/lib/store";
 
 const tossClientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ?? "";
+const MIN_CHARGE_AMOUNT = 1_000;
+const MAX_CHARGE_AMOUNT = 300_000;
+const CHARGE_AMOUNT_UNIT = 10;
 
 function createIdempotencyKey(operation: string): string {
   return `${operation}-${crypto.randomUUID()}`;
 }
 
+function validateChargeAmount(value: string): string {
+  if (!/^\d+$/.test(value.trim())) return "충전할 포인트를 숫자로 입력해 주세요.";
+
+  const amount = Number(value);
+  if (!Number.isSafeInteger(amount) || amount < MIN_CHARGE_AMOUNT)
+    return "최소 충전 금액은 1,000원이에요.";
+  if (amount > MAX_CHARGE_AMOUNT)
+    return "최대 충전 금액은 300,000원이에요.";
+  if (amount % CHARGE_AMOUNT_UNIT !== 0)
+    return "충전 금액은 10P 단위로 입력해 주세요.";
+  return "";
+}
+
 export default function Charge() {
   const router = useRouter();
   const { state } = useStore();
-  const [products, setProducts] = useState<ChargeProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
-  const [processingProductId, setProcessingProductId] = useState<number | null>(
-    null,
-  );
+  const [amountInput, setAmountInput] = useState("1000");
+  const [amountError, setAmountError] = useState("");
+  const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
-  const loadProducts = useCallback(
-    async (accessToken: string, signal?: AbortSignal) => {
-      setLoading(true);
-      setError("");
-      try {
-        setProducts(await getChargeProducts(accessToken, signal));
-      } catch (requestError) {
-        if (
-          requestError instanceof DOMException &&
-          requestError.name === "AbortError"
-        )
-          return;
-        setProducts([]);
-        setError(
-          requestError instanceof ApiError
-            ? requestError.message
-            : "충전 상품을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
-        );
-      } finally {
-        if (!signal?.aborted) setLoading(false);
-      }
-    },
-    [],
-  );
+  const startPayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!state.accessToken || processing) return;
 
-  useEffect(() => {
-    if (!state.accessToken) return;
+    const validationMessage = validateChargeAmount(amountInput);
+    if (validationMessage) {
+      setAmountError(validationMessage);
+      return;
+    }
 
-    const controller = new AbortController();
-    void loadProducts(state.accessToken, controller.signal);
-
-    return () => controller.abort();
-  }, [loadProducts, reloadKey, state.accessToken]);
-
-  const startPayment = async (product: ChargeProduct) => {
-    if (!state.accessToken || processingProductId !== null) return;
-
-    setProcessingProductId(product.id);
+    const pointAmount = Number(amountInput);
+    setAmountError("");
+    setProcessing(true);
     setPaymentError("");
     let providerOrderId: string | null = null;
     try {
       const pendingPayment = await requestCharge(
         state.accessToken,
-        product.id,
+        pointAmount,
         createIdempotencyKey("charge"),
       );
       providerOrderId = pendingPayment.providerOrderId;
@@ -83,29 +70,27 @@ export default function Charge() {
         pendingPayment.providerOrderId,
       );
       if (
-        pendingPayment.cashAmount !== product.price ||
-        pendingPayment.pointAmount !== product.pointAmount
+        pendingPayment.cashAmount !== pointAmount ||
+        pendingPayment.pointAmount !== pointAmount
       ) {
         try {
           await reportPaymentFailure(
             state.accessToken,
             pendingPayment.providerOrderId,
-            "PAYMENT_QUOTE_CHANGED",
+            "PAYMENT_AMOUNT_MISMATCH",
             `failure-${pendingPayment.providerOrderId}`,
           );
           sessionStorage.removeItem(TOSS_PENDING_ORDER_STORAGE_KEY);
         } catch {
           const query = new URLSearchParams({
-            code: "PAYMENT_QUOTE_CHANGED",
-            message:
-              "충전 상품 정보가 변경되어 결제를 진행하지 않았어요. 결제 내역을 정리하고 있어요.",
+            code: "PAYMENT_AMOUNT_MISMATCH",
+            message: "요청한 충전 금액과 결제 금액이 달라 결제를 중단했어요.",
           });
           router.push(`/my/points/charge/fail?${query.toString()}`);
           return;
         }
-        await loadProducts(state.accessToken);
         setPaymentError(
-          "충전 상품의 금액 또는 지급 포인트가 변경됐어요. 최신 상품을 확인한 뒤 다시 결제해 주세요.",
+          "요청한 충전 금액과 결제 금액이 달라 결제를 진행하지 않았어요. 다시 시도해 주세요.",
         );
         return;
       }
@@ -148,9 +133,12 @@ export default function Charge() {
             : "결제창을 여는 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
       );
     } finally {
-      setProcessingProductId(null);
+      setProcessing(false);
     }
   };
+
+  const validAmount = validateChargeAmount(amountInput) === "";
+  const previewAmount = validAmount ? Number(amountInput) : 0;
 
   return (
     <div className="container max-w-[900px]">
@@ -172,54 +160,64 @@ export default function Charge() {
         </p>
       )}
 
-      {loading ? (
-        <div className="rounded-[18px] bg-white py-14 text-center text-sm text-sub shadow-card">
-          충전 상품을 불러오고 있어요.
+      <form
+        noValidate
+        onSubmit={(event) => void startPayment(event)}
+        className="rounded-[18px] bg-white px-6 py-7 shadow-card"
+      >
+        <label htmlFor="charge-amount" className="block text-base font-extrabold">
+          충전할 포인트
+        </label>
+        <div className="relative mt-3">
+          <input
+            id="charge-amount"
+            type="number"
+            inputMode="numeric"
+            min={MIN_CHARGE_AMOUNT}
+            max={MAX_CHARGE_AMOUNT}
+            step={CHARGE_AMOUNT_UNIT}
+            value={amountInput}
+            disabled={processing}
+            onChange={(event) => {
+              setAmountInput(event.target.value);
+              setAmountError("");
+            }}
+            aria-describedby="charge-amount-policy"
+            aria-invalid={Boolean(amountError)}
+            className="w-full rounded-xl border border-line px-4 py-3 pr-10 text-right text-xl font-extrabold outline-none focus:border-brand disabled:bg-gray-50"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-sub">P</span>
         </div>
-      ) : error ? (
-        <div className="rounded-[18px] bg-white px-5 py-14 text-center text-sm text-sub shadow-card">
-          <p>{error}</p>
-          <button
-            type="button"
-            onClick={() => setReloadKey((current) => current + 1)}
-            className="mt-4 cursor-pointer rounded-xl bg-brand px-5 py-2.5 font-bold text-white"
-          >
-            다시 시도
-          </button>
+        <p id="charge-amount-policy" className="mt-2 text-sm text-sub">
+          1원 = 1P · 최소 1,000P · 최대 300,000P · 10P 단위
+        </p>
+        {amountError && (
+          <p role="alert" className="mt-2 text-sm font-bold text-danger">
+            {amountError}
+          </p>
+        )}
+
+        <div className="mt-6 rounded-xl bg-[#f8faf8] px-4 py-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-sub">결제 금액</span>
+            <strong>{fmt(previewAmount)}원</strong>
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-sub">충전 포인트</span>
+            <strong>{fmt(previewAmount)}P</strong>
+          </div>
         </div>
-      ) : products.length === 0 ? (
-        <div className="rounded-[18px] bg-white py-14 text-center text-sm text-sub shadow-card">
-          지금은 구매할 수 있는 충전 상품이 없어요.
-        </div>
-      ) : (
-        <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(200px,1fr))]">
-          {products.map((product) => (
-            <button
-              key={product.id}
-              type="button"
-              disabled={processingProductId !== null}
-              onClick={() => void startPayment(product)}
-              className="cursor-pointer rounded-[18px] border-2 border-transparent bg-white px-5 py-6 text-center shadow-card disabled:cursor-wait disabled:opacity-60"
-            >
-              <div>
-                <span className="material-symbols-outlined text-[34px] text-gold-text">
-                  monetization_on
-                </span>
-              </div>
-              <div className="mb-0.5 mt-2 text-[22px] font-extrabold">
-                {fmt(product.pointAmount)}P
-              </div>
-              <div className="font-bold text-sub">{fmt(product.price)}원</div>
-              <div className="mt-1 text-xs text-faint">{product.name}</div>
-              {processingProductId === product.id && (
-                <div className="mt-2 text-xs font-bold text-brand">
-                  결제창을 여는 중...
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+
+        <button
+          type="submit"
+          disabled={processing}
+          className="mt-6 w-full cursor-pointer rounded-xl bg-brand px-5 py-3.5 font-extrabold text-white disabled:cursor-wait disabled:opacity-60"
+        >
+          {processing
+            ? "결제창을 여는 중..."
+            : `${fmt(previewAmount)}P 충전하기`}
+        </button>
+      </form>
     </div>
   );
 }

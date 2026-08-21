@@ -41,20 +41,6 @@ vi.mock("@/lib/exchange-api", async (importOriginal) => ({
   getExchangesForAdmin: mocks.getExchanges,
 }));
 
-vi.mock("@/features/payment/AdminChargeProductPanel", () => ({
-  default: ({
-    accessToken,
-    adminUserId,
-  }: {
-    accessToken: string;
-    adminUserId: number;
-  }) => (
-    <div data-testid="admin-charge-product-panel">
-      {accessToken}:{adminUserId}
-    </div>
-  ),
-}));
-
 vi.mock("@/features/point/AdminPointAdjustmentPanel", () => ({
   default: ({
     accessToken,
@@ -131,16 +117,6 @@ describe("Admin product management", () => {
     );
   });
 
-  it("충전 상품 관리 탭에서 관리자 패널을 표시한다", () => {
-    render(<Admin />);
-
-    fireEvent.click(screen.getByRole("button", { name: "충전 상품 관리" }));
-
-    expect(screen.getByTestId("admin-charge-product-panel")).toHaveTextContent(
-      "admin-token:1",
-    );
-  });
-
   it("포인트 관리 패널에 실제 관리자 ID를 전달한다", () => {
     render(<Admin />);
 
@@ -159,13 +135,5 @@ describe("Admin product management", () => {
     expect(mocks.replace).toHaveBeenCalledWith("/admin?tab=points", {
       scroll: false,
     });
-  });
-
-  it("URL의 충전 상품 관리 탭을 초기 화면에 복원한다", () => {
-    render(<Admin searchParams={{ tab: "charge-products" }} />);
-
-    expect(screen.getByTestId("admin-charge-product-panel")).toHaveTextContent(
-      "admin-token:1",
-    );
   });
 });
