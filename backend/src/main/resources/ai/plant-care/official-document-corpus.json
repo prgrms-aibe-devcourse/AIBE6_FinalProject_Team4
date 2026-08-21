@@ -1,67 +1,119 @@
 {
+  "corpusVersion": "official-plant-care-corpus-v2",
+  "subjects": [
+    {
+      "subjectId": "basil",
+      "canonicalName": "바질",
+      "aliases": ["스위트 바질", "스위트바질", "Ocimum basilicum"]
+    },
+    {
+      "subjectId": "lettuce",
+      "canonicalName": "상추",
+      "aliases": ["청상추"]
+    },
+    {
+      "subjectId": "cherry-tomato",
+      "canonicalName": "방울토마토",
+      "aliases": ["방울 토마토", "cherry tomato"]
+    },
+    {
+      "subjectId": "strawberry",
+      "canonicalName": "딸기",
+      "aliases": ["strawberry"],
+      "cultivars": [
+        {
+          "canonicalName": "설향",
+          "aliases": ["설향딸기", "설향 딸기"],
+          "authoritySourceName": "농촌진흥청 농사로 딸기 주요품종 특성",
+          "authoritySourceUrl": "https://www.nongsaro.go.kr/portal/ps/psb/psby/vodPlay.ps?menuId=PS00069&mvpClipNo=5&mvpNo=369",
+          "authorityVersion": "농영상 369"
+        }
+      ]
+    },
+    {
+      "subjectId": "chili-pepper",
+      "canonicalName": "고추",
+      "aliases": ["chili pepper", "Capsicum annuum"]
+    },
+    {
+      "subjectId": "watermelon",
+      "canonicalName": "수박",
+      "aliases": ["watermelon", "Citrullus lanatus"]
+    },
+    {
+      "subjectId": "carrot",
+      "canonicalName": "당근",
+      "aliases": ["carrot", "Daucus carota"]
+    },
+    {
+      "subjectId": "bok-choy",
+      "canonicalName": "청경채",
+      "aliases": ["bok choy", "pak choi"]
+    }
+  ],
   "documents": [
     {
-      "speciesNames": ["스위트 바질", "바질"],
+      "subjectIds": ["basil"],
       "sourceId": "nongsaro-218964",
       "sourceName": "농촌진흥청 농사로 바질",
       "sourceUrl": "https://nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=218964&menuId=PS03172&sSeCode=335001&totalSearchYn=Y",
-      "version": "2026-08-19",
-      "content": "바질은 햇볕과 통풍이 좋은 곳에서 기르고 화분 겉흙이 마르면 물을 줍니다. 따뜻한 환경을 좋아하고 추위와 약한 서리에 약하므로 이른 봄 정식은 피합니다."
+      "version": "2020-03-26",
+      "content": "바질은 햇빛이 잘 들어오고 통풍이 잘 되는 곳에서 기릅니다. 화분의 겉흙이 마르면 물을 흠뻑 줍니다."
     },
     {
-      "speciesNames": ["청상추", "상추"],
+      "subjectIds": ["lettuce"],
       "sourceId": "nongsaro-101796",
       "sourceName": "농촌진흥청 농사로 상추 기르기",
       "sourceUrl": "https://www.nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=101796&menuId=PS03163&totalSearchYn=Y",
-      "version": "2026-08-19",
-      "content": "상추는 서늘한 봄과 가을에 기르는 잎채소입니다. 베란다처럼 빛이 제한된 환경에서는 웃자람에 유의하고, 가정 재배에는 튼튼한 모종을 활용하는 것이 도움이 됩니다."
+      "version": "2015-06-01",
+      "content": "상추는 서늘한 봄과 가을에 기르는 잎채소입니다. 반나절 정도 햇빛이 들어오는 곳에서 기르고 적절히 물을 주되, 물이나 비료가 지나치면 맛이 떨어질 수 있어 주의합니다."
     },
     {
-      "speciesNames": ["방울토마토"],
+      "subjectIds": ["cherry-tomato"],
       "sourceId": "nise-cherry-tomato-cultivation",
       "sourceName": "국립특수교육원 방울토마토 재배 과정",
       "sourceUrl": "https://www.nise.go.kr/upload/eduable/vedu/docs/vm1/guide/vm1g07.pdf",
-      "version": "2026-08-19",
+      "version": "vm1g07",
       "content": "방울토마토는 지주대를 세워 지지하고 원줄기와 잎 사이에서 나는 곁순을 관리합니다. 과실이 충분히 붉게 익었을 때 수확합니다."
     },
     {
-      "speciesNames": ["딸기"],
+      "subjectIds": ["strawberry"],
       "sourceId": "nongsaro-indoor-garden-crops",
       "sourceName": "농촌진흥청 농사로 실내 텃밭 재배식물",
       "sourceUrl": "https://nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=228661&menuId=PS03172&sSeCode=335001",
-      "version": "2026-08-19",
-      "content": "딸기는 열매채소로 분류됩니다. 실내 텃밭은 햇빛이 제한되어 있어 열매채소 재배가 어려울 수 있으므로, 빛과 재배 환경을 먼저 점검하고 생육이 더디면 실외 또는 더 밝은 환경을 고려합니다."
+      "version": "2021-05-27",
+      "content": "딸기는 실내에서 키우기 어려운 열매채소로 분류됩니다. 실내 텃밭은 햇빛이 제한되므로 빛의 양과 재배 환경에 맞는 작물인지 먼저 확인합니다."
     },
     {
-      "speciesNames": ["고추"],
+      "subjectIds": ["chili-pepper"],
       "sourceId": "nongsaro-balcony-vegetable-seedlings",
       "sourceName": "농촌진흥청 농사로 베란다 채소재배 모종 이용",
       "sourceUrl": "https://www.nongsaro.go.kr/portal/ps/psb/psby/vodPlay.ps?mvpClipNo=4&mvpNo=325",
-      "version": "2026-08-19",
+      "version": "2006",
       "content": "베란다에서 고추 모종을 심을 때는 건강한 모종을 고르고 약 30cm 간격을 고려합니다. 물은 너무 자주 주지 말고 흙 표면이 건조해질 때 배수구로 물이 흐를 만큼 충분히 줍니다."
     },
     {
-      "speciesNames": ["수박"],
+      "subjectIds": ["watermelon"],
       "sourceId": "nongsaro-watermelon-growing",
       "sourceName": "농촌진흥청 농사로 수박 기르기",
       "sourceUrl": "https://nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=101617&menuId=PS03172&sSeCode=335001&totalSearchYn=Y",
-      "version": "2026-08-19",
-      "content": "수박은 높은 온도와 강한 햇빛을 좋아하는 열매채소입니다. 실내 텃밭은 햇빛이 제한되어 수박 재배가 어려울 수 있으므로, 충분한 일조와 덩굴이 자랄 공간을 확보할 수 있는지 먼저 확인합니다."
+      "version": "2009-06-10",
+      "content": "수박은 높은 온도와 강한 햇빛을 좋아합니다. 저온이나 일조 부족에서는 착과가 어렵고 과실 비대가 불량할 수 있으며, 곁순을 골라 유인할 재배 공간이 필요합니다."
     },
     {
-      "speciesNames": ["당근"],
+      "subjectIds": ["carrot"],
       "sourceId": "nongsaro-carrot-growing",
       "sourceName": "농촌진흥청 농사로 당근 기르기",
       "sourceUrl": "https://nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=101630&menuId=PS03172&sSeCode=335001&totalSearchYn=Y",
-      "version": "2026-08-19",
+      "version": "2009-11-10",
       "content": "당근은 뿌리를 이용하는 채소라 옮겨심기보다 제자리에 씨를 뿌리는 방식이 적합합니다. 토양 수분이 갑자기 달라지면 뿌리가 갈라질 수 있으므로 물주기 변화를 크게 만들지 않도록 유의합니다."
     },
     {
-      "speciesNames": ["청경채"],
+      "subjectIds": ["bok-choy"],
       "sourceId": "nongsaro-bok-choy-growing",
       "sourceName": "농촌진흥청 농사로 청경채",
       "sourceUrl": "https://nongsaro.go.kr/portal/ps/psz/psza/contentSub.ps?cntntsNo=101638&menuId=PS03172&sSeCode=335001&totalSearchYn=Y",
-      "version": "2026-08-19",
+      "version": "2010-08-30",
       "content": "청경채는 상추를 키울 수 있는 정도의 광량에서도 기를 수 있습니다. 유기질이 풍부하고 배수가 잘되며 통풍과 햇볕이 확보된 곳이 좋고, 낮 20~25℃ 안팎의 환경에서 잘 자랍니다."
     }
   ]

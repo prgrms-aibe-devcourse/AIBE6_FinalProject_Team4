@@ -3,6 +3,7 @@ package com.kiwobollae.api.ai.guide.dto;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideContent.Environment;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideContent.Pitfall;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideContent.Stage;
+import com.kiwobollae.api.ai.knowledge.PlantCareGrounding;
 import java.util.List;
 
 /**
@@ -21,10 +22,14 @@ public record PlantCareGuide(
     List<Stage> stages,
     List<Pitfall> pitfalls,
     String harvestTarget,
+    PlantCareGrounding grounding,
     boolean cached) {
 
   public static PlantCareGuide of(
-      String speciesName, PlantCareGuideContent content, boolean cached) {
+      String speciesName,
+      PlantCareGuideContent content,
+      PlantCareGrounding grounding,
+      boolean cached) {
     return new PlantCareGuide(
         speciesName,
         content.difficulty(),
@@ -33,6 +38,7 @@ public record PlantCareGuide(
         content.stages(),
         content.pitfalls(),
         content.harvestTarget(),
+        grounding,
         cached);
   }
 }

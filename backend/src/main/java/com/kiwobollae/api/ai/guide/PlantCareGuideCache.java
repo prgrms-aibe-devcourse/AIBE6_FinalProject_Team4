@@ -1,8 +1,11 @@
 package com.kiwobollae.api.ai.guide;
 
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
 import com.kiwobollae.api.global.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
@@ -34,7 +37,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class PlantCareGuideCache extends BaseEntity {
 
-  /** 정규화된 종 이름(캐시 키). 정규화 규칙은 PlantCareGuideService#normalizeSpeciesName 참고. */
+  /** 공통 종명 정규화와 별칭 해소를 거친 정식 종 이름(캐시 키). */
   @Column(name = "species_name", nullable = false, length = 100)
   private String speciesName;
 
@@ -46,6 +49,15 @@ public class PlantCareGuideCache extends BaseEntity {
    */
   @Column(name = "source_context_hash", nullable = false, length = 64)
   private String sourceContextHash;
+
+  /** 생성에 공식 문서 근거를 사용했는지 보존한다. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "evidence_status", nullable = false, length = 30)
+  private PlantCareEvidenceStatus evidenceStatus;
+
+  /** 생성에 사용한 출처·버전·내용 해시 목록. 원문 본문은 중복 저장하지 않는다. */
+  @Column(name = "evidence_sources_json", nullable = false, columnDefinition = "longtext")
+  private String evidenceSourcesJson;
 
   /** 응답 스키마 버전. 스키마를 바꾸면 이 값을 올려 옛 저장본을 자연히 무효화한다 — 지우거나 마이그레이션 하지 않고 새 버전으로만 조회하면 된다. */
   @Column(name = "guide_version", nullable = false)

@@ -11,8 +11,12 @@ import com.kiwobollae.api.ai.config.AiConfig;
 import com.kiwobollae.api.ai.config.OpenAiProperties;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuide;
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
-import com.kiwobollae.api.ai.guide.knowledge.ClasspathPlantCareKnowledgeCatalog;
-import com.kiwobollae.api.ai.guide.knowledge.VerifiedPlantCareKnowledgeRetriever;
+import com.kiwobollae.api.ai.knowledge.ClasspathOfficialPlantCareDocumentCorpus;
+import com.kiwobollae.api.ai.knowledge.OfficialDocumentPlantCareKnowledgeRetriever;
+import com.kiwobollae.api.ai.knowledge.PlantCareAdviceSafetyPolicy;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
+import com.kiwobollae.api.ai.knowledge.PlantCareKnowledgeMetadataCodec;
+import com.kiwobollae.api.ai.knowledge.PlantSpeciesNameNormalizer;
 import com.kiwobollae.api.ai.policy.AiRequestGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import java.time.Clock;
@@ -58,6 +62,7 @@ class PlantCareGuideSmokeTest {
     System.out.println(guide);
 
     assertThat(guide.speciesName()).isEqualTo("청상추");
+    assertThat(guide.grounding().status()).isEqualTo(PlantCareEvidenceStatus.VERIFIED);
     assertUsableGuide(guide);
   }
 
@@ -75,6 +80,7 @@ class PlantCareGuideSmokeTest {
     System.out.println(guide);
 
     assertThat(guide.speciesName()).isEqualTo("고수");
+    assertThat(guide.grounding().status()).isEqualTo(PlantCareEvidenceStatus.GENERAL_FALLBACK);
     assertUsableGuide(guide);
   }
 
@@ -119,6 +125,8 @@ class PlantCareGuideSmokeTest {
   /** 실제 OpenAI 클라이언트만 진짜, 저장소와 호출 제한은 끊는다. */
   private PlantCareGuideService serviceBackedByRealOpenAi(OpenAiProperties properties) {
     OpenAiClient client = RealOpenAiClients.create(properties);
+    ObjectMapper objectMapper = new ObjectMapper();
+    PlantSpeciesNameNormalizer speciesNameNormalizer = new PlantSpeciesNameNormalizer();
 
     // 저장소는 stub 없이 두면 Mockito가 Optional.empty()를 돌려주므로 항상 캐시 미스가 된다.
     PlantCareGuideGenerationLockStore generationLockStore =
@@ -130,14 +138,17 @@ class PlantCareGuideSmokeTest {
                     new PlantCareGuideGenerationLockStore.Lease(
                         invocation.getArgument(0), new Object())));
     return new PlantCareGuideService(
-        new VerifiedPlantCareKnowledgeRetriever(
-            new ClasspathPlantCareKnowledgeCatalog(new ObjectMapper())),
+        new OfficialDocumentPlantCareKnowledgeRetriever(
+            speciesNameNormalizer,
+            new ClasspathOfficialPlantCareDocumentCorpus(objectMapper, speciesNameNormalizer)),
+        new PlantCareKnowledgeMetadataCodec(objectMapper),
+        new PlantCareAdviceSafetyPolicy(),
         mock(PlantCareGuideCacheRepository.class),
         mock(PlantCareGuideCacheWriter.class),
         client,
         mock(AiRequestGuard.class),
         generationLockStore,
-        new ObjectMapper(),
+        objectMapper,
         Clock.fixed(Instant.parse("2026-08-05T01:00:00Z"), KST));
   }
 

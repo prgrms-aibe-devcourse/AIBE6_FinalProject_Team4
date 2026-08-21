@@ -3,6 +3,7 @@ package com.kiwobollae.api.ai.guide;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.kiwobollae.api.ai.guide.dto.PlantCareGuideSchema;
+import com.kiwobollae.api.ai.knowledge.PlantCareEvidenceStatus;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,6 +87,8 @@ class PlantCareGuideCacheMySqlIntegrationTest {
     return PlantCareGuideCache.builder()
         .speciesName(speciesName)
         .sourceContextHash(sourceContextHash)
+        .evidenceStatus(PlantCareEvidenceStatus.VERIFIED)
+        .evidenceSourcesJson("[]")
         .guideVersion(PlantCareGuideSchema.VERSION)
         .model("text-model")
         .guideJson(guideJson)

@@ -27,8 +27,8 @@ public class PlantCareGuideController {
   @Operation(
       summary = "식물 종 재배 가이드 조회",
       description =
-          "입력한 종의 검증 재배 자료가 있으면 이를 근거로 가이드를 반환합니다. 저장된 가이드가 없으면 AI로 생성한 뒤 저장합니다. "
-              + "검증 자료가 없는 새 종도 일반 재배 지식을 바탕으로 생성합니다. cached=false면 이번 요청에서 생성된 결과입니다.")
+          "자유 입력한 종명을 정규화하고 별칭·등록 품종을 해소해 공식 문서 코퍼스를 검색합니다. 품종은 기준 작물의 공통 근거임을 별도로 표시합니다. 저장된 가이드가 없으면 AI로 생성한 뒤 저장하며, 문서 내용이 바뀌면 새 근거 해시로 다시 생성합니다. "
+              + "응답의 grounding으로 공식 근거 사용 여부, 적용 범위, 기준 종명과 출처를 확인할 수 있습니다. 근거가 없는 종은 보수적인 일반 AI 지식으로 생성합니다. cached=false면 이번 요청에서 생성된 결과입니다.")
   @GetMapping("/care-guide")
   public ResponseEntity<ApiResponse<PlantCareGuide>> getCareGuide(
       @AuthenticationPrincipal Long userId, @RequestParam String speciesName) {
