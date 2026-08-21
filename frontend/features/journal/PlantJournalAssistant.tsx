@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import PlantCareGroundingNotice from "@/components/PlantCareGroundingNotice";
 import {
   getPlantCareFaqs,
   PlantCareFaq,
@@ -11,6 +12,7 @@ import {
 } from "@/features/journal/plant-care-faqs";
 import { askPlantChat } from "@/features/journal/plant-chat-api";
 import { ApiError } from "@/lib/api";
+import { PlantCareGrounding } from "@/lib/plant-care-grounding";
 
 const MAX_QUESTION_LENGTH = 2000;
 const PANEL_ID = "plant-journal-assistant-panel";
@@ -33,6 +35,7 @@ interface DisplayMessage {
   source: MessageSource;
   recommendedActions?: readonly string[];
   additionalChecks?: readonly string[];
+  grounding?: PlantCareGrounding;
 }
 
 interface PlantJournalAssistantProps {
@@ -120,6 +123,10 @@ function AssistantMessage({ message }: { message: DisplayMessage }) {
         {message.source === "FAQ" ? "준비된 답변" : "내 식물 기록 기반 AI 답변"}
       </div>
       <p className="whitespace-pre-wrap">{message.content}</p>
+
+      {message.grounding && (
+        <PlantCareGroundingNotice grounding={message.grounding} compact />
+      )}
 
       {message.recommendedActions && message.recommendedActions.length > 0 && (
         <div className="mt-2.5 rounded-r-[10px] border-l-2 border-brand bg-brand-soft px-3 py-2">
@@ -326,6 +333,7 @@ export default function PlantJournalAssistant({
           source: "AI",
           recommendedActions: response.recommendedActions,
           additionalChecks: response.additionalChecks,
+          grounding: response.grounding,
         },
       ]);
       setQuestion("");

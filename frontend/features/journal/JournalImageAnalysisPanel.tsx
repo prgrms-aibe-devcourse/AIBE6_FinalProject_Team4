@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import PlantCareGroundingNotice from "@/components/PlantCareGroundingNotice";
 import {
   analyzeJournalImage,
   getJournalImageAnalyses,
@@ -360,6 +361,9 @@ export default function JournalImageAnalysisPanel({
             </div>
           ) : result ? (
             <div>
+              <div className="mb-5">
+                <PlantCareGroundingNotice grounding={result.grounding} />
+              </div>
               <p className="mb-5 text-[15px] font-semibold leading-[1.75] text-[#465443]">
                 {result.summary}
               </p>

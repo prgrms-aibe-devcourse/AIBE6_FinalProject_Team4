@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import PlantCareGroundingNotice from "@/components/PlantCareGroundingNotice";
 import Skeleton from "@/components/Skeleton";
 import { ApiError } from "@/lib/api";
 import { getPlantCareGuide, PlantCareGuideData } from "@/lib/care-guide-api";
@@ -228,6 +229,7 @@ export default function PlantCareGuidePanel({
 
       {guide && expanded && (
         <div className="mt-4 flex flex-col gap-5">
+          <PlantCareGroundingNotice grounding={guide.grounding} />
           <div>
             <span
               className="inline-block rounded-full px-3 py-[5px] text-xs font-extrabold"

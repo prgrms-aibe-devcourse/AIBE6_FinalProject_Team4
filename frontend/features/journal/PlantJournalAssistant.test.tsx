@@ -17,6 +17,20 @@ vi.mock("@/features/journal/plant-chat-api", () => ({
 const mockedAskPlantChat = vi.mocked(askPlantChat);
 const PLANT = { id: 21, nickname: "바질이", speciesName: "바질" };
 const CONVERSATION_ID = "30a508b8-bffc-43c3-8dd0-539a2068500a";
+const VERIFIED_GROUNDING = {
+  status: "VERIFIED" as const,
+  scope: "EXACT_SPECIES" as const,
+  resolvedSpeciesName: "바질",
+  sources: [
+    {
+      sourceId: "official-basil",
+      sourceName: "공식 바질 재배 문서",
+      sourceUrl: "https://example.test/basil",
+      version: "2026-08-21",
+      contentHash: "a".repeat(64),
+    },
+  ],
+};
 const scrollIntoViewMock = vi.fn();
 
 Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -233,6 +247,7 @@ describe("PlantJournalAssistant", () => {
         answer: "열매 전체가 고르게 붉고 향이 진할 때 수확해 주세요.",
         recommendedActions: ["아침에 꼭지째 수확해 주세요."],
         additionalChecks: [],
+        grounding: VERIFIED_GROUNDING,
       });
       await pendingResponse;
     });
@@ -290,6 +305,7 @@ describe("PlantJournalAssistant", () => {
       answer: "최근 기록만으로는 원인을 단정하기 어려워요.",
       recommendedActions: ["겉흙 아래 수분을 확인해 주세요."],
       additionalChecks: ["새잎에도 갈변이 생기는지 살펴보세요."],
+      grounding: VERIFIED_GROUNDING,
     });
     renderAssistant();
     openAssistant();
@@ -316,6 +332,10 @@ describe("PlantJournalAssistant", () => {
     expect(
       await screen.findByText("최근 기록만으로는 원인을 단정하기 어려워요."),
     ).toBeInTheDocument();
+    expect(screen.getByText("공식 문서 근거를 확인했어요")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "공식 바질 재배 문서" }),
+    ).toHaveAttribute("href", "https://example.test/basil");
     expect(
       screen.getByText("겉흙 아래 수분을 확인해 주세요."),
     ).toBeInTheDocument();
@@ -334,12 +354,14 @@ describe("PlantJournalAssistant", () => {
         answer: "첫 번째 답변입니다.",
         recommendedActions: ["흙을 확인해 주세요."],
         additionalChecks: [],
+        grounding: VERIFIED_GROUNDING,
       })
       .mockResolvedValueOnce({
         conversationId: CONVERSATION_ID,
         answer: "이전 답변을 이어서 설명해 드릴게요.",
         recommendedActions: ["관찰을 이어가 주세요."],
         additionalChecks: [],
+        grounding: VERIFIED_GROUNDING,
       });
     renderAssistant();
     openAssistant();
@@ -442,6 +464,7 @@ describe("PlantJournalAssistant", () => {
         answer: "첫 번째 답변입니다.",
         recommendedActions: ["흙을 확인해 주세요."],
         additionalChecks: [],
+        grounding: VERIFIED_GROUNDING,
       })
       .mockRejectedValueOnce(
         new ApiError(
@@ -455,6 +478,7 @@ describe("PlantJournalAssistant", () => {
         answer: "새 대화의 답변입니다.",
         recommendedActions: ["다시 관찰해 주세요."],
         additionalChecks: [],
+        grounding: VERIFIED_GROUNDING,
       });
     renderAssistant();
     openAssistant();

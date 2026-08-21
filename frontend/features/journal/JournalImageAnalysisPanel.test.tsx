@@ -46,6 +46,20 @@ function analysis(imageHash = images[0].imageHash): JournalImageAnalysisData {
     possibleCauses: ["물주기 간격의 영향일 수 있어요."],
     recommendedActions: ["흙이 마른 정도를 먼저 확인해 주세요."],
     additionalChecks: ["잎 뒷면도 살펴봐 주세요."],
+    grounding: {
+      status: "VERIFIED",
+      scope: "EXACT_SPECIES",
+      resolvedSpeciesName: "바질",
+      sources: [
+        {
+          sourceId: "official-basil",
+          sourceName: "공식 바질 재배 문서",
+          sourceUrl: "https://example.test/basil",
+          version: "2026-08-21",
+          contentHash: "a".repeat(64),
+        },
+      ],
+    },
     analyzedAt: "2026-08-13T10:30:00",
   };
 }
@@ -89,6 +103,7 @@ describe("JournalImageAnalysisPanel", () => {
       await screen.findByText("조금 더 관찰해 주세요"),
     ).toBeInTheDocument();
     expect(screen.getByText(analysis().summary)).toBeInTheDocument();
+    expect(screen.getByText("공식 문서 근거를 확인했어요")).toBeInTheDocument();
   });
 
   it("저장된 결과를 재사용하고 선택 사진이 바뀌면 해당 결과를 보여준다", async () => {

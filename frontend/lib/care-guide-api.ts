@@ -1,4 +1,5 @@
 import { request } from "@/lib/api";
+import { PlantCareGrounding } from "@/lib/plant-care-grounding";
 
 export interface PlantCareGuideEnvironment {
   sunlight: string;
@@ -26,6 +27,7 @@ export interface PlantCareGuideData {
   stages: PlantCareGuideStage[];
   pitfalls: PlantCareGuidePitfall[];
   harvestTarget: string;
+  grounding: PlantCareGrounding;
   // 저장본을 돌려줬는지 여부. AI 호출 비용을 통제하기 위한 내부 지표라 화면에는 노출하지 않는다
   // (ai 이슈 3 결정 — 사용자는 같은 가이드를 볼 뿐이라 캐시 여부를 알 이유가 없다).
   cached: boolean;

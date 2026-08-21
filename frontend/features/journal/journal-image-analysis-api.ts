@@ -1,4 +1,5 @@
 import { request } from "@/lib/api";
+import { PlantCareGrounding } from "@/lib/plant-care-grounding";
 
 export type JournalImageQuality = "CLEAR" | "LIMITED" | "UNUSABLE";
 export type JournalPlantCondition =
@@ -15,6 +16,7 @@ export interface JournalImageAnalysisData {
   possibleCauses: string[];
   recommendedActions: string[];
   additionalChecks: string[];
+  grounding: PlantCareGrounding;
   analyzedAt: string;
 }
 

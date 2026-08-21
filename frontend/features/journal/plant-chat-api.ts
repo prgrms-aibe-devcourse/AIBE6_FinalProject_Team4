@@ -1,4 +1,5 @@
 import { request } from "@/lib/api";
+import { PlantCareGrounding } from "@/lib/plant-care-grounding";
 
 export interface PlantChatRequestPayload {
   question: string;
@@ -10,6 +11,7 @@ export interface PlantChatResponseData {
   answer: string;
   recommendedActions: string[];
   additionalChecks: string[];
+  grounding: PlantCareGrounding;
 }
 
 export function askPlantChat(

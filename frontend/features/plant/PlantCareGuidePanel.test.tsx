@@ -39,6 +39,20 @@ const GUIDE: PlantCareGuideData = {
     },
   ],
   harvestTarget: "파종 후 약 70일이면 첫 열매를 볼 수 있어요.",
+  grounding: {
+    status: "VERIFIED",
+    scope: "EXACT_SPECIES",
+    resolvedSpeciesName: "방울토마토",
+    sources: [
+      {
+        sourceId: "nise-cherry-tomato-cultivation",
+        sourceName: "국립특수교육원 방울토마토 재배 과정",
+        sourceUrl: "https://example.test/cherry-tomato",
+        version: "2026-08-21",
+        contentHash: "a".repeat(64),
+      },
+    ],
+  },
   cached: true,
 };
 
@@ -101,6 +115,54 @@ describe("PlantCareGuidePanel", () => {
       screen.getByRole("heading", { name: "수확 목표" }),
     ).toBeInTheDocument();
     expect(screen.getByText(GUIDE.harvestTarget)).toBeInTheDocument();
+    expect(screen.getByText("공식 문서 근거를 확인했어요")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", {
+        name: "국립특수교육원 방울토마토 재배 과정",
+      }),
+    ).toHaveAttribute("href", "https://example.test/cherry-tomato");
+  });
+
+  it("공식 문서 근거가 없으면 일반 AI 안내임을 구분해 보여준다", async () => {
+    mockedGetGuide.mockResolvedValueOnce({
+      ...GUIDE,
+      grounding: {
+        status: "GENERAL_FALLBACK",
+        scope: "NONE",
+        resolvedSpeciesName: "원숭이꼬리선인장",
+        sources: [],
+      },
+    });
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "재배 가이드 보기" }));
+
+    expect(
+      await screen.findByText("공식 근거가 없는 일반 AI 안내예요"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/농약·비료 처방 대신/)).toBeInTheDocument();
+  });
+
+  it("품종 입력에 기준 작물 공통 근거를 사용하면 적용 범위를 구분해 보여준다", async () => {
+    mockedGetGuide.mockResolvedValueOnce({
+      ...GUIDE,
+      speciesName: "설향딸기",
+      grounding: {
+        ...GUIDE.grounding,
+        scope: "BASE_SPECIES",
+        resolvedSpeciesName: "딸기",
+      },
+    });
+    renderPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "재배 가이드 보기" }));
+
+    expect(
+      await screen.findByText("딸기 공통 재배 근거를 확인했어요"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/품종 전용 자료가 아닌 딸기 공통/),
+    ).toBeInTheDocument();
   });
 
   // 검수를 하지 않기로 한 대신 반드시 노출하기로 한 문구다 (ai 이슈 2 제품 결정).
