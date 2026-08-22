@@ -12,6 +12,7 @@ import com.kiwobollae.api.payment.dto.response.PaymentResponse;
 import com.kiwobollae.api.payment.provider.PaymentConfirmCommand;
 import com.kiwobollae.api.payment.provider.PaymentConfirmResult;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
+import com.kiwobollae.api.payment.provider.PaymentProviderBusyException;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import java.lang.reflect.Method;
@@ -101,6 +102,47 @@ class PaymentConfirmationTransactionBoundaryTest {
 				PaymentConfirmationPreparation.class,
 				PaymentConfirmResult.class
 		));
+		assertTransactional(PaymentConfirmationTransactionService.class.getMethod(
+				"failBeforeProvider",
+				PaymentConfirmationPreparation.class
+		));
+	}
+
+	@Test
+	void bulkheadRejectionFailsPreparationBeforeReturningUnavailable() {
+		PaymentRepository paymentRepository = mock(PaymentRepository.class);
+		PaymentRefundRepository paymentRefundRepository = mock(PaymentRefundRepository.class);
+		UserRepository userRepository = mock(UserRepository.class);
+		PaymentProvider paymentProvider = mock(PaymentProvider.class);
+		IdempotencyService idempotencyService = mock(IdempotencyService.class);
+		PaymentConfirmationTransactionService transactionService =
+				mock(PaymentConfirmationTransactionService.class);
+		PaymentService paymentService = new PaymentService(
+				paymentRepository,
+				paymentRefundRepository,
+				userRepository,
+				paymentProvider,
+				idempotencyService,
+				transactionService,
+				mock(ObjectMapper.class)
+		);
+		PaymentConfirmRequest request = new PaymentConfirmRequest("order-1", "payment-key-1", 5_000L);
+		PaymentConfirmCommand command = new PaymentConfirmCommand("order-1", "payment-key-1", 5_000L);
+		PaymentConfirmationPreparation preparation = PaymentConfirmationPreparation.pending(
+				7L, "confirm-key", "request-hash", 21L, command);
+		given(transactionService.prepare(
+				org.mockito.ArgumentMatchers.eq(7L),
+				org.mockito.ArgumentMatchers.eq("confirm-key"),
+				org.mockito.ArgumentMatchers.anyString(),
+				org.mockito.ArgumentMatchers.eq(request)
+		)).willReturn(preparation);
+		given(paymentProvider.confirm(command)).willThrow(new PaymentProviderBusyException());
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+				paymentService.confirmPayment(7L, "confirm-key", request))
+				.isInstanceOf(PaymentProviderBusyException.class);
+
+		org.mockito.Mockito.verify(transactionService).failBeforeProvider(preparation);
 	}
 
 	private void assertTransactional(Method method) {

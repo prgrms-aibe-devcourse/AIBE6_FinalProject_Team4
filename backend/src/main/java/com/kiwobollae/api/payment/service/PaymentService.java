@@ -16,6 +16,7 @@ import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentConfirmResult;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
+import com.kiwobollae.api.payment.provider.PaymentProviderBusyException;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import java.nio.charset.StandardCharsets;
@@ -97,7 +98,13 @@ public class PaymentService {
 			return preparation.replayResponse();
 		}
 
-		PaymentConfirmResult confirmResult = paymentProvider.confirm(preparation.command());
+		PaymentConfirmResult confirmResult;
+		try {
+			confirmResult = paymentProvider.confirm(preparation.command());
+		} catch (PaymentProviderBusyException exception) {
+			paymentConfirmationTransactionService.failBeforeProvider(preparation);
+			throw exception;
+		}
 		return paymentConfirmationTransactionService.complete(preparation, confirmResult);
 	}
 

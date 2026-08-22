@@ -133,6 +133,19 @@ public class PaymentConfirmationTransactionService {
 		return response;
 	}
 
+	@Transactional
+	public void failBeforeProvider(PaymentConfirmationPreparation preparation) {
+		IdempotencyExecution idempotency = idempotencyService.lockForCompletion(
+				preparation.userId(),
+				CONFIRM_API_TYPE,
+				preparation.idempotencyKey(),
+				preparation.requestHash()
+		);
+		if (!idempotency.replay()) {
+			idempotencyService.fail(idempotency.key());
+		}
+	}
+
 	private void validateTossPayment(Payment payment) {
 		if (payment.getProvider() != PaymentProviderType.TOSS
 				|| paymentProvider.getType() != PaymentProviderType.TOSS) {

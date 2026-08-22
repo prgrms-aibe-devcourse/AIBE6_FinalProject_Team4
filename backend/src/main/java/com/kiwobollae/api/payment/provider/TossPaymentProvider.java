@@ -30,18 +30,87 @@ public class TossPaymentProvider implements PaymentProvider {
 	private static final String CANCEL_DONE_STATUS = "DONE";
 
 	private final RestClient restClient;
+	private final RestClient reconciliationRestClient;
+	private final TossPaymentBulkhead bulkhead;
+	private final TossPaymentCircuitBreaker circuitBreaker;
 
 	@Autowired
 	public TossPaymentProvider(
 			@Value("${payment.toss.base-url:https://api.tosspayments.com}") String baseUrl,
 			@Value("${payment.toss.secret-key:}") String secretKey,
 			@Value("${payment.toss.connect-timeout:3s}") Duration connectTimeout,
-			@Value("${payment.toss.read-timeout:30s}") Duration readTimeout
+			@Value("${payment.toss.read-timeout:30s}") Duration readTimeout,
+			@Value("${payment.toss.reconciliation-read-timeout:5s}") Duration reconciliationReadTimeout,
+			TossPaymentBulkhead bulkhead,
+			TossPaymentCircuitBreaker circuitBreaker
 	) {
-		this(createRestClientBuilder(connectTimeout, readTimeout), baseUrl, secretKey);
+		this(
+				createRestClients(
+						baseUrl,
+						secretKey,
+						connectTimeout,
+						readTimeout,
+						reconciliationReadTimeout
+				),
+				bulkhead,
+				circuitBreaker
+		);
 	}
 
 	TossPaymentProvider(
+			RestClient.Builder restClientBuilder,
+			String baseUrl,
+			String secretKey
+	) {
+		this(
+				createSharedRestClients(restClientBuilder, baseUrl, secretKey),
+				new TossPaymentBulkhead(100, Duration.ZERO),
+				new TossPaymentCircuitBreaker(100, Duration.ofSeconds(1), System::nanoTime)
+		);
+	}
+
+	private TossPaymentProvider(
+			RestClients restClients,
+			TossPaymentBulkhead bulkhead,
+			TossPaymentCircuitBreaker circuitBreaker
+	) {
+		this.restClient = restClients.primary();
+		this.reconciliationRestClient = restClients.reconciliation();
+		this.bulkhead = bulkhead;
+		this.circuitBreaker = circuitBreaker;
+	}
+
+	private static RestClients createRestClients(
+			String baseUrl,
+			String secretKey,
+			Duration connectTimeout,
+			Duration readTimeout,
+			Duration reconciliationReadTimeout
+	) {
+		return new RestClients(
+				buildRestClient(
+						createRestClientBuilder(connectTimeout, readTimeout),
+						baseUrl,
+						secretKey
+				),
+				buildRestClient(
+						createRestClientBuilder(connectTimeout, reconciliationReadTimeout),
+						baseUrl,
+						secretKey
+				)
+		);
+	}
+
+	private static RestClients createSharedRestClients(
+			RestClient.Builder restClientBuilder,
+			String baseUrl,
+			String secretKey
+	) {
+		RestClient sharedClient = buildRestClient(restClientBuilder, baseUrl, secretKey);
+		return new RestClients(sharedClient, sharedClient);
+	}
+
+	private static RestClient buildRestClient(
 			RestClient.Builder restClientBuilder,
 			String baseUrl,
 			String secretKey
@@ -50,7 +119,7 @@ public class TossPaymentProvider implements PaymentProvider {
 		String basicCredential = Base64.getEncoder().encodeToString(
 				(secretKey + ":").getBytes(StandardCharsets.UTF_8)
 		);
-		this.restClient = restClientBuilder
+		return restClientBuilder
 				.baseUrl(baseUrl)
 				.defaultHeader(HttpHeaders.AUTHORIZATION, "Basic " + basicCredential)
 				.defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -84,6 +153,11 @@ public class TossPaymentProvider implements PaymentProvider {
 
 	@Override
 	public PaymentConfirmResult confirm(PaymentConfirmCommand command) {
+		return circuitBreaker.execute(() ->
+				bulkhead.execute(() -> confirmWithinBulkhead(command)));
+	}
+
+	private PaymentConfirmResult confirmWithinBulkhead(PaymentConfirmCommand command) {
 		try {
 			TossPaymentResponse response = restClient.post()
 					.uri("/v1/payments/confirm")
@@ -121,6 +195,11 @@ public class TossPaymentProvider implements PaymentProvider {
 
 	@Override
 	public PaymentRefundResult refund(PaymentRefundCommand command) {
+		return circuitBreaker.execute(() ->
+				bulkhead.execute(() -> refundWithinBulkhead(command)));
+	}
+
+	private PaymentRefundResult refundWithinBulkhead(PaymentRefundCommand command) {
 		try {
 			TossPaymentResponse response = restClient.post()
 					.uri("/v1/payments/{paymentKey}/cancel", command.paymentKey())
@@ -172,7 +251,7 @@ public class TossPaymentProvider implements PaymentProvider {
 
 	private TossPaymentResponse findPayment(String paymentKey) {
 		try {
-			return restClient.get()
+			return reconciliationRestClient.get()
 					.uri("/v1/payments/{paymentKey}", paymentKey)
 					.retrieve()
 					.body(TossPaymentResponse.class);
@@ -256,7 +335,7 @@ public class TossPaymentProvider implements PaymentProvider {
 		};
 	}
 
-	private void validateTestConfiguration(String baseUrl, String secretKey) {
+	private static void validateTestConfiguration(String baseUrl, String secretKey) {
 		if (baseUrl == null || baseUrl.isBlank()) {
 			throw new IllegalStateException("Toss Payments API 주소가 설정되지 않았습니다.");
 		}
@@ -267,6 +346,9 @@ public class TossPaymentProvider implements PaymentProvider {
 
 	private BusinessException providerUnavailable() {
 		return new BusinessException(ErrorCode.PAYMENT_PROVIDER_UNAVAILABLE);
+	}
+
+	private record RestClients(RestClient primary, RestClient reconciliation) {
 	}
 
 	private record TossConfirmRequest(String paymentKey, String orderId, Long amount) {
