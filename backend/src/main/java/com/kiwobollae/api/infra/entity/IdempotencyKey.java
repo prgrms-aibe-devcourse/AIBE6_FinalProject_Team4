@@ -91,4 +91,11 @@ public class IdempotencyKey extends BaseEntity {
 		this.responseExpiresAt = responseExpiration;
 		this.claimToken = null;
 	}
+
+	public void fail(LocalDateTime now, LocalDateTime responseExpiration) {
+		this.status = IdempotencyStatus.FAILED;
+		this.completedAt = now;
+		this.responseExpiresAt = responseExpiration;
+		this.claimToken = null;
+	}
 }

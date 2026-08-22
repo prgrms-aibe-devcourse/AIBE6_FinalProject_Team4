@@ -87,6 +87,9 @@ public class IdempotencyService {
 		if (existing.getStatus() == IdempotencyStatus.SUCCEEDED) {
 			return new IdempotencyExecution(existing, true);
 		}
+		if (existing.getStatus() == IdempotencyStatus.FAILED) {
+			throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT);
+		}
 		if (existing.getStatus() != IdempotencyStatus.IN_PROGRESS) {
 			throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS);
 		}
@@ -137,6 +140,12 @@ public class IdempotencyService {
 		idempotencyKeyRepository.save(key);
 	}
 
+	public void fail(IdempotencyKey key) {
+		LocalDateTime now = LocalDateTime.now(seoulClock);
+		key.fail(now, now.plusHours(retentionHours(key.getApiType())));
+		idempotencyKeyRepository.save(key);
+	}
+
 	private IdempotencyExecution validateExisting(IdempotencyKey existing, String requestHash) {
 		return validateExisting(existing, requestHash, null);
 	}
@@ -152,6 +161,9 @@ public class IdempotencyService {
 		}
 		if (existing.getStatus() == IdempotencyStatus.SUCCEEDED) {
 			return new IdempotencyExecution(existing, true);
+		}
+		if (existing.getStatus() == IdempotencyStatus.FAILED) {
+			throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT);
 		}
 		throw new BusinessException(ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS);
 	}

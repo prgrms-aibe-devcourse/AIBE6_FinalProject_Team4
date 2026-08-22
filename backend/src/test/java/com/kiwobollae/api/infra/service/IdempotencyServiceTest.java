@@ -51,6 +51,7 @@ class IdempotencyServiceTest {
 	void paymentRefundKeyAndResponseAreRetainedForSevenDays() {
 		IdempotencyKey key = spy(IdempotencyKey.builder()
 				.apiType("PAYMENT_REFUND")
+				.requestHash("request-hash")
 				.status(IdempotencyStatus.IN_PROGRESS)
 				.createdAt(LocalDateTime.of(2026, 7, 31, 10, 0))
 				.expiresAt(LocalDateTime.of(2026, 8, 7, 10, 0))
@@ -260,5 +261,34 @@ class IdempotencyServiceTest {
 
 		assertThat(execution.replay()).isTrue();
 		assertThat(execution.key()).isSameAs(key);
+	}
+
+	@Test
+	void marksDefinitiveFailureAndRetainsPaymentKeyForSevenDays() {
+		IdempotencyKey key = spy(IdempotencyKey.builder()
+				.apiType("PAYMENT_REFUND")
+				.requestHash("request-hash")
+				.status(IdempotencyStatus.IN_PROGRESS)
+				.build());
+		given(idempotencyKeyRepository.save(key)).willReturn(key);
+
+		idempotencyService.fail(key);
+
+		assertThat(key.getStatus()).isEqualTo(IdempotencyStatus.FAILED);
+		assertThat(key.getCompletedAt()).isEqualTo(LocalDateTime.of(2026, 7, 31, 10, 0));
+		assertThat(key.getResponseExpiresAt())
+				.isEqualTo(LocalDateTime.of(2026, 8, 7, 10, 0));
+		assertThat(key.getClaimToken()).isNull();
+		verify(idempotencyKeyRepository).save(key);
+
+		given(idempotencyKeyRepository.findForUpdate(7L, "PAYMENT_REFUND", "failed-key"))
+				.willReturn(Optional.of(key));
+		assertThatThrownBy(() -> idempotencyService.start(
+				7L,
+				"PAYMENT_REFUND",
+				"failed-key",
+				"request-hash"
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COMMON_IDEMPOTENCY_CONFLICT));
 	}
 }

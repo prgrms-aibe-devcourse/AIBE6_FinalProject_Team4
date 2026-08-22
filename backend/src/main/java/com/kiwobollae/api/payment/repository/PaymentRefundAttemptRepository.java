@@ -14,8 +14,8 @@ public interface PaymentRefundAttemptRepository extends JpaRepository<PaymentRef
 	// 상태라, 자동 재환불(=이중 환불 위험) 대신 사람이 확인하도록 막는다.
 	boolean existsByPaymentIdAndStatus(Long paymentId, PaymentRefundAttemptStatus status);
 
-	// 성공 확정은 본 환불 트랜잭션 안에서 한다 — 환불이 롤백되면 이 갱신도 함께 롤백돼
-	// 기록이 STARTED로 남고, 위 확인에 걸린다.
+	// 성공 또는 명확한 거절의 내부 처리가 모두 끝났을 때 최종 트랜잭션에서 SETTLED로 바꾼다.
+	// 최종 트랜잭션이 롤백되면 STARTED로 남아 위 확인에 걸린다.
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query("""
 			UPDATE PaymentRefundAttempt a

@@ -326,6 +326,39 @@ public class WalletService {
 		);
 	}
 
+	/** 명확하게 거절된 PG 환불에 앞서 회수했던 유상 포인트를 환불 건별로 한 번만 원복한다. */
+	@Transactional
+	public void restorePaidPointForFailedPaymentRefund(
+			Long userId,
+			long pointAmount,
+			Long paymentRefundId
+	) {
+		if (pointAmount < 1 || paymentRefundId == null || paymentRefundId < 1) {
+			throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED);
+		}
+
+		Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.POINT_WALLET_NOT_FOUND));
+		if (pointTransactionRepository.existsByTypeAndRefTypeAndRefId(
+				PointTxType.RESTORE,
+				PointRefType.PAYMENT_REFUND,
+				paymentRefundId
+		)) {
+			return;
+		}
+
+		long balanceAfter = wallet.increasePaidPoint(pointAmount);
+		saveTransaction(
+				wallet,
+				PointTxType.RESTORE,
+				CurrencyType.PAID,
+				pointAmount,
+				balanceAfter,
+				PointRefType.PAYMENT_REFUND,
+				paymentRefundId
+		);
+	}
+
 	/**
 	 * 포인트 증감 공통 프리미티브: 지갑 행을 비관적 락으로 잠근 뒤 한 통화(currency)의 잔액에
 	 * 부호 있는 delta를 적용하고, 불변 원장(balance_after 스냅샷)을 같은 트랜잭션에 기록한다.

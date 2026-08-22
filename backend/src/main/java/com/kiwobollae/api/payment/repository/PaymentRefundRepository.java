@@ -35,4 +35,19 @@ public interface PaymentRefundRepository extends JpaRepository<PaymentRefund, Lo
 			@Param("refundKey") String refundKey,
 			@Param("completedAt") LocalDateTime completedAt
 	);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+			UPDATE PaymentRefund r
+			SET r.status = :targetStatus,
+			    r.completedAt = :completedAt
+			WHERE r.id = :refundId
+			  AND r.status = :expectedStatus
+			""")
+	int failIfCurrent(
+			@Param("refundId") Long refundId,
+			@Param("expectedStatus") PaymentRefundStatus expectedStatus,
+			@Param("targetStatus") PaymentRefundStatus targetStatus,
+			@Param("completedAt") LocalDateTime completedAt
+	);
 }

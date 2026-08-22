@@ -15,10 +15,12 @@ import com.kiwobollae.api.payment.dto.request.PaymentRefundRequest;
 import com.kiwobollae.api.payment.dto.response.PaymentRefundResponse;
 import com.kiwobollae.api.payment.entity.Payment;
 import com.kiwobollae.api.payment.entity.enums.PaymentProviderType;
+import com.kiwobollae.api.payment.entity.enums.PaymentRefundAttemptStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentRefundStatus;
 import com.kiwobollae.api.payment.entity.enums.PaymentStatus;
 import com.kiwobollae.api.payment.provider.PaymentProvider;
 import com.kiwobollae.api.payment.provider.PaymentRefundResult;
+import com.kiwobollae.api.payment.repository.PaymentRefundAttemptRepository;
 import com.kiwobollae.api.payment.repository.PaymentRefundRepository;
 import com.kiwobollae.api.payment.repository.PaymentRepository;
 import com.kiwobollae.api.point.entity.PointTransaction;
@@ -43,6 +45,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ActiveProfiles("test")
 @SpringBootTest(
@@ -67,6 +70,9 @@ class PaymentRefundServiceMySqlIntegrationTest {
 	private PaymentRefundRepository paymentRefundRepository;
 
 	@Autowired
+	private PaymentRefundAttemptRepository paymentRefundAttemptRepository;
+
+	@Autowired
 	private WalletRepository walletRepository;
 
 	@Autowired
@@ -88,8 +94,10 @@ class PaymentRefundServiceMySqlIntegrationTest {
 	void setUp() {
 		clearData();
 		given(paymentProvider.getType()).willReturn(PaymentProviderType.TOSS);
-		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any()))
-				.willReturn(PaymentRefundResult.success("integration-refund-key"));
+		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any())).willAnswer(invocation -> {
+			assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+			return PaymentRefundResult.success("integration-refund-key");
+		});
 
 		User user = userRepository.saveAndFlush(User.builder()
 				.email("payment-refund-integration@example.test")
@@ -132,10 +140,42 @@ class PaymentRefundServiceMySqlIntegrationTest {
 	private void clearData() {
 		idempotencyKeyRepository.deleteAllInBatch();
 		pointTransactionRepository.deleteAllInBatch();
+		paymentRefundAttemptRepository.deleteAllInBatch();
 		paymentRefundRepository.deleteAllInBatch();
 		paymentRepository.deleteAllInBatch();
 		walletRepository.deleteAllInBatch();
 		userRepository.deleteAllInBatch();
+	}
+
+	@Test
+	void definitiveProviderDeclineRestoresReservedPointAndSettlesAttempt() {
+		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any()))
+				.willReturn(PaymentRefundResult.failure("환불이 거절되었습니다."));
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> paymentRefundService.refund(
+				userId,
+				"refund-declined-key",
+				paymentId,
+				new PaymentRefundRequest("거절 복구 테스트")
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PAYMENT_DECLINED));
+
+		assertThat(paymentRepository.findById(paymentId).orElseThrow().getStatus())
+				.isEqualTo(PaymentStatus.COMPLETED);
+		assertThat(walletRepository.findByUserId(userId).orElseThrow().getPaidPoint()).isEqualTo(5_000L);
+		assertThat(paymentRefundRepository.findAll())
+				.singleElement()
+				.satisfies(refund -> assertThat(refund.getStatus()).isEqualTo(PaymentRefundStatus.FAILED));
+		assertThat(paymentRefundAttemptRepository.findAll())
+				.singleElement()
+				.satisfies(attempt -> assertThat(attempt.getStatus())
+						.isEqualTo(PaymentRefundAttemptStatus.SETTLED));
+		assertThat(pointTransactionRepository.findAll())
+				.extracting(PointTransaction::getType, PointTransaction::getAmount)
+				.containsExactlyInAnyOrder(
+						org.assertj.core.groups.Tuple.tuple(PointTxType.REFUND, -5_000L),
+						org.assertj.core.groups.Tuple.tuple(PointTxType.RESTORE, 5_000L)
+				);
 	}
 
 	void concurrentFullRefundsCompleteOnlyOnce() throws Exception {
@@ -175,23 +215,52 @@ class PaymentRefundServiceMySqlIntegrationTest {
 	}
 
 	@Test
-	void concurrentFullRefundsWithSameIdempotencyKeyReplaySameResponse() throws Exception {
-		CountDownLatch ready = new CountDownLatch(2);
-		CountDownLatch start = new CountDownLatch(1);
+	void concurrentSameIdempotencyKeyReturnsInProgressThenReplaysCompletedResponse() throws Exception {
+		CountDownLatch providerStarted = new CountDownLatch(1);
+		CountDownLatch releaseProvider = new CountDownLatch(1);
+		given(paymentProvider.refund(org.mockito.ArgumentMatchers.any())).willAnswer(invocation -> {
+			assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+			providerStarted.countDown();
+			if (!releaseProvider.await(WAIT_SECONDS, TimeUnit.SECONDS)) {
+				throw new IllegalStateException("Provider test release timed out");
+			}
+			return PaymentRefundResult.success("integration-refund-key");
+		});
 
-		List<PaymentRefundResponse> responses = runConcurrently(
-				refundResponseAttempt("refund-same-key", ready, start),
-				refundResponseAttempt("refund-same-key", ready, start),
-				ready,
-				start
-		);
+		ExecutorService executor = Executors.newSingleThreadExecutor();
+		try {
+			Future<PaymentRefundResponse> firstFuture = executor.submit(() -> paymentRefundService.refund(
+					userId,
+					"refund-same-key",
+					paymentId,
+					new PaymentRefundRequest("동시 환불 멱등성 테스트")
+			));
+			assertThat(providerStarted.await(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
 
-		assertThat(responses)
-				.extracting(PaymentRefundResponse::id)
-				.containsOnly(responses.getFirst().id());
-		assertThat(responses)
-				.extracting(PaymentRefundResponse::status)
-				.containsOnly(PaymentRefundStatus.COMPLETED);
+			org.assertj.core.api.Assertions.assertThatThrownBy(() -> paymentRefundService.refund(
+					userId,
+					"refund-same-key",
+					paymentId,
+					new PaymentRefundRequest("동시 환불 멱등성 테스트")
+			)).isInstanceOfSatisfying(BusinessException.class, exception ->
+					assertThat(exception.getErrorCode())
+							.isEqualTo(ErrorCode.COMMON_IDEMPOTENCY_IN_PROGRESS));
+
+			releaseProvider.countDown();
+			PaymentRefundResponse first = firstFuture.get(WAIT_SECONDS, TimeUnit.SECONDS);
+			PaymentRefundResponse replay = paymentRefundService.refund(
+					userId,
+					"refund-same-key",
+					paymentId,
+					new PaymentRefundRequest("동시 환불 멱등성 테스트")
+			);
+
+			assertThat(replay.id()).isEqualTo(first.id());
+			assertThat(replay.status()).isEqualTo(PaymentRefundStatus.COMPLETED);
+		} finally {
+			releaseProvider.countDown();
+			executor.shutdownNow();
+		}
 		assertThat(idempotencyKeyRepository.count()).isEqualTo(1L);
 		assertThat(paymentRefundRepository.count()).isEqualTo(1L);
 		assertThat(pointTransactionRepository.count()).isEqualTo(1L);
