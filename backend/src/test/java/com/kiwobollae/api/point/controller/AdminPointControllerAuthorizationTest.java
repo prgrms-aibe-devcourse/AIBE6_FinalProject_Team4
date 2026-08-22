@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kiwobollae.api.auth.entity.enums.UserStatus;
+import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentRequest;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentResponse;
@@ -17,6 +19,8 @@ import com.kiwobollae.api.point.service.AdminPointAdjustmentService;
 import com.kiwobollae.api.point.service.AdminPointAdjustmentHistoryService;
 import com.kiwobollae.api.point.service.WalletService;
 import java.time.LocalDateTime;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -49,6 +53,15 @@ class AdminPointControllerAuthorizationTest {
 
 	@MockitoBean
 	private AdminPointAdjustmentHistoryService adminPointAdjustmentHistoryService;
+
+	@MockitoBean
+	private UserRepository userRepository;
+
+	@BeforeEach
+	void setUpActiveUsers() {
+		given(userRepository.findStatusById(1L)).willReturn(Optional.of(UserStatus.ACTIVE));
+		given(userRepository.findStatusById(2L)).willReturn(Optional.of(UserStatus.ACTIVE));
+	}
 
 	@Test
 	void anonymousUserCannotAdjustPoint() throws Exception {
@@ -87,7 +100,7 @@ class AdminPointControllerAuthorizationTest {
 	void regularUserCannotViewAnotherUsersWallet() throws Exception {
 		String token = jwtTokenProvider.generateAccessToken(2L, "USER");
 
-		mockMvc.perform(get("/api/v1/admin/point/user/7/wallet")
+		mockMvc.perform(get("/api/v1/admin/points/user/7/wallet")
 						.header("Authorization", "Bearer " + token))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("AUTH_ACCESS_DENIED"));
@@ -100,7 +113,7 @@ class AdminPointControllerAuthorizationTest {
 				7L, 900L, 500L, 400L, LocalDateTime.of(2026, 8, 3, 10, 0)
 		));
 
-		mockMvc.perform(get("/api/v1/admin/point/user/7/wallet")
+		mockMvc.perform(get("/api/v1/admin/points/user/7/wallet")
 						.header("Authorization", "Bearer " + token))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.balance").value(900));
@@ -110,7 +123,7 @@ class AdminPointControllerAuthorizationTest {
 	void regularUserCannotViewAdminAdjustmentHistory() throws Exception {
 		String token = jwtTokenProvider.generateAccessToken(2L, "USER");
 
-		mockMvc.perform(get("/api/v1/admin/point/adjustments")
+		mockMvc.perform(get("/api/v1/admin/points/adjustments")
 						.header("Authorization", "Bearer " + token))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("AUTH_ACCESS_DENIED"));
@@ -128,14 +141,14 @@ class AdminPointControllerAuthorizationTest {
 				org.mockito.ArgumentMatchers.any()
 		)).willReturn(Page.empty());
 
-		mockMvc.perform(get("/api/v1/admin/point/adjustments")
+		mockMvc.perform(get("/api/v1/admin/points/adjustments")
 						.header("Authorization", "Bearer " + token))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content").isArray());
 	}
 
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request() throws Exception {
-		return post("/api/v1/admin/point/adjust")
+		return post("/api/v1/admin/points/adjust")
 				.header("Idempotency-Key", "adjust-key")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(adjustmentRequest()));

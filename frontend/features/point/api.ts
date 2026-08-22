@@ -150,7 +150,7 @@ export function adjustPointByAdmin(
   payload: AdminPointAdjustmentInput,
   idempotencyKey: string,
 ): Promise<AdminPointAdjustmentData> {
-  return request<AdminPointAdjustmentData>('/api/v1/admin/point/adjust', {
+  return request<AdminPointAdjustmentData>('/api/v1/admin/points/adjust', {
     method: 'POST',
     accessToken,
     headers: { 'Idempotency-Key': idempotencyKey },
@@ -162,7 +162,7 @@ export function getWalletByAdmin(
   accessToken: string,
   userId: number,
 ): Promise<WalletData> {
-  return request<WalletData>(`/api/v1/admin/point/user/${userId}/wallet`, {
+  return request<WalletData>(`/api/v1/admin/points/user/${userId}/wallet`, {
     accessToken,
   });
 }
@@ -186,7 +186,7 @@ export function getAdminPointAdjustments({
   if (to) query.set('to', to);
 
   return request<AdminPointAdjustmentHistoryPage>(
-    `/api/v1/admin/point/adjustments?${query.toString()}`,
+    `/api/v1/admin/points/adjustments?${query.toString()}`,
     { accessToken, signal },
   );
 }
