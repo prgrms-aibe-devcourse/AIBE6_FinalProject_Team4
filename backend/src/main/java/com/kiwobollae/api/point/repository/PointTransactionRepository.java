@@ -25,20 +25,6 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 			Long refId
 	);
 
-	/** 지갑별 원장 조회. type/기간은 null이면 미적용(선택 필터). 정렬·페이지는 Pageable로. */
-	@Query("""
-			SELECT pt FROM PointTransaction pt
-			WHERE pt.wallet.id = :walletId
-			  AND (:type IS NULL OR pt.type = :type)
-			  AND (:from IS NULL OR pt.createdAt >= :from)
-			  AND (:to IS NULL OR pt.createdAt < :to)
-			""")
-	Page<PointTransaction> search(@Param("walletId") Long walletId,
-			@Param("type") PointTxType type,
-			@Param("from") LocalDateTime from,
-			@Param("to") LocalDateTime to,
-			Pageable pageable);
-
 	@Query(
 			value = """
 					SELECT MAX(pt.id) AS id,
@@ -62,7 +48,10 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 					         pt.ref_type,
 					         pt.ref_id,
 					         CASE
-					             WHEN pt.ref_id IS NULL OR pt.type = 'ADMIN_ADJUST' THEN pt.id
+					             WHEN pt.ref_id IS NULL
+					                  OR pt.type = 'ADMIN_ADJUST'
+					                  OR pt.type IN ('MARKET_ESCROW', 'MARKET_RELEASE', 'MARKET_PURCHASE', 'MARKET_SALE')
+					             THEN pt.id
 					             ELSE 0
 					         END
 					ORDER BY createdAt DESC, id DESC
@@ -81,7 +70,10 @@ public interface PointTransactionRepository extends JpaRepository<PointTransacti
 					             pt.ref_type,
 					             pt.ref_id,
 					             CASE
-					                 WHEN pt.ref_id IS NULL OR pt.type = 'ADMIN_ADJUST' THEN pt.id
+					                 WHEN pt.ref_id IS NULL
+					                      OR pt.type = 'ADMIN_ADJUST'
+					                      OR pt.type IN ('MARKET_ESCROW', 'MARKET_RELEASE', 'MARKET_PURCHASE', 'MARKET_SALE')
+					                 THEN pt.id
 					                 ELSE 0
 					             END
 					) grouped_activity

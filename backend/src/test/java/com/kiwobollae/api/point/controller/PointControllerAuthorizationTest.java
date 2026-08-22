@@ -7,9 +7,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kiwobollae.api.auth.entity.enums.UserStatus;
+import com.kiwobollae.api.auth.repository.UserRepository;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
 import com.kiwobollae.api.point.service.PointTransactionService;
 import com.kiwobollae.api.point.service.WalletService;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +37,12 @@ class PointControllerAuthorizationTest {
 
 	@MockitoBean private WalletService walletService;
 	@MockitoBean private PointTransactionService pointTransactionService;
+	@MockitoBean private UserRepository userRepository;
+
+	@BeforeEach
+	void setUpActiveUser() {
+		given(userRepository.findStatusById(7L)).willReturn(Optional.of(UserStatus.ACTIVE));
+	}
 
 	@Test
 	void anonymousUserCannotViewPointActivities() throws Exception {
