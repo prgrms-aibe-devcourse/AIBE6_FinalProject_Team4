@@ -168,6 +168,13 @@ jobs:
               -e NAVER_REDIRECT_URI="${NAVER_REDIRECT_URI:-}" \
               -e TOSS_PAYMENTS_BASE_URL="${TOSS_PAYMENTS_BASE_URL:-https://api.tosspayments.com}" \
               -e TOSS_PAYMENTS_SECRET_KEY="${TOSS_PAYMENTS_SECRET_KEY:-}" \
+              -e TOSS_PAYMENTS_CONNECT_TIMEOUT=3s \
+              -e TOSS_PAYMENTS_READ_TIMEOUT=30s \
+              -e TOSS_PAYMENTS_RECONCILIATION_READ_TIMEOUT=5s \
+              -e TOSS_PAYMENTS_MAX_CONCURRENT_CALLS=10 \
+              -e TOSS_PAYMENTS_ACQUIRE_TIMEOUT=100ms \
+              -e TOSS_PAYMENTS_FAILURE_THRESHOLD=5 \
+              -e TOSS_PAYMENTS_CIRCUIT_OPEN_DURATION=30s \
               -e OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com}" \
               -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
               -e OPENAI_TEXT_MODEL="${OPENAI_TEXT_MODEL:-}" \
