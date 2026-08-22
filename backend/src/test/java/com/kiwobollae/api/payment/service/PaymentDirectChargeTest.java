@@ -57,7 +57,7 @@ class PaymentDirectChargeTest {
 	}
 
 	@Test
-	void requestChargeCreatesOneWonPerPointPaymentWithoutChargeProduct() throws Exception {
+	void requestChargeCreatesOneWonPerPointPayment() throws Exception {
 		User user = org.mockito.Mockito.mock(User.class);
 		IdempotencyKey idempotencyKey = org.mockito.Mockito.mock(IdempotencyKey.class);
 		ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
@@ -83,12 +83,9 @@ class PaymentDirectChargeTest {
 		);
 
 		Payment payment = paymentCaptor.getValue();
-		assertThat(payment.getChargeProductId()).isNull();
-		assertThat(payment.getChargeProductName()).isEqualTo("12,340P 충전");
 		assertThat(payment.getCashAmount()).isEqualTo(12_340L);
 		assertThat(payment.getPointAmount()).isEqualTo(12_340L);
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
-		assertThat(response.chargeProductId()).isNull();
 		assertThat(response.cashAmount()).isEqualTo(response.pointAmount());
 	}
 

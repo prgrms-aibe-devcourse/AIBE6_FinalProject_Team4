@@ -60,8 +60,6 @@ class PaymentControllerTest {
 		PaymentResponse response = new PaymentResponse(
 				21L,
 				7L,
-				null,
-				"12,340P 충전",
 				12_340L,
 				12_340L,
 				PaymentStatus.PENDING,
@@ -82,7 +80,6 @@ class PaymentControllerTest {
 								{"pointAmount":12340}
 								"""))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.data.chargeProductId").doesNotExist())
 				.andExpect(jsonPath("$.data.cashAmount").value(12340))
 				.andExpect(jsonPath("$.data.pointAmount").value(12340));
 
@@ -174,8 +171,6 @@ class PaymentControllerTest {
 		PaymentResponse response = new PaymentResponse(
 				21L,
 				7L,
-				3L,
-				"1,000P 충전",
 				1_000L,
 				1_000L,
 				PaymentStatus.FAILED,

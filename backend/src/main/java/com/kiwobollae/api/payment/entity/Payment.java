@@ -14,7 +14,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
@@ -37,7 +36,7 @@ import lombok.NoArgsConstructor;
 		},
 		check = {
 				@CheckConstraint(name = "ck_payments_direct_charge_amount",
-						constraint = "charge_product_id is not null or (cash_amount = point_amount and cash_amount between 1000 and 300000 and mod(cash_amount, 10) = 0)")
+						constraint = "cash_amount = point_amount and cash_amount between 1000 and 300000 and mod(cash_amount, 10) = 0")
 		})
 // JPA Auditing에 더해 Asia/Seoul DB 세션 기준 ON UPDATE 안전망(공용 BaseTimeEntity는 건드리지 않고 override).
 @AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false,
@@ -50,14 +49,6 @@ public class Payment extends BaseTimeEntity {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "user_id", nullable = false)
 	private User user;
-
-	// 기존 정액 충전 상품으로 생성된 결제 이력을 식별하기 위한 legacy 참조다.
-	// 신규 직접 충전 결제에는 null을 저장하며 애플리케이션에서는 엔티티 연관으로 사용하지 않는다.
-	@Column(name = "charge_product_id")
-	private Long chargeProductId;
-
-	@Column(name = "charge_product_name", nullable = false, length = 50)
-	private String chargeProductName;
 
 	@Column(name = "cash_amount", nullable = false)
 	private Long cashAmount;
@@ -83,10 +74,4 @@ public class Payment extends BaseTimeEntity {
 	@Column(name = "approved_at")
 	private LocalDateTime approvedAt;
 
-	@PrePersist
-	private void ensureChargeProductNameSnapshot() {
-		if ((chargeProductName == null || chargeProductName.isBlank()) && pointAmount != null) {
-			chargeProductName = String.format("%,dP 충전", pointAmount);
-		}
-	}
 }

@@ -70,8 +70,6 @@ public class PaymentService {
 
 		Payment payment = Payment.builder()
 				.user(user)
-				.chargeProductId(null)
-				.chargeProductName(createChargeName(request.pointAmount()))
 				.cashAmount(request.pointAmount())
 				.pointAmount(request.pointAmount())
 				.status(PaymentStatus.PENDING)
@@ -195,10 +193,6 @@ public class PaymentService {
 				|| pointAmount % CHARGE_AMOUNT_UNIT != 0) {
 			throw new BusinessException(ErrorCode.PAYMENT_CHARGE_AMOUNT_INVALID);
 		}
-	}
-
-	private String createChargeName(Long pointAmount) {
-		return String.format("%,dP 충전", pointAmount);
 	}
 
 	private String sha256(String value) {

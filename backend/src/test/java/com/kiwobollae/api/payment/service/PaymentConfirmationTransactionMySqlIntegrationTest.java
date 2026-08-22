@@ -77,8 +77,6 @@ class PaymentConfirmationTransactionMySqlIntegrationTest {
 
 		paymentRepository.saveAndFlush(Payment.builder()
 				.user(user)
-				.chargeProductId(null)
-				.chargeProductName("5,000P 충전")
 				.cashAmount(5_000L)
 				.pointAmount(5_000L)
 				.status(PaymentStatus.PENDING)

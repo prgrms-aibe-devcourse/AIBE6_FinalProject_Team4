@@ -114,8 +114,6 @@ class PaymentConfirmationTransactionServiceTest {
 		given(payment.getId()).willReturn(21L);
 		given(payment.getUser()).willReturn(user);
 		given(user.getId()).willReturn(7L);
-		given(payment.getChargeProductId()).willReturn(null);
-		given(payment.getChargeProductName()).willReturn("5,000P 충전");
 		given(payment.getCashAmount()).willReturn(5_000L);
 		given(payment.getPointAmount()).willReturn(5_000L);
 		given(payment.getStatus()).willReturn(status);

@@ -13,8 +13,6 @@ app:
       enabled: true
     gacha-pack:
       enabled: true
-    charge-product:
-      enabled: true
     product:
       enabled: true
     card:

@@ -22,8 +22,6 @@ class PaymentResponseJsonTest {
 		PaymentResponse response = new PaymentResponse(
 				1L,
 				2L,
-				3L,
-				"1,000P 충전",
 				1_000L,
 				1_000L,
 				PaymentStatus.PENDING,

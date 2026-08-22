@@ -35,21 +35,41 @@ class PaymentDirectChargeSchemaMySqlIntegrationTest {
 	@Autowired private PaymentRepository paymentRepository;
 
 	@Test
-	void directChargeColumnsAllowNoProductAndRequireSnapshotName() {
-		assertThat(columnNullable("charge_product_id")).isEqualTo("YES");
-		assertThat(columnNullable("charge_product_name")).isEqualTo("NO");
+	void directChargeSchemaHasNoChargeProductTableOrColumns() {
+		assertThat(tableExists("charge_products")).isFalse();
+		assertThat(columnExists("charge_product_id")).isFalse();
+		assertThat(columnExists("charge_product_name")).isFalse();
+		assertThat(directChargeCheckClause()).doesNotContain("charge_product");
 	}
 
 	@Test
-	void directChargeReferenceMigrationCanRunOnCurrentSchema() {
-		ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
-				new ClassPathResource("db/reference/migrations/20260821-payment-direct-charge.sql")
-		);
+	void chargeProductCleanupMigrationCanRunOnCurrentSchema() {
+		runCleanupMigration();
 
-		populator.execute(dataSource);
+		assertThat(tableExists("charge_products")).isFalse();
+		assertThat(columnExists("charge_product_id")).isFalse();
+		assertThat(columnExists("charge_product_name")).isFalse();
+		assertThat(directChargeCheckClause()).doesNotContain("charge_product");
+	}
 
-		assertThat(columnNullable("charge_product_id")).isEqualTo("YES");
-		assertThat(columnNullable("charge_product_name")).isEqualTo("NO");
+	@Test
+	void chargeProductCleanupMigrationRemovesLegacyForeignKeyColumnsAndTable() {
+		runCleanupMigration();
+		jdbcTemplate.execute("CREATE TABLE charge_products (id bigint NOT NULL PRIMARY KEY)");
+		jdbcTemplate.execute("""
+				ALTER TABLE payments
+				    ADD COLUMN charge_product_id bigint NULL,
+				    ADD COLUMN charge_product_name varchar(50) NULL,
+				    ADD CONSTRAINT fk_payments_charge_product_cleanup_test
+				        FOREIGN KEY (charge_product_id) REFERENCES charge_products(id)
+				""");
+
+		runCleanupMigration();
+
+		assertThat(tableExists("charge_products")).isFalse();
+		assertThat(columnExists("charge_product_id")).isFalse();
+		assertThat(columnExists("charge_product_name")).isFalse();
+		assertThat(directChargeCheckClause()).doesNotContain("charge_product");
 	}
 
 	@Test
@@ -57,7 +77,6 @@ class PaymentDirectChargeSchemaMySqlIntegrationTest {
 		User user = saveUser();
 		Payment saved = paymentRepository.saveAndFlush(payment(user, 12_340L, 12_340L));
 
-		assertThat(saved.getChargeProductId()).isNull();
 		assertThat(saved.getCashAmount()).isEqualTo(saved.getPointAmount());
 		assertThatThrownBy(() -> paymentRepository.saveAndFlush(payment(user, 2_801L, 2_801L)))
 				.isInstanceOf(DataIntegrityViolationException.class);
@@ -79,8 +98,6 @@ class PaymentDirectChargeSchemaMySqlIntegrationTest {
 	private Payment payment(User user, Long cashAmount, Long pointAmount) {
 		return Payment.builder()
 				.user(user)
-				.chargeProductId(null)
-				.chargeProductName("직접 충전")
 				.cashAmount(cashAmount)
 				.pointAmount(pointAmount)
 				.status(PaymentStatus.PENDING)
@@ -89,17 +106,48 @@ class PaymentDirectChargeSchemaMySqlIntegrationTest {
 				.build();
 	}
 
-	private String columnNullable(String columnName) {
+	private boolean tableExists(String tableName) {
 		return jdbcTemplate.queryForObject(
 				"""
-						SELECT IS_NULLABLE
+						SELECT COUNT(*) > 0
+						FROM information_schema.tables
+						WHERE table_schema = DATABASE()
+						  AND table_name = ?
+						""",
+				Boolean.class,
+				tableName
+		);
+	}
+
+	private boolean columnExists(String columnName) {
+		return jdbcTemplate.queryForObject(
+				"""
+						SELECT COUNT(*) > 0
 						FROM information_schema.columns
 						WHERE table_schema = DATABASE()
 						  AND table_name = 'payments'
 						  AND column_name = ?
 						""",
-				String.class,
+				Boolean.class,
 				columnName
 		);
+	}
+
+	private String directChargeCheckClause() {
+		return jdbcTemplate.queryForObject(
+				"""
+						SELECT LOWER(check_clause)
+						FROM information_schema.check_constraints
+						WHERE constraint_schema = DATABASE()
+						  AND constraint_name = 'ck_payments_direct_charge_amount'
+						""",
+				String.class
+		);
+	}
+
+	private void runCleanupMigration() {
+		new ResourceDatabasePopulator(
+				new ClassPathResource("db/reference/migrations/20260822-remove-charge-products.sql")
+		).execute(dataSource);
 	}
 }

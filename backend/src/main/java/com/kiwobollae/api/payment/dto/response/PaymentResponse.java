@@ -8,8 +8,6 @@ import java.time.LocalDateTime;
 public record PaymentResponse(
 		Long id,
 		Long userId,
-		Long chargeProductId,
-		String chargeProductName,
 		Long cashAmount,
 		Long pointAmount,
 		PaymentStatus status,
@@ -28,8 +26,6 @@ public record PaymentResponse(
 		return new PaymentResponse(
 				payment.getId(),
 				payment.getUser().getId(),
-				payment.getChargeProductId(),
-				payment.getChargeProductName(),
 				payment.getCashAmount(),
 				payment.getPointAmount(),
 				payment.getStatus(),

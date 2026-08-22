@@ -167,7 +167,9 @@ export default function Payments() {
               <div key={payment.id} className="rounded-2xl bg-white px-5 py-[18px] shadow-card">
                 <div className="flex flex-wrap items-center gap-3.5">
                   <div className="min-w-[160px] flex-1">
-                    <div className="font-extrabold">{payment.chargeProductName}</div>
+                    <div className="font-extrabold">
+                      {fmt(payment.pointAmount)}P 충전
+                    </div>
                     <div className="mt-[3px] text-[13px] text-sub">
                       {formatDate(payment.createdAt)} · {fmt(payment.cashAmount)}원 ·{' '}
                       {fmt(payment.pointAmount)}P

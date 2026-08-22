@@ -40,8 +40,6 @@ vi.mock("@/lib/store", () => ({
 const pendingPayment = {
   id: 91,
   userId: 7,
-  chargeProductId: null,
-  chargeProductName: "12,340P 충전",
   cashAmount: 12_340,
   pointAmount: 12_340,
   status: "PENDING" as const,

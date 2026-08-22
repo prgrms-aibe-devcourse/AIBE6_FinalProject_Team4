@@ -98,7 +98,7 @@ export default function Charge() {
       await requestTossPayment({
         clientKey: tossClientKey,
         orderId: pendingPayment.providerOrderId,
-        orderName: pendingPayment.chargeProductName,
+        orderName: `${fmt(pendingPayment.pointAmount)}P 충전`,
         amount: pendingPayment.cashAmount,
         customerEmail: state.user?.email,
         customerName: state.user?.nickname,

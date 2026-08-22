@@ -6,8 +6,6 @@ export type PaymentStatus =
 export interface PaymentData {
   id: number;
   userId: number;
-  chargeProductId?: number | null;
-  chargeProductName: string;
   cashAmount: number;
   pointAmount: number;
   status: PaymentStatus;
