@@ -95,6 +95,46 @@ describe("point activity presentation", () => {
     ).toContain("사유 기록 없음");
   });
 
+  it("카드 거래소 포인트 이벤트를 종류별 문구로 설명한다", () => {
+    const escrow = activity({
+      type: "MARKET_ESCROW",
+      refType: "MARKET_OFFER",
+      amount: -900,
+      paidAmount: -900,
+      freeAmount: 0,
+    });
+    const release = activity({
+      type: "MARKET_RELEASE",
+      refType: "MARKET_OFFER",
+      amount: 900,
+      paidAmount: 900,
+      freeAmount: 0,
+    });
+    const purchase = activity({
+      type: "MARKET_PURCHASE",
+      refType: "MARKET_TRADE",
+      amount: -1000,
+      paidAmount: -1000,
+      freeAmount: 0,
+    });
+    const sale = activity({
+      type: "MARKET_SALE",
+      refType: "MARKET_TRADE",
+      amount: 800,
+      paidAmount: 800,
+      freeAmount: 0,
+    });
+
+    expect(getPointActivityTitle(escrow)).toBe("거래소 제안 포인트 보관");
+    expect(getPointActivityDescription(escrow)).toContain("거래 완료 전까지");
+    expect(getPointActivityTitle(release)).toBe("거래소 보관 포인트 반환");
+    expect(getPointActivityDescription(release)).toContain("돌아왔어요");
+    expect(getPointActivityTitle(purchase)).toBe("카드 거래소 구매");
+    expect(getPointActivityDescription(purchase)).toContain("구매에");
+    expect(getPointActivityTitle(sale)).toBe("카드 거래소 판매 정산");
+    expect(getPointActivityDescription(sale)).toContain("거래 수수료");
+  });
+
   it("거래 출처에 맞는 관련 내역 링크를 제공한다", () => {
     expect(
       getPointActivityLink(activity({ refType: "ORDER", refId: 10 })),
@@ -129,6 +169,18 @@ describe("point activity presentation", () => {
     ).toEqual({
       href: "/journals",
       label: "성장일지 보기",
+    });
+    expect(
+      getPointActivityLink(activity({ refType: "MARKET_OFFER", refId: 21 })),
+    ).toEqual({
+      href: "/card-market/negotiations/21",
+      label: "가격 협상 보기",
+    });
+    expect(
+      getPointActivityLink(activity({ refType: "MARKET_TRADE", refId: 31 })),
+    ).toEqual({
+      href: "/card-market?view=trades",
+      label: "거래 내역 보기",
     });
   });
 });
