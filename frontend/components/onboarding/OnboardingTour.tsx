@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/store";
 import { useSpotlightTour } from "@/lib/onboarding/useSpotlightTour";
+import { dispatchTourHighlight } from "@/lib/onboarding/tourHighlightEvent";
 import SpotlightTour, { TourStep } from "./SpotlightTour";
 
 // 데스크톱 상단 NAV(Navbar.tsx의 NAV, 8개) 기준 — 각 항목에 data-tour-id={key}가 붙어있다.
@@ -121,6 +122,18 @@ export default function OnboardingTour() {
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // 현재 스텝이 가리키는 data-tour-id를 Navbar에 알려, 드롭다운 그룹(내 식물/가챠) 안에
+  // 있는 항목이면 Navbar가 그 그룹을 자동으로 펼치게 한다. 투어가 닫히면 null을 보내
+  // 강제로 펼쳤던 드롭다운을 닫는다.
+  useEffect(() => {
+    const targetId = tour.open ? steps[tour.stepIndex]?.targetId ?? null : null;
+    dispatchTourHighlight(targetId);
+  }, [tour.open, tour.stepIndex, steps]);
+
+  useEffect(() => {
+    return () => dispatchTourHighlight(null);
   }, []);
 
   // 뷰포트가 바뀌면(리사이즈로 데스크톱↔모바일 스텝 배열이 바뀌면) 진행 중이던 스텝 길이가

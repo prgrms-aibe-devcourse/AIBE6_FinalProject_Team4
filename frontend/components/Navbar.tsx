@@ -14,6 +14,7 @@ import {
   grantLocalTestGachaCard,
 } from '@/lib/gacha-api';
 import { ApiError } from '@/lib/api';
+import { TOUR_HIGHLIGHT_EVENT, TourHighlightDetail } from '@/lib/onboarding/tourHighlightEvent';
 
 const SHOW_LOCAL_GACHA_TEST_CONTROLS = process.env.NODE_ENV !== 'production';
 
@@ -82,6 +83,17 @@ const AUTH_GATE_MESSAGE: Record<string, string> = {
   account: '마이페이지는 로그인 후 이용할 수 있어요.',
 };
 
+// 온보딩 투어가 강조하려는 data-tour-id가 드롭다운 그룹 안에 있으면, 그 그룹의 key를
+// 반환한다(그룹 트리거 자신의 key인 items[0].key가 넘어온 경우도 같은 그룹으로 처리).
+function findGroupKeyForTargetId(targetId: string): string | null {
+  for (const n of NAV) {
+    if (n.type === 'group' && n.items.some((item) => item.key === targetId)) {
+      return n.key;
+    }
+  }
+  return null;
+}
+
 function activeKey(pathname: string) {
   if (pathname === '/') return 'home';
   if (pathname.startsWith('/plants')) return 'plants';
@@ -127,6 +139,17 @@ export default function Navbar() {
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, [bellOpen, profileOpen, openNavGroup]);
+
+  // 온보딩 투어가 드롭다운 그룹 안의 항목(일지/거래소)을 강조할 차례가 되면, 마우스 호버
+  // 없이도 그 그룹을 펼쳐서 스포트라이트가 실제 타겟을 찾을 수 있게 한다.
+  useEffect(() => {
+    const onTourHighlight = (e: Event) => {
+      const targetId = (e as CustomEvent<TourHighlightDetail>).detail;
+      setOpenNavGroup(targetId ? findGroupKeyForTargetId(targetId) : null);
+    };
+    window.addEventListener(TOUR_HIGHLIGHT_EVENT, onTourHighlight);
+    return () => window.removeEventListener(TOUR_HIGHLIGHT_EVENT, onTourHighlight);
+  }, []);
 
   const openNotif = (n: NotificationData) => {
     setBellOpen(false);
