@@ -46,12 +46,20 @@ export default function (data) {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
-      'Idempotency-Key': `${Date.now()}-${__VU}-${__ITER}`,
+      // sleep 없이 초당 수백 회 도는 spike 시나리오라 Date.now()만으로는 같은 밀리초에 충돌할 수
+      // 있어 난수를 더한다.
+      'Idempotency-Key': `${Date.now()}-${__VU}-${__ITER}-${Math.random()}`,
     },
   });
 
   check(res, {
-    // 포인트 부족(잔액 소진)은 서버 오류가 아니라 테스트 데이터 한계이므로 별도로 구분해서 봐야 함
     'status is 200/201': (r) => r.status === 200 || r.status === 201,
+  });
+  check(res, {
+    // 422 POINT_INSUFFICIENT_BALANCE는 서버 오류가 아니라 테스트 계정 잔액 소진에 따른 정상
+    // 비즈니스 거절이므로 별도 체크로 분리해서 관찰한다 (위 체크는 실패로 잡히는 게 맞음 — 실행
+    // 결과 요약에서 이 체크와 함께 보고 실제 장애인지 잔액 소진인지 구분한다).
+    'status is 200/201/422(insufficient balance)': (r) =>
+      r.status === 200 || r.status === 201 || r.status === 422,
   });
 }

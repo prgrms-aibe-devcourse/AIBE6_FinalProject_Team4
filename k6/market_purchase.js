@@ -47,7 +47,7 @@ export default function (data) {
     {
       headers: {
         Authorization: `Bearer ${token}`,
-        'Idempotency-Key': `${Date.now()}-${__VU}-${__ITER}`,
+        'Idempotency-Key': `${Date.now()}-${__VU}-${__ITER}-${Math.random()}`,
       },
     },
   );

@@ -397,13 +397,23 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
             <div className="text-[15px] text-sub">타임랩스를 만들고 있어요. 완료되면 알림으로 알려드릴게요</div>
           )}
           {timelapse.status === 'COMPLETED' && timelapse.videoUrl && (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video
-              key={timelapse.videoUrl}
-              src={resolveImageUrl(timelapse.videoUrl)}
-              controls
-              className="w-full max-w-[400px] rounded-[14px]"
-            />
+            <div>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <video
+                key={timelapse.videoUrl}
+                src={resolveImageUrl(timelapse.videoUrl)}
+                controls
+                className="w-full max-w-[400px] rounded-[14px]"
+              />
+              <button
+                type="button"
+                onClick={handleRequestTimelapse}
+                disabled={timelapseRequesting}
+                className="mt-3 cursor-pointer rounded-[11px] bg-brand px-[18px] py-[11px] font-bold text-white disabled:opacity-60"
+              >
+                {timelapseRequesting ? '요청 중...' : '다시 만들기'}
+              </button>
+            </div>
           )}
           {timelapse.status === 'FAILED' && (
             <div>

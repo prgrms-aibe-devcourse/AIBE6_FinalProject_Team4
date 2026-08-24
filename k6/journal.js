@@ -24,24 +24,23 @@ const EMAIL = __ENV.TEST_EMAIL || 'loadtest@example.com';
 const PASSWORD = __ENV.TEST_PASSWORD || 'password123!';
 const PLANT_PROFILE_ID = Number(__ENV.PLANT_PROFILE_ID || 1);
 
-// TODO: 더미 데이터 세팅 완료 후 실제 S3에 존재하는 이미지 URL/해시로 교체
-const SAMPLE_IMAGE = {
-  imageUrl:
-    __ENV.SAMPLE_IMAGE_URL ||
-    'https://example-bucket.s3.ap-northeast-2.amazonaws.com/journals/sample.jpg',
-  imageHash: __ENV.SAMPLE_IMAGE_HASH || 'sample-hash-0001',
-  representative: true,
-};
+// TODO: 더미 데이터 세팅 완료 후 실제 S3에 존재하는 이미지 URL로 교체
+const SAMPLE_IMAGE_URL =
+  __ENV.SAMPLE_IMAGE_URL ||
+  'https://example-bucket.s3.ap-northeast-2.amazonaws.com/journals/sample.jpg';
 
 export function setup() {
   return { accessToken: login(EMAIL, PASSWORD) };
 }
 
 export default function (data) {
+  // imageHash가 같은 날 중복이면 JOURNAL_DUPLICATE_IMAGE(422)로 거부되므로 요청마다 유니크하게 생성
+  const uniqueHash = `k6-${Date.now()}-${__VU}-${__ITER}`;
+
   const payload = JSON.stringify({
     plantProfileId: PLANT_PROFILE_ID,
     content: `k6 load test journal ${Date.now()}-${__VU}-${__ITER}`,
-    images: [SAMPLE_IMAGE],
+    images: [{ imageUrl: SAMPLE_IMAGE_URL, imageHash: uniqueHash, representative: true }],
   });
 
   const res = http.post(`${BASE_URL}/api/v1/journals`, payload, {
