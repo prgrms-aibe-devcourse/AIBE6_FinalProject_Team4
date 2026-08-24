@@ -11,7 +11,10 @@ import { useSpotlightTour } from "@/lib/onboarding/useSpotlightTour";
 import { dispatchTourHighlight } from "@/lib/onboarding/tourHighlightEvent";
 import SpotlightTour, { TourStep } from "./SpotlightTour";
 
-// 데스크톱 상단 NAV(Navbar.tsx의 NAV, 8개) 기준 — 각 항목에 data-tour-id={key}가 붙어있다.
+// 데스크톱 상단 NAV(Navbar.tsx의 NAV) 기준 — 홈 버튼은 데스크톱에서 삭제되어 투어에서도
+// 제외한다. plantGroup/gachaGroup은 개별 하위 항목이 아니라 그룹 자체를 targetId로 삼아,
+// 드롭다운을 연 채로 트리거+패널 전체를 한 번에 스포트라이트한다(Navbar.tsx 참고).
+// 스텝 순서도 NAV 배열 순서(내 식물 → 상점 → 쿠폰 → 가챠 → 커뮤니티)와 동일하게 맞춘다.
 const TOUR_STEPS_DESKTOP: TourStep[] = [
   {
     targetId: null,
@@ -19,19 +22,9 @@ const TOUR_STEPS_DESKTOP: TourStep[] = [
     description: "키워볼래가 처음이시죠? 위쪽 메뉴를 하나씩 소개해드릴게요.",
   },
   {
-    targetId: "home",
-    title: "홈",
-    description: "오늘의 포인트, 일지, 식물 현황을 한눈에 볼 수 있어요.",
-  },
-  {
-    targetId: "plants",
+    targetId: "plantGroup",
     title: "내 식물",
-    description: "반려 식물을 등록하고 성장 상태를 관리해요.",
-  },
-  {
-    targetId: "journal",
-    title: "일지",
-    description: "매일 식물의 모습을 기록하면 포인트를 받아요.",
+    description: "반려 식물을 등록하고 성장 상태를 관리하거나, 매일의 모습을 일지로 기록해요.",
   },
   {
     targetId: "shop",
@@ -44,19 +37,14 @@ const TOUR_STEPS_DESKTOP: TourStep[] = [
     description: "포인트로 쿠폰을 구매하고 실제 농작물로 교환해요.",
   },
   {
-    targetId: "gacha",
+    targetId: "gachaGroup",
     title: "가챠",
-    description: "카드팩을 열어 카드를 모으고 도감을 완성해보세요.",
+    description: "카드팩을 열어 카드를 모으거나, 보유한 카드를 다른 사용자와 거래해요.",
   },
   {
     targetId: "board",
     title: "커뮤니티",
     description: "다른 사용자들과 식물 이야기를 나눠보세요.",
-  },
-  {
-    targetId: "market",
-    title: "거래소",
-    description: "보유한 카드를 다른 사용자와 거래할 수 있어요.",
   },
 ];
 

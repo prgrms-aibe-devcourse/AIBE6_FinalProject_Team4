@@ -27,15 +27,25 @@ export default function SpotlightTour({
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const findVisibleRect = useCallback((targetId: string): DOMRect | null => {
-    // 같은 data-tour-id를 가진 요소가 데스크톱/모바일 버전으로 동시에 DOM에 있을 수 있다
-    // (Tailwind hidden/md:hidden으로 화면에서만 안 보이게 하는 패턴) — querySelector는 먼저
-    // 나오는 요소를 집어서 숨겨진 쪽의 0 근처 좌표를 잘못 가리킬 수 있으므로, 실제로 화면에
-    // 보이는(너비/높이가 있는) 요소를 찾는다.
+    // 같은 data-tour-id를 가진 요소가 여러 개 동시에 화면에 있을 수 있다 — 데스크톱/모바일
+    // 버전이 Tailwind hidden/md:hidden으로 한쪽만 보이는 경우(이때는 보이는 것 하나만 잡힘),
+    // 또는 드롭다운 그룹의 트리거 링크와 펼쳐진 패널처럼 같은 targetId를 공유하며 둘 다 실제로
+    // 보이는 경우(이때는 두 요소를 감싸는 사각형이 되어야 스포트라이트가 드롭다운 전체를
+    // 덮는다). 그래서 너비/높이가 있는(실제로 보이는) 요소를 전부 모아 하나로 합친다.
     const candidates = document.querySelectorAll(`[data-tour-id="${targetId}"]`);
     let visibleRect: DOMRect | null = null;
     candidates.forEach((el) => {
       const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0) visibleRect = r;
+      if (r.width === 0 || r.height === 0) return;
+      if (!visibleRect) {
+        visibleRect = r;
+        return;
+      }
+      const left = Math.min(visibleRect.left, r.left);
+      const top = Math.min(visibleRect.top, r.top);
+      const right = Math.max(visibleRect.right, r.right);
+      const bottom = Math.max(visibleRect.bottom, r.bottom);
+      visibleRect = new DOMRect(left, top, right - left, bottom - top);
     });
     return visibleRect;
   }, []);
@@ -55,24 +65,22 @@ export default function SpotlightTour({
     return () => window.removeEventListener("resize", updateRect);
   }, [updateRect]);
 
-  // 드롭다운 그룹(예: 일지/거래소) 안의 항목은 Navbar가 온보딩 이벤트를 받아 비동기로 펼친
-  // 뒤에야 DOM에 나타난다. 위 updateRect의 첫 시도는 아직 못 찾을 수 있으므로, 짧게(최대
-  // 10프레임) 재시도해 타겟이 나타나면 그 즉시 좌표를 잡는다.
+  // 드롭다운 그룹(예: 내 식물/가챠)을 가리키는 스텝은 트리거 링크가 항상 먼저 보이고,
+  // Navbar가 온보딩 이벤트를 받아 펼친 패널은 한 박자 늦게 DOM에 나타난다. 그래서 "못 찾았을
+  // 때만 재시도"로는 안 되고(트리거만으로도 이미 "찾음" 처리돼버림), 스텝이 바뀔 때마다 짧게
+  // (최대 10프레임) 계속 다시 측정해 패널이 늦게 나타나도 합쳐진 사각형으로 갱신되게 한다.
   useEffect(() => {
     const step = steps[stepIndex];
-    if (!step?.targetId || findVisibleRect(step.targetId)) return;
+    if (!step?.targetId) return;
+    const targetId = step.targetId;
     let frame = 0;
     let rafId: number;
-    const tryFind = () => {
-      const found = findVisibleRect(step.targetId as string);
-      if (found) {
-        setRect(found);
-        return;
-      }
+    const tick = () => {
+      setRect(findVisibleRect(targetId));
       frame += 1;
-      if (frame < 10) rafId = requestAnimationFrame(tryFind);
+      if (frame < 10) rafId = requestAnimationFrame(tick);
     };
-    rafId = requestAnimationFrame(tryFind);
+    rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
   }, [steps, stepIndex, findVisibleRect]);
 
