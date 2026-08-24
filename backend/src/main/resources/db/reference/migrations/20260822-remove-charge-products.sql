@@ -7,11 +7,13 @@
 SET @invalid_direct_charge_payment_rows = (
     SELECT COUNT(*)
     FROM payments
-    WHERE (
-        cash_amount = point_amount
-        AND cash_amount BETWEEN 1000 AND 300000
-        AND MOD(cash_amount, 10) = 0
-    ) IS FALSE
+    WHERE cash_amount IS NULL
+       OR point_amount IS NULL
+       OR (
+           cash_amount = point_amount
+           AND cash_amount BETWEEN 1000 AND 300000
+           AND MOD(cash_amount, 10) = 0
+       ) IS FALSE
 );
 
 SELECT @invalid_direct_charge_payment_rows AS invalid_direct_charge_payment_rows;
@@ -136,8 +138,10 @@ DEALLOCATE PREPARE add_direct_charge_check_statement;
 --   AND column_name IN ('charge_product_id', 'charge_product_name');
 -- SELECT COUNT(*) AS invalid_payment_rows
 -- FROM payments
--- WHERE (
---     cash_amount = point_amount
---     AND cash_amount BETWEEN 1000 AND 300000
---     AND MOD(cash_amount, 10) = 0
--- ) IS FALSE;
+-- WHERE cash_amount IS NULL
+--    OR point_amount IS NULL
+--    OR (
+--        cash_amount = point_amount
+--        AND cash_amount BETWEEN 1000 AND 300000
+--        AND MOD(cash_amount, 10) = 0
+--    ) IS FALSE;
