@@ -1,5 +1,6 @@
 package com.kiwobollae.api.inquiry.controller;
 
+import com.kiwobollae.api.global.common.AdminPageableSupport;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.inquiry.dto.request.InquiryAnswerRequest;
@@ -39,9 +40,11 @@ public class AdminInquiryController {
 	@GetMapping
 	public ResponseEntity<ApiResponse<Page<InquiryResponse>>> getInquiries(
 			@RequestParam(required = false) InquiryStatus status,
+			@RequestParam(required = false) Integer size,
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success(inquiryService.getInquiriesForAdmin(status, pageable)));
+		return ResponseEntity.ok(ApiResponse.success(inquiryService.getInquiriesForAdmin(
+				status, AdminPageableSupport.withUncappedSize(size, pageable))));
 	}
 
 	@Operation(summary = "문의 답변", description = "문의에 답변을 등록합니다. 답변과 동시에 종료 처리됩니다.")

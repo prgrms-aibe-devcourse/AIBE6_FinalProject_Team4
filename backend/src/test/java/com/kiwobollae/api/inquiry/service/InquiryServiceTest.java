@@ -9,6 +9,7 @@ import com.kiwobollae.api.inquiry.dto.response.InquiryResponse;
 import com.kiwobollae.api.inquiry.entity.Inquiry;
 import com.kiwobollae.api.inquiry.entity.enums.InquiryCategory;
 import com.kiwobollae.api.inquiry.repository.InquiryRepository;
+import com.kiwobollae.api.notification.service.NotificationService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ class InquiryServiceTest {
 
 	@Mock private InquiryRepository inquiryRepository;
 	@Mock private UserRepository userRepository;
+	@Mock private NotificationService notificationService;
 
 	@InjectMocks
 	private InquiryService inquiryService;

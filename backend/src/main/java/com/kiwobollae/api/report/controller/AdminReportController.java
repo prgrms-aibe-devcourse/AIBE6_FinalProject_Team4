@@ -1,5 +1,6 @@
 package com.kiwobollae.api.report.controller;
 
+import com.kiwobollae.api.global.common.AdminPageableSupport;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.report.dto.request.ReportActionRequest;
@@ -40,9 +41,11 @@ public class AdminReportController {
 	public ResponseEntity<ApiResponse<Page<ReportResponse>>> getReports(
 			@RequestParam(required = false) ReportStatus status,
 			@RequestParam(required = false) Long targetUserId,
+			@RequestParam(required = false) Integer size,
 			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success(reportService.getReportsForAdmin(status, targetUserId, pageable)));
+		return ResponseEntity.ok(ApiResponse.success(reportService.getReportsForAdmin(
+				status, targetUserId, AdminPageableSupport.withUncappedSize(size, pageable))));
 	}
 
 	@Operation(summary = "신고 완료 처리", description = "신고를 검토해 조치를 완료 처리합니다.")

@@ -225,8 +225,8 @@ export default function GachaWorkshop({
                   <span className="rounded-full bg-[#edf3e9] px-3 py-1 text-xs font-black text-brand">
                     {cosmetic.type === "TITLE" ? "칭호" : "프로필 테두리"}
                   </span>
-                  <span className="font-black text-[#8b6b16]">
-                    {cosmetic.price} ✦
+                  <span className="flex items-center gap-0.5 font-black text-[#8b6b16]">
+                    {cosmetic.price} <span className="material-symbols-outlined text-sm">toll</span>
                   </span>
                 </div>
                 <h4 className="mt-5 text-lg font-black">{cosmetic.name}</h4>

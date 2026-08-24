@@ -66,7 +66,7 @@ describe("AdminPointAdjustmentHistory", () => {
       expect.objectContaining({
         accessToken: "admin-token",
         page: 0,
-        size: 20,
+        size: 10,
         userId: undefined,
       }),
     );

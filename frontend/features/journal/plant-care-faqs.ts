@@ -3,7 +3,7 @@ export const PLANT_CARE_FAQ_CATEGORIES = [
   { id: "watering", label: "물주기", icon: "water_drop" },
   { id: "environment", label: "환경", icon: "wb_sunny" },
   { id: "symptom", label: "잎·병해충", icon: "eco" },
-  { id: "growth", label: "성장 관리", icon: "psychiatry" },
+  { id: "growth", label: "성장 관리", icon: "trending_up" },
 ] as const;
 
 export type PlantCareFaqCategory =

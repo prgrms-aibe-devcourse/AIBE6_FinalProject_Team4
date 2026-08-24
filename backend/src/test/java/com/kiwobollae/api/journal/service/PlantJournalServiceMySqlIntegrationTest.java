@@ -81,7 +81,6 @@ class PlantJournalServiceMySqlIntegrationTest {
 				.name("일지롤백테스트")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build());
 		userId = user.getId();

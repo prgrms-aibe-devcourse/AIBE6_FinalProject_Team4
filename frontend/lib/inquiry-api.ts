@@ -66,9 +66,11 @@ export function getInquiriesForAdmin(
   page = 0,
   size = 20,
   signal?: AbortSignal,
+  sort?: string,
 ): Promise<SpringPage<InquiryData>> {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (status) query.set('status', status);
+  if (sort) query.set('sort', sort);
   return request<SpringPage<InquiryData>>(`/api/v1/admin/inquiries?${query.toString()}`, {
     accessToken,
     signal,

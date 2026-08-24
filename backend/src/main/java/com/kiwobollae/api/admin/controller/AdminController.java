@@ -21,6 +21,7 @@ import com.kiwobollae.api.commerce.dto.response.OrderResponse;
 import com.kiwobollae.api.commerce.entity.enums.DeliveryStatus;
 import com.kiwobollae.api.commerce.entity.enums.ExchangeStatus;
 import com.kiwobollae.api.commerce.entity.enums.OrderStatus;
+import com.kiwobollae.api.global.common.AdminPageableSupport;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import io.swagger.v3.oas.annotations.Operation;
@@ -73,10 +74,12 @@ public class AdminController {
 			@RequestParam(required = false) Long userId,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+			@RequestParam(required = false) Integer size,
 			@ParameterObject @PageableDefault(size = 20, sort = "orderedAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
 		return ResponseEntity.ok(ApiResponse.success(
-				orderManagementService.getOrdersForAdmin(status, deliveryStatus, userId, from, to, pageable)
+				orderManagementService.getOrdersForAdmin(
+						status, deliveryStatus, userId, from, to, AdminPageableSupport.withUncappedSize(size, pageable))
 		));
 	}
 
@@ -111,15 +114,11 @@ public class AdminController {
 	@GetMapping("/exchanges")
 	public ResponseEntity<ApiResponse<Page<ExchangeOrderResponse>>> getExchanges(
 			@RequestParam(required = false) ExchangeStatus status,
+			@RequestParam(required = false) Integer size,
 			@ParameterObject @PageableDefault(size = 20, sort = "requestedAt", direction = Sort.Direction.DESC)
 			Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success(exchangeManagementService.getExchangesForAdmin(status, pageable)));
-	}
-
-	@Operation(summary = "교환 준비 처리", description = "접수된 교환 신청을 준비 중 상태로 전환합니다.")
-	@PatchMapping("/exchanges/{id}/prepare")
-	public ResponseEntity<ApiResponse<ExchangeOrderResponse>> prepareExchange(@PathVariable Long id) {
-		return ResponseEntity.ok(ApiResponse.success(exchangeManagementService.prepareExchange(id)));
+		return ResponseEntity.ok(ApiResponse.success(exchangeManagementService.getExchangesForAdmin(
+				status, AdminPageableSupport.withUncappedSize(size, pageable))));
 	}
 
 	@Operation(summary = "교환 배송 시작 처리", description = "준비 중인 교환 신청을 배송 중 상태로 전환합니다.")
@@ -134,7 +133,7 @@ public class AdminController {
 		return ResponseEntity.ok(ApiResponse.success(exchangeManagementService.deliverExchange(id)));
 	}
 
-	@Operation(summary = "교환 신청 취소", description = "접수 대기 중인 교환 신청을 관리자가 취소합니다. 쿠폰·재고가 환급됩니다.")
+	@Operation(summary = "교환 신청 취소", description = "배송 준비 중인 교환 신청을 관리자가 취소합니다. 쿠폰·재고가 환급됩니다.")
 	@PatchMapping("/exchanges/{id}/cancel")
 	public ResponseEntity<ApiResponse<ExchangeOrderResponse>> cancelExchange(
 			@PathVariable Long id,

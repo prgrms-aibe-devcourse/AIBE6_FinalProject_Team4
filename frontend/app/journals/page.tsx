@@ -1,6 +1,7 @@
 'use client';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 import { getDailyJournalRewardStatus, getJournals, PlantJournalData } from '@/lib/journal-api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { useStore } from '@/lib/store';
@@ -91,8 +92,8 @@ export default function JournalsPage() {
     eligiblePlants.length === 0
       ? null
       : dailyRewardGranted
-        ? '오늘의 일지 보상을 받았어요! 🎉'
-        : '아직 오늘 일지 보상을 받지 않았어요. 일지를 남겨보세요 🌱';
+        ? '오늘의 일지 보상을 받았어요!'
+        : '아직 오늘 일지 보상을 받지 않았어요. 일지를 남겨보세요';
 
   return (
     <div className="container">
@@ -163,11 +164,15 @@ export default function JournalsPage() {
       </div>
 
       {loading ? (
-        <div className="px-5 py-[60px] text-center text-sub">일지를 불러오고 있어요 🌿</div>
+        <div className="rounded-[22px] bg-white px-5 py-[70px] text-center text-sub shadow-card">일지를 불러오고 있어요</div>
       ) : error ? (
-        <div className="px-5 py-[60px] text-center text-sub">{error}</div>
+        <div className="rounded-[22px] bg-white px-5 py-[70px] text-center text-sub shadow-card">{error}</div>
       ) : visibleJournals.length === 0 ? (
-        <div className="px-5 py-[60px] text-center text-sub">이 조건의 일지가 아직 없어요. 오늘의 기록을 남겨볼까요? 🌱</div>
+        <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
+          <img src={SEEDLING_ICON_SRC} alt="" className="animate-floaty mx-auto h-[70px] w-[70px]" />
+          <p className="mb-5 mt-4 text-[17px] font-bold text-[#6d7a68]">이 조건의 일지가 아직 없어요.<br />오늘의 기록을 남겨볼까요?</p>
+          <Link href="/journals/new" className="inline-block rounded-xl bg-brand px-[26px] py-[13px] font-bold text-white hover:text-white">+ 오늘의 일지 쓰기</Link>
+        </div>
       ) : (
         <div className="grid gap-[18px] [grid-template-columns:repeat(auto-fill,minmax(250px,1fr))]">
           {visibleJournals.map((j) => {
@@ -183,7 +188,7 @@ export default function JournalsPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={image} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    '🌿'
+                    <img src={SEEDLING_ICON_SRC} alt="" className="h-[62px] w-[62px]" />
                   )}
                 </div>
                 <div className="p-3.5">

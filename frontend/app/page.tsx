@@ -6,17 +6,17 @@ import { useStore, fmt } from '@/lib/store';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
 import { getJournals } from '@/lib/journal-api';
 import { resolveImageUrl } from '@/lib/api';
-import { dPlus, plantThumbnail, plantVisual } from '@/lib/plant-visual';
+import { dPlus, plantThumbnail, plantVisual, SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 
 const CONFETTI = [
-  { left: '8%', dur: '1.4s', delay: '0s', emoji: '🌿' }, { left: '26%', dur: '1.7s', delay: '.2s', emoji: '✨' },
-  { left: '46%', dur: '1.3s', delay: '.1s', emoji: '🍉' }, { left: '64%', dur: '1.8s', delay: '.35s', emoji: '🌱' },
-  { left: '82%', dur: '1.5s', delay: '.15s', emoji: '✨' }, { left: '92%', dur: '1.6s', delay: '.28s', emoji: '💚' },
+  { left: '8%', dur: '1.4s', delay: '0s', icon: 'leaf' }, { left: '26%', dur: '1.7s', delay: '.2s', icon: 'sparkle' },
+  { left: '46%', dur: '1.3s', delay: '.1s', icon: 'watermelon' }, { left: '64%', dur: '1.8s', delay: '.35s', icon: 'seedling' },
+  { left: '82%', dur: '1.5s', delay: '.15s', icon: 'sparkle' }, { left: '92%', dur: '1.6s', delay: '.28s', icon: 'heart' },
 ];
 
 const FEATURES = [
-  { emoji: '🌱', title: '매일 기록하기', desc: '식물의 성장을 사진과 함께 일지로 남겨요' },
-  { emoji: '☀️', title: '포인트 쌓기', desc: '기록할 때마다 포인트가 차곡차곡 쌓여요' },
+  { icon: 'seedling', title: '매일 기록하기', desc: '식물의 성장을 사진과 함께 일지로 남겨요' },
+  { icon: 'sun', title: '포인트 쌓기', desc: '기록할 때마다 포인트가 차곡차곡 쌓여요' },
   {
     image: {
       src: 'https://4team-storage-495264909330-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com/cards/8/399f7998-3e24-5d1d-b69c-68da63b839ef.png',
@@ -25,7 +25,7 @@ const FEATURES = [
     title: '가챠 카드 뽑기',
     desc: <><span>쌓인 포인트로 카드팩을 열고</span><br /><span>특별한 카드를 모아보세요</span></>,
   },
-  { emoji: '🍉', title: '진짜 열매 받기', desc: '모은 쿠폰을 진짜 과일·채소로 교환해요' },
+  { icon: 'watermelon', title: '진짜 열매 받기', desc: '모은 쿠폰을 진짜 과일·채소로 교환해요' },
 ];
 
 function kstToday(): string {
@@ -108,9 +108,9 @@ export default function Home() {
           </div>
           <div className="flex justify-center">
             <div className="relative flex h-[300px] w-[280px] items-center justify-center rounded-[28px] bg-gradient-to-b from-[#F3F7E9] to-[#E4EFCF] shadow-[0_20px_50px_rgba(124,179,66,.18)]">
-              <div className="animate-floaty text-[130px]">🪴</div>
-              <div className="absolute right-[30px] top-[26px] text-[40px]">☀️</div>
-              <div className="absolute bottom-7 left-[26px] text-[30px]">🌱</div>
+              <img src="/icons/potted-plant.svg" alt="" className="animate-floaty h-[130px] w-[130px]" />
+              <img src="/icons/sun.svg" alt="" className="absolute right-[30px] top-[26px] h-[40px] w-[40px]" />
+              <img src="/icons/seedling.svg" alt="" className="absolute bottom-7 left-[26px] h-[30px] w-[30px]" />
             </div>
           </div>
         </div>
@@ -128,7 +128,7 @@ export default function Home() {
                     className="h-[34px] w-auto rounded-[2px] object-contain shadow-[0_2px_5px_rgba(120,82,12,.22)]"
                   />
                 ) : (
-                  f.emoji
+                  <img src={`/icons/${f.icon}.svg`} alt="" className="h-[34px] w-[34px]" />
                 )}
               </div>
               <div className="mt-2 font-extrabold">{f.title}</div>
@@ -142,25 +142,25 @@ export default function Home() {
 
   return (
     <div className="container animate-upIn">
-      <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, {state.user?.nickname}님! 오늘도 푸릇한 하루예요 ☀️</h1>
+      <h1 className="mb-1 text-[27px] font-extrabold">안녕하세요, {state.user?.nickname}님! 오늘도 푸릇한 하루예요</h1>
       <p className="mb-6 text-sub">작은 기록이 모여 큰 수확이 돼요.</p>
 
       {state.readyCards > 0 && (
         <div className="relative mb-6 flex flex-wrap items-center gap-4 overflow-hidden rounded-[20px] bg-gradient-to-br from-[#FFE9A6] to-[#FFD54F] px-6 py-[22px] shadow-[0_8px_24px_rgba(255,213,79,.3)]">
-          <div className="text-[46px]">🍉</div>
+          <img src="/icons/watermelon.svg" alt="" className="h-[46px] w-[46px]" />
           <div className="min-w-[200px] flex-1">
             <div className="text-lg font-extrabold text-[#6b5500]">교환 가능한 쿠폰이 {state.readyCards}종 있어요!</div>
             <div className="text-[14.5px] text-gold-text">진짜 열매로 바꿔볼까요?</div>
           </div>
-          <Link href="/cards" className="rounded-xl bg-ink px-5 py-3 font-bold text-white transition-colors duration-150 hover:bg-[#2a332a] hover:text-white">교환하러 가기 🎉</Link>
+          <Link href="/cards" className="flex items-center gap-1 rounded-xl bg-ink px-5 py-3 font-bold text-white transition-colors duration-150 hover:bg-[#2a332a] hover:text-white">교환하러 가기 <img src="/icons/party.svg" alt="" className="h-7 w-7" /></Link>
           {CONFETTI.map((c, i) => (
-            <span
+            <img
               key={i}
-              className="absolute -top-2.5 animate-confettiFall text-base"
+              src={`/icons/${c.icon}.svg`}
+              alt=""
+              className="absolute -top-2.5 h-7 w-7 animate-confettiFall"
               style={{ left: c.left, animationDuration: c.dur, animationDelay: c.delay, animationIterationCount: 'infinite' }}
-            >
-              {c.emoji}
-            </span>
+            />
           ))}
         </div>
       )}
@@ -202,12 +202,12 @@ export default function Home() {
         <Link href="/plants" className="text-sm font-bold text-brand-dark">전체보기 →</Link>
       </div>
       {plantsLoading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요</div>
       ) : plantsError ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{plantsError}</div>
       ) : plants.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[50px] text-center shadow-card">
-          <div className="animate-floaty text-[56px]">🌱</div>
+          <img src="/icons/seedling.svg" alt="" className="animate-floaty mx-auto h-[56px] w-[56px]" />
           {state.plantCount > 0 ? (
             <p className="mb-5 mt-3 text-[15px] font-bold text-[#6d7a68]">지금 재배중인 식물이 없어요.<br />새로운 식물을 시작해 볼까요?</p>
           ) : (
@@ -232,10 +232,16 @@ export default function Home() {
                   />
                 ) : (
                   <div
-                    className="flex h-[120px] items-center justify-center text-[60px]"
+                    className="flex h-[120px] items-center justify-center"
                     style={{ background: thumb.type === 'emoji' ? thumb.grad : visual.grad }}
                   >
-                    {thumb.type === 'emoji' ? thumb.emoji : visual.emoji}
+                    {(thumb.type === 'emoji' ? thumb.icon : visual.icon) === 'spa' ? (
+                      <img src={SEEDLING_ICON_SRC} alt="" className="h-[60px] w-[60px]" />
+                    ) : (
+                      <span className="material-symbols-outlined text-[60px]">
+                        {thumb.type === 'emoji' ? thumb.icon : visual.icon}
+                      </span>
+                    )}
                   </div>
                 )}
                 <div className="p-3.5">

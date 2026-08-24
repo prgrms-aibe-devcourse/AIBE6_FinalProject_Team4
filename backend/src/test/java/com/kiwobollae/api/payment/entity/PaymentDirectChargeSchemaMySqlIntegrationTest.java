@@ -90,7 +90,6 @@ class PaymentDirectChargeSchemaMySqlIntegrationTest {
 				.name("직접 충전 스키마")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build());
 	}

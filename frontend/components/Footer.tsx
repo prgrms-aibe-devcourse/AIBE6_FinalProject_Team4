@@ -16,7 +16,7 @@ export default function Footer() {
     <footer className="mt-10 hidden border-t border-line bg-[#F6F8EF] font-sans md:block">
       <div className="mx-auto grid max-w-[1160px] grid-cols-[1.4fr_1fr_1fr_1fr] items-start gap-8 px-5 pb-7 pt-10">
         <div>
-          <div className="text-[19px] font-extrabold text-brand-dark">키워볼래 🌱</div>
+          <div className="text-[19px] font-extrabold text-brand-dark">키워볼래</div>
           <p className="mt-3 max-w-[260px] text-[13.5px] leading-[1.7] text-sub">
             식물을 키우고, 기록하고, 진짜 열매를 받아보세요. 작은 기록이 모여 큰 수확이 돼요.
           </p>

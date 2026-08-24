@@ -19,7 +19,7 @@ export default function CardMarketHeader({
 }: CardMarketHeaderProps) {
   return (
     <>
-      <section className="relative mb-12 overflow-hidden rounded-[32px] bg-gradient-to-br from-[#1f3023] via-[#3f5b3d] to-[#9a7b26] px-7 py-11 text-white shadow-xl md:px-12 md:py-14">
+      <section className="relative mb-7 overflow-hidden rounded-[28px] bg-gradient-to-br from-[#1f3023] via-[#3f5b3d] to-[#9a7b26] px-6 py-8 text-white shadow-card md:px-10">
         <div className="relative z-10 max-w-2xl">
           <span className="mb-6 inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-black tracking-[0.1em] text-[#f4e7ae] backdrop-blur-sm">
             HYPER · GOLDEN ONLY

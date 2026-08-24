@@ -183,6 +183,7 @@ export function getOrdersForAdmin(
   page = 0,
   size = 20,
   signal?: AbortSignal,
+  sort?: string,
 ): Promise<OrderDetailPage> {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (filters?.status) query.set('status', filters.status);
@@ -190,6 +191,7 @@ export function getOrdersForAdmin(
   if (filters?.userId) query.set('userId', String(filters.userId));
   if (filters?.from) query.set('from', filters.from);
   if (filters?.to) query.set('to', filters.to);
+  if (sort) query.set('sort', sort);
   return request<OrderDetailPage>(`/api/v1/admin/order?${query.toString()}`, { accessToken, signal });
 }
 

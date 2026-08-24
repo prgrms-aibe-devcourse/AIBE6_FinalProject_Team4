@@ -106,7 +106,6 @@ class PaymentRefundServiceMySqlIntegrationTest {
 				.name("환불통합테스트")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build());
 		userId = user.getId();

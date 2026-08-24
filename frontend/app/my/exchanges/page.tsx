@@ -10,7 +10,7 @@ import { useUI } from '@/lib/ui';
 import { formatPhone } from '@/components/AddressForm';
 import { useRouter } from 'next/navigation';
 
-const STEPS: [ExchangeStatus, string][] = [['REQUESTED', '신청됨'], ['PREPARING', '준비중'], ['SHIPPING', '배송중'], ['DELIVERED', '배송완료']];
+const STEPS: [ExchangeStatus, string][] = [['PREPARING', '준비중'], ['SHIPPING', '배송중'], ['DELIVERED', '배송완료']];
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -81,6 +81,15 @@ export default function MyExchanges({
   };
 
   useEffect(() => {
+    if (loading || exchanges.length === 0 || !window.location.hash) return;
+    const targetId = decodeURIComponent(window.location.hash.slice(1));
+    if (!targetId.startsWith('exchange-')) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [loading, exchanges]);
+
+  useEffect(() => {
     if (!hydrated || !state.accessToken) return;
     const accessToken = state.accessToken;
 
@@ -123,15 +132,15 @@ export default function MyExchanges({
     <div className="container">
       <h1 className="mb-5 text-[26px] font-extrabold">교환</h1>
 
-      <div className="mb-7">
+      <div className="mb-7 rounded-[20px] bg-white p-5 shadow-card">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-extrabold">내 쿠폰</h2>
           <Link href="/cards" className="text-sm font-bold text-brand-dark">쿠폰 구매하기 →</Link>
         </div>
         {cardsLoading ? (
-          <div className="rounded-[18px] bg-white py-8 text-center text-sm text-sub">쿠폰을 불러오고 있어요 🎟️</div>
+          <div className="py-8 text-center text-sm text-sub">쿠폰을 불러오고 있어요</div>
         ) : myCards.length === 0 ? (
-          <div className="rounded-[18px] bg-white py-8 text-center text-sm text-sub">아직 보유한 쿠폰이 없어요.</div>
+          <div className="py-8 text-center text-sm text-sub">아직 보유한 쿠폰이 없어요.</div>
         ) : (
           <div className="flex gap-3 overflow-x-auto pb-1">
             {myCards.map((card) => {
@@ -139,12 +148,12 @@ export default function MyExchanges({
               const ready = owned >= card.requiredCountForExchange;
               const pct = Math.min(100, Math.round((owned / card.requiredCountForExchange) * 100));
               return (
-                <div key={card.id} className="w-[150px] flex-none rounded-[16px] bg-white p-3 shadow-card">
+                <div key={card.id} className="w-[150px] flex-none rounded-[16px] bg-[#F8FAF3] p-3 shadow-card">
                   <div
                     className="mb-2 flex h-[80px] items-center justify-center rounded-[10px] bg-brand-soft bg-cover bg-center text-[36px]"
                     style={card.imageUrl ? { backgroundImage: `url("${card.imageUrl}")` } : undefined}
                   >
-                    {!card.imageUrl && '🃏'}
+                    {!card.imageUrl && <span className="material-symbols-outlined text-[36px]">style</span>}
                   </div>
                   <div className="mb-1 truncate text-[13px] font-extrabold">{couponName(card.name)}</div>
                   <div className="mb-2 text-[11px] font-bold text-sub">보유 {owned} / {card.requiredCountForExchange}</div>
@@ -170,20 +179,20 @@ export default function MyExchanges({
       <h2 className="mb-3.5 text-lg font-extrabold">교환 내역</h2>
 
       {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">교환 내역을 불러오고 있어요 🍉</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub shadow-card">교환 내역을 불러오고 있어요</div>
       ) : error ? (
-        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub shadow-card">{error}</div>
       ) : exchanges.length === 0 ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">아직 신청한 교환이 없어요.</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub shadow-card">아직 신청한 교환이 없어요.</div>
       ) : (
         <div className="flex flex-col gap-4">
           {exchanges.map((x) => {
             const cancelled = x.status === 'CANCELLED';
             const idx = STEPS.findIndex((s) => s[0] === x.status);
             return (
-              <div key={x.id} className="rounded-[18px] bg-white p-5 shadow-card">
+              <div key={x.id} id={`exchange-${x.id}`} className="rounded-[18px] bg-white p-5 shadow-card">
                 <div className="flex flex-wrap items-center gap-3.5">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-[13px] bg-brand-soft text-[28px]">🎁</div>
+                  <span className="material-symbols-outlined flex h-14 w-14 items-center justify-center rounded-[13px] bg-brand-soft text-[28px]">redeem</span>
                   <div className="min-w-[160px] flex-1">
                     <div className="font-extrabold">
                       {x.exchangeProductName} <span className="text-[12px] font-semibold text-faint">#{x.id}</span>
@@ -193,7 +202,7 @@ export default function MyExchanges({
                       {x.deliveredAt && ` · 배송완료 ${formatDate(x.deliveredAt)}`}
                     </div>
                   </div>
-                  {x.status === 'REQUESTED' && (
+                  {x.status === 'PREPARING' && (
                     <button type="button" onClick={() => cancel(x.id)} className="cursor-pointer rounded-[11px] border-[1.5px] border-[#e8bdad] bg-white px-4 py-[9px] font-bold text-[#b5502f]">
                       취소하기
                     </button>

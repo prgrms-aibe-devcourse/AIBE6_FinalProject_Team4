@@ -104,7 +104,7 @@ export function useProductDetail({
       return false;
     }
     if (alreadyInCart) {
-      showToast("이미 장바구니에 있는 상품이에요.", "err");
+      showToast("장바구니에 상품이 담겨있습니다.", "err");
       return false;
     }
     setAdding(true);
@@ -112,7 +112,7 @@ export function useProductDetail({
       await addCartItem(product.id, qty, state.accessToken);
       await refreshCartCount();
       setAlreadyInCart(true);
-      showToast("장바구니에 담았어요 🛒");
+      showToast("장바구니에 담았어요");
       return true;
     } catch (requestError) {
       showToast(

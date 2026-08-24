@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   user: null as null | {
     nickname: string;
     email: string;
-    level: number;
     role: string;
   },
   showToast: vi.fn(),
@@ -95,7 +94,6 @@ describe("Navbar", () => {
     mocks.user = {
       nickname: "테스터",
       email: "tester@example.com",
-      level: 1,
       role: "USER",
     };
     vi.mocked(grantLocalTestGachaCard).mockResolvedValue({

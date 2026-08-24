@@ -1,7 +1,6 @@
 package com.kiwobollae.api.auth.service;
 
 import com.kiwobollae.api.auth.dto.request.*;
-import com.kiwobollae.api.auth.dto.response.AccessReissueResult;
 import com.kiwobollae.api.auth.dto.response.NicknameAvailabilityResponse;
 import com.kiwobollae.api.auth.dto.response.TokenIssueResult;
 import com.kiwobollae.api.auth.dto.response.UserResponse;
@@ -14,15 +13,21 @@ import com.kiwobollae.api.auth.oauth.OAuthClient;
 import com.kiwobollae.api.auth.oauth.OAuthUserInfo;
 import com.kiwobollae.api.auth.repository.RefreshTokenRepository;
 import com.kiwobollae.api.auth.repository.UserRepository;
+import com.kiwobollae.api.global.concurrency.UniqueInsertGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
+import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
+import com.kiwobollae.api.notification.entity.JournalReminderLog;
 import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.repository.JournalReminderLogRepository;
 import com.kiwobollae.api.notification.service.NotificationService;
 import com.kiwobollae.api.point.service.WalletService;
 import com.kiwobollae.api.global.security.TokenHasher;
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +55,44 @@ public class AuthService {
 	}
 	private final WalletService walletService;
 	private final NotificationService notificationService;
+	private final JournalReminderLogRepository journalReminderLogRepository;
+	private final UniqueInsertGuard uniqueInsertGuard;
+	private final DailyJournalRewardRepository dailyJournalRewardRepository;
+
+	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+	private static final String JOURNAL_REMINDER_REF_TYPE = "JOURNAL_REMINDER_DATE";
+	private static final String JOURNAL_REMINDER_TITLE = "아직 오늘 일지를 작성하지 않았어요";
+	private static final String JOURNAL_REMINDER_CONTENT = "오늘의 성장 일지를 남기고 보상을 받아보세요.";
+	private static final String JOURNAL_REMINDER_LINK_URL = "/journals/new";
+
+	// 오늘치 일지 보상을 아직 받지 않은 사용자에게 로그인 시 한 번만 작성을 유도한다.
+	// existsBy 확인과 notify() 저장 사이에 동시 요청(로그인+토큰 재발급 등)이 끼어들면 둘 다
+	// "아직 안 보냄"으로 보고 중복 저장할 수 있어, 전용 잠금 테이블에 유니크 제약을 걸고
+	// UniqueInsertGuard로 원자적으로 하나만 승리하게 한다 — 이긴 요청만 실제 알림을 보낸다.
+	private void sendJournalReminderIfNeeded(User user) {
+		LocalDate today = LocalDate.now(KST);
+		if (dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), today)) {
+			return;
+		}
+		if (journalReminderLogRepository.existsByUser_IdAndReminderDate(user.getId(), today)) {
+			return;
+		}
+		boolean claimed = uniqueInsertGuard.tryInsert(() ->
+				journalReminderLogRepository.saveAndFlush(
+						JournalReminderLog.create(user, today, LocalDateTime.now(KST))));
+		if (!claimed) {
+			return;
+		}
+		notificationService.notify(
+				user.getId(),
+				NotificationType.JOURNAL_REMINDER,
+				JOURNAL_REMINDER_TITLE,
+				JOURNAL_REMINDER_CONTENT,
+				JOURNAL_REMINDER_LINK_URL,
+				JOURNAL_REMINDER_REF_TYPE,
+				today.toEpochDay()
+		);
+	}
 
 	// 소셜/일반 가입 모두 동일한 환영 알림을 보낸다. 일지를 쓰려면 먼저 식물을 등록해야
 	// 하므로(등록은 /journals/new가 아니라 /plants 화면의 모달에서 이뤄진다), 신규
@@ -88,7 +131,6 @@ public class AuthService {
 				.phoneNumber(request.phoneNumber())
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build();
 
@@ -151,7 +193,6 @@ public class AuthService {
 				.provider(provider)
 				.providerId(userInfo.providerId())
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build();
 		User savedUser = userRepository.save(user);
@@ -176,28 +217,41 @@ public class AuthService {
 		throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, "닉네임 생성에 실패했습니다. 다시 시도해 주세요.");
 	}
 
-	public AccessReissueResult reissue(String rawRefreshToken) {
+	/**
+	 * 재발급마다 액세스·리프레시 토큰을 모두 새로 발급하고 기존 리프레시 토큰은 즉시 폐기한다
+	 * (rotation). 이미 폐기된(= 한 번 회전되고 지난) 리프레시 토큰이 다시 들어오면 탈취로 간주해
+	 * 해당 계정의 모든 세션을 강제 로그아웃시킨다 — 로테이션 없이 만료 전까지 같은 토큰을 계속
+	 * 재사용하던 이전 방식은, 토큰이 한 번 유출되면 만료 시점까지 계속 쓸 수 있고 탈취 여부를
+	 * 감지할 방법도 없었다.
+	 */
+	@Transactional
+	public TokenIssueResult reissue(String rawRefreshToken) {
 		if (rawRefreshToken == null || !jwtTokenProvider.validateToken(rawRefreshToken)) {
 			throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
 		}
 
 		String tokenHash = tokenHasher.hash(rawRefreshToken);
-		RefreshToken stored = refreshTokenRepository.findByTokenHashAndRevokedAtIsNull(tokenHash)
+		RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
 				.orElseThrow(() -> new BusinessException(ErrorCode.AUTH_TOKEN_INVALID));
+
+		if (stored.getRevokedAt() != null) {
+			LocalDateTime now = LocalDateTime.now();
+			refreshTokenRepository.findAllByUser_IdAndRevokedAtIsNull(stored.getUser().getId())
+					.forEach(token -> token.revoke(now));
+			throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID);
+		}
 
 		if (stored.getExpiresAt().isBefore(LocalDateTime.now())) {
 			throw new BusinessException(ErrorCode.AUTH_TOKEN_EXPIRED);
 		}
 
-		// No rotation: the same refresh token (and its cookie) stays valid and gets
-		// reused until it expires on its own or the user logs out.
 		User user = stored.getUser();
 		if (user.getStatus() != UserStatus.ACTIVE) {
 			throw new BusinessException(ErrorCode.AUTH_ACCOUNT_NOT_ACTIVE);
 		}
 
-		String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), user.getRole().name());
-		return new AccessReissueResult(accessToken, "Bearer", UserResponse.from(user));
+		stored.revoke(LocalDateTime.now());
+		return issueTokens(user);
 	}
 
 	public UserResponse getMe(Long userId) {
@@ -287,7 +341,7 @@ public class AuthService {
 	}
 
 	/**
-	 * Same as findById, but also rejects SUSPENDED/RESTRICTED/WITHDRAWN accounts —
+	 * Same as findById, but also rejects SUSPENDED/WITHDRAWN accounts —
 	 * an access token can outlive an admin action taken mid-session (up to its
 	 * expiry), so every /auth/me/** action re-checks status instead of trusting
 	 * "the token was valid at issue time" the way a stateless JWT alone would.
@@ -321,6 +375,7 @@ public class AuthService {
 				.createdAt(LocalDateTime.now())
 				.build();
 		refreshTokenRepository.save(entity);
+		sendJournalReminderIfNeeded(user);
 
 		return new TokenIssueResult(accessToken, "Bearer", UserResponse.from(user), refreshToken);
 	}

@@ -63,11 +63,11 @@ export default function GachaWorkshopOverview({
         <div className="pointer-events-none absolute right-0 top-0 h-full w-40 bg-gradient-to-l from-[#fff7d8] to-transparent" />
         <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#ebd178] bg-[#fff8dc]">
           <span className="absolute inset-2 rounded-full bg-[#f4ce4d]/25 blur-md motion-safe:animate-pulse" />
-          <span className="relative text-[30px] leading-none text-[#d19c18] drop-shadow-[0_0_7px_rgba(222,176,44,.45)]">
-            ✦
+          <span className="material-symbols-outlined relative text-[30px] leading-none text-[#d19c18] drop-shadow-[0_0_7px_rgba(222,176,44,.45)]">
+            toll
           </span>
-          <span className="absolute right-1.5 top-1.5 text-[7px] text-[#8e6915] motion-safe:animate-pulse">
-            ✦
+          <span className="material-symbols-outlined absolute right-1.5 top-1.5 text-[7px] text-[#8e6915] motion-safe:animate-pulse">
+            toll
           </span>
         </div>
 

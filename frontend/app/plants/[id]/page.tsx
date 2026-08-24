@@ -7,7 +7,7 @@ import { useUI } from '@/lib/ui';
 import { BADGE } from '@/lib/data';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { deletePlant, deletePlantImage, getPlant, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
-import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, PROFILE_EMOJI_OPTIONS, SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 import { getJournals, PlantJournalData } from '@/lib/journal-api';
 import { getTimelapse, requestTimelapse, PlantTimelapseData } from '@/lib/timelapse-api';
 import { nickValid } from '@/lib/plant-validation';
@@ -193,7 +193,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       setPhotoPreview(resolveImageUrl(thumb.url));
     } else {
       setPhotoMode('emoji');
-      const idx = PROFILE_EMOJI_OPTIONS.findIndex(([emoji]) => emoji === thumb.emoji);
+      const idx = PROFILE_EMOJI_OPTIONS.findIndex(([icon]) => icon === thumb.icon);
       setSelectedEmojiIdx(idx >= 0 ? idx : 0);
       setPhotoPreview(null);
     }
@@ -211,7 +211,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
     const photoChanged =
       photoFile !== null ||
       photoMode !== originalMode ||
-      (photoMode === 'emoji' && original.type === 'emoji' && PROFILE_EMOJI_OPTIONS[selectedEmojiIdx][0] !== original.emoji);
+      (photoMode === 'emoji' && original.type === 'emoji' && PROFILE_EMOJI_OPTIONS[selectedEmojiIdx][0] !== original.icon);
     const hasChanges = editNick !== plant.nickname || editStatus !== plant.status || photoChanged;
 
     if (!hasChanges) {
@@ -295,7 +295,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
       setStatusOpen(false);
       setPhotoFile(null);
       void refreshPlantStats();
-      showToast('식물 정보를 수정했어요 🌿');
+      showToast('식물 정보를 수정했어요');
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError ? requestError.message : '수정에 실패했어요. 잠시 후 다시 시도해 주세요.',
@@ -309,7 +309,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
   if (loading) {
     return (
       <div className="container">
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 정보를 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 정보를 불러오고 있어요</div>
       </div>
     );
   }
@@ -342,7 +342,13 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={resolveImageUrl(thumb.url)} alt="" className="h-[300px] w-full rounded-[22px] object-cover" />
         ) : (
-          <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-[22px] text-[140px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
+          <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-[22px]" style={{ background: thumb.grad }}>
+            {thumb.icon === 'spa' ? (
+              <img src={SEEDLING_ICON_SRC} alt="" className="h-[140px] w-[140px]" />
+            ) : (
+              <span className="material-symbols-outlined text-[140px]">{thumb.icon}</span>
+            )}
+          </div>
         )}
         <div>
           <div className="mb-2.5 inline-block rounded-full px-3 py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
@@ -388,7 +394,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
             </button>
           )}
           {(timelapse.status === 'PENDING' || timelapse.status === 'PROCESSING') && (
-            <div className="text-[15px] text-sub">타임랩스를 만들고 있어요. 완료되면 알림으로 알려드릴게요 🎬</div>
+            <div className="text-[15px] text-sub">타임랩스를 만들고 있어요. 완료되면 알림으로 알려드릴게요</div>
           )}
           {timelapse.status === 'COMPLETED' && timelapse.videoUrl && (
             // eslint-disable-next-line jsx-a11y/media-has-caption
@@ -435,7 +441,7 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={image} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    '🌿'
+                    <img src={SEEDLING_ICON_SRC} alt="" className="h-8 w-8" />
                   )}
                 </div>
                 <div className="flex-1">
@@ -517,17 +523,17 @@ export default function PlantDetail({ params }: { params: { id: string } }) {
               </div>
             ) : (
               <div className="mb-4 mt-2 flex flex-wrap gap-2.5">
-                {PROFILE_EMOJI_OPTIONS.map(([emoji, grad], i) => (
+                {PROFILE_EMOJI_OPTIONS.map(([icon, grad], i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => setSelectedEmojiIdx(i)}
-                    className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] text-[28px] ${
+                    className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] ${
                       selectedEmojiIdx === i ? 'border-brand' : 'border-transparent'
                     }`}
                     style={{ background: grad }}
                   >
-                    {emoji}
+                    <span className="material-symbols-outlined text-[28px]">{icon}</span>
                   </button>
                 ))}
               </div>

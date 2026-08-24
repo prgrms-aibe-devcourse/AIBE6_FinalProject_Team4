@@ -58,7 +58,6 @@ class GachaCollectionAcquisitionMySqlIntegrationTest {
                 .name("가챠동시성테스트")
                 .provider(AuthProvider.LOCAL)
                 .role(UserRole.USER)
-                .level(1)
                 .status(UserStatus.ACTIVE)
                 .build());
     TradingCard card =

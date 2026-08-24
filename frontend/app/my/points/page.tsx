@@ -126,7 +126,7 @@ export default function PointsHome() {
 
   if (!walletLoaded && (walletLoading || !walletError)) {
     return (
-      <div className="container max-w-[900px]">
+      <div className="container">
         <div className="rounded-[22px] bg-white py-14 text-center text-sub">
           포인트 잔액을 불러오고 있어요.
         </div>
@@ -136,7 +136,7 @@ export default function PointsHome() {
 
   if (walletError && !walletLoaded) {
     return (
-      <div className="container max-w-[900px]">
+      <div className="container">
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
           <p>{walletError}</p>
           <button
@@ -152,7 +152,7 @@ export default function PointsHome() {
   }
 
   return (
-    <div className="container max-w-[900px]">
+    <div className="container">
       <div className="mb-6 rounded-[22px] bg-gradient-to-br from-[#FFE9A6] to-[#FFD54F] p-7 shadow-[0_8px_24px_rgba(255,213,79,.3)]">
         <div className="text-sm font-bold text-gold-text">내 포인트</div>
         <div className="mb-1 mt-1.5 flex items-center gap-2 text-[42px] font-extrabold text-[#6b5500]">

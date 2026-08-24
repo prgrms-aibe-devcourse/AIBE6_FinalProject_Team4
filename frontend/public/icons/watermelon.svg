@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <g transform="rotate(225 24 24)">
+    <path d="M4 24a20 20 0 0 1 40 0z" fill="#4CAF50"/>
+    <path d="M8 24a16 16 0 0 1 32 0z" fill="#F1F8E9"/>
+    <path d="M12 24a12 12 0 0 1 24 0z" fill="#FF5252"/>
+    <circle cx="19" cy="19" r="1.4" fill="#212121"/>
+    <circle cx="24" cy="16" r="1.4" fill="#212121"/>
+    <circle cx="29" cy="19" r="1.4" fill="#212121"/>
+    <circle cx="24" cy="22" r="1.4" fill="#212121"/>
+  </g>
+</svg>

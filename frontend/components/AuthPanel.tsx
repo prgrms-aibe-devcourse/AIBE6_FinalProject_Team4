@@ -121,7 +121,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
     try {
       await requestEmailVerification(signupEmail);
       setVerificationSent(true);
-      showToast("인증코드를 보냈어요. 5분 이내에 입력해 주세요 📮");
+      showToast("인증코드를 보냈어요. 5분 이내에 입력해 주세요");
     } catch (e) {
       setVerificationError(
         e instanceof ApiError ? e.message : "인증코드 발송에 실패했어요.",
@@ -137,7 +137,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
     try {
       await confirmEmailVerification(signupEmail, verificationCode);
       setEmailVerified(true);
-      showToast("이메일 인증을 완료했어요 ✅");
+      showToast("이메일 인증을 완료했어요");
     } catch (e) {
       setVerificationError(
         e instanceof ApiError ? e.message : "인증코드 확인에 실패했어요.",
@@ -175,7 +175,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
     try {
       await requestPasswordResetVerification(resetEmail);
       setResetVerificationSent(true);
-      showToast("인증코드를 보냈어요. 5분 이내에 입력해 주세요 📮");
+      showToast("인증코드를 보냈어요. 5분 이내에 입력해 주세요");
     } catch (e) {
       setResetVerificationError(
         e instanceof ApiError ? e.message : "인증코드 발송에 실패했어요.",
@@ -192,7 +192,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
       const { resetToken: token } = await confirmPasswordResetVerification(resetEmail, resetCode);
       setResetToken(token);
       setResetVerified(true);
-      showToast("이메일 인증을 완료했어요 ✅");
+      showToast("이메일 인증을 완료했어요");
     } catch (e) {
       setResetVerificationError(
         e instanceof ApiError ? e.message : "인증코드 확인에 실패했어요.",
@@ -215,7 +215,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
     setSubmitting(true);
     try {
       await apiResetPassword(resetEmail, resetNewPassword, resetToken);
-      showToast("비밀번호를 변경했어요. 새 비밀번호로 로그인해 주세요 🌿");
+      showToast("비밀번호를 변경했어요. 새 비밀번호로 로그인해 주세요");
       resetToLoginView();
     } catch (e) {
       setResetError(
@@ -242,7 +242,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
     try {
       const res = await apiLogin(email, password);
       login(res.accessToken, res.user);
-      afterAuth("환영해요! 홈으로 데려다드릴게요 🌿");
+      afterAuth("환영해요! 홈으로 데려다드릴게요");
     } catch (e) {
       setLoginError(
         e instanceof ApiError
@@ -289,7 +289,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
       });
       const res = await apiLogin(signupEmail, signupPassword);
       login(res.accessToken, res.user);
-      afterAuth("환영해요! 이제 첫 식물을 맞이해 볼까요? 🌱");
+      afterAuth("환영해요! 이제 첫 식물을 맞이해 볼까요?");
     } catch (e) {
       setSignupError(
         e instanceof ApiError
@@ -307,7 +307,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
       {view === "login" && (
         <div className="flex flex-1 items-start justify-center px-5 pb-[60px] pt-2.5">
           <div className={`${CARD} max-w-[400px]`}>
-            <h2 className="mb-1 text-2xl font-extrabold">다시 오셨네요 🌿</h2>
+            <h2 className="mb-1 text-2xl font-extrabold">다시 오셨네요</h2>
             <p className="mb-6 text-sm text-sub">
               오늘도 푸릇한 하루 보내세요.
             </p>
@@ -423,7 +423,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
         <div className="flex flex-1 items-start justify-center px-5 pb-[60px] pt-2.5">
           <div className={`${CARD} max-w-[460px]`}>
             <h2 className="mb-1 text-2xl font-extrabold">
-              첫 식물을 맞이할 준비 🌱
+              첫 식물을 맞이할 준비
             </h2>
             <p className="mb-[22px] text-sm text-sub">
               몇 가지만 알려주시면 바로 시작할 수 있어요.
@@ -447,7 +447,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
                     className="w-[104px] shrink-0 cursor-pointer whitespace-nowrap rounded-xl border-[1.5px] border-line bg-white text-[13px] font-bold text-[#5b6a54] transition-colors duration-150 hover:bg-brand-soft hover:text-brand-dark disabled:cursor-default disabled:opacity-60"
                   >
                     {emailVerified
-                      ? "인증완료 ✅"
+                      ? "인증완료"
                       : verificationSent
                         ? "재전송"
                         : "인증코드 받기"}
@@ -527,7 +527,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
                     className="w-[104px] shrink-0 cursor-pointer whitespace-nowrap rounded-xl border-[1.5px] border-line bg-white text-[13px] font-bold text-[#5b6a54] transition-colors duration-150 hover:bg-brand-soft hover:text-brand-dark disabled:cursor-default disabled:opacity-60"
                   >
                     {nicknameChecked && nicknameAvailable
-                      ? "사용가능 ✅"
+                      ? "사용가능"
                       : "중복확인"}
                   </button>
                 </div>
@@ -607,7 +607,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
       {view === "reset" && (
         <div className="flex flex-1 items-start justify-center px-5 pb-[60px] pt-2.5">
           <div className={`${CARD} max-w-[400px]`}>
-            <h2 className="mb-1 text-2xl font-extrabold">비밀번호 찾기 🔑</h2>
+            <h2 className="mb-1 text-2xl font-extrabold">비밀번호 찾기</h2>
             <p className="mb-6 text-sm text-sub">
               가입한 이메일로 인증코드를 보내드릴게요.
             </p>
@@ -630,7 +630,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
                     className="w-[104px] shrink-0 cursor-pointer whitespace-nowrap rounded-xl border-[1.5px] border-line bg-white text-[13px] font-bold text-[#5b6a54] transition-colors duration-150 hover:bg-brand-soft hover:text-brand-dark disabled:cursor-default disabled:opacity-60"
                   >
                     {resetVerified
-                      ? "인증완료 ✅"
+                      ? "인증완료"
                       : resetVerificationSent
                         ? "재전송"
                         : "인증코드 받기"}
@@ -736,7 +736,7 @@ export default function AuthPanel({ initialView = "login" }: AuthPanelProps) {
     <div className="flex min-h-screen flex-col font-sans">
       <div className="flex items-center justify-center p-[22px]">
         <Link href="/" className="text-[22px] font-extrabold text-brand-dark">
-          키워볼래 🌱
+          키워볼래
         </Link>
       </div>
       {content}

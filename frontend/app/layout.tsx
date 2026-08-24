@@ -8,7 +8,7 @@ import { GachaCosmeticsProvider } from '@/features/gacha/use-gacha-cosmetics';
 import OnboardingTour from '@/components/onboarding/OnboardingTour';
 
 export const metadata = {
-  title: '키워볼래 🌱',
+  title: '키워볼래',
   description: '식물을 키우고, 기록하고, 진짜 열매를 받아보세요',
 };
 

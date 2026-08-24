@@ -7,8 +7,12 @@ import {
   downloadAdminCardMarketRevenueCsv,
   getAdminCardMarketRevenue,
 } from "@/lib/admin-card-market-api";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AdminPagination from "./AdminPagination";
+import { useScrollOnPageLoad } from "./use-scroll-on-page-load";
 
+const PAGE_SIZE = 10;
+const GRID_COLS = "grid-cols-[.6fr_1.2fr_1fr_1fr_1fr_1fr]";
 const POINT = new Intl.NumberFormat("ko-KR");
 
 function point(value: number) {
@@ -24,6 +28,7 @@ export default function AdminCardMarketRevenuePanel({
 }: {
   accessToken: string;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
   const [revenue, setRevenue] = useState<AdminCardMarketRevenue | null>(null);
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -34,12 +39,15 @@ export default function AdminCardMarketRevenuePanel({
   );
   const [exporting, setExporting] = useState(false);
 
+  useScrollOnPageLoad(page, loading, sectionRef);
+
   const load = useCallback(
     (signal?: AbortSignal) => {
       setLoading(true);
       setError("");
       return getAdminCardMarketRevenue(accessToken, {
         page,
+        size: PAGE_SIZE,
         signal,
         filters: appliedFilters,
       })
@@ -282,9 +290,9 @@ export default function AdminCardMarketRevenuePanel({
         ))}
       </section>
 
-      <section className="overflow-x-auto rounded-[18px] border border-line bg-white shadow-sm">
+      <section ref={sectionRef} className="overflow-x-auto rounded-[18px] border border-line bg-white shadow-sm">
         <div className="min-w-[1000px]">
-          <div className="grid grid-cols-[.6fr_1.2fr_1fr_1fr_1fr_1fr] gap-3 border-b border-line bg-[#fafbf7] px-4 py-3 text-xs font-extrabold text-sub">
+          <div className={`grid gap-3 border-b border-line bg-[#fafbf7] px-4 py-3 text-xs font-extrabold text-sub ${GRID_COLS}`}>
             <div>거래</div>
             <div>카드</div>
             <div>판매자 → 구매자</div>
@@ -292,9 +300,9 @@ export default function AdminCardMarketRevenuePanel({
             <div className="text-right">플랫폼 수익</div>
             <div className="text-right">완료 시각</div>
           </div>
-          {loading ? (
+          {loading && !revenue?.content.length ? (
             <div className="p-12 text-center text-sub">
-              수익 내역을 불러오는 중...
+              거래 내역을 불러오고 있어요.
             </div>
           ) : error ? (
             <div className="p-12 text-center text-danger">{error}</div>
@@ -332,26 +340,8 @@ export default function AdminCardMarketRevenuePanel({
           )}
         </div>
         {revenue && revenue.totalPages > 1 ? (
-          <div className="flex items-center justify-center gap-3 border-t border-line px-4 py-4">
-            <button
-              type="button"
-              disabled={page <= 0}
-              onClick={() => setPage((current) => current - 1)}
-              className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
-            >
-              이전
-            </button>
-            <span className="text-sm font-bold text-sub">
-              {page + 1} / {revenue.totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={page + 1 >= revenue.totalPages}
-              onClick={() => setPage((current) => current + 1)}
-              className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
-            >
-              다음
-            </button>
+          <div className="border-t border-line px-4 pt-4 pb-6">
+            <AdminPagination page={page} totalPages={revenue.totalPages} onChange={setPage} />
           </div>
         ) : null}
       </section>

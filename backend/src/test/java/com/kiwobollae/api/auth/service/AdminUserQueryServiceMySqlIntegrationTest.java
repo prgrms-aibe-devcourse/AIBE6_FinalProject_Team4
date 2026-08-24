@@ -83,8 +83,6 @@ class AdminUserQueryServiceMySqlIntegrationTest {
 				.phoneNumber("01012345678")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
-				.experience(0L)
 				.status(status)
 				.build());
 	}

@@ -90,7 +90,7 @@ export default function NotiSettings() {
       <h1 className="mb-5 text-2xl font-extrabold">알림 설정</h1>
 
       {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-sub">불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">불러오고 있어요</div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">{error}</div>
       ) : (

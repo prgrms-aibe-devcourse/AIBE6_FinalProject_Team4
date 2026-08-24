@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ApiError, SpringPage } from "@/lib/api";
 import {
   AdminUserStatus,
@@ -10,18 +11,22 @@ import {
   suspendAdminUser,
 } from "@/features/admin/user-api";
 import { useUI } from "@/lib/ui";
+import AdminPagination from "./AdminPagination";
+import { useScrollOnPageLoad } from "./use-scroll-on-page-load";
+
+const PAGE_SIZE = 10;
+const COLUMN_COUNT = 6;
+const VALID_STATUSES: AdminUserStatus[] = ["ACTIVE", "SUSPENDED", "WITHDRAWN"];
 
 const STATUS_LABELS: Record<AdminUserStatus, string> = {
   ACTIVE: "활성",
   SUSPENDED: "정지",
-  RESTRICTED: "제한",
   WITHDRAWN: "탈퇴",
 };
 
 const STATUS_STYLES: Record<AdminUserStatus, string> = {
   ACTIVE: "bg-[#E8F3D8] text-brand-text",
   SUSPENDED: "bg-[#FBEDE3] text-[#b5771a]",
-  RESTRICTED: "bg-[#FFF3CC] text-gold-text",
   WITHDRAWN: "bg-[#f0f1ea] text-[#7a8176]",
 };
 
@@ -39,10 +44,26 @@ export default function AdminUserPanel({
   onViewReports: (userId: number, label: string) => void;
 }) {
   const { showToast, askConfirm } = useUI();
-  const [searchInput, setSearchInput] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [status, setStatus] = useState<AdminUserStatus | "">("");
-  const [page, setPage] = useState(0);
+  const sectionRef = useRef<HTMLElement>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // 새로고침·공유 링크에서도 검색어/상태/페이지가 그대로 복원되도록 쿼리스트링에서 초기값을
+  // 읽는다. tab 등 이 탭과 무관한 다른 파라미터는 아래 동기화 effect에서 그대로 보존한다.
+  const initialKeyword = searchParams.get("userKeyword") ?? "";
+  const initialStatusParam = searchParams.get("userStatus");
+  const initialStatus: AdminUserStatus | "" =
+    initialStatusParam && (VALID_STATUSES as string[]).includes(initialStatusParam)
+      ? (initialStatusParam as AdminUserStatus)
+      : "";
+  const initialPageParam = Number(searchParams.get("userPage"));
+  const initialPage = Number.isInteger(initialPageParam) && initialPageParam > 0 ? initialPageParam - 1 : 0;
+
+  const [searchInput, setSearchInput] = useState(initialKeyword);
+  const [keyword, setKeyword] = useState(initialKeyword);
+  const [status, setStatus] = useState<AdminUserStatus | "">(initialStatus);
+  const [page, setPage] = useState(initialPage);
   const [usersPage, setUsersPage] = useState<SpringPage<AdminUserSummary> | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -58,6 +79,22 @@ export default function AdminUserPanel({
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
+  // 검색어/상태/페이지가 바뀔 때마다 쿼리스트링에 반영한다. tab 같은 다른 파라미터는
+  // 현재 URL에서 그대로 가져와 보존하고, 기본값(빈 검색어·전체 상태·1페이지)이면
+  // URL을 지저분하게 만들지 않도록 해당 파라미터를 아예 지운다.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (keyword) params.set("userKeyword", keyword);
+    else params.delete("userKeyword");
+    if (status) params.set("userStatus", status);
+    else params.delete("userStatus");
+    if (page > 0) params.set("userPage", String(page + 1));
+    else params.delete("userPage");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, status, page]);
+
   const load = useCallback(
     (signal?: AbortSignal) =>
       getAdminUsers({
@@ -65,7 +102,7 @@ export default function AdminUserPanel({
         keyword: keyword || undefined,
         status: status || undefined,
         page,
-        size: 20,
+        size: PAGE_SIZE,
         signal,
       })
         .then(setUsersPage)
@@ -144,11 +181,16 @@ export default function AdminUserPanel({
     });
   };
 
-  const users = usersPage?.content ?? [];
+  // reportCount는 백엔드에서 페이징 쿼리와 별도로 계산돼 정렬 가능한 컬럼이 아니라
+  // (User 엔티티에 없는 파생값) 서버에 sort=reportCount로 요청할 수 없다 — 현재 페이지 안에서만
+  // 누적 신고수가 높은 순으로 보여준다.
+  const users = [...(usersPage?.content ?? [])].sort((a, b) => b.reportCount - a.reportCount);
   const totalPages = usersPage?.totalPages ?? 0;
 
+  useScrollOnPageLoad(page, loading, sectionRef);
+
   return (
-    <section className="overflow-hidden rounded-[18px] bg-white shadow-card">
+    <section ref={sectionRef} className="overflow-hidden rounded-[18px] bg-white shadow-card">
       <div className="border-b border-line p-5">
         <h2 className="text-lg font-extrabold">유저 관리</h2>
         <p className="mt-1 text-sm text-sub">
@@ -184,7 +226,6 @@ export default function AdminUserPanel({
             <option value="">전체 상태</option>
             <option value="ACTIVE">활성 회원</option>
             <option value="SUSPENDED">정지 회원</option>
-            <option value="RESTRICTED">제한 회원</option>
             <option value="WITHDRAWN">탈퇴 회원</option>
           </select>
         </div>
@@ -203,21 +244,21 @@ export default function AdminUserPanel({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
-                  회원을 불러오고 있어요.
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
+                  조건에 맞는 회원을 불러오고 있어요.
                 </td>
               </tr>
             ) : errorMessage ? (
               <tr>
-                <td colSpan={6} role="alert" className="px-5 py-10 text-center text-danger">
+                <td colSpan={COLUMN_COUNT} role="alert" className="px-5 py-10 text-center text-danger">
                   {errorMessage}
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
                   조건에 맞는 회원이 없어요.
                 </td>
               </tr>
@@ -289,29 +330,9 @@ export default function AdminUserPanel({
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line px-5 py-3.5 text-sm">
+      <div className="flex flex-col items-center gap-3 border-t border-line px-5 pt-3.5 pb-5 text-sm sm:flex-row sm:justify-between">
         <span className="text-sub">총 {usersPage?.totalElements ?? 0}명</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            disabled={page === 0 || loading}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="min-w-[64px] text-center font-bold">
-            {totalPages === 0 ? 0 : page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => current + 1)}
-            disabled={loading || totalPages === 0 || page + 1 >= totalPages}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
       </div>
 
       {suspendTarget && (

@@ -139,7 +139,7 @@ export default function EditBoardPostPage({ params }: { params: { id: string } }
   if (!hydrated || loading) {
     return (
       <div className="container">
-        <div className="px-5 py-[60px] text-center text-sub">게시글을 불러오고 있어요 🌱</div>
+        <div className="px-5 py-[60px] text-center text-sub">게시글을 불러오고 있어요</div>
       </div>
     );
   }

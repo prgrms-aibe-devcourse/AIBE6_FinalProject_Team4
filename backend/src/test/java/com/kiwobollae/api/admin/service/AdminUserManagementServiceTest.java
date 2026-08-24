@@ -36,7 +36,6 @@ class AdminUserManagementServiceTest {
 				.name("김초록")
 				.provider(AuthProvider.LOCAL)
 				.role(role)
-				.level(1)
 				.status(status)
 				.build();
 	}

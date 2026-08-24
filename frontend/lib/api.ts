@@ -181,8 +181,6 @@ export interface UserResponse {
   phoneNumber: string | null;
   provider: string;
   role: string;
-  level: number;
-  experience: number;
   status: string;
   suspendedReason: string | null;
   withdrawnAt: string | null;

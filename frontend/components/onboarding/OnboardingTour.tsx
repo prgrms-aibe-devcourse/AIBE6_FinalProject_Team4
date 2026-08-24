@@ -14,7 +14,7 @@ import SpotlightTour, { TourStep } from "./SpotlightTour";
 const TOUR_STEPS_DESKTOP: TourStep[] = [
   {
     targetId: null,
-    title: "환영해요! 🌱",
+    title: "환영해요!",
     description: "키워볼래가 처음이시죠? 위쪽 메뉴를 하나씩 소개해드릴게요.",
   },
   {
@@ -68,7 +68,7 @@ const TOUR_STEPS_DESKTOP: TourStep[] = [
 const TOUR_STEPS_MOBILE: TourStep[] = [
   {
     targetId: null,
-    title: "환영해요! 🌱",
+    title: "환영해요!",
     description: "키워볼래가 처음이시죠? 아래 메뉴를 하나씩 소개해드릴게요.",
   },
   {

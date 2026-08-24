@@ -27,8 +27,8 @@ import {
   adminCancelExchange,
   deliverExchange,
   ExchangeOrderData,
+  ExchangeStatus,
   getExchangesForAdmin,
-  prepareExchange,
   shipExchange,
 } from "@/lib/exchange-api";
 import {
@@ -46,8 +46,10 @@ import { fmt, useStore } from "@/lib/store";
 import { couponName } from "@/lib/coupon-label";
 import { ProductCategory } from "@/lib/product-api";
 import { useUI } from "@/lib/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminPagination from "@/components/admin/AdminPagination";
+import { useScrollOnPageLoad } from "@/components/admin/use-scroll-on-page-load";
 
 const CANCEL_REASON_OPTIONS = [
   "품절",
@@ -63,7 +65,6 @@ const delMeta: Record<string, [string, string, string]> = {
   DELIVERED: ["배송완료", "bg-[#E8F3D8] text-brand-text", "완료됨"],
 };
 const exMeta: Record<string, [string, string, string]> = {
-  REQUESTED: ["신청됨", "bg-[#F0ECF9] text-[#7a5ea8]", "준비 시작"],
   PREPARING: ["준비중", "bg-[#FFF3CC] text-gold-text", "배송 시작"],
   SHIPPING: ["배송중", "bg-[#E3F0FA] text-[#3a76a8]", "배송 완료"],
   DELIVERED: ["배송완료", "bg-[#E8F3D8] text-brand-text", "완료됨"],
@@ -91,6 +92,62 @@ function localMidnightIso(baseDate: Date, offsetDays: number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T00:00:00`;
 }
 
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(date);
+}
+
+const ORDER_STATUS_OPTIONS = [
+  { key: "", label: "전체" },
+  { key: "PREPARING", label: "준비중" },
+  { key: "SHIPPING", label: "배송중" },
+  { key: "DELIVERED", label: "배송완료" },
+  { key: "PURCHASE_CONFIRMED", label: "구매확정" },
+  { key: "CANCELLED", label: "취소됨" },
+] as const;
+
+// 배송 흐름(준비중/배송중/배송완료)과 주문 자체 상태(구매확정/취소됨)를 하나의 드롭다운으로
+// 합쳐 보여주되, 실제 API 호출 시에는 어느 필드로 걸어야 하는지에 따라 나눠서 보낸다.
+function buildOrderFilters(key: string) {
+  if (!key) return undefined;
+  if (key === "PURCHASE_CONFIRMED" || key === "CANCELLED") {
+    return { status: key as "PURCHASE_CONFIRMED" | "CANCELLED" };
+  }
+  // 취소된 주문과 구매확정된 주문도 배송상태(취소/확정 시점 값)가 그대로 남아 있어
+  // deliveryStatus만으로 걸면 함께 걸려 나온다. 서버가 페이지네이션까지 끝낸 뒤에
+  // 클라이언트에서 걸러내면 뒷페이지가 통째로 비거나 totalPages가 틀어지므로,
+  // status=PAID를 함께 보내 서버 쿼리 단계에서 제외한다.
+  return { deliveryStatus: key as "PREPARING" | "SHIPPING" | "DELIVERED", status: "PAID" as const };
+}
+
+// 완료된(배송완료/구매확정) 건만 최신순으로, 그 외에는 아직 처리해야 할 오래된 것부터 보이게 한다.
+function orderSort(filterKey: string) {
+  return filterKey === "DELIVERED" || filterKey === "PURCHASE_CONFIRMED"
+    ? "orderedAt,DESC"
+    : "orderedAt,ASC";
+}
+function exchangeSort(filterKey: string) {
+  return filterKey === "DELIVERED" ? "requestedAt,DESC" : "requestedAt,ASC";
+}
+
+const EXCHANGE_STATUS_OPTIONS = [
+  { key: "", label: "전체" },
+  { key: "PREPARING", label: "준비중" },
+  { key: "SHIPPING", label: "배송중" },
+  { key: "DELIVERED", label: "배송완료" },
+  { key: "CANCELLED", label: "취소됨" },
+] as const;
+
+const ORDER_STATUS_PRIORITY: Record<string, number> = {
+  PREPARING: 0, SHIPPING: 1, DELIVERED: 2, PURCHASE_CONFIRMED: 3, CANCELLED: 4,
+};
+const EXCHANGE_STATUS_PRIORITY: Record<string, number> = {
+  PREPARING: 0, SHIPPING: 1, DELIVERED: 2, CANCELLED: 3,
+};
+
 function formatDelta(diff: number): string {
   if (diff > 0) return `▲ 어제 대비 +${diff}`;
   if (diff < 0) return `▼ 어제 대비 ${diff}`;
@@ -105,41 +162,10 @@ const CHIP = "rounded-full px-2.5 py-1 text-xs font-extrabold";
 const BTN_SOFT =
   "cursor-pointer rounded-[9px] bg-brand-soft px-[13px] py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white";
 const ADMIN_PAGE_SIZE = 10;
+// "전체" 조회에서 상태 우선순위대로 전체 정렬하려면 서버가 한 번에 다 내려줘야 한다 —
+// 서버는 필드 하나로만 정렬할 수 있어 커스텀 상태 순서를 페이지 단위로는 만들 수 없다.
+const ADMIN_ALL_SIZE = 2000;
 
-function AdminPagination({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (page: number) => void;
-}) {
-  if (totalPages <= 1) return null;
-  return (
-    <div className="flex items-center justify-center gap-3 border-t border-line px-4 py-4">
-      <button
-        type="button"
-        disabled={page <= 0}
-        onClick={() => onChange(page - 1)}
-        className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
-      >
-        이전
-      </button>
-      <span className="text-sm font-bold text-sub">
-        {page + 1} / {totalPages}
-      </span>
-      <button
-        type="button"
-        disabled={page + 1 >= totalPages}
-        onClick={() => onChange(page + 1)}
-        className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
-      >
-        다음
-      </button>
-    </div>
-  );
-}
 const PRODUCT_CATEGORY_LABEL: Record<ProductCategory, string> = {
   KIT: "재배 키트",
   SEEDLING: "모종",
@@ -225,7 +251,7 @@ export default function Admin({
         1,
         controller.signal,
       ),
-      getExchangesForAdmin(accessToken, "REQUESTED", 0, 1, controller.signal),
+      getExchangesForAdmin(accessToken, "PREPARING", 0, 1, controller.signal),
       getAdminUsers({
         accessToken,
         status: "ACTIVE",
@@ -292,7 +318,7 @@ export default function Admin({
     {
       label: "교환 신청",
       value: kpisLoading || !kpis ? "-" : `${kpis.pendingExchanges}건`,
-      delta: kpisLoading || !kpis ? "" : "승인 대기 중",
+      delta: kpisLoading || !kpis ? "" : "배송 준비 중",
       dc: "text-gold-text",
       tab: "exchanges",
     },
@@ -316,6 +342,9 @@ export default function Admin({
       tab: "reports",
     },
   ];
+  const ordersSectionRef = useRef<HTMLDivElement>(null);
+  const exchangesSectionRef = useRef<HTMLDivElement>(null);
+  const productsSectionRef = useRef<HTMLDivElement>(null);
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [orderItemsById, setOrderItemsById] = useState<
     Record<number, OrderItemData[]>
@@ -323,6 +352,7 @@ export default function Admin({
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState("");
   const [ordersTotalPages, setOrdersTotalPages] = useState(0);
+  const [orderStatusFilter, setOrderStatusFilter] = useState("");
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -334,14 +364,19 @@ export default function Admin({
 
     getOrdersForAdmin(
       accessToken,
-      undefined,
-      adminPage,
-      ADMIN_PAGE_SIZE,
+      buildOrderFilters(orderStatusFilter),
+      orderStatusFilter ? adminPage : 0,
+      orderStatusFilter ? ADMIN_PAGE_SIZE : ADMIN_ALL_SIZE,
       controller.signal,
+      orderSort(orderStatusFilter),
     )
       .then((page) => {
         setOrders(page.content.map((detail) => detail.order));
-        setOrdersTotalPages(page.totalPages);
+        setOrdersTotalPages(
+          orderStatusFilter
+            ? page.totalPages
+            : Math.ceil(page.totalElements / ADMIN_PAGE_SIZE),
+        );
         const map: Record<number, OrderItemData[]> = {};
         page.content.forEach((detail) => {
           map[detail.order.id] = detail.items;
@@ -366,11 +401,12 @@ export default function Admin({
       });
 
     return () => controller.abort();
-  }, [adminPage, hydrated, state.accessToken]);
+  }, [adminPage, orderStatusFilter, hydrated, state.accessToken]);
   const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
   const [exchangesLoading, setExchangesLoading] = useState(true);
   const [exchangesError, setExchangesError] = useState("");
   const [exchangesTotalPages, setExchangesTotalPages] = useState(0);
+  const [exchangeStatusFilter, setExchangeStatusFilter] = useState("");
 
   useEffect(() => {
     if (!hydrated || !state.accessToken) return;
@@ -382,14 +418,19 @@ export default function Admin({
 
     getExchangesForAdmin(
       accessToken,
-      undefined,
-      adminPage,
-      ADMIN_PAGE_SIZE,
+      (exchangeStatusFilter || undefined) as ExchangeStatus | undefined,
+      exchangeStatusFilter ? adminPage : 0,
+      exchangeStatusFilter ? ADMIN_PAGE_SIZE : ADMIN_ALL_SIZE,
       controller.signal,
+      exchangeSort(exchangeStatusFilter),
     )
       .then((page) => {
         setExchanges(page.content);
-        setExchangesTotalPages(page.totalPages);
+        setExchangesTotalPages(
+          exchangeStatusFilter
+            ? page.totalPages
+            : Math.ceil(page.totalElements / ADMIN_PAGE_SIZE),
+        );
       })
       .catch((requestError) => {
         if (
@@ -409,7 +450,7 @@ export default function Admin({
       });
 
     return () => controller.abort();
-  }, [adminPage, hydrated, state.accessToken]);
+  }, [adminPage, exchangeStatusFilter, hydrated, state.accessToken]);
 
   // SEEDLING 상품 종 이름 입력용 자동완성 — 이미 재배가이드가 생성된 종 이름만 검색된다.
   const [productSpeciesSuggestions, setProductSpeciesSuggestions] = useState<
@@ -419,6 +460,56 @@ export default function Admin({
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
+
+  // 주문/교환은 페이지마다 실제로 서버에 다시 조회하므로 응답이 온 뒤(loading===false)에
+  // 스크롤한다. 상품은 전체를 한 번에 불러온 뒤 화면에서만 나눠 보여줘서(재요청 없음)
+  // productsLoading이 페이지 전환에 반응하지 않는다 — 그래서 상품 목록만 아래
+  // AdminPagination의 onChange에서 즉시 스크롤한다.
+  useScrollOnPageLoad(adminPage, ordersLoading, ordersSectionRef, tab === "orders");
+  useScrollOnPageLoad(adminPage, exchangesLoading, exchangesSectionRef, tab === "exchanges");
+
+  // "전체" 조회일 때는 상태별로 준비중→배송중→배송완료→구매확정→취소됨 순서로 묶어서
+  // 전체 데이터를 정렬한 뒤, 그 정렬된 전체 목록을 여기서 직접 페이지 단위로 잘라 보여준다
+  // (서버는 필드 하나로만 정렬할 수 있어 커스텀 상태 순서로는 페이지네이션을 못 해준다 —
+  // 그래서 "전체"일 때만 한 번에 다 받아와 클라이언트에서 정렬·페이지네이션한다).
+  // 배송완료/구매확정은 이미 끝난 건이라 최신순, 나머지는 오래된순이 되도록 그룹 안에서
+  // 필요한 그룹만 뒤집는다 — 기본 조회 자체가 orderedAt 오래된순이라 뒤집으면 최신순이 된다.
+  const sortedAllOrders = useMemo(() => {
+    if (orderStatusFilter) return orders;
+    const buckets: Record<string, OrderData[]> = {
+      PREPARING: [], SHIPPING: [], DELIVERED: [], PURCHASE_CONFIRMED: [], CANCELLED: [],
+    };
+    orders.forEach((o) => {
+      const key = o.status === "CANCELLED" || o.status === "PURCHASE_CONFIRMED" ? o.status : o.deliveryStatus;
+      buckets[key].push(o);
+    });
+    buckets.DELIVERED.reverse();
+    buckets.PURCHASE_CONFIRMED.reverse();
+    return Object.keys(ORDER_STATUS_PRIORITY)
+      .sort((a, b) => ORDER_STATUS_PRIORITY[a] - ORDER_STATUS_PRIORITY[b])
+      .flatMap((key) => buckets[key]);
+  }, [orders, orderStatusFilter]);
+
+  const displayOrders = orderStatusFilter
+    ? sortedAllOrders
+    : sortedAllOrders.slice(adminPage * ADMIN_PAGE_SIZE, (adminPage + 1) * ADMIN_PAGE_SIZE);
+
+  const sortedAllExchanges = useMemo(() => {
+    if (exchangeStatusFilter) return exchanges;
+    const buckets: Record<string, ExchangeOrderData[]> = {
+      PREPARING: [], SHIPPING: [], DELIVERED: [], CANCELLED: [],
+    };
+    exchanges.forEach((x) => buckets[x.status].push(x));
+    buckets.DELIVERED.reverse();
+    return Object.keys(EXCHANGE_STATUS_PRIORITY)
+      .sort((a, b) => EXCHANGE_STATUS_PRIORITY[a] - EXCHANGE_STATUS_PRIORITY[b])
+      .flatMap((key) => buckets[key]);
+  }, [exchanges, exchangeStatusFilter]);
+
+  const displayExchanges = exchangeStatusFilter
+    ? sortedAllExchanges
+    : sortedAllExchanges.slice(adminPage * ADMIN_PAGE_SIZE, (adminPage + 1) * ADMIN_PAGE_SIZE);
+
   const [productSubmitting, setProductSubmitting] = useState(false);
   const [productBusyId, setProductBusyId] = useState<number | null>(null);
   const [stockDeltas, setStockDeltas] = useState<Record<number, string>>({});
@@ -496,7 +587,7 @@ export default function Admin({
         updated = await deliverOrderForAdmin(o.id, state.accessToken);
       else return;
       setOrders((prev) => prev.map((p) => (p.id === o.id ? updated : p)));
-      showToast("배송 상태를 업데이트했어요. 고객에게 알림이 발송돼요 📦");
+      showToast("배송 상태를 업데이트했어요. 고객에게 알림이 발송돼요");
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError
@@ -559,15 +650,13 @@ export default function Admin({
     if (!state.accessToken) return;
     try {
       let updated: ExchangeOrderData;
-      if (x.status === "REQUESTED")
-        updated = await prepareExchange(x.id, state.accessToken);
-      else if (x.status === "PREPARING")
+      if (x.status === "PREPARING")
         updated = await shipExchange(x.id, state.accessToken);
       else if (x.status === "SHIPPING")
         updated = await deliverExchange(x.id, state.accessToken);
       else return;
       setExchanges((prev) => prev.map((e) => (e.id === x.id ? updated : e)));
-      showToast("교환 상태를 업데이트했어요 🍉");
+      showToast("교환 상태를 업데이트했어요");
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError
@@ -855,17 +944,37 @@ export default function Admin({
       </div>
 
       {tab === "orders" && (
-        <div className={PANEL}>
-          <div className={`grid grid-cols-[1fr_1fr_1fr_1fr_1.4fr] ${HEAD}`}>
+        <div ref={ordersSectionRef} className={PANEL}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-[#f2f3ec] px-[18px] py-3">
+            <label className="text-xs font-bold text-sub">
+              상태
+              <select
+                value={orderStatusFilter}
+                onChange={(event) => {
+                  setOrderStatusFilter(event.target.value);
+                  changeAdminPage(0);
+                }}
+                className="ml-2 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1.5 text-xs font-bold text-ink outline-none focus:border-brand"
+              >
+                {ORDER_STATUS_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className={`grid grid-cols-[.9fr_1fr_1.1fr_.9fr_1fr_1.4fr] ${HEAD}`}>
             <div>주문번호</div>
             <div>고객</div>
+            <div>주문일시</div>
             <div>금액</div>
             <div>배송상태</div>
             <div className="text-right">처리</div>
           </div>
-          {ordersLoading ? (
+          {ordersLoading && orders.length === 0 ? (
             <div className="px-[18px] py-10 text-center text-sm text-sub">
-              주문을 불러오고 있어요 🌱
+              주문 내역을 불러오고 있어요.
             </div>
           ) : ordersError ? (
             <div className="px-[18px] py-10 text-center text-sm text-sub">
@@ -876,7 +985,7 @@ export default function Admin({
               주문이 없어요.
             </div>
           ) : (
-            orders.map((o) => {
+            displayOrders.map((o) => {
               const m = delMeta[o.deliveryStatus];
               const cancelled = o.status === "CANCELLED";
               const advanceable =
@@ -886,10 +995,11 @@ export default function Admin({
               return (
                 <div key={o.id} className="border-t border-[#f2f3ec]">
                   <div
-                    className={`grid grid-cols-[1fr_1fr_1fr_1fr_1.4fr] ${ROW} border-t-0 pb-2`}
+                    className={`grid grid-cols-[.9fr_1fr_1.1fr_.9fr_1fr_1.4fr] ${ROW} border-t-0 pb-2`}
                   >
                     <div className="font-bold">주문 #{o.id}</div>
                     <div className="text-[#6d7a68]">{o.receiverName}</div>
+                    <div className="text-[12.5px] text-sub">{formatDateTime(o.orderedAt)}</div>
                     <div className="font-bold text-gold-text">
                       {fmt(o.totalPoint)}P
                     </div>
@@ -953,25 +1063,47 @@ export default function Admin({
               );
             })
           )}
-          <AdminPagination
-            page={adminPage}
-            totalPages={ordersTotalPages}
-            onChange={changeAdminPage}
-          />
+          <div className="border-t border-line px-4 pt-4 pb-6">
+            <AdminPagination
+              page={adminPage}
+              totalPages={ordersTotalPages}
+              onChange={changeAdminPage}
+            />
+          </div>
         </div>
       )}
 
       {tab === "exchanges" && (
-        <div className={PANEL}>
-          <div className={`grid grid-cols-[1.3fr_1fr_1fr_1.4fr] ${HEAD}`}>
+        <div ref={exchangesSectionRef} className={PANEL}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-[#f2f3ec] px-[18px] py-3">
+            <label className="text-xs font-bold text-sub">
+              상태
+              <select
+                value={exchangeStatusFilter}
+                onChange={(event) => {
+                  setExchangeStatusFilter(event.target.value);
+                  changeAdminPage(0);
+                }}
+                className="ml-2 cursor-pointer rounded-lg border-[1.5px] border-line bg-white px-2.5 py-1.5 text-xs font-bold text-ink outline-none focus:border-brand"
+              >
+                {EXCHANGE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className={`grid grid-cols-[1.1fr_.9fr_1.1fr_.8fr_1.4fr] ${HEAD}`}>
             <div>실물상품</div>
             <div>쿠폰</div>
+            <div>신청일시</div>
             <div>상태</div>
             <div className="text-right">처리</div>
           </div>
-          {exchangesLoading ? (
+          {exchangesLoading && exchanges.length === 0 ? (
             <div className="px-[18px] py-10 text-center text-sm text-sub">
-              교환 신청을 불러오고 있어요 🍉
+              교환 신청 내역을 불러오고 있어요.
             </div>
           ) : exchangesError ? (
             <div className="px-[18px] py-10 text-center text-sm text-sub">
@@ -982,53 +1114,61 @@ export default function Admin({
               교환 신청이 없어요.
             </div>
           ) : (
-            exchanges.map((x) => {
+            displayExchanges.map((x) => {
               const m = exMeta[x.status];
               const advanceable =
-                x.status === "REQUESTED" ||
                 x.status === "PREPARING" ||
                 x.status === "SHIPPING";
               return (
-                <div
-                  key={x.id}
-                  className={`grid grid-cols-[1.3fr_1fr_1fr_1.4fr] ${ROW}`}
-                >
-                  <div className="font-bold">{x.exchangeProductName}</div>
-                  <div className="text-[#6d7a68]">
-                    {couponName(x.cardName)} {x.usedCardCount}장
+                <div key={x.id} className="border-t border-[#f2f3ec]">
+                  <div
+                    className={`grid grid-cols-[1.1fr_.9fr_1.1fr_.8fr_1.4fr] ${ROW} border-t-0 pb-2`}
+                  >
+                    <div className="font-bold">{x.exchangeProductName}</div>
+                    <div className="text-[#6d7a68]">
+                      {couponName(x.cardName)} {x.usedCardCount}장
+                    </div>
+                    <div className="text-[12.5px] text-sub">{formatDateTime(x.requestedAt)}</div>
+                    <div>
+                      <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
+                    </div>
+                    <div className="flex justify-end gap-1.5">
+                      {advanceable && (
+                        <button
+                          type="button"
+                          onClick={() => advEx(x)}
+                          className="cursor-pointer rounded-[9px] bg-brand-soft px-3 py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white"
+                        >
+                          {m[2]}
+                        </button>
+                      )}
+                      {x.status === "PREPARING" && (
+                        <button
+                          type="button"
+                          onClick={() => cancelEx(x.id)}
+                          className="cursor-pointer rounded-[9px] border-[1.5px] border-[#e8bdad] bg-white px-3 py-[7px] text-[13px] font-bold text-[#b5502f] transition-colors duration-150 hover:bg-danger-soft hover:border-[#e0a488]"
+                        >
+                          취소
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <span className={`${CHIP} ${m[1]}`}>{m[0]}</span>
-                  </div>
-                  <div className="flex justify-end gap-1.5">
-                    {advanceable && (
-                      <button
-                        type="button"
-                        onClick={() => advEx(x)}
-                        className="cursor-pointer rounded-[9px] bg-brand-soft px-3 py-[7px] text-[13px] font-bold text-brand-dark transition-colors duration-150 hover:bg-brand hover:text-white"
-                      >
-                        {m[2]}
-                      </button>
-                    )}
-                    {x.status === "REQUESTED" && (
-                      <button
-                        type="button"
-                        onClick={() => cancelEx(x.id)}
-                        className="cursor-pointer rounded-[9px] border-[1.5px] border-[#e8bdad] bg-white px-3 py-[7px] text-[13px] font-bold text-[#b5502f] transition-colors duration-150 hover:bg-danger-soft hover:border-[#e0a488]"
-                      >
-                        취소
-                      </button>
-                    )}
+                  <div className="px-[18px] pb-3.5 text-[12.5px] text-sub">
+                    {x.receiverName} · {formatPhone(x.receiverPhone)} ·{" "}
+                    {x.zipCode && `[${x.zipCode}] `}
+                    {x.address} {x.addressDetail}
                   </div>
                 </div>
               );
             })
           )}
-          <AdminPagination
-            page={adminPage}
-            totalPages={exchangesTotalPages}
-            onChange={changeAdminPage}
-          />
+          <div className="border-t border-line px-4 pt-4 pb-6">
+            <AdminPagination
+              page={adminPage}
+              totalPages={exchangesTotalPages}
+              onChange={changeAdminPage}
+            />
+          </div>
         </div>
       )}
 
@@ -1225,7 +1365,7 @@ export default function Admin({
             </button>
           </div>
 
-          <div className={`${PANEL} overflow-x-auto`}>
+          <div ref={productsSectionRef} className={`${PANEL} overflow-x-auto`}>
             <div className="min-w-[920px]">
               <div
                 className={`grid grid-cols-[1.7fr_.8fr_.8fr_2.3fr_.7fr_1.4fr] ${HEAD}`}
@@ -1237,9 +1377,9 @@ export default function Admin({
                 <div>노출</div>
                 <div className="text-right">관리</div>
               </div>
-              {productsLoading ? (
+              {productsLoading && products.length === 0 ? (
                 <div className="px-5 py-12 text-center text-sm text-sub">
-                  상품을 불러오고 있어요.
+                  상품 목록을 불러오고 있어요.
                 </div>
               ) : productsError ? (
                 <div className="px-5 py-12 text-center text-sm text-danger">
@@ -1271,8 +1411,8 @@ export default function Admin({
                               }}
                             />
                           ) : (
-                            <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-brand-soft text-xl">
-                              {product.category === "GACHA_PACK" ? "🎴" : "🌱"}
+                            <span className="material-symbols-outlined grid h-10 w-10 flex-none place-items-center rounded-lg bg-brand-soft text-xl">
+                              {product.category === "GACHA_PACK" ? "style" : "potted_plant"}
                             </span>
                           )}
                           <div className="min-w-0">
@@ -1400,11 +1540,18 @@ export default function Admin({
                     );
                   })
               )}
-              <AdminPagination
-                page={adminPage}
-                totalPages={Math.ceil(products.length / ADMIN_PAGE_SIZE)}
-                onChange={changeAdminPage}
-              />
+              <div className="border-t border-line px-4 pt-4 pb-6">
+                <AdminPagination
+                  page={adminPage}
+                  totalPages={Math.ceil(products.length / ADMIN_PAGE_SIZE)}
+                  onChange={(next) => {
+                    changeAdminPage(next);
+                    if (typeof productsSectionRef.current?.scrollIntoView === "function") {
+                      productsSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>

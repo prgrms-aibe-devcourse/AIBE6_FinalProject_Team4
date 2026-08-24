@@ -90,7 +90,7 @@ public class OrderManagementService {
 		notificationService.notify(
 				order.getUser().getId(),
 				NotificationType.DELIVERY,
-				"주문하신 상품이 배송을 시작했어요 📦",
+				"주문하신 상품이 배송을 시작했어요",
 				"주문 #" + id + " · " + order.getAddress(),
 				"/my/orders#order-" + id,
 				REF_TYPE,
@@ -111,7 +111,7 @@ public class OrderManagementService {
 		notificationService.notify(
 				order.getUser().getId(),
 				NotificationType.DELIVERY,
-				"주문하신 상품이 배송완료됐어요 🎉",
+				"주문하신 상품이 배송완료됐어요",
 				"주문 #" + id + " · " + order.getAddress(),
 				"/my/orders#order-" + id,
 				REF_TYPE,

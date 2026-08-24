@@ -60,7 +60,7 @@ export default function Cart() {
   if (!state.accessToken) {
     return (
       <div className="container">
-        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub shadow-card">
           <p>장바구니는 로그인 후 이용할 수 있어요.</p>
           <Link href="/auth" className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white">
             로그인하러 가기
@@ -153,11 +153,11 @@ export default function Cart() {
       <h1 className="mb-5 text-[26px] font-extrabold">장바구니</h1>
 
       {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-sub">장바구니를 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub shadow-card">장바구니를 불러오고 있어요</div>
       ) : error ? (
-        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">{error}</div>
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub shadow-card">{error}</div>
       ) : items.length === 0 ? (
-        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
+        <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub shadow-card">
           <p>장바구니가 비어있어요.</p>
           <Link href="/shop" className="mt-4 inline-block rounded-xl bg-brand px-5 py-2.5 font-bold text-white hover:text-white">
             상점 둘러보기
@@ -166,7 +166,7 @@ export default function Cart() {
       ) : (
         <div className="grid items-start gap-[22px] [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-end">
+            <div className="flex h-7 items-center justify-end">
               <button
                 type="button"
                 disabled={checkedCount === 0 || bulkDeleting}
@@ -179,7 +179,7 @@ export default function Cart() {
             {items.map((item) => {
               const on = checked[item.id] && !item.soldOut;
               return (
-                <div key={item.id} className="flex items-center gap-3.5 rounded-2xl bg-white p-[15px] shadow-card">
+                <div key={item.id} className="flex items-center gap-3.5 rounded-2xl bg-white p-[15px] shadow-[0_2px_10px_rgba(46,54,42,.07)]">
                   <button
                     type="button"
                     onClick={() => !item.soldOut && setChecked((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
@@ -199,7 +199,7 @@ export default function Cart() {
                     role={item.imageUrl ? "img" : undefined}
                     aria-label={item.imageUrl ? item.productName : undefined}
                   >
-                    {!item.imageUrl && "🌱"}
+                    {!item.imageUrl && <span className="material-symbols-outlined">potted_plant</span>}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px] font-extrabold">{item.productName}</div>
@@ -247,8 +247,10 @@ export default function Cart() {
             })}
           </div>
 
-          <div className="rounded-[18px] bg-white p-[22px] shadow-card">
-            <div className="mb-4 font-extrabold">주문 요약</div>
+          <div className="flex flex-col gap-3">
+            <div className="h-7" />
+            <div className="rounded-[18px] bg-white p-[22px] shadow-card">
+              <div className="mb-4 font-extrabold">주문 요약</div>
             <div className="flex items-center justify-between py-2 text-[14.5px]">
               <span className="text-sub">선택 상품 합계</span>
               <PointPrice value={total} size="sm" />
@@ -278,6 +280,7 @@ export default function Cart() {
             >
               주문하기
             </button>
+            </div>
           </div>
         </div>
       )}

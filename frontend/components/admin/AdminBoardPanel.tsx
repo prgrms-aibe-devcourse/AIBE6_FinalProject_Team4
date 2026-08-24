@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { getBoardPostsForAdmin, restoreBoardPostAsAdmin } from "@/lib/board-api";
 import { useUI } from "@/lib/ui";
 import { useAdminPaginatedList } from "./use-admin-paginated-list";
+import AdminPagination from "./AdminPagination";
+import { useScrollOnPageLoad } from "./use-scroll-on-page-load";
+
+const PAGE_SIZE = 10;
+const COLUMN_COUNT = 6;
 
 const CATEGORY_LABEL: Record<string, string> = {
   NOTICE: "공지",
@@ -28,11 +33,12 @@ function formatDateTime(value: string): string {
 
 export default function AdminBoardPanel({ accessToken }: { accessToken: string }) {
   const { showToast, askConfirm } = useUI();
+  const sectionRef = useRef<HTMLElement>(null);
   const [restoringIds, setRestoringIds] = useState<Set<number>>(new Set());
 
   const fetchPage = useCallback(
     (page: number, signal?: AbortSignal) =>
-      getBoardPostsForAdmin("HIDDEN", page, 20, accessToken, signal),
+      getBoardPostsForAdmin("HIDDEN", page, PAGE_SIZE, accessToken, signal),
     [accessToken],
   );
   const {
@@ -45,6 +51,8 @@ export default function AdminBoardPanel({ accessToken }: { accessToken: string }
     errorMessage,
     reload,
   } = useAdminPaginatedList(fetchPage, "숨김 처리된 게시글 목록을 불러오지 못했어요.");
+
+  useScrollOnPageLoad(page, loading, sectionRef);
 
   const restorePost = (id: number) => {
     if (restoringIds.has(id)) return;
@@ -76,7 +84,7 @@ export default function AdminBoardPanel({ accessToken }: { accessToken: string }
   };
 
   return (
-    <section className="overflow-hidden rounded-[18px] bg-white shadow-card">
+    <section ref={sectionRef} className="overflow-hidden rounded-[18px] bg-white shadow-card">
       <div className="border-b border-line p-5">
         <h2 className="text-lg font-extrabold">게시판 관리</h2>
         <p className="mt-1 text-sm text-sub">
@@ -98,21 +106,21 @@ export default function AdminBoardPanel({ accessToken }: { accessToken: string }
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && posts.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
-                  목록을 불러오고 있어요.
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
+                  숨김 처리된 게시글을 불러오고 있어요.
                 </td>
               </tr>
             ) : errorMessage ? (
               <tr>
-                <td colSpan={6} role="alert" className="px-5 py-10 text-center text-danger">
+                <td colSpan={COLUMN_COUNT} role="alert" className="px-5 py-10 text-center text-danger">
                   {errorMessage}
                 </td>
               </tr>
             ) : posts.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
                   숨김 처리된 게시글이 없어요.
                 </td>
               </tr>
@@ -169,29 +177,9 @@ export default function AdminBoardPanel({ accessToken }: { accessToken: string }
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line px-5 py-3.5 text-sm">
+      <div className="flex flex-col items-center gap-3 border-t border-line px-5 pt-3.5 pb-5 text-sm sm:flex-row sm:justify-between">
         <span className="text-sub">총 {totalElements}건</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            disabled={page === 0 || loading}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="min-w-[64px] text-center font-bold">
-            {totalPages === 0 ? 0 : page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => current + 1)}
-            disabled={loading || totalPages === 0 || page + 1 >= totalPages}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
       </div>
     </section>
   );

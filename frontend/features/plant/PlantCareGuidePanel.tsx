@@ -17,11 +17,11 @@ const DIFFICULTY_BADGE: Record<string, { bg: string; color: string }> = {
 };
 const FALLBACK_BADGE = { bg: "#EEF3E4", color: "#4b7a1e" };
 
-const STAGE_EMOJI: Record<string, string> = {
-  파종: "🌰",
-  새싹: "🌱",
-  성장: "🌿",
-  수확: "🧺",
+const STAGE_ICON: Record<string, string> = {
+  파종: "grain",
+  새싹: "potted_plant",
+  성장: "grass",
+  수확: "shopping_basket",
 };
 
 const ENVIRONMENT_ROWS: {
@@ -151,7 +151,9 @@ export default function PlantCareGuidePanel({
     <section className={outerClass}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Heading className={headingClass}>🌿 AI 재배 가이드</Heading>
+          <Heading className={`${headingClass} flex items-center gap-1`}>
+            <span className="material-symbols-outlined align-middle text-[18px]">eco</span> AI 재배 가이드
+          </Heading>
           <p className="mt-1 text-[13px] text-sub">
             {speciesName} 재배법을 AI가 정리해 드려요.
           </p>
@@ -180,7 +182,7 @@ export default function PlantCareGuidePanel({
           {loading && (
             <div className="mt-3.5" role="status">
               <div className="mb-3 text-[14.5px] font-semibold text-brand-dark">
-                가이드를 만들고 있어요. 잠시만 기다려 주세요 🌱
+                가이드를 만들고 있어요. 잠시만 기다려 주세요
               </div>
               <Skeleton className="h-4 w-2/3" />
               <Skeleton className="mt-2 h-4 w-full" />
@@ -273,8 +275,11 @@ export default function PlantCareGuidePanel({
                   key={stage.name}
                   className="rounded-xl border-[1.5px] border-line px-3.5 py-3"
                 >
-                  <div className="text-[14px] font-extrabold">
-                    {STAGE_EMOJI[stage.name] || "🌱"} {stage.name}
+                  <div className="flex items-center gap-1 text-[14px] font-extrabold">
+                    <span className="material-symbols-outlined align-middle text-base">
+                      {STAGE_ICON[stage.name] || "potted_plant"}
+                    </span>{" "}
+                    {stage.name}
                   </div>
                   <div className="mt-1 text-[14px] leading-[1.6] text-[#4a5647]">
                     {stage.guide}

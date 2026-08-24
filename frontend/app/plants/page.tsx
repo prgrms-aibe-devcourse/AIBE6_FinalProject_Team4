@@ -8,7 +8,7 @@ import { ApiError, resolveImageUrl } from '@/lib/api';
 import { createPlant, deletePlantImage, getMyPlants, PlantProfileData, PlantStatus, updatePlant, uploadPlantImage } from '@/lib/plant-api';
 import { getProfileIdsWrittenToday } from '@/lib/journal-api';
 import { searchPlantCareGuideSpecies } from '@/lib/care-guide-api';
-import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS } from '@/lib/plant-visual';
+import { dPlus, EMOJI_THUMBNAIL_PREFIX, formatDate, plantThumbnail, plantVisual, PROFILE_EMOJI_OPTIONS, SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 import { nickValid, speciesNameValid } from '@/lib/plant-validation';
 import PlantCareGuidePanel from '@/features/plant/PlantCareGuidePanel';
 import { useSpotlightTour } from '@/lib/onboarding/useSpotlightTour';
@@ -344,7 +344,7 @@ export default function PlantsPage() {
       void refreshPlantStats();
       setOpen(false);
       resetRegisterForm();
-      showToast(`'${created.nickname}'와의 여정이 시작됐어요! 🌿`);
+      showToast(`'${created.nickname}'와의 여정이 시작됐어요!`);
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError ? requestError.message : '등록에 실패했어요. 잠시 후 다시 시도해 주세요.',
@@ -459,31 +459,31 @@ export default function PlantsPage() {
       </div>
 
       {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">식물 목록을 불러오고 있어요</div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">{error}</div>
       ) : list.length === 0 && writtenTodayFilterActive ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
-          <div className="animate-floaty text-[70px]">🌿</div>
+          <img src={SEEDLING_ICON_SRC} alt="" className="animate-floaty mx-auto h-[70px] w-[70px]" />
           {/* totalPages는 이제 필터링된 실제 개수 기준이라 정확하지만, 필터를 켠 채로 다른 곳에서
               오늘 일지를 써서 목록이 줄어들면 머무르고 있던 page가 범위를 벗어날 수 있다 —
               그 경우엔 "안 쓴 식물이 없다"가 전체가 아니라 이 페이지 한정이라는 걸 명시한다. */}
           <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
-            {totalPages > 1 ? '이 페이지에는 오늘 일지 안 쓴 식물이 없어요 🌿' : '오늘 일지 안 쓴 식물이 없어요 🌿'}
+            {totalPages > 1 ? '이 페이지에는 오늘 일지 안 쓴 식물이 없어요' : '오늘 일지 안 쓴 식물이 없어요'}
           </p>
         </div>
       ) : list.length === 0 && filter !== 'all' ? (
         // 진짜로 식물이 하나도 없는 것과, 상태 필터에 맞는 게 지금 없는 것은 다른 상황이다 —
         // 후자는 "등록하기" 유도가 아니라 필터에 걸린 것뿐이라는 걸 알려줘야 한다.
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
-          <div className="animate-floaty text-[70px]">🌱</div>
+          <img src={SEEDLING_ICON_SRC} alt="" className="animate-floaty mx-auto h-[70px] w-[70px]" />
           <p className="mt-4 text-[17px] font-bold text-[#6d7a68]">
             {FILTERS.find(([key]) => key === filter)?.[1]} 상태의 식물이 없어요.
           </p>
         </div>
       ) : list.length === 0 ? (
         <div className="rounded-[22px] bg-white px-5 py-[70px] text-center shadow-card">
-          <div className="animate-floaty text-[70px]">🌱</div>
+          <img src={SEEDLING_ICON_SRC} alt="" className="animate-floaty mx-auto h-[70px] w-[70px]" />
           <p className="mb-5 mt-4 text-[17px] font-bold text-[#6d7a68]">아직 함께하는 식물이 없네요.<br />첫 반려식물을 등록해 볼까요?</p>
           <button type="button" onClick={() => setOpen(true)} className="cursor-pointer rounded-xl bg-brand px-[26px] py-[13px] font-bold text-white">+ 새 식물 등록</button>
         </div>
@@ -510,7 +510,13 @@ export default function PlantsPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={resolveImageUrl(thumb.url)} alt="" className="h-[150px] w-full object-cover" />
                 ) : (
-                  <div className="flex h-[150px] items-center justify-center text-[72px]" style={{ background: thumb.grad }}>{thumb.emoji}</div>
+                  <div className="flex h-[150px] items-center justify-center" style={{ background: thumb.grad }}>
+                    {thumb.icon === 'spa' ? (
+                      <img src={SEEDLING_ICON_SRC} alt="" className="h-[72px] w-[72px]" />
+                    ) : (
+                      <span className="material-symbols-outlined text-[72px]">{thumb.icon}</span>
+                    )}
+                  </div>
                 )}
                 <div className="absolute left-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold" style={{ background: b.bg, color: b.color }}>{b.label}</div>
                 {selectMode && (
@@ -582,7 +588,7 @@ export default function PlantsPage() {
       {open && (
         <div onClick={() => !submitting && closeRegisterModal()} className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-[rgba(46,54,42,.4)] px-5 py-10">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[460px] animate-pop rounded-[22px] bg-white p-[26px]">
-            <h3 className="mb-1 text-xl font-extrabold">새 식물 등록 🌿</h3>
+            <h3 className="mb-1 flex items-center gap-1 text-xl font-extrabold">새 식물 등록 <span className="material-symbols-outlined align-middle text-lg">eco</span></h3>
             <p className="mb-5 text-[13.5px] text-sub">새 친구의 정보를 알려주세요.</p>
 
             <label className={LABEL}>별명 <span className="text-[#e5533b]">*</span></label>
@@ -609,10 +615,10 @@ export default function PlantsPage() {
               }`}
             />
             <div className={`mb-2.5 text-xs ${reg.speciesName ? (speciesV.ok ? 'text-brand' : 'text-[#e08a3c]') : 'text-faint'}`}>
-              {reg.speciesName ? speciesV.msg || '좋아요! 🌿' : '한글/영문/공백만 사용해 지어주세요.'}
+              {reg.speciesName ? speciesV.msg || '좋아요!' : '한글/영문/공백만 사용해 지어주세요.'}
             </div>
             {speciesSearchLoading ? (
-              <div className="mb-[18px] text-[13.5px] text-faint">비슷한 종을 찾고 있어요 🌱</div>
+              <div className="mb-[18px] text-[13.5px] text-faint">비슷한 종을 찾고 있어요</div>
             ) : speciesSuggestions.length > 0 ? (
               <div className="mb-[18px] flex flex-wrap gap-2">
                 {speciesSuggestions.map((name) => {
@@ -626,7 +632,11 @@ export default function PlantsPage() {
                         selected ? 'border-brand bg-[#F3F8EA] text-ink' : 'border-[#eceee5] bg-white text-[#6d7a68]'
                       }`}
                     >
-                      {plantVisual(name).emoji} {name}
+                      {plantVisual(name).icon === 'spa' ? (
+                        <img src={SEEDLING_ICON_SRC} alt="" className="inline-block h-4 w-4 align-middle" />
+                      ) : (
+                        <span className="material-symbols-outlined align-middle text-base">{plantVisual(name).icon}</span>
+                      )} {name}
                     </button>
                   );
                 })}
@@ -706,17 +716,17 @@ export default function PlantsPage() {
             ) : (
               <>
                 <div className="mb-1.5 mt-2 flex flex-wrap gap-2.5">
-                  {PROFILE_EMOJI_OPTIONS.map(([emoji, grad], i) => (
+                  {PROFILE_EMOJI_OPTIONS.map(([icon, grad], i) => (
                     <button
                       key={i}
                       type="button"
                       onClick={() => setReg({ ...reg, photoIdx: i })}
-                      className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] text-[28px] ${
+                      className={`flex h-16 w-16 cursor-pointer items-center justify-center rounded-xl border-[3px] ${
                         reg.photoIdx === i ? 'border-brand' : 'border-transparent'
                       }`}
                       style={{ background: grad }}
                     >
-                      {emoji}
+                      <span className="material-symbols-outlined text-[28px]">{icon}</span>
                     </button>
                   ))}
                 </div>

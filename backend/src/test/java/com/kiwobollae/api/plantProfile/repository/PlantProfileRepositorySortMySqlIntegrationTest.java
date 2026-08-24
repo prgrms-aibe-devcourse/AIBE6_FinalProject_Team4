@@ -51,7 +51,6 @@ class PlantProfileRepositorySortMySqlIntegrationTest {
 				.name("정렬테스트")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build());
 		userId = user.getId();

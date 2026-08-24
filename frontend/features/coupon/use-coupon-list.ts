@@ -98,8 +98,7 @@ export function useCouponList(searchParams?: CouponSearchParams) {
         return (card.ownedCount ?? 0) >= card.requiredCountForExchange;
       }
       if (filter === "collecting") {
-        const ownedCount = card.ownedCount ?? 0;
-        return ownedCount > 0 && ownedCount < card.requiredCountForExchange;
+        return (card.ownedCount ?? 0) > 0;
       }
       return true;
     });

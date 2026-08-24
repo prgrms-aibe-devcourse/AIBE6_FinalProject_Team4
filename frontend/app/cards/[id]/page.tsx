@@ -7,12 +7,12 @@ import { couponName } from '@/lib/coupon-label';
 import { fmt } from '@/lib/store';
 
 const CONFETTI = [
-  { left: '10%', dur: '1.5s', delay: '0s', emoji: '🎉' },
-  { left: '28%', dur: '1.8s', delay: '.2s', emoji: '✨' },
-  { left: '48%', dur: '1.4s', delay: '.1s', emoji: '🍉' },
-  { left: '66%', dur: '1.9s', delay: '.3s', emoji: '🥕' },
-  { left: '82%', dur: '1.6s', delay: '.15s', emoji: '✨' },
-  { left: '92%', dur: '1.7s', delay: '.25s', emoji: '🎉' },
+  { left: '10%', dur: '1.5s', delay: '0s', icon: 'celebration' },
+  { left: '28%', dur: '1.8s', delay: '.2s', icon: 'auto_awesome' },
+  { left: '48%', dur: '1.4s', delay: '.1s', icon: 'nutrition' },
+  { left: '66%', dur: '1.9s', delay: '.3s', icon: 'nutrition' },
+  { left: '82%', dur: '1.6s', delay: '.15s', icon: 'auto_awesome' },
+  { left: '92%', dur: '1.7s', delay: '.25s', icon: 'celebration' },
 ];
 
 export default function CardDetail({
@@ -49,7 +49,7 @@ export default function CardDetail({
     return (
       <div className="container">
         <div className="rounded-[22px] bg-white py-14 text-center text-sub">
-          쿠폰을 불러오고 있어요 🎟️
+          쿠폰을 불러오고 있어요
         </div>
       </div>
     );
@@ -83,7 +83,7 @@ export default function CardDetail({
               : undefined
           }
         >
-          {!card.imageUrl && '🃏'}
+          {!card.imageUrl && <span className="material-symbols-outlined text-[150px]">style</span>}
         </div>
         <div>
           <h1 className="mb-1.5 text-[28px] font-extrabold">{couponName(card.name)}</h1>
@@ -120,7 +120,7 @@ export default function CardDetail({
                 <div className="mt-[3px] text-[13.5px] text-sub">
                   {owned >= card.requiredCountForExchange
                     ? card.exchangeProductStock > 0
-                      ? '모두 모았어요! 교환할 수 있어요 🎉'
+                      ? '모두 모았어요! 교환할 수 있어요'
                       : '쿠폰은 모두 모았지만 교환 상품이 품절됐어요.'
                     : `${card.requiredCountForExchange - owned}장만 더 모으면 교환할 수 있어요`}
                 </div>
@@ -227,12 +227,12 @@ export default function CardDetail({
                 className="absolute -top-2 animate-confettiFall text-base"
                 style={{ left: c.left, animationDuration: c.dur, animationDelay: c.delay, animationIterationCount: 'infinite' }}
               >
-                {c.emoji}
+                <span className="material-symbols-outlined text-base">{c.icon}</span>
               </span>
             ))}
-            <div className="text-[66px]">🎉</div>
+            <span className="material-symbols-outlined text-[66px]">celebration</span>
             <h3 className="mb-2 mt-3.5 text-xl font-extrabold">축하해요!</h3>
-            <p className="mb-6 leading-[1.6] text-[#6d7a68]">{couponName(card.name)}이 모두 모였어요.<br />지금 바로 교환할 수 있어요 🎉</p>
+            <p className="mb-6 leading-[1.6] text-[#6d7a68]">{couponName(card.name)}이 모두 모였어요.<br />지금 바로 교환할 수 있어요</p>
             <div className="flex gap-2.5">
               {card.exchangeProductStock > 0 ? (
                 <button type="button" onClick={goToExchange} className="flex-1 cursor-pointer rounded-xl bg-brand p-[13px] font-extrabold text-white">

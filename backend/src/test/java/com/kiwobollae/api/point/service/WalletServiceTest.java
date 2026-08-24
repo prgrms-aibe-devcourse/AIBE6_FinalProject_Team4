@@ -22,6 +22,7 @@ import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import com.kiwobollae.api.notification.service.NotificationService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +45,9 @@ class WalletServiceTest {
 
 	@Mock
 	private PointTransactionTimeProvider pointTransactionTimeProvider;
+
+	@Mock
+	private NotificationService notificationService;
 
 	@InjectMocks
 	private WalletService walletService;
@@ -652,6 +656,15 @@ class WalletServiceTest {
 		assertThat(captor.getValue().getRefId()).isEqualTo(1L);
 		assertThat(captor.getValue().getAdjustmentReason())
 				.isEqualTo(AdminPointAdjustmentReason.OUTSTANDING_MEMBER);
+
+		verify(notificationService).notify(
+				org.mockito.ArgumentMatchers.eq(7L),
+				org.mockito.ArgumentMatchers.eq(com.kiwobollae.api.notification.entity.enums.NotificationType.POINT),
+				org.mockito.ArgumentMatchers.eq("포인트가 지급됐어요"),
+				org.mockito.ArgumentMatchers.any(),
+				org.mockito.ArgumentMatchers.eq("/my/points"),
+				org.mockito.ArgumentMatchers.eq("ADMIN_ADJUST"),
+				org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test
@@ -668,6 +681,15 @@ class WalletServiceTest {
 		assertThat(response.freePoint()).isZero();
 		assertThat(response.paidPoint()).isEqualTo(500L);
 		assertThat(response.balance()).isEqualTo(500L);
+
+		verify(notificationService).notify(
+				org.mockito.ArgumentMatchers.eq(7L),
+				org.mockito.ArgumentMatchers.eq(com.kiwobollae.api.notification.entity.enums.NotificationType.POINT),
+				org.mockito.ArgumentMatchers.eq("포인트가 차감됐어요"),
+				org.mockito.ArgumentMatchers.any(),
+				org.mockito.ArgumentMatchers.eq("/my/points"),
+				org.mockito.ArgumentMatchers.eq("ADMIN_ADJUST"),
+				org.mockito.ArgumentMatchers.any());
 	}
 
 	@Test

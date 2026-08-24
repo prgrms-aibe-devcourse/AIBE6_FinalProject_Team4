@@ -73,7 +73,7 @@ export default function MyBoardPage() {
   }
 
   return (
-    <div className="container max-w-[800px]">
+    <div className="container">
       <h1 className="mb-1 text-[26px] font-extrabold">내가 쓴 글/댓글</h1>
       <p className="mb-5 text-sub">커뮤니티 게시판에 남긴 글과 댓글을 모아 볼 수 있어요.</p>
 
@@ -101,7 +101,7 @@ export default function MyBoardPage() {
       <div className="flex flex-col gap-3">
         {loading ? (
           <div className="rounded-[14px] bg-white px-[18px] py-[60px] text-center text-sub shadow-card">
-            불러오는 중이에요 🌱
+            불러오는 중이에요
           </div>
         ) : error ? (
           <div className="rounded-[14px] bg-white px-[18px] py-[60px] text-center text-sub shadow-card">{error}</div>

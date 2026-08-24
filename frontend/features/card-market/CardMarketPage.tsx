@@ -94,8 +94,8 @@ function CardMarketPageContent() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f4f6f1] px-4 pb-24 pt-12 text-[#263023] md:px-8 md:pt-14">
-      <div className="mx-auto max-w-[1160px]">
+    <main className="min-h-screen bg-[#f4f6f1] px-4 pb-24 pt-[26px] text-[#263023] md:px-8">
+      <div className="mx-auto max-w-[1080px]">
         <CardMarketHeader
           tab={market.tab}
           authenticated={Boolean(token)}

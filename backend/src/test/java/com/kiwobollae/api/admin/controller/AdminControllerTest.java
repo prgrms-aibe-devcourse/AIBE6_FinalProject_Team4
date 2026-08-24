@@ -69,31 +69,12 @@ class AdminControllerTest {
 
 	@Test
 	void getExchangesReturnsPagedList() throws Exception {
-		given(exchangeManagementService.getExchangesForAdmin(eq(ExchangeStatus.REQUESTED), any()))
-				.willReturn(new PageImpl<>(List.of(sampleResponse(1L, ExchangeStatus.REQUESTED)), PageRequest.of(0, 20), 1));
+		given(exchangeManagementService.getExchangesForAdmin(eq(ExchangeStatus.PREPARING), any()))
+				.willReturn(new PageImpl<>(List.of(sampleResponse(1L, ExchangeStatus.PREPARING)), PageRequest.of(0, 20), 1));
 
-		mockMvc.perform(get("/api/v1/admin/exchanges").param("status", "REQUESTED"))
+		mockMvc.perform(get("/api/v1/admin/exchanges").param("status", "PREPARING"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].id").value(1));
-	}
-
-	@Test
-	void prepareExchangeReturnsUpdatedOrder() throws Exception {
-		given(exchangeManagementService.prepareExchange(1L)).willReturn(sampleResponse(1L, ExchangeStatus.PREPARING));
-
-		mockMvc.perform(patch("/api/v1/admin/exchanges/1/prepare"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.status").value("PREPARING"));
-	}
-
-	@Test
-	void prepareExchangeReturnsInvalidStateError() throws Exception {
-		given(exchangeManagementService.prepareExchange(1L))
-				.willThrow(new BusinessException(ErrorCode.EXCHANGE_INVALID_STATE));
-
-		mockMvc.perform(patch("/api/v1/admin/exchanges/1/prepare"))
-				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.code").value("EXCHANGE_INVALID_STATE"));
 	}
 
 	@Test

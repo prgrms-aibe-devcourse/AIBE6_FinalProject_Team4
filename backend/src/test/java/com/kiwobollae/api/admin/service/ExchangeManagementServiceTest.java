@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.kiwobollae.api.auth.entity.User;
 import com.kiwobollae.api.commerce.dto.response.ExchangeOrderResponse;
@@ -19,6 +20,8 @@ import com.kiwobollae.api.commerce.repository.ExchangeOrderRepository;
 import com.kiwobollae.api.commerce.service.ExchangeRefundService;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
+import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.service.NotificationService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +40,7 @@ class ExchangeManagementServiceTest {
 
 	@Mock private ExchangeOrderRepository exchangeOrderRepository;
 	@Mock private ExchangeRefundService exchangeRefundService;
+	@Mock private NotificationService notificationService;
 	@InjectMocks private ExchangeManagementService exchangeManagementService;
 
 	private ExchangeOrder mockOrder(Long id, ExchangeStatus status, Long userId, Long cardId,
@@ -67,49 +71,15 @@ class ExchangeManagementServiceTest {
 	@Test
 	void getExchangesForAdminMapsRepositoryPage() {
 		Pageable pageable = PageRequest.of(0, 10);
-		ExchangeOrder order = mockOrder(1L, ExchangeStatus.REQUESTED, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.search(ExchangeStatus.REQUESTED, pageable))
+		ExchangeOrder order = mockOrder(1L, ExchangeStatus.PREPARING, 7L, 1L, 10L, 3);
+		given(exchangeOrderRepository.search(ExchangeStatus.PREPARING, pageable))
 				.willReturn(new PageImpl<>(List.of(order)));
 
 		Page<ExchangeOrderResponse> result =
-				exchangeManagementService.getExchangesForAdmin(ExchangeStatus.REQUESTED, pageable);
+				exchangeManagementService.getExchangesForAdmin(ExchangeStatus.PREPARING, pageable);
 
 		assertThat(result.getContent()).hasSize(1);
 		assertThat(result.getContent().get(0).id()).isEqualTo(1L);
-	}
-
-	@Test
-	void prepareExchangeTransitionsAndReturnsRefreshedResponse() {
-		given(exchangeOrderRepository.updateStatusIfMatches(50L, ExchangeStatus.PREPARING, ExchangeStatus.REQUESTED))
-				.willReturn(1);
-		ExchangeOrder refreshed = mockOrder(50L, ExchangeStatus.PREPARING, 7L, 1L, 10L, 3);
-		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(refreshed));
-
-		ExchangeOrderResponse response = exchangeManagementService.prepareExchange(50L);
-
-		assertThat(response.status()).isEqualTo(ExchangeStatus.PREPARING);
-	}
-
-	@Test
-	void prepareExchangeFailsWithNotFoundWhenOrderDoesNotExist() {
-		given(exchangeOrderRepository.updateStatusIfMatches(50L, ExchangeStatus.PREPARING, ExchangeStatus.REQUESTED))
-				.willReturn(0);
-		given(exchangeOrderRepository.existsById(50L)).willReturn(false);
-
-		assertThatThrownBy(() -> exchangeManagementService.prepareExchange(50L))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_NOT_FOUND));
-	}
-
-	@Test
-	void prepareExchangeFailsWithInvalidStateWhenStatusMismatched() {
-		given(exchangeOrderRepository.updateStatusIfMatches(50L, ExchangeStatus.PREPARING, ExchangeStatus.REQUESTED))
-				.willReturn(0);
-		given(exchangeOrderRepository.existsById(50L)).willReturn(true);
-
-		assertThatThrownBy(() -> exchangeManagementService.prepareExchange(50L))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EXCHANGE_INVALID_STATE));
 	}
 
 	@Test
@@ -122,6 +92,8 @@ class ExchangeManagementServiceTest {
 		ExchangeOrderResponse response = exchangeManagementService.shipExchange(50L);
 
 		assertThat(response.status()).isEqualTo(ExchangeStatus.SHIPPING);
+		verify(notificationService).notify(
+				eq(7L), eq(NotificationType.DELIVERY), any(), any(), eq("/my/exchanges#exchange-50"), eq("EXCHANGE"), eq(50L));
 	}
 
 	@Test
@@ -134,6 +106,8 @@ class ExchangeManagementServiceTest {
 		ExchangeOrderResponse response = exchangeManagementService.deliverExchange(50L);
 
 		assertThat(response.status()).isEqualTo(ExchangeStatus.DELIVERED);
+		verify(notificationService).notify(
+				eq(7L), eq(NotificationType.DELIVERY), any(), any(), eq("/my/exchanges#exchange-50"), eq("EXCHANGE"), eq(50L));
 	}
 
 	@Test
@@ -155,6 +129,8 @@ class ExchangeManagementServiceTest {
 		ExchangeOrderResponse response = exchangeManagementService.adminCancelExchange(50L, "품절");
 
 		assertThat(response.status()).isEqualTo(ExchangeStatus.CANCELLED);
+		verify(notificationService).notify(
+				eq(7L), eq(NotificationType.DELIVERY), any(), any(), eq("/my/exchanges#exchange-50"), eq("EXCHANGE"), eq(50L));
 	}
 
 	@Test

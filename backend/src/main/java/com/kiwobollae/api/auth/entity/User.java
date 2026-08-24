@@ -61,13 +61,6 @@ public class User extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private UserRole role;
 
-	@Column(nullable = false)
-	private Integer level;
-
-	@Builder.Default
-	@Column(nullable = false)
-	private Long experience = 0L;
-
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 50)
 	private UserStatus status;

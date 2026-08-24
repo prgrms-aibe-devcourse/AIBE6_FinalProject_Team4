@@ -50,7 +50,6 @@ class DailyJournalRewardRepositoryMySqlIntegrationTest {
 				.name("일일보상")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build()).getId();
 	}

@@ -70,7 +70,6 @@ class GachaDismantleMySqlIntegrationTest {
                 .name("가챠분해테스트")
                 .provider(AuthProvider.LOCAL)
                 .role(UserRole.USER)
-                .level(1)
                 .status(UserStatus.ACTIVE)
                 .build());
     TradingCard card =
@@ -253,7 +252,6 @@ class GachaDismantleMySqlIntegrationTest {
             .name(name)
             .provider(AuthProvider.LOCAL)
             .role(UserRole.USER)
-            .level(1)
             .status(UserStatus.ACTIVE)
             .build());
   }

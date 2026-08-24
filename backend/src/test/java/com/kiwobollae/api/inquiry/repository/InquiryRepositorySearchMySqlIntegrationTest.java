@@ -57,7 +57,6 @@ class InquiryRepositorySearchMySqlIntegrationTest {
 				.name("문의검색테스트")
 				.provider(AuthProvider.LOCAL)
 				.role(UserRole.USER)
-				.level(1)
 				.status(UserStatus.ACTIVE)
 				.build());
 		inquiryRepository.saveAndFlush(Inquiry.create(user, InquiryCategory.ETC, "제목", "내용"));

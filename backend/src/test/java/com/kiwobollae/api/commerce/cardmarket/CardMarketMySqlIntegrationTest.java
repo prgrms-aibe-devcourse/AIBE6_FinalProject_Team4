@@ -215,7 +215,6 @@ class CardMarketMySqlIntegrationTest {
                 .name("거래소 테스트")
                 .provider(AuthProvider.LOCAL)
                 .role(UserRole.USER)
-                .level(1)
                 .status(UserStatus.ACTIVE)
                 .build());
     walletService.createWallet(user);

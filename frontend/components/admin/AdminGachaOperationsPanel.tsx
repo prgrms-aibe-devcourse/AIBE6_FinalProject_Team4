@@ -8,7 +8,12 @@ import {
   retryAdminGachaDraw,
 } from "@/lib/admin-gacha-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AdminPagination from "./AdminPagination";
+import { useScrollOnPageLoad } from "./use-scroll-on-page-load";
+
+const PAGE_SIZE = 10;
+const GRID_COLS = "grid-cols-[.55fr_1fr_1fr_1fr_.8fr_1.2fr_.7fr]";
 
 const STATUS_LABEL: Record<AdminGachaDrawStatus, string> = {
   PENDING: "처리 대기",
@@ -38,6 +43,7 @@ export default function AdminGachaOperationsPanel({
   accessToken: string;
 }) {
   const { showToast } = useUI();
+  const sectionRef = useRef<HTMLElement>(null);
   const [draws, setDraws] = useState<AdminGachaDraw[]>([]);
   const [status, setStatus] = useState<AdminGachaDrawStatus | "">("");
   const [userIdInput, setUserIdInput] = useState("");
@@ -49,6 +55,8 @@ export default function AdminGachaOperationsPanel({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState("");
 
+  useScrollOnPageLoad(page, loading, sectionRef);
+
   const load = useCallback(
     (signal?: AbortSignal) => {
       setLoading(true);
@@ -57,6 +65,7 @@ export default function AdminGachaOperationsPanel({
         status: status || undefined,
         userId: appliedUserId,
         page,
+        size: PAGE_SIZE,
         signal,
       })
         .then((response) => {
@@ -176,9 +185,9 @@ export default function AdminGachaOperationsPanel({
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-[18px] border border-line bg-white shadow-sm">
+      <section ref={sectionRef} className="overflow-x-auto rounded-[18px] border border-line bg-white shadow-sm">
         <div className="min-w-[980px]">
-          <div className="grid grid-cols-[.55fr_1fr_1fr_1fr_.8fr_1.2fr_.7fr] gap-3 border-b border-line bg-[#fafbf7] px-4 py-3 text-xs font-extrabold text-sub">
+          <div className={`grid gap-3 border-b border-line bg-[#fafbf7] px-4 py-3 text-xs font-extrabold text-sub ${GRID_COLS}`}>
             <div>ID</div>
             <div>사용자</div>
             <div>출처</div>
@@ -187,9 +196,9 @@ export default function AdminGachaOperationsPanel({
             <div>처리 정보</div>
             <div>관리</div>
           </div>
-          {loading ? (
+          {loading && draws.length === 0 ? (
             <div className="p-12 text-center text-sub">
-              처리 내역을 불러오고 있어요.
+              조건에 맞는 처리 내역을 불러오고 있어요.
             </div>
           ) : error ? (
             <div className="p-12 text-center text-danger">{error}</div>
@@ -246,31 +255,10 @@ export default function AdminGachaOperationsPanel({
             ))
           )}
         </div>
-      </section>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            type="button"
-            disabled={page === 0}
-            onClick={() => setPage((value) => Math.max(0, value - 1))}
-            className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="text-sm font-bold text-sub">
-            {page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page + 1 >= totalPages}
-            onClick={() => setPage((value) => value + 1)}
-            className="rounded-xl border border-line bg-white px-4 py-2 font-bold disabled:opacity-40"
-          >
-            다음
-          </button>
+        <div className="border-t border-line px-4 pt-4 pb-6">
+          <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
         </div>
-      )}
+      </section>
     </div>
   );
 }

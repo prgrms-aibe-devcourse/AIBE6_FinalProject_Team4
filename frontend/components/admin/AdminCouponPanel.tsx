@@ -15,7 +15,10 @@ import {
 } from "@/lib/admin-card-api";
 import { ApiError } from "@/lib/api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AdminPagination from "./AdminPagination";
+
+const GRID_COLS = "grid-cols-[1.5fr_.8fr_1fr_.7fr]";
 
 const EMPTY_FORM = {
   name: "",
@@ -35,6 +38,7 @@ export default function AdminCouponPanel({
   onPageChange?: (page: number) => void;
 }) {
   const { askConfirm, showToast } = useUI();
+  const listSectionRef = useRef<HTMLElement>(null);
   const [cards, setCards] = useState<AdminCard[]>([]);
   const [exchangeProducts, setExchangeProducts] = useState<
     AdminExchangeProductOption[]
@@ -319,17 +323,15 @@ export default function AdminCouponPanel({
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-[18px] border border-line bg-white shadow-sm">
-        <div className="grid grid-cols-[1.5fr_.8fr_1fr_.7fr] gap-3 border-b border-line bg-[#fafbf7] px-4 py-3 text-xs font-extrabold text-sub">
+      <section ref={listSectionRef} className="overflow-hidden rounded-[18px] border border-line bg-white shadow-sm">
+        <div className={`grid gap-3 border-b border-line bg-[#fafbf7] px-4 py-3 text-xs font-extrabold text-sub ${GRID_COLS}`}>
           <div>쿠폰</div>
           <div>가격·필요량</div>
           <div>교환 상품</div>
           <div>관리</div>
         </div>
         {loading ? (
-          <div className="p-10 text-center text-sub">
-            쿠폰을 불러오고 있어요.
-          </div>
+          <div className="p-10 text-center text-sub">쿠폰 목록을 불러오고 있어요.</div>
         ) : error ? (
           <div className="p-10 text-center text-danger">{error}</div>
         ) : cards.length === 0 ? (
@@ -396,26 +398,20 @@ export default function AdminCouponPanel({
           ))
         )}
         {onPageChange && totalPages > 1 ? (
-          <div className="flex items-center justify-center gap-3 border-t border-line px-4 py-4">
-            <button
-              type="button"
-              disabled={page <= 0}
-              onClick={() => onPageChange(page - 1)}
-              className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
-            >
-              이전
-            </button>
-            <span className="text-sm font-bold text-sub">
-              {page + 1} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={page + 1 >= totalPages}
-              onClick={() => onPageChange(page + 1)}
-              className="rounded-xl border border-line px-4 py-2 text-sm font-bold disabled:opacity-40"
-            >
-              다음
-            </button>
+          <div className="border-t border-line px-4 pt-4 pb-6">
+            <AdminPagination
+              page={page}
+              totalPages={totalPages}
+              onChange={(next) => {
+                // 이 목록은 전체를 한 번에 불러온 뒤 화면에서만 나눠 보여주므로(서버 재요청
+                // 없음) 로딩을 기다릴 필요 없이 페이지가 바뀌는 즉시 내용이 준비된다.
+                onPageChange(next);
+                const el = listSectionRef.current;
+                if (el && typeof el.scrollIntoView === "function") {
+                  el.scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+              }}
+            />
           </div>
         ) : null}
       </section>

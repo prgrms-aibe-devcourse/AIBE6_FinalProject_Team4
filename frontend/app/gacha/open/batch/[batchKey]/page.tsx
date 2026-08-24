@@ -105,9 +105,10 @@ export default function GachaBatchOpenPage({
             <button
               type="button"
               onClick={() => setMuted((value) => !value)}
-              className="rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
+              className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-2 text-xs font-bold"
             >
-              {muted ? "🔇 음소거" : "🔊 사운드"}
+              <span className="material-symbols-outlined text-sm">{muted ? "volume_off" : "volume_up"}</span>
+              {muted ? "음소거" : "사운드"}
             </button>
             <button
               type="button"

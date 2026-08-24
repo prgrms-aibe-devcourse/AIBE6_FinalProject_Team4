@@ -1,7 +1,19 @@
 spring:
   jpa:
-    # ddl-auto is already "update" by default (see application.yaml) — nothing to override here.
     show-sql: true
+    # Spring Boot 기본값(false)이면 data-locations의 SQL이 Hibernate가 스키마를 만들기 전에
+    # 실행된다 — 그러면 ddl-auto: create가 뒤이어 테이블을 통째로 새로 만들면서 방금 넣은
+    # 시드 데이터가 그대로 날아간다(에러 없이 조용히 사라져서 알아채기 어려움). Hibernate가
+    # 스키마를 다 만든 뒤에 SQL이 실행되도록 순서를 뒤집는다.
+    defer-datasource-initialization: true
+  sql:
+    init:
+      # dev-seed-data.sql은 옛 InitData류 ApplicationRunner를 대체한다. ddl-auto: create로
+      # 매번 스키마가 새로 생기는 로컬 전제에서만 안전하다(스키마가 이미 채워진 DB에 재실행하는
+      # 상황은 상정하지 않음 — 파일 상단 주석 참고). 정액 충전 상품(charge_products)은 직접
+      # 금액 충전으로 대체되며 테이블 자체가 사라져 더 이상 시드하지 않는다.
+      mode: always
+      data-locations: classpath:dev-seed-data.sql
 
 logging:
   level:
@@ -9,36 +21,13 @@ logging:
 
 app:
   seed:
-    gacha:
-      enabled: true
-    gacha-pack:
-      enabled: true
-    product:
-      enabled: true
-    card:
-      enabled: true
-    plant-profile:
-      # Seeds sample plant profiles for the InitData test users, so /plants isn't
-      # empty on a fresh local DB. Depends on InitData (users) and ProductInitData
-      # (plant speciegit s) having already run — see @Order on PlantProfileInitData.
-      enabled: true
-    journal:
-      # Seeds sample journal entries (with placeholder images) for whichever plant
-      # profiles exist, so /journals isn't empty while real journal creation is
-      # still blocked on image upload. Depends on PlantProfileInitData having run.
-      enabled: true
-    notification:
-      # Seeds one sample alert per NotificationType for each InitData test user,
-      # so the notification bell/목록/설정 화면 isn't empty on a fresh local DB.
-      enabled: true
+    # gacha/gacha-pack/charge-product/product/card/plant-profile/journal/notification/board
+    # 플래그는 각 ApplicationRunner가 dev-seed-data.sql로 대체되며 함께 제거됐다 —
+    # 이제 spring.sql.init 설정(위)이 그 역할을 한다.
     point-scenario:
       # Seeds test@test.com's point history with admin adjustments, a mixed-point
       # order and cancellation, a mixed-point card purchase, and two journal rewards.
       # The resulting free-point balance is 400P and seed activity times follow the
       # relative journal dates instead of the server startup time.
       # Charge/refund history is created through Toss Payments test transactions.
-      enabled: true
-    board:
-      # Seeds sample board posts/comments (including a reply-to-reply thread) for
-      # the InitData test users, so /board isn't empty on a fresh local DB.
       enabled: true

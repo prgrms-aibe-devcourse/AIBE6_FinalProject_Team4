@@ -128,7 +128,7 @@ export default function Payments() {
   };
 
   return (
-    <div className="container max-w-[900px]">
+    <div className="container">
       <Link href="/my/points" className="text-sm font-semibold text-sub">← 포인트</Link>
       <h1 className="mb-5 mt-3.5 text-2xl font-extrabold">결제 내역</h1>
       <div className="mb-[22px] rounded-[13px] bg-gold-soft px-4 py-[13px] text-sm font-bold text-gold-text">

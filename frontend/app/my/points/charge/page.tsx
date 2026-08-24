@@ -149,7 +149,7 @@ export default function Charge() {
   };
 
   return (
-    <div className="container max-w-[900px]">
+    <div className="container">
       <Link href="/my/points" className="text-sm font-semibold text-sub">
         ← 포인트
       </Link>

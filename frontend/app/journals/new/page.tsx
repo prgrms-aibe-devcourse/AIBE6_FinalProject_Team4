@@ -6,7 +6,7 @@ import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { ApiError } from '@/lib/api';
 import { getMyPlants, PlantProfileData } from '@/lib/plant-api';
-import { plantVisual } from '@/lib/plant-visual';
+import { plantVisual, SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 import { createJournal, deleteJournalImage, uploadJournalImage } from '@/lib/journal-api';
 import { localToday } from '@/lib/format';
 
@@ -125,8 +125,8 @@ function NewJournalInner() {
   };
 
   const submit = async () => {
-    if (photos.length === 0) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요 📷', 'err');
-    if (draft.plantId === null) return showToast('먼저 어떤 식물인지 골라주세요 🌿', 'err');
+    if (photos.length === 0) return showToast('앗, 사진이 꼭 필요해요. 오늘의 모습을 한 장 담아주세요', 'err');
+    if (draft.plantId === null) return showToast('먼저 어떤 식물인지 골라주세요', 'err');
     if (!state.accessToken) return;
     const accessToken = state.accessToken;
 
@@ -200,7 +200,7 @@ function NewJournalInner() {
 
       {saved ? (
         <div className="max-w-[640px] rounded-[18px] bg-brand-soft p-6">
-          <div className="text-[34px]">🌿</div>
+          <span className="material-symbols-outlined text-[34px]">eco</span>
           <div className="mt-2 text-lg font-extrabold text-ink">일지가 저장됐어요!</div>
           <div className="mt-2 font-bold text-sub">오늘 보상을 이미 받았다면, 보너스 포인트는 추가 지급되지 않아요.</div>
           <div className="mt-[18px] flex flex-wrap gap-2.5">
@@ -226,10 +226,10 @@ function NewJournalInner() {
               {selectedPlant ? (
                 <>
                   <span
-                    className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[11px] text-[26px]"
+                    className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[11px]"
                     style={{ background: plantVisual(selectedPlant.speciesName).grad }}
                   >
-                    {plantVisual(selectedPlant.speciesName).emoji}
+                    <img src={SEEDLING_ICON_SRC} alt="" className="h-[26px] w-[26px]" />
                   </span>
                   <span className="font-bold">{selectedPlant.nickname}</span>
                 </>
@@ -341,10 +341,10 @@ function NewJournalInner() {
                     }`}
                   >
                     <span
-                      className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-[10px] text-[22px]"
+                      className="flex h-[46px] w-[46px] flex-none items-center justify-center rounded-[10px]"
                       style={{ background: visual.grad }}
                     >
-                      {visual.emoji}
+                      <img src={SEEDLING_ICON_SRC} alt="" className="h-[22px] w-[22px]" />
                     </span>
                     <span className="flex-1 font-bold">{p.nickname}</span>
                     {disabled && <span className="text-xs font-bold text-faint">실패</span>}
@@ -359,7 +359,7 @@ function NewJournalInner() {
       {guideModalOpen && (
         <div onClick={() => setGuideModalOpen(false)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[380px] animate-pop rounded-[20px] bg-white p-6">
-            <h3 className="mb-1 text-[19px] font-extrabold">이렇게 찍어보세요 📸</h3>
+            <h3 className="mb-1 flex items-center gap-1 text-[19px] font-extrabold">이렇게 찍어보세요 <span className="material-symbols-outlined align-middle text-base">photo_camera</span></h3>
             <p className="mb-4 text-[13.5px] text-sub">식물이 정중앙에 오도록 찍어주시면, 나중에 모아서 타임랩스 영상을 만들어드릴 때 훨씬 예쁘게 이어져요.</p>
             <div className="relative mx-auto mb-4 grid aspect-square w-full max-w-[220px] grid-cols-3 grid-rows-3 overflow-hidden rounded-2xl border-2 border-dashed border-brand bg-brand-soft">
               {Array.from({ length: 9 }).map((_, i) => (

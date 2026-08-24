@@ -54,7 +54,7 @@ function ExchangeNewInner() {
   }, [cardId, hydrated, state.accessToken]);
 
   if (loading) {
-    return <div className="container"><div className="rounded-[22px] bg-white py-14 text-center text-sub">불러오고 있어요 🍉</div></div>;
+    return <div className="container"><div className="rounded-[22px] bg-white py-14 text-center text-sub">불러오고 있어요</div></div>;
   }
 
   if (error || !card) {
@@ -76,9 +76,9 @@ function ExchangeNewInner() {
     return (
       <div className="container">
         <div className="mx-auto my-10 max-w-[480px] animate-pop rounded-[22px] bg-white px-[30px] py-11 text-center shadow-[0_8px_30px_rgba(124,179,66,.12)]">
-          <div className="text-[70px]">🍉</div>
+          <span className="material-symbols-outlined text-[70px]">nutrition</span>
           <h1 className="mb-2 mt-4 text-2xl font-extrabold">신청이 접수됐어요!</h1>
-          <p className="mb-[26px] leading-[1.6] text-[#6d7a68]">밭에서 가장 좋은 아이로 골라 보내드릴게요 🍉</p>
+          <p className="mb-[26px] leading-[1.6] text-[#6d7a68]">밭에서 가장 좋은 아이로 골라 보내드릴게요</p>
           <div className="flex flex-wrap justify-center gap-2.5">
             <Link href="/my/exchanges" className="rounded-xl bg-brand px-6 py-[13px] font-bold text-white hover:text-white">교환 내역 보기</Link>
             <Link href="/cards" className="rounded-xl border-[1.5px] border-[#cfe0b6] bg-white px-6 py-[13px] font-bold text-brand-dark">쿠폰 더 모으기</Link>
@@ -133,7 +133,7 @@ function ExchangeNewInner() {
               className="flex h-[66px] w-[66px] items-center justify-center rounded-[14px] bg-brand-soft bg-cover bg-center text-[34px]"
               style={card.imageUrl ? { backgroundImage: `url("${card.imageUrl}")` } : undefined}
             >
-              {!card.imageUrl && '🃏'}
+              {!card.imageUrl && <span className="material-symbols-outlined">style</span>}
             </div>
             {card.exchangeProductImageUrl ? (
               <>
@@ -153,10 +153,10 @@ function ExchangeNewInner() {
           </div>
 
           {!notEnough && !outOfStock && (
-            <>
-              <div className="mb-3 mt-5 font-extrabold">배송지</div>
+            <div className="mt-5 rounded-2xl bg-white p-[18px] shadow-card">
+              <div className="mb-3 font-extrabold">배송지</div>
               <AddressForm accessToken={state.accessToken} value={addressFields} onChange={setAddressFields} />
-            </>
+            </div>
           )}
         </div>
 

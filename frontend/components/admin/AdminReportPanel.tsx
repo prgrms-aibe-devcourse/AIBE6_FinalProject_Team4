@@ -13,8 +13,14 @@ import {
   ReportTargetType,
 } from "@/lib/report-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAdminPaginatedList } from "./use-admin-paginated-list";
+import AdminPagination from "./AdminPagination";
+import { useScrollOnPageLoad } from "./use-scroll-on-page-load";
+
+const PAGE_SIZE = 10;
+const COLUMN_COUNT = 6;
+const ADMIN_ALL_SIZE = 2000;
 
 export interface AdminReportTargetUserFilter {
   id: number;
@@ -36,6 +42,12 @@ const TARGET: Record<ReportTargetType, string> = {
 const HIDEABLE_TARGETS: ReportTargetType[] = ["POST", "COMMENT"];
 
 const ACTION_TYPE_OPTIONS = ["콘텐츠 숨김", "경고 조치", "계정 정지", "조치 없음", "기타"];
+
+const REPORT_STATUS_PRIORITY: Record<ReportStatus, number> = {
+  PENDING: 0,
+  COMPLETED: 1,
+  REJECTED: 2,
+};
 
 const STAT: Record<ReportStatus, [string, string]> = {
   PENDING: ["검토 대기", "bg-[#FBEDE3] text-[#b5771a]"],
@@ -79,11 +91,28 @@ export default function AdminReportPanel({
   // 응답할 수 있다 — requestId로 가장 최근에 연 신고의 응답인지 확인해 뒤처진 응답이
   // 엉뚱한 신고의 미리보기를 덮어쓰지 않도록 막는다.
   const previewRequestId = useRef(0);
+  const sectionRef = useRef<HTMLElement>(null);
 
+  // 처리 완료/반려된 신고는 이미 끝난 건이라 최신순으로, 그 외(검토 대기 등)는 아직
+  // 처리해야 할 오래된 신고가 먼저 보이도록 오래된순으로 조회한다.
+  const reportSort =
+    status === "COMPLETED" || status === "REJECTED" ? "createdAt,DESC" : "createdAt,ASC";
+
+  // "전체" 조회는 상태 우선순위(검토대기→처리완료→반려됨)로 전체를 재정렬해야 하는데,
+  // 서버는 필드 하나로만 정렬할 수 있어 페이지 단위로는 커스텀 순서를 만들 수 없다 —
+  // 그래서 이때만 한 번에 다 받아와 아래에서 클라이언트가 직접 정렬·페이지네이션한다.
   const fetchPage = useCallback(
     (page: number, signal?: AbortSignal) =>
-      getReportsForAdmin(accessToken, status || undefined, page, 20, signal, targetUser?.id),
-    [accessToken, status, targetUser?.id],
+      getReportsForAdmin(
+        accessToken,
+        status || undefined,
+        status ? page : 0,
+        status ? PAGE_SIZE : ADMIN_ALL_SIZE,
+        signal,
+        targetUser?.id,
+        reportSort,
+      ),
+    [accessToken, status, targetUser?.id, reportSort],
   );
   const {
     page,
@@ -95,6 +124,21 @@ export default function AdminReportPanel({
     errorMessage,
     reload,
   } = useAdminPaginatedList(fetchPage, "신고 목록을 불러오지 못했어요.");
+
+  useScrollOnPageLoad(page, loading, sectionRef);
+
+  // "전체" 조회일 때만 검토대기→처리완료→반려됨 순서로 묶어 보여준다. 특정 상태로
+  // 필터링했을 때는 모든 항목이 같은 상태라 순서를 다시 매길 필요가 없다.
+  const sortedAllReports = useMemo(() => {
+    if (status) return reports;
+    return [...reports].sort(
+      (a, b) => REPORT_STATUS_PRIORITY[a.status] - REPORT_STATUS_PRIORITY[b.status],
+    );
+  }, [reports, status]);
+  const displayReports = status
+    ? sortedAllReports
+    : sortedAllReports.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const displayTotalPages = status ? totalPages : Math.ceil(totalElements / PAGE_SIZE);
 
   // 유저 관리 탭에서 다른 유저의 누적 신고수를 눌러 targetUser가 바뀌면(패널이 이미 열려 있는
   // 상태여도) 1페이지부터 다시 보여준다.
@@ -189,7 +233,7 @@ export default function AdminReportPanel({
   };
 
   return (
-    <section className="overflow-hidden rounded-[18px] bg-white shadow-card">
+    <section ref={sectionRef} className="overflow-hidden rounded-[18px] bg-white shadow-card">
       <div className="border-b border-line p-5">
         <h2 className="text-lg font-extrabold">신고 관리</h2>
         <p className="mt-1 text-sm text-sub">
@@ -248,16 +292,16 @@ export default function AdminReportPanel({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && reports.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
-                  신고 목록을 불러오고 있어요.
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
+                  조건에 맞는 신고 내역을 불러오고 있어요.
                 </td>
               </tr>
             ) : errorMessage ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={COLUMN_COUNT}
                   role="alert"
                   className="px-5 py-10 text-center text-danger"
                 >
@@ -266,12 +310,12 @@ export default function AdminReportPanel({
               </tr>
             ) : reports.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
                   조건에 맞는 신고가 없어요.
                 </td>
               </tr>
             ) : (
-              reports.map((report) => {
+              displayReports.map((report) => {
                 const st = STAT[report.status];
                 return (
                   <tr key={report.id} className="border-t border-[#f2f3ec]">
@@ -322,29 +366,9 @@ export default function AdminReportPanel({
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line px-5 py-3.5 text-sm">
+      <div className="flex flex-col items-center gap-3 border-t border-line px-5 pt-3.5 pb-5 text-sm sm:flex-row sm:justify-between">
         <span className="text-sub">총 {totalElements}건</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            disabled={page === 0 || loading}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="min-w-[64px] text-center font-bold">
-            {totalPages === 0 ? 0 : page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => current + 1)}
-            disabled={loading || totalPages === 0 || page + 1 >= totalPages}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination page={page} totalPages={displayTotalPages} onChange={setPage} />
       </div>
 
       {selected && (

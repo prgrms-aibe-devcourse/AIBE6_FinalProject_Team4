@@ -55,7 +55,7 @@ class AdminPointAdjustmentServiceTest {
 		given(idempotencyService.start(eq(1L), eq("POINT_ADMIN_ADJUST"), eq("adjust-key"), anyString()))
 				.willReturn(new IdempotencyExecution(key, false));
 		given(walletService.adjustByAdmin(
-				1L, 7L, CurrencyType.FREE, 300L, AdminPointAdjustmentReason.SPECIAL_EVENT))
+				1L, 7L, CurrencyType.FREE, 300L, AdminPointAdjustmentReason.SPECIAL_EVENT, true))
 				.willReturn(response);
 
 		AdminPointAdjustmentResponse result = adminPointAdjustmentService.adjust(1L, "adjust-key", request);
@@ -214,10 +214,10 @@ class AdminPointAdjustmentServiceTest {
 		given(idempotencyService.start(eq(1L), eq("POINT_ADMIN_ADJUST"), eq("adjust-key"), anyString()))
 				.willReturn(new IdempotencyExecution(key, false));
 		given(walletService.adjustByAdmin(
-				1L, 7L, CurrencyType.FREE, 300L, AdminPointAdjustmentReason.SPECIAL_EVENT))
+				1L, 7L, CurrencyType.FREE, 300L, AdminPointAdjustmentReason.SPECIAL_EVENT, true))
 				.willReturn(response(91L, 7L, CurrencyType.FREE, 300L, 800L));
 		given(walletService.adjustByAdmin(
-				1L, 7L, CurrencyType.FREE, 300L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER))
+				1L, 7L, CurrencyType.FREE, 300L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER, true))
 				.willReturn(response(92L, 7L, CurrencyType.FREE, 300L, 1_100L));
 
 		adminPointAdjustmentService.adjust(1L, "adjust-key", new AdminPointAdjustmentRequest(

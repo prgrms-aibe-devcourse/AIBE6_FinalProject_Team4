@@ -58,7 +58,7 @@ public class ExchangeController {
 		return ResponseEntity.ok(ApiResponse.success(exchangeService.getMyExchange(userId, id)));
 	}
 
-	@Operation(summary = "교환 신청 취소", description = "접수 대기 중인 내 교환 신청을 취소합니다. 쿠폰·재고가 환급됩니다.")
+	@Operation(summary = "교환 신청 취소", description = "배송 준비 중인 내 교환 신청을 취소합니다. 쿠폰·재고가 환급됩니다.")
 	@PatchMapping("/{id}/cancel")
 	public ResponseEntity<Void> cancelExchange(
 			@AuthenticationPrincipal Long userId,

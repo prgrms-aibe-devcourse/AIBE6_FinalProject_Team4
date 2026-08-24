@@ -38,7 +38,7 @@ export default function ProductDetail({
     return (
       <div className="container">
         <div className="rounded-[22px] bg-white py-14 text-center text-sub">
-          상품을 불러오고 있어요 🌱
+          상품을 불러오고 있어요
         </div>
       </div>
     );
@@ -78,7 +78,7 @@ export default function ProductDetail({
               : undefined
           }
         >
-          {!product.imageUrl && '🌱'}
+          {!product.imageUrl && <span className="material-symbols-outlined">potted_plant</span>}
         </div>
         <div>
           <div className="mb-2.5 inline-block rounded-full bg-brand-soft px-[11px] py-1 text-xs font-extrabold text-brand-dark">
@@ -169,7 +169,7 @@ export default function ProductDetail({
                 <>
                   {alreadyInCart && (
                     <div className="mb-3.5 rounded-[11px] bg-brand-soft px-[13px] py-[11px] text-[13px] font-semibold text-brand-dark">
-                      이미 장바구니에 있는 상품이에요.{' '}
+                      장바구니에 상품이 담겨있습니다.{' '}
                       <Link href="/cart" className="font-extrabold underline">장바구니 보기</Link>
                     </div>
                   )}

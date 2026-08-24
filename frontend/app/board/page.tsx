@@ -1,11 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { BOARD_LIST_URL_KEY, BoardCategory, BoardPostData, BoardSearchType, getBoardPosts } from '@/lib/board-api';
 import { useStore } from '@/lib/store';
+import { useScrollOnPageLoad } from '@/components/admin/use-scroll-on-page-load';
 
 const CATEGORY_LABEL: Record<BoardCategory, string> = {
   NOTICE: '공지사항',
@@ -93,6 +94,7 @@ function BoardPageContent() {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const listRef = useRef<HTMLDivElement>(null);
 
   // 공지사항은 카테고리/페이지와 무관하게 항상 맨 위에 고정해서 보여준다. 검색 중에는 이 목록도
   // 같은 검색어로 필터링해서, 검색어와 무관한 공지가 계속 고정 노출되거나 반대로 검색어와 일치하는
@@ -165,6 +167,8 @@ function BoardPageContent() {
     return () => controller.abort();
   }, [hydrated, tab, page, keyword, searchType, sort, state.accessToken]);
 
+  useScrollOnPageLoad(page, loading, listRef);
+
   // NOTICE 탭 자체를 볼 때는 목록이 이미 전부 공지라 별도 고정 영역이 필요 없다. 그 외 탭은
   // 백엔드가 이 페이지네이션 결과 자체에서 이미 공지를 제외하고 내려주므로(excludeCategory),
   // totalElements가 곧 화면에 실제로 나열되는 일반 글 개수와 정확히 일치한다 — 프론트에서 다시
@@ -202,7 +206,7 @@ function BoardPageContent() {
     >
       <div className="flex flex-col gap-1.5 sm:hidden">
         <div className="flex items-start gap-1.5">
-          {pinned && <span className="mt-0.5 shrink-0 text-sm">📌</span>}
+          {pinned && <span className="material-symbols-outlined mt-0.5 shrink-0 text-sm">push_pin</span>}
           <span className={`shrink-0 rounded px-1.5 py-[3px] text-[11px] font-extrabold ${CATEGORY_BG[post.category]} ${CATEGORY_TEXT[post.category]}`}>
             {CATEGORY_LABEL[post.category]}
           </span>
@@ -224,7 +228,7 @@ function BoardPageContent() {
       </div>
 
       <div className="hidden items-center gap-2 sm:grid sm:grid-cols-[60px_1fr_90px_84px_56px_56px]">
-        <div className="text-center text-sm text-faint">{pinned ? '📌' : number}</div>
+        <div className="text-center text-sm text-faint">{pinned ? <span className="material-symbols-outlined text-sm">push_pin</span> : number}</div>
         <div className="flex min-w-0 items-baseline gap-1.5">
           <span className={`shrink-0 text-xs font-extrabold ${CATEGORY_TEXT[post.category]}`}>
             [{CATEGORY_LABEL[post.category]}]
@@ -272,7 +276,7 @@ function BoardPageContent() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-[18px] bg-white shadow-card">
+      <div className="overflow-hidden rounded-[18px] bg-white shadow-card" ref={listRef}>
         <div className="hidden items-center gap-2 border-b-2 border-ink/80 px-4 py-3 text-xs font-extrabold text-faint sm:grid sm:grid-cols-[60px_1fr_90px_84px_56px_56px] sm:px-5">
           <div className="text-center">번호</div>
           <div>제목</div>
@@ -282,13 +286,13 @@ function BoardPageContent() {
           <div className="text-center">추천</div>
         </div>
 
-        {loading ? (
-          <div className="px-5 py-[60px] text-center text-sub">게시글을 불러오고 있어요 🌱</div>
+        {loading && posts.length === 0 && pinned.length === 0 ? (
+          <div className="px-5 py-[60px] text-center text-sub">조건에 맞는 게시글을 불러오고 있어요</div>
         ) : error ? (
           <div className="px-5 py-[60px] text-center text-sub">{error}</div>
         ) : posts.length === 0 && pinned.length === 0 ? (
           <div className="px-5 py-[60px] text-center text-sub">
-            {keyword ? '검색 결과가 없어요.' : '아직 게시글이 없어요. 첫 글을 남겨보세요 🌱'}
+            {keyword ? '검색 결과가 없어요.' : '아직 게시글이 없어요. 첫 글을 남겨보세요'}
           </div>
         ) : (
           <div className="divide-y divide-[#f0f1ea]">

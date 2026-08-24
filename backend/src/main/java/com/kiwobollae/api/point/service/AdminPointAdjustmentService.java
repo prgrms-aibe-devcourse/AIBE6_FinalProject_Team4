@@ -34,6 +34,20 @@ public class AdminPointAdjustmentService {
 			String idempotencyKey,
 			AdminPointAdjustmentRequest request
 	) {
+		return adjust(adminUserId, idempotencyKey, request, true);
+	}
+
+	/**
+	 * 알림 발송 여부를 선택할 수 있는 버전. 로컬 시드(PointScenarioInitData)처럼 실제 관리자
+	 * 액션이 아닌 호출에서 알림이 나가지 않도록 {@code notify=false}로 쓴다.
+	 */
+	@Transactional
+	public AdminPointAdjustmentResponse adjust(
+			Long adminUserId,
+			String idempotencyKey,
+			AdminPointAdjustmentRequest request,
+			boolean notify
+	) {
 		validateBaseRequest(adminUserId, idempotencyKey, request);
 		if (request.adjustmentReason() == null) {
 			return replayLegacyRequest(adminUserId, idempotencyKey, request);
@@ -50,7 +64,8 @@ public class AdminPointAdjustmentService {
 				request.userId(),
 				request.currencyType(),
 				request.amount(),
-				request.adjustmentReason()
+				request.adjustmentReason(),
+				notify
 		);
 		idempotencyService.succeed(
 				idempotency.key(),

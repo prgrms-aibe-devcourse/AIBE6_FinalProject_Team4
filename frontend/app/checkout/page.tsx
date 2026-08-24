@@ -133,9 +133,9 @@ function CheckoutInner() {
     return (
       <div className="container">
         <div className="mx-auto my-10 max-w-[480px] animate-pop rounded-[22px] bg-white px-[30px] py-11 text-center shadow-[0_8px_30px_rgba(124,179,66,.12)]">
-          <div className="text-[66px]">🌿</div>
+          <span className="material-symbols-outlined text-[66px]">eco</span>
           <h1 className="mb-2 mt-4 text-[23px] font-extrabold">주문이 완료됐어요!</h1>
-          <p className="mb-5 leading-[1.6] text-[#6d7a68]">정성껏 준비해서 보내드릴게요 🌿</p>
+          <p className="mb-5 leading-[1.6] text-[#6d7a68]">정성껏 준비해서 보내드릴게요</p>
           <div className="mb-[22px] rounded-[14px] bg-[#F6F9EF] p-4 text-left text-sm">
             <div className="flex justify-between py-1"><span className="text-sub">주문번호</span><span className="font-extrabold">#{result.order.id}</span></div>
             <div className="flex justify-between py-1"><span className="text-sub">배송지</span><span className="font-bold">{result.order.address}</span></div>
@@ -154,7 +154,7 @@ function CheckoutInner() {
   if (loading) {
     return (
       <div className="container">
-        <div className="rounded-[22px] bg-white py-14 text-center text-sub">주문 정보를 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">주문 정보를 불러오고 있어요</div>
       </div>
     );
   }
@@ -178,13 +178,13 @@ function CheckoutInner() {
       <h1 className="mb-5 mt-3.5 text-[26px] font-extrabold">주문·결제</h1>
       <div className="grid items-start gap-[22px] [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
         <div>
-          <div className="mb-3 font-extrabold">배송지</div>
-          <div className="mb-6">
+          <div className="mb-6 rounded-2xl bg-white p-[18px] shadow-card">
+            <div className="mb-3 font-extrabold">배송지</div>
             <AddressForm accessToken={state.accessToken} value={addressFields} onChange={setAddressFields} />
           </div>
 
-          <div className="mb-3 font-extrabold">주문 상품</div>
-          <div className="rounded-2xl bg-white px-[18px] py-1.5 shadow-card">
+          <div className="rounded-2xl bg-white p-[18px] shadow-card">
+            <div className="mb-2 font-extrabold">주문 상품</div>
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3 border-b border-[#f4f5ee] py-3 last:border-b-0">
                 <div
@@ -197,7 +197,7 @@ function CheckoutInner() {
                   role={item.imageUrl ? "img" : undefined}
                   aria-label={item.imageUrl ? item.productName : undefined}
                 >
-                  {!item.imageUrl && "🌱"}
+                  {!item.imageUrl && <span className="material-symbols-outlined">potted_plant</span>}
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-bold">{item.productName}</div>

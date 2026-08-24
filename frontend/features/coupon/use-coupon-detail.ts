@@ -117,7 +117,7 @@ export function useCouponDetail({
             set((current) => ({ readyCards: current.readyCards + 1 }));
             setCelebrate(true);
           } else {
-            showToast("쿠폰을 구매했어요! 🎟️");
+            showToast("쿠폰을 구매했어요!");
           }
         } catch (purchaseError) {
           showToast(

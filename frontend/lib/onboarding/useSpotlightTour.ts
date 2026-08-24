@@ -15,7 +15,7 @@ function seenKey(userId: number, tourId: string): string {
 export interface UseSpotlightTourResult {
   open: boolean;
   stepIndex: number;
-  /** ❓ 버튼 등으로 언제든 처음부터 다시 시작할 때 호출 */
+  /** 버튼 등으로 언제든 처음부터 다시 시작할 때 호출 */
   start: () => void;
   /** 다음 스텝으로 — 마지막 스텝이면 완료 처리(스킵과 동일하게 플래그 저장 후 닫힘) */
   next: () => void;

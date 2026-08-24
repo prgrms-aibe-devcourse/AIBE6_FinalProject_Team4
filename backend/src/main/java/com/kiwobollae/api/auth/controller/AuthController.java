@@ -10,7 +10,6 @@ import com.kiwobollae.api.auth.dto.request.PasswordVerifyRequest;
 import com.kiwobollae.api.auth.dto.request.SignupRequest;
 import com.kiwobollae.api.auth.dto.request.UserUpdateRequest;
 import com.kiwobollae.api.auth.dto.request.WithdrawRequest;
-import com.kiwobollae.api.auth.dto.response.AccessReissueResult;
 import com.kiwobollae.api.auth.dto.response.AccessTokenResponse;
 import com.kiwobollae.api.auth.dto.response.LoginResponse;
 import com.kiwobollae.api.auth.dto.response.NicknameAvailabilityResponse;
@@ -118,13 +117,15 @@ public class AuthController {
 		}
 	}
 
-	@Operation(summary = "토큰 재발급", description = "httpOnly 쿠키의 리프레시 토큰을 검증하고 액세스 토큰만 새로 발급합니다. 리프레시 토큰 자체는 로그인 시 발급된 것을 만료 전까지 그대로 재사용합니다.")
+	@Operation(summary = "토큰 재발급", description = "httpOnly 쿠키의 리프레시 토큰을 검증하고 액세스·리프레시 토큰을 모두 새로 발급합니다(로테이션). 기존 리프레시 토큰은 즉시 폐기되며, 이미 폐기된 토큰이 재사용되면 탈취로 간주해 해당 계정의 모든 세션이 강제 로그아웃됩니다.")
 	@PostMapping("/reissue")
 	public ResponseEntity<ApiResponse<AccessTokenResponse>> reissue(
 			@CookieValue(value = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
-		AccessReissueResult result = authService.reissue(refreshToken);
+		TokenIssueResult result = authService.reissue(refreshToken);
 		AccessTokenResponse body = new AccessTokenResponse(result.accessToken(), result.tokenType(), result.user());
-		return ResponseEntity.ok(ApiResponse.success(body));
+		return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, buildRefreshCookie(result.rawRefreshToken()).toString())
+				.body(ApiResponse.success(body));
 	}
 
 	@Operation(summary = "로그아웃", description = "리프레시 토큰을 폐기하고 쿠키를 만료시킵니다.")

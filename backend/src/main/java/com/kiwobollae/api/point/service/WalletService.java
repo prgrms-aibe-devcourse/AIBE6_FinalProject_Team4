@@ -15,6 +15,8 @@ import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
 import com.kiwobollae.api.point.repository.PointTransactionRepository;
 import com.kiwobollae.api.point.repository.WalletRepository;
+import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.service.NotificationService;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +31,24 @@ public class WalletService {
 
 	private static final long JOURNAL_REWARD_AMOUNT = 100L;
 	private static final long ORDER_FREE_POINT_UNIT = 100L;
+	private static final String ADMIN_ADJUST_REF_TYPE = "ADMIN_ADJUST";
 
 	private final WalletRepository walletRepository;
 	private final PointTransactionRepository pointTransactionRepository;
 	private final PointTransactionTimeProvider pointTransactionTimeProvider;
+	private final NotificationService notificationService;
+
+	private static String adjustmentReasonLabel(AdminPointAdjustmentReason reason) {
+		return switch (reason) {
+			case SPECIAL_EVENT -> "이벤트 지급";
+			case OUTSTANDING_MEMBER -> "우수 회원 보상";
+			case FRAUD_PENALTY -> "부정 이용 페널티";
+		};
+	}
+
+	private static String currencyLabel(CurrencyType currency) {
+		return currency == CurrencyType.FREE ? "무상" : "유상";
+	}
 
 	/** POINT-10: 일반·소셜 회원가입 트랜잭션에서 지갑 자동 생성(paid=0, free=0). auth 도메인이 호출. */
 	@Transactional
@@ -61,6 +77,22 @@ public class WalletService {
 			long amount,
 			AdminPointAdjustmentReason adjustmentReason
 	) {
+		return adjustByAdmin(adminUserId, userId, currency, amount, adjustmentReason, true);
+	}
+
+	/**
+	 * 알림 발송 여부를 선택할 수 있는 버전. 로컬 시드(PointScenarioInitData)처럼 실제 사용자
+	 * 액션이 아닌 호출에서 알림이 나가지 않도록 {@code notify=false}로 쓴다.
+	 */
+	@Transactional
+	public AdminPointAdjustmentResponse adjustByAdmin(
+			Long adminUserId,
+			Long userId,
+			CurrencyType currency,
+			long amount,
+			AdminPointAdjustmentReason adjustmentReason,
+			boolean notify
+	) {
 		if (adminUserId == null || adminUserId < 1
 				|| userId == null || userId < 1 || currency == null || amount == 0
 				|| adjustmentReason == null || !adjustmentReason.supports(amount)) {
@@ -80,6 +112,17 @@ public class WalletService {
 				adminUserId,
 				adjustmentReason
 		);
+		if (notify) {
+			notificationService.notify(
+					userId,
+					NotificationType.POINT,
+					amount > 0 ? "포인트가 지급됐어요" : "포인트가 차감됐어요",
+					adjustmentReasonLabel(adjustmentReason) + " · " + currencyLabel(currency) + " " + Math.abs(amount) + "P",
+					"/my/points",
+					ADMIN_ADJUST_REF_TYPE,
+					transaction.getId()
+			);
+		}
 		return AdminPointAdjustmentResponse.from(userId, transaction, wallet);
 	}
 

@@ -1,6 +1,6 @@
 import { request, SpringPage } from '@/lib/api';
 
-export type AdminUserStatus = 'ACTIVE' | 'SUSPENDED' | 'RESTRICTED' | 'WITHDRAWN';
+export type AdminUserStatus = 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN';
 export type AdminUserRole = 'ADMIN' | 'USER';
 
 export interface AdminUserSummary {

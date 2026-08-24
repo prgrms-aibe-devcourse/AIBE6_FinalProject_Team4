@@ -73,7 +73,7 @@ export default function Cards({ searchParams }: { searchParams?: CouponSearchPar
 
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
-          쿠폰을 불러오고 있어요 🎟️
+          쿠폰을 불러오고 있어요
         </div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">
@@ -112,10 +112,10 @@ export default function Cards({ searchParams }: { searchParams?: CouponSearchPar
                       : undefined
                   }
                 >
-                  {!card.imageUrl && '🃏'}
+                  {!card.imageUrl && <span className="material-symbols-outlined text-[78px]">style</span>}
                   {ready && (
                     <span className={`absolute right-3 top-3 rounded-full px-[11px] py-[5px] text-xs font-extrabold ${outOfStock ? 'bg-[#eceee8] text-sub' : 'bg-gold text-gold-text'}`}>
-                      {outOfStock ? '교환 상품 품절' : '교환 가능 🎉'}
+                      {outOfStock ? '교환 상품 품절' : '교환 가능'}
                     </span>
                   )}
                 </div>

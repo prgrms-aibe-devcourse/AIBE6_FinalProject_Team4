@@ -17,7 +17,6 @@ import {
 } from "@/lib/api";
 import { formatPhone } from "@/components/AddressForm";
 import { embedAddressSearch } from "@/lib/daumPostcode";
-import { levelTitle } from "@/lib/levels";
 import { useStore } from "@/lib/store";
 import { useUI } from "@/lib/ui";
 import Link from "next/link";
@@ -212,14 +211,13 @@ export default function MyPage() {
         phoneNumber: phoneNumber || undefined,
       });
       setProfile(updated);
-      // 헤더/네브바가 참조하는 store의 nickname·level도 같이 갱신
+      // 헤더/네브바가 참조하는 store의 nickname도 같이 갱신
       set((s) =>
         s.user
           ? {
               user: {
                 ...s.user,
                 nickname: updated.nickname,
-                level: updated.level,
               },
             }
           : {},
@@ -474,11 +472,10 @@ export default function MyPage() {
   };
 
   const displayNickname = profile?.nickname ?? state.user?.nickname ?? "게스트";
-  const displayLevel = profile?.level ?? state.user?.level ?? 1;
   const displayEmail = profile?.email ?? state.user?.email ?? "";
 
   return (
-    <div className="container max-w-[960px]">
+    <div className="container">
       <div className="mb-6 flex flex-wrap items-center gap-[18px] rounded-[20px] bg-white p-6 shadow-card">
         <ProfileCosmeticFrame
           borderCode={equippedBorder?.code}
@@ -491,9 +488,6 @@ export default function MyPage() {
         <div className="min-w-[180px] flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xl font-extrabold">{displayNickname}</span>
-            <span className="whitespace-nowrap rounded-full bg-brand-soft px-[11px] py-1 text-xs font-extrabold text-brand-dark">
-              Lv.{displayLevel} {levelTitle(displayLevel)}
-            </span>
           </div>
           <div className="mt-1 text-sm text-sub">{displayEmail}</div>
           {equippedTitle ? (
@@ -592,7 +586,7 @@ export default function MyPage() {
                   {nickname !== originalNickname &&
                   nicknameChecked &&
                   nicknameAvailable
-                    ? "사용가능 ✅"
+                    ? "사용가능"
                     : "중복확인"}
                 </button>
               </div>

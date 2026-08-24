@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore, fmt } from '@/lib/store';
 import { NotificationData, NotificationType } from '@/lib/notification-api';
 import { useUI } from '@/lib/ui';
-import { levelTitle } from '@/lib/levels';
 import Skeleton from './Skeleton';
 import { useGachaCosmetics } from '@/features/gacha/use-gacha-cosmetics';
 import GachaTitleBadge from '@/components/gacha/GachaTitleBadge';
@@ -19,25 +18,43 @@ import { ApiError } from '@/lib/api';
 const SHOW_LOCAL_GACHA_TEST_CONTROLS = process.env.NODE_ENV !== 'production';
 
 const NOTIF_ICON: Record<NotificationType, string> = {
-  DELIVERY: '📦',
-  COMMUNITY: '💬',
-  POINT: '☀️',
-  JOURNAL_REMINDER: '🌱',
-  INQUIRY: '💬',
-  NOTICE: '📢',
-  TIMELAPSE: '🎬',
-  CARD_MARKET: '🤝',
+  DELIVERY: 'local_shipping',
+  COMMUNITY: 'forum',
+  POINT: 'light_mode',
+  JOURNAL_REMINDER: 'potted_plant',
+  INQUIRY: 'forum',
+  NOTICE: 'campaign',
+  TIMELAPSE: 'movie',
+  CARD_MARKET: 'handshake',
 };
 
-const NAV = [
-  { key: 'home', label: '홈', href: '/' },
-  { key: 'plants', label: '내 식물', href: '/plants' },
-  { key: 'journal', label: '일지', href: '/journals' },
-  { key: 'shop', label: '상점', href: '/shop' },
-  { key: 'cards', label: '쿠폰', href: '/cards' },
-  { key: 'gacha', label: '가챠', href: '/gacha' },
-  { key: 'board', label: '커뮤니티', href: '/board' },
-  { key: 'market', label: '거래소', href: '/card-market' },
+type NavLink = { type: 'link'; key: string; label: string; href: string };
+type NavGroup = { type: 'group'; key: string; label: string; items: { key: string; label: string; href: string }[] };
+
+// 상단 탭이 너무 많아져서 관련된 것끼리 드롭다운으로 묶는다 — 내 식물/일지, 가챠/거래소.
+// 상점/쿠폰/커뮤니티는 각각 단독 탭으로 둔다.
+const NAV: (NavLink | NavGroup)[] = [
+  {
+    type: 'group',
+    key: 'plantGroup',
+    label: '내 식물',
+    items: [
+      { key: 'plants', label: '내 식물', href: '/plants' },
+      { key: 'journal', label: '일지', href: '/journals' },
+    ],
+  },
+  { type: 'link', key: 'shop', label: '상점', href: '/shop' },
+  { type: 'link', key: 'cards', label: '쿠폰', href: '/cards' },
+  {
+    type: 'group',
+    key: 'gachaGroup',
+    label: '가챠',
+    items: [
+      { key: 'gacha', label: '가챠', href: '/gacha' },
+      { key: 'market', label: '거래소', href: '/card-market' },
+    ],
+  },
+  { type: 'link', key: 'board', label: '커뮤니티', href: '/board' },
 ];
 
 // 모바일 하단 탭은 자리가 5개뿐이라 홈/식물/가챠/커뮤니티/상점만 남기고, 마이페이지는
@@ -90,6 +107,8 @@ export default function Navbar() {
 
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
+  const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
+  const navGroupRef = useRef<HTMLDivElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [testCardLoading, setTestCardLoading] = useState<
     'HYPER_RARE' | 'GOLDEN_RARE' | null
@@ -99,14 +118,15 @@ export default function Navbar() {
   const [authGateKey, setAuthGateKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!bellOpen && !profileOpen) return;
+    if (!bellOpen && !profileOpen && !openNavGroup) return;
     const onClick = (e: MouseEvent) => {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+      if (navGroupRef.current && !navGroupRef.current.contains(e.target as Node)) setOpenNavGroup(null);
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
-  }, [bellOpen, profileOpen]);
+  }, [bellOpen, profileOpen, openNavGroup]);
 
   const openNotif = (n: NotificationData) => {
     setBellOpen(false);
@@ -166,23 +186,80 @@ export default function Navbar() {
     <div className="font-sans">
       <div className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
         <div className="mx-auto flex h-[62px] max-w-[1160px] items-center gap-2 px-4 md:gap-4 md:px-5">
-          <Link href="/" className="whitespace-nowrap text-[17px] font-extrabold text-brand-dark md:text-[19px]">키워볼래 🌱</Link>
-          <div className="ml-3 hidden gap-0.5 overflow-auto md:flex">
-            {NAV.map((n) => (
-              <Link
-                key={n.key}
-                href={n.href}
-                data-tour-id={n.key}
-                onClick={(e) => guardNavClick(e, n.key)}
-                className={`whitespace-nowrap rounded-[10px] px-3 py-2 text-[15px] font-bold transition-colors duration-150 ${
-                  active === n.key
-                    ? 'bg-brand text-white hover:bg-brand-dark hover:text-white'
-                    : 'text-[#5b6a54] hover:bg-brand-soft hover:text-brand-dark'
-                }`}
-              >
-                {n.label}
-              </Link>
-            ))}
+          <Link href="/" className="whitespace-nowrap text-[17px] font-extrabold text-brand-dark md:text-[19px]">키워볼래</Link>
+          <div className="ml-3 hidden gap-0.5 overflow-visible md:flex" ref={navGroupRef}>
+            {NAV.map((n) => {
+              if (n.type === 'link') {
+                return (
+                  <Link
+                    key={n.key}
+                    href={n.href}
+                    data-tour-id={n.key}
+                    onClick={(e) => guardNavClick(e, n.key)}
+                    className={`whitespace-nowrap rounded-[10px] px-3 py-2 text-[15px] font-bold transition-colors duration-150 ${
+                      active === n.key
+                        ? 'bg-brand text-white hover:bg-brand-dark hover:text-white'
+                        : 'text-[#5b6a54] hover:bg-brand-soft hover:text-brand-dark'
+                    }`}
+                  >
+                    {n.label}
+                  </Link>
+                );
+              }
+              const groupActive = n.items.some((item) => item.key === active);
+              return (
+                <div
+                  key={n.key}
+                  className="relative"
+                  onMouseEnter={() => setOpenNavGroup(n.key)}
+                  onMouseLeave={() => setOpenNavGroup((v) => (v === n.key ? null : v))}
+                >
+                  <Link
+                    href={n.items[0].href}
+                    data-tour-id={n.items[0].key}
+                    onClick={(e) => {
+                      guardNavClick(e, n.items[0].key);
+                      setOpenNavGroup(null);
+                    }}
+                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3 py-2 text-[15px] font-bold transition-colors duration-150 ${
+                      groupActive
+                        ? 'bg-brand text-white hover:bg-brand-dark hover:text-white'
+                        : 'text-[#5b6a54] hover:bg-brand-soft hover:text-brand-dark'
+                    }`}
+                  >
+                    {n.label}
+                    <span
+                      aria-hidden="true"
+                      className={`h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent ${
+                        groupActive ? 'border-t-white' : 'border-t-current'
+                      }`}
+                    />
+                  </Link>
+                  {openNavGroup === n.key && (
+                    <div className="absolute left-0 top-full z-50 w-40 overflow-hidden rounded-2xl border border-line bg-white py-1.5 shadow-[0_14px_40px_-12px_rgba(85,139,47,.35)]">
+                      {n.items.map((item) => (
+                        <Link
+                          key={item.key}
+                          href={item.href}
+                          data-tour-id={item.key}
+                          onClick={(e) => {
+                            guardNavClick(e, item.key);
+                            setOpenNavGroup(null);
+                          }}
+                          className={`block px-4 py-2.5 text-[14px] font-semibold transition-colors duration-150 ${
+                            active === item.key
+                              ? 'bg-brand-soft text-brand-dark'
+                              : 'text-ink hover:bg-brand-soft hover:text-ink'
+                          }`}
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <div className="flex-1" />
           {!hydrated ? (
@@ -247,7 +324,7 @@ export default function Navbar() {
                         onClick={() => openNotif(n)}
                         className={`flex w-full cursor-pointer items-start gap-[11px] border-b border-[#F7F2E7] px-4 py-3 text-left transition-colors duration-150 hover:bg-brand-soft ${!n.isRead ? 'bg-[#FFFBEB]' : 'bg-white'}`}
                       >
-                        <span className="text-[18px]">{NOTIF_ICON[n.type]}</span>
+                        <span className="material-symbols-outlined text-[18px]">{NOTIF_ICON[n.type]}</span>
                         <div className="min-w-0">
                           <div className="text-[14px] font-bold text-[#3E4A3D]">{n.title}</div>
                           <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[12.5px] text-faint">{n.content}</div>
@@ -289,9 +366,6 @@ export default function Navbar() {
                     <div className="border-b border-[#F2ECDD] px-4 py-3.5">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[15px] font-bold">{state.user?.nickname ?? '게스트'}님</span>
-                        <span className="whitespace-nowrap rounded-full bg-brand-soft px-2.5 py-0.5 text-[11px] font-extrabold text-brand-dark">
-                          Lv.{state.user?.level ?? 1} {levelTitle(state.user?.level ?? 1)}
-                        </span>
                       </div>
                       <div className="mt-1 truncate text-[12.5px] text-faint">{state.user?.email}</div>
                       {equippedTitle && (

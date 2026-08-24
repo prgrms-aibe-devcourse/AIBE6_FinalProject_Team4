@@ -9,8 +9,19 @@ import {
   InquiryStatus,
 } from "@/lib/inquiry-api";
 import { useUI } from "@/lib/ui";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useAdminPaginatedList } from "./use-admin-paginated-list";
+import AdminPagination from "./AdminPagination";
+import { useScrollOnPageLoad } from "./use-scroll-on-page-load";
+
+const PAGE_SIZE = 10;
+const COLUMN_COUNT = 6;
+const ADMIN_ALL_SIZE = 2000;
+
+const INQUIRY_STATUS_PRIORITY: Record<InquiryStatus, number> = {
+  OPEN: 0,
+  ANSWERED: 1,
+};
 
 const CAT: Record<InquiryCategory, string> = {
   PAYMENT: "결제",
@@ -42,15 +53,30 @@ export default function AdminInquiryPanel({
   accessToken: string;
 }) {
   const { showToast } = useUI();
+  const sectionRef = useRef<HTMLElement>(null);
   const [status, setStatus] = useState<InquiryStatus | "">("");
   const [selected, setSelected] = useState<InquiryData | null>(null);
   const [answerContent, setAnswerContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // 답변완료 문의는 이미 끝난 건이라 최신순으로, 그 외(대기 등)는 아직 답변해야 할
+  // 오래된 문의가 먼저 보이도록 오래된순으로 조회한다.
+  const inquirySort = status === "ANSWERED" ? "createdAt,DESC" : "createdAt,ASC";
+
+  // "전체" 조회는 대기→답변완료 순서로 전체를 재정렬해야 하는데, 서버는 필드 하나로만
+  // 정렬할 수 있어 페이지 단위로는 커스텀 순서를 만들 수 없다 — 그래서 이때만 한 번에 다
+  // 받아와 아래에서 클라이언트가 직접 정렬·페이지네이션한다.
   const fetchPage = useCallback(
     (page: number, signal?: AbortSignal) =>
-      getInquiriesForAdmin(accessToken, status || undefined, page, 20, signal),
-    [accessToken, status],
+      getInquiriesForAdmin(
+        accessToken,
+        status || undefined,
+        status ? page : 0,
+        status ? PAGE_SIZE : ADMIN_ALL_SIZE,
+        signal,
+        inquirySort,
+      ),
+    [accessToken, status, inquirySort],
   );
   const {
     page,
@@ -62,6 +88,19 @@ export default function AdminInquiryPanel({
     errorMessage,
     reload,
   } = useAdminPaginatedList(fetchPage, "문의 목록을 불러오지 못했어요.");
+
+  useScrollOnPageLoad(page, loading, sectionRef);
+
+  const sortedAllInquiries = useMemo(() => {
+    if (status) return inquiries;
+    return [...inquiries].sort(
+      (a, b) => INQUIRY_STATUS_PRIORITY[a.status] - INQUIRY_STATUS_PRIORITY[b.status],
+    );
+  }, [inquiries, status]);
+  const displayInquiries = status
+    ? sortedAllInquiries
+    : sortedAllInquiries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const displayTotalPages = status ? totalPages : Math.ceil(totalElements / PAGE_SIZE);
 
   const changeStatus = (next: InquiryStatus | "") => {
     setStatus(next);
@@ -103,7 +142,7 @@ export default function AdminInquiryPanel({
   };
 
   return (
-    <section className="overflow-hidden rounded-[18px] bg-white shadow-card">
+    <section ref={sectionRef} className="overflow-hidden rounded-[18px] bg-white shadow-card">
       <div className="border-b border-line p-5">
         <h2 className="text-lg font-extrabold">문의 관리</h2>
         <p className="mt-1 text-sm text-sub">
@@ -147,16 +186,16 @@ export default function AdminInquiryPanel({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && inquiries.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
-                  문의 목록을 불러오고 있어요.
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
+                  조건에 맞는 문의를 불러오고 있어요.
                 </td>
               </tr>
             ) : errorMessage ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={COLUMN_COUNT}
                   role="alert"
                   className="px-5 py-10 text-center text-danger"
                 >
@@ -165,12 +204,12 @@ export default function AdminInquiryPanel({
               </tr>
             ) : inquiries.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-sub">
+                <td colSpan={COLUMN_COUNT} className="px-5 py-10 text-center text-sub">
                   조건에 맞는 문의가 없어요.
                 </td>
               </tr>
             ) : (
-              inquiries.map((inquiry) => {
+              displayInquiries.map((inquiry) => {
                 const st = STAT[inquiry.status];
                 return (
                   <tr key={inquiry.id} className="border-t border-[#f2f3ec]">
@@ -208,29 +247,9 @@ export default function AdminInquiryPanel({
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line px-5 py-3.5 text-sm">
+      <div className="flex flex-col items-center gap-3 border-t border-line px-5 pt-3.5 pb-5 text-sm sm:flex-row sm:justify-between">
         <span className="text-sub">총 {totalElements}건</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            disabled={page === 0 || loading}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="min-w-[64px] text-center font-bold">
-            {totalPages === 0 ? 0 : page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => current + 1)}
-            disabled={loading || totalPages === 0 || page + 1 >= totalPages}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination page={page} totalPages={displayTotalPages} onChange={setPage} />
       </div>
 
       {selected && (

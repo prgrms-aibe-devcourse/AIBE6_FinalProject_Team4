@@ -34,7 +34,7 @@ module.exports = {
         sans: ['Pretendard', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
-        card: '0 4px 20px rgba(124,179,66,.08)',
+        card: '0 2px 6px rgba(46,54,42,.05), 0 10px 28px rgba(124,179,66,.18)',
       },
       keyframes: {
         upIn: {

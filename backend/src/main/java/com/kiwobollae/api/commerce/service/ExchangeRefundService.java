@@ -32,12 +32,14 @@ public class ExchangeRefundService {
 
 	@Transactional
 	public ExchangeOrder cancelAndRefund(Long id, CancelledBy cancelledBy, String reason) {
+		// 일반 주문 취소가 배송 준비중(PREPARING)까지는 허용하고 배송중(SHIPPING)부터 막는 것과
+		// 동일한 경계를 쓴다.
 		int cancelled = exchangeOrderRepository.cancelIfMatches(
 				id,
 				cancelledBy,
 				reason,
 				LocalDateTime.now(KST),
-				ExchangeStatus.REQUESTED
+				ExchangeStatus.PREPARING
 		);
 		if (cancelled == 0) {
 			if (!exchangeOrderRepository.existsById(id)) {

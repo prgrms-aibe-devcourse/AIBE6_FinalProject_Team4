@@ -137,7 +137,7 @@ export default function Orders({
       try {
         await confirmOrder(order.id, state.accessToken);
         await load();
-        showToast('구매를 확정했어요. 고마워요 🌿');
+        showToast('구매를 확정했어요. 고마워요');
       } catch (requestError) {
         showToast(
           requestError instanceof ApiError ? requestError.message : '확정에 실패했어요.',
@@ -153,7 +153,7 @@ export default function Orders({
 
   if (!state.accessToken) {
     return (
-      <div className="container max-w-[960px]">
+      <div className="container">
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">
           주문 내역은 로그인 후 확인할 수 있어요.
         </div>
@@ -162,11 +162,11 @@ export default function Orders({
   }
 
   return (
-    <div className="container max-w-[960px]">
+    <div className="container">
       <h1 className="mb-5 text-2xl font-extrabold">주문 내역</h1>
 
       {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-sub">주문 내역을 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">주문 내역을 불러오고 있어요</div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">{error}</div>
       ) : orders.length === 0 ? (
@@ -209,7 +209,7 @@ export default function Orders({
                         role={item.imageUrl ? "img" : undefined}
                         aria-label={item.imageUrl ? item.productName : undefined}
                       >
-                        {!item.imageUrl && "🌱"}
+                        {!item.imageUrl && <span className="material-symbols-outlined">potted_plant</span>}
                       </div>
                       <div className="flex-1 text-sm font-semibold">{item.productName} <span className="text-faint">× {item.quantity}</span></div>
                     </div>

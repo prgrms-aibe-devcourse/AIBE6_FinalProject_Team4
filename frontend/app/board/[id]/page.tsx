@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError, resolveImageUrl } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
 import { PlantJournalData } from '@/lib/journal-api';
@@ -515,7 +516,7 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
   if (!hydrated || loading) {
     return (
       <div className="container">
-        <div className="px-5 py-[60px] text-center text-sub">게시글을 불러오고 있어요 🌱</div>
+        <div className="px-5 py-[60px] text-center text-sub">게시글을 불러오고 있어요</div>
       </div>
     );
   }
@@ -583,7 +584,7 @@ export default function BoardDetailPage({ params }: { params: { id: string } }) 
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={journalImage} alt="" className="h-full w-full object-cover" />
               ) : (
-                '🌿'
+                <img src={SEEDLING_ICON_SRC} alt="" className="h-[46px] w-[46px]" />
               )}
             </div>
             <div className="min-w-0 flex-1">

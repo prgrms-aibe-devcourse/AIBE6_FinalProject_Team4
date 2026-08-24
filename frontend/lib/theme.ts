@@ -24,7 +24,7 @@ export const grads = {
   tomato: 'linear-gradient(135deg,#FFCC80,#FF8A65)',
   basil: 'linear-gradient(135deg,#AED581,#7CB342)',
   lettuce: 'linear-gradient(135deg,#C8E6A0,#9CCC65)',
-  sprout: 'linear-gradient(135deg,#C5E1A5,#7CB342)',
+  sprout: 'linear-gradient(135deg,#D4EAB8,#9FCB6C)',
   sun: 'linear-gradient(135deg,#FFE082,#FFB74D)',
   mint: 'linear-gradient(135deg,#B2DFDB,#4DB6AC)',
   strawberry: 'linear-gradient(135deg,#F8BBD0,#F06292)',

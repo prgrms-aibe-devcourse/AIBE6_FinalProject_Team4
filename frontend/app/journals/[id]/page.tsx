@@ -8,6 +8,7 @@ import { useUI } from '@/lib/ui';
 import { deleteJournal, deleteJournalImage, getJournal, PlantJournalData, updateJournal, uploadJournalImage } from '@/lib/journal-api';
 import { getBoardPostJournal } from '@/lib/board-api';
 import { formatDate } from '@/lib/format';
+import { SEEDLING_ICON_SRC } from '@/lib/plant-visual';
 import { createReport } from '@/lib/report-api';
 import JournalImageAnalysisPanel from '@/features/journal/JournalImageAnalysisPanel';
 
@@ -251,7 +252,7 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
       revokeNewPhotoBlobs(editPhotos);
       setJournal(updated);
       setEditing(false);
-      showToast('일지를 수정했어요 🌿');
+      showToast('일지를 수정했어요');
     } catch (requestError) {
       showToast(
         requestError instanceof ApiError ? requestError.message : '수정에 실패했어요. 잠시 후 다시 시도해 주세요.',
@@ -286,7 +287,7 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
   if (loading) {
     return (
       <div className="container">
-        <div className="px-5 py-[60px] text-center text-sub">일지를 불러오고 있어요 🌿</div>
+        <div className="px-5 py-[60px] text-center text-sub">일지를 불러오고 있어요</div>
       </div>
     );
   }
@@ -398,7 +399,7 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={activeImage} alt="" className="h-full w-full object-cover" />
             ) : (
-              '🌿'
+              <img src={SEEDLING_ICON_SRC} alt="" className="h-[150px] w-[150px]" />
             )}
           </div>
           {journal.images.length > 1 && (
@@ -473,7 +474,7 @@ function JournalDetailInner({ params }: { params: { id: string } }) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={image} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  '🌿'
+                  <img src={SEEDLING_ICON_SRC} alt="" className="h-[22px] w-[22px]" />
                 )}
               </div>
               <div className="text-[13.5px] text-[#6d7a68]">{journal.plantProfileNickname} · {formatDate(journal.writtenDate)}</div>

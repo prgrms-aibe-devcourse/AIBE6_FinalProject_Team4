@@ -96,14 +96,14 @@ class ExchangeServiceTest {
 		User userRef = mock(User.class);
 		given(userRepository.getReferenceById(7L)).willReturn(userRef);
 
-		ExchangeOrder saved = mockOrder(100L, ExchangeStatus.REQUESTED, 7L, 1L, 10L, 3);
+		ExchangeOrder saved = mockOrder(100L, ExchangeStatus.PREPARING, 7L, 1L, 10L, 3);
 		given(exchangeOrderRepository.saveAndFlush(any(ExchangeOrder.class))).willReturn(saved);
 
 		ExchangeOrderResponse response = exchangeService.requestExchange(7L, REQUEST);
 
 		assertThat(response.id()).isEqualTo(100L);
 		assertThat(response.usedCardCount()).isEqualTo(3);
-		assertThat(response.status()).isEqualTo(ExchangeStatus.REQUESTED);
+		assertThat(response.status()).isEqualTo(ExchangeStatus.PREPARING);
 		verify(userCardRepository).decrementCountIfEnough(7L, 1L, 3);
 		verify(exchangeProductRepository).decrementStockIfAvailable(10L);
 	}
@@ -185,7 +185,7 @@ class ExchangeServiceTest {
 	@Test
 	void getMyExchangesMapsRepositoryPage() {
 		Pageable pageable = PageRequest.of(0, 10);
-		ExchangeOrder order = mockOrder(1L, ExchangeStatus.REQUESTED, 7L, 1L, 10L, 3);
+		ExchangeOrder order = mockOrder(1L, ExchangeStatus.PREPARING, 7L, 1L, 10L, 3);
 		given(exchangeOrderRepository.findAllByUserId(7L, pageable))
 				.willReturn(new PageImpl<>(java.util.List.of(order)));
 
@@ -197,7 +197,7 @@ class ExchangeServiceTest {
 
 	@Test
 	void getMyExchangeReturnsOwnedOrder() {
-		ExchangeOrder order = mockOrder(1L, ExchangeStatus.REQUESTED, 7L, 1L, 10L, 3);
+		ExchangeOrder order = mockOrder(1L, ExchangeStatus.PREPARING, 7L, 1L, 10L, 3);
 		given(exchangeOrderRepository.findByIdAndUserId(1L, 7L)).willReturn(Optional.of(order));
 
 		ExchangeOrderResponse response = exchangeService.getMyExchange(7L, 1L);

@@ -10,6 +10,8 @@ import com.kiwobollae.api.inquiry.dto.response.InquiryResponse;
 import com.kiwobollae.api.inquiry.entity.Inquiry;
 import com.kiwobollae.api.inquiry.entity.enums.InquiryStatus;
 import com.kiwobollae.api.inquiry.repository.InquiryRepository;
+import com.kiwobollae.api.notification.entity.enums.NotificationType;
+import com.kiwobollae.api.notification.service.NotificationService;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,8 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class InquiryService {
 
+	private static final String REF_TYPE = "INQUIRY";
+
 	private final InquiryRepository inquiryRepository;
 	private final UserRepository userRepository;
+	private final NotificationService notificationService;
 
 	@Transactional
 	public InquiryResponse createInquiry(Long userId, InquiryRequest request) {
@@ -62,6 +67,15 @@ public class InquiryService {
 		}
 		Inquiry inquiry = inquiryRepository.findByIdWithAnswerAdmin(inquiryId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.INQUIRY_NOT_FOUND));
+		notificationService.notify(
+				inquiry.getUser().getId(),
+				NotificationType.INQUIRY,
+				"문의하신 내용에 답변이 도착했어요",
+				inquiry.getTitle(),
+				"/my/inquiries#inquiry-" + inquiryId,
+				REF_TYPE,
+				inquiryId
+		);
 		return InquiryResponse.from(inquiry);
 	}
 }

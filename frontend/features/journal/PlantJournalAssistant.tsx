@@ -82,27 +82,25 @@ function AssistantMark({
   return (
     <span
       aria-hidden="true"
-      className={`relative flex flex-none items-center justify-center border shadow-sm ${
+      className={`relative flex flex-none items-center justify-center border border-brand-dark bg-gradient-to-br from-[#8BC34A] to-[#558B2F] shadow-sm ${
         compact ? "h-10 w-10 rounded-[14px]" : "h-12 w-12 rounded-[17px]"
-      } ${
-        inverted
-          ? "border-brand-dark bg-brand-dark text-white"
-          : "border-[#d5ded0] bg-white text-brand-dark"
       }`}
     >
+      <img
+        src="/icons/seedling-white.svg"
+        alt=""
+        className={compact ? "h-[26px] w-[26px]" : "h-[30px] w-[30px]"}
+      />
       <span
-        className={`material-symbols-outlined ${compact ? "text-[23px]" : "text-[28px]"}`}
-      >
-        psychiatry
-      </span>
-      <span
-        className={`absolute -right-1 -top-1 flex items-center justify-center rounded-full border-2 border-white bg-[#e4a934] text-white shadow-sm ${
+        className={`absolute -right-1 -top-1 flex items-center justify-center rounded-full border-2 border-white bg-[#e4a934] shadow-sm ${
           compact ? "h-[17px] w-[17px]" : "h-5 w-5"
         }`}
       >
-        <span className="material-symbols-outlined text-[11px]">
-          auto_awesome
-        </span>
+        <img
+          src="/icons/sparkle-white.svg"
+          alt=""
+          className={compact ? "h-2.5 w-2.5" : "h-3 w-3"}
+        />
       </span>
     </span>
   );

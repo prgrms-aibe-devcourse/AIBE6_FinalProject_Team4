@@ -98,7 +98,9 @@ public class ExchangeOrder extends BaseEntity {
 				.exchangeProduct(exchangeProduct)
 				.exchangeProductName(exchangeProduct.getName())
 				.usedCardCount(usedCardCount)
-				.status(ExchangeStatus.REQUESTED)
+				// 일반 주문(Order)과 동일한 컨벤션으로, 별도의 "신청됨" 단계 없이 바로 배송 준비
+				// 상태로 시작한다 — 취소 가능 여부도 주문과 맞춰 PREPARING 동안에만 허용한다.
+				.status(ExchangeStatus.PREPARING)
 				.receiverName(receiverName)
 				.receiverPhone(receiverPhone)
 				.zipCode(zipCode)

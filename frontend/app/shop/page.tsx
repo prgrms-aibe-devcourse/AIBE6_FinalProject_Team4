@@ -80,7 +80,7 @@ export default function Shop({ searchParams }: { searchParams?: ShopSearchParams
 
       {loading ? (
         <div className="rounded-[22px] bg-white py-14 text-center text-[15px] text-sub">
-          상품을 불러오고 있어요 🌱
+          상품을 불러오고 있어요
         </div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-[15px] text-sub">
@@ -114,7 +114,7 @@ export default function Shop({ searchParams }: { searchParams?: ShopSearchParams
                       : undefined
                   }
                 >
-                  {!product.imageUrl && <span>🌱</span>}
+                  {!product.imageUrl && <span className="material-symbols-outlined">potted_plant</span>}
                   {product.soldOut && (
                     <span className="absolute left-3 top-3 rounded-lg bg-sub px-3 py-1 text-xs font-bold text-white">
                       품절

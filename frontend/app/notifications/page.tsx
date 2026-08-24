@@ -168,7 +168,7 @@ export default function Notifications() {
       </div>
 
       {loading ? (
-        <div className="rounded-[22px] bg-white py-14 text-center text-sub">알림을 불러오고 있어요 🌱</div>
+        <div className="rounded-[22px] bg-white py-14 text-center text-sub">알림을 불러오고 있어요</div>
       ) : error ? (
         <div className="rounded-[22px] bg-white px-5 py-14 text-center text-sub">{error}</div>
       ) : items.length === 0 ? (

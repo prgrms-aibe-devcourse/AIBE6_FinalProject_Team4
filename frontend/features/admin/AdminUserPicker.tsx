@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AdminUserStatus,
   AdminUserSummary,
   getAdminUsers,
 } from "@/features/admin/user-api";
 import { ApiError, SpringPage } from "@/lib/api";
+import AdminPagination from "@/components/admin/AdminPagination";
+import { useScrollOnPageLoad } from "@/components/admin/use-scroll-on-page-load";
 
 interface AdminUserPickerProps {
   accessToken: string | null;
@@ -18,14 +20,12 @@ interface AdminUserPickerProps {
 const STATUS_LABELS: Record<AdminUserStatus, string> = {
   ACTIVE: "활성",
   SUSPENDED: "정지",
-  RESTRICTED: "제한",
   WITHDRAWN: "탈퇴",
 };
 
 const STATUS_STYLES: Record<AdminUserStatus, string> = {
   ACTIVE: "bg-[#E8F3D8] text-brand-text",
   SUSPENDED: "bg-[#FBEDE3] text-[#b5771a]",
-  RESTRICTED: "bg-[#FFF3CC] text-gold-text",
   WITHDRAWN: "bg-[#f0f1ea] text-[#7a8176]",
 };
 
@@ -35,6 +35,7 @@ export default function AdminUserPicker({
   onSelect,
   disabled = false,
 }: AdminUserPickerProps) {
+  const sectionRef = useRef<HTMLElement>(null);
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [status, setStatus] = useState<AdminUserStatus | "">("ACTIVE");
@@ -90,8 +91,10 @@ export default function AdminUserPicker({
   const users = usersPage?.content ?? [];
   const totalPages = usersPage?.totalPages ?? 0;
 
+  useScrollOnPageLoad(page, loading, sectionRef);
+
   return (
-    <section className="overflow-hidden rounded-[18px] bg-white shadow-card">
+    <section ref={sectionRef} className="overflow-hidden rounded-[18px] bg-white shadow-card">
       <div className="border-b border-line p-5">
         <h2 className="text-lg font-extrabold">회원 선택</h2>
         <p className="mt-1 text-sm text-sub">
@@ -133,7 +136,6 @@ export default function AdminUserPicker({
           >
             <option value="ACTIVE">활성 회원</option>
             <option value="SUSPENDED">정지 회원</option>
-            <option value="RESTRICTED">제한 회원</option>
             <option value="WITHDRAWN">탈퇴 회원</option>
             <option value="">전체 상태</option>
           </select>
@@ -152,10 +154,10 @@ export default function AdminUserPicker({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && users.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-5 py-10 text-center text-sub">
-                  회원을 불러오고 있어요.
+                  조건에 맞는 회원을 불러오고 있어요.
                 </td>
               </tr>
             ) : errorMessage ? (
@@ -222,31 +224,9 @@ export default function AdminUserPicker({
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line px-5 py-3.5 text-sm">
+      <div className="flex flex-col items-center gap-3 border-t border-line px-5 pt-3.5 pb-5 text-sm sm:flex-row sm:justify-between">
         <span className="text-sub">총 {usersPage?.totalElements ?? 0}명</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            disabled={disabled || page === 0 || loading}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="min-w-[64px] text-center font-bold">
-            {totalPages === 0 ? 0 : page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => current + 1)}
-            disabled={
-              disabled || loading || totalPages === 0 || page + 1 >= totalPages
-            }
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination page={page} totalPages={totalPages} onChange={setPage} disabled={disabled} />
       </div>
     </section>
   );

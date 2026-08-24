@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AdminPointAdjustmentDirection,
   AdminPointAdjustmentHistoryData,
@@ -9,6 +9,10 @@ import {
 } from "@/features/point/api";
 import { ApiError } from "@/lib/api";
 import { getAdminPointAdjustmentReasonLabel } from "@/features/point/admin-adjustment-reasons";
+import AdminPagination from "@/components/admin/AdminPagination";
+import { useScrollOnPageLoad } from "@/components/admin/use-scroll-on-page-load";
+
+const PAGE_SIZE = 10;
 
 interface AdminPointAdjustmentHistoryProps {
   accessToken: string | null;
@@ -39,6 +43,7 @@ export default function AdminPointAdjustmentHistory({
   selectedUserId,
   refreshKey,
 }: AdminPointAdjustmentHistoryProps) {
+  const sectionRef = useRef<HTMLElement>(null);
   const [currencyType, setCurrencyType] = useState<PointCurrencyType | "">("");
   const [direction, setDirection] = useState<
     AdminPointAdjustmentDirection | ""
@@ -69,7 +74,7 @@ export default function AdminPointAdjustmentHistory({
       from: fromDate ? `${fromDate}T00:00:00` : undefined,
       to: toNextDayStart(toDate),
       page,
-      size: 20,
+      size: PAGE_SIZE,
       signal: controller.signal,
     })
       .then(setHistoryPage)
@@ -110,8 +115,10 @@ export default function AdminPointAdjustmentHistory({
   const history = historyPage?.content ?? [];
   const totalPages = historyPage?.totalPages ?? 0;
 
+  useScrollOnPageLoad(page, loading, sectionRef);
+
   return (
-    <section className="overflow-hidden rounded-[18px] bg-white shadow-card">
+    <section ref={sectionRef} className="overflow-hidden rounded-[18px] bg-white shadow-card">
       <div className="border-b border-line p-5">
         <h2 className="text-lg font-extrabold">관리자 포인트 조정 내역</h2>
         <p className="mt-1 text-sm text-sub">
@@ -211,10 +218,10 @@ export default function AdminPointAdjustmentHistory({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && history.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-5 py-10 text-center text-sub">
-                  조정 내역을 불러오고 있어요.
+                  조건에 맞는 조정 내역을 불러오고 있어요.
                 </td>
               </tr>
             ) : errorMessage ? (
@@ -283,29 +290,9 @@ export default function AdminPointAdjustmentHistory({
         </table>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line px-5 py-3.5 text-sm">
+      <div className="flex flex-col items-center gap-3 border-t border-line px-5 pt-3.5 pb-5 text-sm sm:flex-row sm:justify-between">
         <span className="text-sub">총 {historyPage?.totalElements ?? 0}건</span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-            disabled={page === 0 || loading}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            이전
-          </button>
-          <span className="min-w-[64px] text-center font-bold">
-            {totalPages === 0 ? 0 : page + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPage((current) => current + 1)}
-            disabled={loading || totalPages === 0 || page + 1 >= totalPages}
-            className="rounded-lg border border-line px-3 py-1.5 font-bold text-sub disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            다음
-          </button>
-        </div>
+        <AdminPagination page={page} totalPages={totalPages} onChange={setPage} />
       </div>
     </section>
   );

@@ -57,7 +57,7 @@ class ExchangeRefundServiceTest {
 	void cancelAndRefundRestoresCardCountAndProductStockOnSuccess() {
 		ExchangeOrder order = mockOrder();
 		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.USER), eq("단순 변심"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
+				eq(50L), eq(CancelledBy.USER), eq("단순 변심"), any(LocalDateTime.class), eq(ExchangeStatus.PREPARING)
 		)).willReturn(1);
 		given(exchangeOrderRepository.findById(50L)).willReturn(Optional.of(order));
 
@@ -71,7 +71,7 @@ class ExchangeRefundServiceTest {
 	@Test
 	void cancelAndRefundFailsWithInvalidStateWhenAlreadyCancelled() {
 		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.USER), eq("단순 변심"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
+				eq(50L), eq(CancelledBy.USER), eq("단순 변심"), any(LocalDateTime.class), eq(ExchangeStatus.PREPARING)
 		)).willReturn(0);
 		given(exchangeOrderRepository.existsById(50L)).willReturn(true);
 
@@ -85,7 +85,7 @@ class ExchangeRefundServiceTest {
 	@Test
 	void cancelAndRefundFailsWithNotFoundWhenOrderDoesNotExist() {
 		given(exchangeOrderRepository.cancelIfMatches(
-				eq(50L), eq(CancelledBy.ADMIN), eq("품절"), any(LocalDateTime.class), eq(ExchangeStatus.REQUESTED)
+				eq(50L), eq(CancelledBy.ADMIN), eq("품절"), any(LocalDateTime.class), eq(ExchangeStatus.PREPARING)
 		)).willReturn(0);
 		given(exchangeOrderRepository.existsById(50L)).willReturn(false);
 

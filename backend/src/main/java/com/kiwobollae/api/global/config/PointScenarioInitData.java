@@ -109,22 +109,22 @@ public class PointScenarioInitData implements ApplicationRunner {
 						adminUserId,
 						"seed-point-free-grant-v1",
 						new AdminPointAdjustmentRequest(
-								userId, CurrencyType.FREE, 800L, AdminPointAdjustmentReason.SPECIAL_EVENT)
-				));
+								userId, CurrencyType.FREE, 800L, AdminPointAdjustmentReason.SPECIAL_EVENT),
+						false));
 		pointTransactionTimeProvider.runAt(timeline.freeDeductAt(), () ->
 				adminPointAdjustmentService.adjust(
 						adminUserId,
 						"seed-point-free-deduct-v1",
 						new AdminPointAdjustmentRequest(
-								userId, CurrencyType.FREE, -100L, AdminPointAdjustmentReason.FRAUD_PENALTY)
-				));
+								userId, CurrencyType.FREE, -100L, AdminPointAdjustmentReason.FRAUD_PENALTY),
+						false));
 		pointTransactionTimeProvider.runAt(timeline.paidGrantAt(), () ->
 				adminPointAdjustmentService.adjust(
 						adminUserId,
 						"seed-point-paid-grant-v1",
 						new AdminPointAdjustmentRequest(
-								userId, CurrencyType.PAID, 5_000L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER)
-				));
+								userId, CurrencyType.PAID, 5_000L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER),
+						false));
 	}
 
 	private void seedOrderAndCancellation(Long userId, SeedTimeline timeline) {
@@ -201,8 +201,8 @@ public class PointScenarioInitData implements ApplicationRunner {
 						adminUserId,
 						"seed-point-final-free-balance-v1",
 						new AdminPointAdjustmentRequest(
-								userId, CurrencyType.FREE, 200L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER)
-				));
+								userId, CurrencyType.FREE, 200L, AdminPointAdjustmentReason.OUTSTANDING_MEMBER),
+						false));
 	}
 
 	private void seedJournalRewards(User user, LocalDate yesterday) {

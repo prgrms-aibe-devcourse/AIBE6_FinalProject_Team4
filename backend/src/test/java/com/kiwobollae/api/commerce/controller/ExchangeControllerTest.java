@@ -80,7 +80,7 @@ class ExchangeControllerTest {
 		authenticateAs(7L);
 		ExchangeOrderRequest request = new ExchangeOrderRequest(1L, "홍길동", "010-1234-5678", "06236", "서울시 강남구", "101동");
 		given(exchangeService.requestExchange(eq(7L), any(ExchangeOrderRequest.class)))
-				.willReturn(sampleResponse(100L, ExchangeStatus.REQUESTED));
+				.willReturn(sampleResponse(100L, ExchangeStatus.PREPARING));
 
 		mockMvc.perform(post("/api/v1/exchanges")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +88,7 @@ class ExchangeControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.success").value(true))
 				.andExpect(jsonPath("$.data.id").value(100))
-				.andExpect(jsonPath("$.data.status").value("REQUESTED"));
+				.andExpect(jsonPath("$.data.status").value("PREPARING"));
 	}
 
 	@Test
@@ -108,7 +108,7 @@ class ExchangeControllerTest {
 	void getMyExchangesReturnsPagedList() throws Exception {
 		authenticateAs(7L);
 		given(exchangeService.getMyExchanges(eq(7L), any()))
-				.willReturn(new PageImpl<>(List.of(sampleResponse(1L, ExchangeStatus.REQUESTED)), PageRequest.of(0, 20), 1));
+				.willReturn(new PageImpl<>(List.of(sampleResponse(1L, ExchangeStatus.PREPARING)), PageRequest.of(0, 20), 1));
 
 		mockMvc.perform(get("/api/v1/exchanges"))
 				.andExpect(status().isOk())
@@ -118,7 +118,7 @@ class ExchangeControllerTest {
 	@Test
 	void getMyExchangeReturnsDetail() throws Exception {
 		authenticateAs(7L);
-		given(exchangeService.getMyExchange(7L, 1L)).willReturn(sampleResponse(1L, ExchangeStatus.REQUESTED));
+		given(exchangeService.getMyExchange(7L, 1L)).willReturn(sampleResponse(1L, ExchangeStatus.PREPARING));
 
 		mockMvc.perform(get("/api/v1/exchanges/1"))
 				.andExpect(status().isOk())
