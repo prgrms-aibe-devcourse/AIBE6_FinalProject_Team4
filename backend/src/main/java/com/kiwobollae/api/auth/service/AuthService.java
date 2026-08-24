@@ -13,21 +13,16 @@ import com.kiwobollae.api.auth.oauth.OAuthClient;
 import com.kiwobollae.api.auth.oauth.OAuthUserInfo;
 import com.kiwobollae.api.auth.repository.RefreshTokenRepository;
 import com.kiwobollae.api.auth.repository.UserRepository;
-import com.kiwobollae.api.global.concurrency.UniqueInsertGuard;
 import com.kiwobollae.api.global.exception.BusinessException;
 import com.kiwobollae.api.global.exception.ErrorCode;
 import com.kiwobollae.api.global.security.JwtTokenProvider;
-import com.kiwobollae.api.journal.repository.DailyJournalRewardRepository;
-import com.kiwobollae.api.notification.entity.JournalReminderLog;
 import com.kiwobollae.api.notification.entity.enums.NotificationType;
-import com.kiwobollae.api.notification.repository.JournalReminderLogRepository;
+import com.kiwobollae.api.notification.service.JournalReminderNotifier;
 import com.kiwobollae.api.notification.service.NotificationService;
 import com.kiwobollae.api.point.service.WalletService;
 import com.kiwobollae.api.global.security.TokenHasher;
 import java.security.SecureRandom;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -55,44 +50,7 @@ public class AuthService {
 	}
 	private final WalletService walletService;
 	private final NotificationService notificationService;
-	private final JournalReminderLogRepository journalReminderLogRepository;
-	private final UniqueInsertGuard uniqueInsertGuard;
-	private final DailyJournalRewardRepository dailyJournalRewardRepository;
-
-	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-	private static final String JOURNAL_REMINDER_REF_TYPE = "JOURNAL_REMINDER_DATE";
-	private static final String JOURNAL_REMINDER_TITLE = "아직 오늘 일지를 작성하지 않았어요";
-	private static final String JOURNAL_REMINDER_CONTENT = "오늘의 성장 일지를 남기고 보상을 받아보세요.";
-	private static final String JOURNAL_REMINDER_LINK_URL = "/journals/new";
-
-	// 오늘치 일지 보상을 아직 받지 않은 사용자에게 로그인 시 한 번만 작성을 유도한다.
-	// existsBy 확인과 notify() 저장 사이에 동시 요청(로그인+토큰 재발급 등)이 끼어들면 둘 다
-	// "아직 안 보냄"으로 보고 중복 저장할 수 있어, 전용 잠금 테이블에 유니크 제약을 걸고
-	// UniqueInsertGuard로 원자적으로 하나만 승리하게 한다 — 이긴 요청만 실제 알림을 보낸다.
-	private void sendJournalReminderIfNeeded(User user) {
-		LocalDate today = LocalDate.now(KST);
-		if (dailyJournalRewardRepository.existsForUserAndRewardDate(user.getId(), today)) {
-			return;
-		}
-		if (journalReminderLogRepository.existsByUser_IdAndReminderDate(user.getId(), today)) {
-			return;
-		}
-		boolean claimed = uniqueInsertGuard.tryInsert(() ->
-				journalReminderLogRepository.saveAndFlush(
-						JournalReminderLog.create(user, today, LocalDateTime.now(KST))));
-		if (!claimed) {
-			return;
-		}
-		notificationService.notify(
-				user.getId(),
-				NotificationType.JOURNAL_REMINDER,
-				JOURNAL_REMINDER_TITLE,
-				JOURNAL_REMINDER_CONTENT,
-				JOURNAL_REMINDER_LINK_URL,
-				JOURNAL_REMINDER_REF_TYPE,
-				today.toEpochDay()
-		);
-	}
+	private final JournalReminderNotifier journalReminderNotifier;
 
 	// 소셜/일반 가입 모두 동일한 환영 알림을 보낸다. 일지를 쓰려면 먼저 식물을 등록해야
 	// 하므로(등록은 /journals/new가 아니라 /plants 화면의 모달에서 이뤄진다), 신규
@@ -375,7 +333,7 @@ public class AuthService {
 				.createdAt(LocalDateTime.now())
 				.build();
 		refreshTokenRepository.save(entity);
-		sendJournalReminderIfNeeded(user);
+		journalReminderNotifier.sendIfNeeded(user.getId());
 
 		return new TokenIssueResult(accessToken, "Bearer", UserResponse.from(user), refreshToken);
 	}
