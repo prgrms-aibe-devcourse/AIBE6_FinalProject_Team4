@@ -82,7 +82,7 @@ class AdminPointControllerTest {
 				org.mockito.ArgumentMatchers.any()
 		)).willReturn(new PageImpl<>(List.of(history), PageRequest.of(0, 20), 1));
 
-		mockMvc.perform(get("/api/v1/admin/point/adjustments")
+		mockMvc.perform(get("/api/v1/admin/points/adjustments")
 						.param("userId", "7")
 						.param("currencyType", "FREE")
 						.param("direction", "DEDUCT"))
@@ -99,7 +99,7 @@ class AdminPointControllerTest {
 				7L, 900L, 500L, 400L, LocalDateTime.of(2026, 8, 3, 10, 0)
 		));
 
-		mockMvc.perform(get("/api/v1/admin/point/user/7/wallet"))
+		mockMvc.perform(get("/api/v1/admin/points/user/7/wallet"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.userId").value(7))
 				.andExpect(jsonPath("$.data.paidPoint").value(500))
@@ -119,7 +119,7 @@ class AdminPointControllerTest {
 		);
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request)).willReturn(response);
 
-		mockMvc.perform(post("/api/v1/admin/point/adjust")
+		mockMvc.perform(post("/api/v1/admin/points/adjust")
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(request)))
@@ -138,7 +138,7 @@ class AdminPointControllerTest {
 
 	@Test
 	void adjustPointRejectsMissingCurrencyType() throws Exception {
-		mockMvc.perform(post("/api/v1/admin/point/adjust")
+		mockMvc.perform(post("/api/v1/admin/points/adjust")
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
@@ -156,7 +156,7 @@ class AdminPointControllerTest {
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
 				.willThrow(new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED));
 
-		mockMvc.perform(post("/api/v1/admin/point/adjust")
+		mockMvc.perform(post("/api/v1/admin/points/adjust")
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
@@ -175,7 +175,7 @@ class AdminPointControllerTest {
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
 				.willThrow(new BusinessException(ErrorCode.POINT_SELF_ADJUSTMENT_FORBIDDEN));
 
-		mockMvc.perform(post("/api/v1/admin/point/adjust")
+		mockMvc.perform(post("/api/v1/admin/points/adjust")
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(request)))
@@ -187,7 +187,7 @@ class AdminPointControllerTest {
 
 	@Test
 	void adjustPointRejectsUnsupportedAdjustmentReason() throws Exception {
-		mockMvc.perform(post("/api/v1/admin/point/adjust")
+		mockMvc.perform(post("/api/v1/admin/points/adjust")
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
@@ -204,7 +204,7 @@ class AdminPointControllerTest {
 		given(adminPointAdjustmentService.adjust(1L, "adjust-key", request))
 				.willThrow(new BusinessException(ErrorCode.POINT_INSUFFICIENT_BALANCE));
 
-		mockMvc.perform(post("/api/v1/admin/point/adjust")
+		mockMvc.perform(post("/api/v1/admin/points/adjust")
 						.header("Idempotency-Key", "adjust-key")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(request)))

@@ -38,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "관리자 포인트", description = "관리자 전용 포인트 조정 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping(ApiVersion.V1 + "/admin/point")
+@RequestMapping(ApiVersion.V1 + "/admin/points")
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminPointController {
 

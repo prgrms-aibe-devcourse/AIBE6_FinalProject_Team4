@@ -1,6 +1,36 @@
 -- 직접 금액 충전만 사용하므로 정액 충전 상품과 payments의 legacy 상품 컬럼을 제거한다.
 -- 이 저장소의 reference migration은 자동 실행되지 않으므로 기존 테스트 배포 DB에는 수동 적용한다.
 
+-- CHECK 제약 추가 전에 기존 데이터가 동일한 조건을 만족하는지 검증한다.
+-- 위반 행이 있으면 아래 INSERT가 ck_abort_remove_charge_products_invalid_payments 오류로 실패하며,
+-- 이후 FK/컬럼/테이블 제거가 실행되지 않는다.
+SET @invalid_direct_charge_payment_rows = (
+    SELECT COUNT(*)
+    FROM payments
+    WHERE cash_amount IS NULL
+       OR point_amount IS NULL
+       OR (
+           cash_amount = point_amount
+           AND cash_amount BETWEEN 1000 AND 300000
+           AND MOD(cash_amount, 10) = 0
+       ) IS FALSE
+);
+
+SELECT @invalid_direct_charge_payment_rows AS invalid_direct_charge_payment_rows;
+
+DROP TEMPORARY TABLE IF EXISTS migration_guard_20260822_remove_charge_products;
+
+CREATE TEMPORARY TABLE migration_guard_20260822_remove_charge_products (
+    invalid_payment_rows BIGINT NOT NULL,
+    CONSTRAINT ck_abort_remove_charge_products_invalid_payments
+        CHECK (invalid_payment_rows = 0)
+);
+
+INSERT INTO migration_guard_20260822_remove_charge_products (invalid_payment_rows)
+VALUES (@invalid_direct_charge_payment_rows);
+
+DROP TEMPORARY TABLE migration_guard_20260822_remove_charge_products;
+
 SET @charge_product_fk = (
     SELECT constraint_name
     FROM information_schema.referential_constraints
@@ -108,6 +138,10 @@ DEALLOCATE PREPARE add_direct_charge_check_statement;
 --   AND column_name IN ('charge_product_id', 'charge_product_name');
 -- SELECT COUNT(*) AS invalid_payment_rows
 -- FROM payments
--- WHERE cash_amount <> point_amount
---    OR cash_amount NOT BETWEEN 1000 AND 300000
---    OR MOD(cash_amount, 10) <> 0;
+-- WHERE cash_amount IS NULL
+--    OR point_amount IS NULL
+--    OR (
+--        cash_amount = point_amount
+--        AND cash_amount BETWEEN 1000 AND 300000
+--        AND MOD(cash_amount, 10) = 0
+--    ) IS FALSE;

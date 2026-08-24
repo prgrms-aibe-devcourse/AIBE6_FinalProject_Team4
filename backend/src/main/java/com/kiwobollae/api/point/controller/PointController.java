@@ -3,7 +3,6 @@ package com.kiwobollae.api.point.controller;
 import com.kiwobollae.api.global.common.ApiResponse;
 import com.kiwobollae.api.global.common.ApiVersion;
 import com.kiwobollae.api.point.dto.response.PointActivityResponse;
-import com.kiwobollae.api.point.dto.response.PointTransactionResponse;
 import com.kiwobollae.api.point.dto.response.WalletResponse;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
 import com.kiwobollae.api.point.entity.enums.PointTxType;
@@ -16,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.format.annotation.DateTimeFormat.ISO;
@@ -43,21 +41,8 @@ public class PointController {
 		return ResponseEntity.ok(ApiResponse.success(walletService.getWallet(userId)));
 	}
 
-	@Operation(summary = "포인트 거래 내역 조회",
-			description = "내 지갑의 포인트 거래 내역을 조회합니다. 유형(type)/기간(from,to) 필터와 페이지네이션 지원. [POINT-02]")
-	@GetMapping("/transactions")
-	public ResponseEntity<ApiResponse<Page<PointTransactionResponse>>> getTransactions(
-			@AuthenticationPrincipal Long userId,
-			@RequestParam(required = false) PointTxType type,
-			@RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE_TIME) LocalDateTime from,
-			@RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE_TIME) LocalDateTime to,
-			@ParameterObject @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-		return ResponseEntity.ok(ApiResponse.success(
-				pointTransactionService.getTransactions(userId, type, from, to, pageable)));
-	}
-
 	@Operation(summary = "사용자 포인트 활동 내역 조회",
-			description = "같은 거래의 유상·무상 원장을 한 건으로 묶어 조회합니다. 유형·출처·기간 필터와 페이지네이션을 지원합니다.")
+			description = "같은 거래의 유상·무상 원장을 한 건으로 묶어 조회합니다. 카드 거래소의 각 포인트 이벤트는 독립 내역으로 유지하며, 유형·출처·기간 필터와 페이지네이션을 지원합니다. [POINT-02]")
 	@GetMapping("/activities")
 	public ResponseEntity<ApiResponse<Page<PointActivityResponse>>> getActivities(
 			@AuthenticationPrincipal Long userId,

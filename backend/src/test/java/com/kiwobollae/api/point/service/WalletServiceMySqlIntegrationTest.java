@@ -15,7 +15,6 @@ import com.kiwobollae.api.point.entity.Wallet;
 import com.kiwobollae.api.point.dto.request.AdminPointAdjustmentDirection;
 import com.kiwobollae.api.point.dto.response.AdminPointAdjustmentHistoryResponse;
 import com.kiwobollae.api.point.dto.response.PointActivityResponse;
-import com.kiwobollae.api.point.dto.response.PointTransactionResponse;
 import com.kiwobollae.api.point.entity.enums.AdminPointAdjustmentReason;
 import com.kiwobollae.api.point.entity.enums.CurrencyType;
 import com.kiwobollae.api.point.entity.enums.PointRefType;
@@ -387,18 +386,47 @@ class WalletServiceMySqlIntegrationTest {
 				.containsExactly(
 						AdminPointAdjustmentReason.OUTSTANDING_MEMBER,
 						AdminPointAdjustmentReason.SPECIAL_EVENT);
-
-		Page<PointTransactionResponse> transactions = pointTransactionService.getTransactions(
-				userId, PointTxType.ADMIN_ADJUST, null, null, PageRequest.of(0, 20));
-		assertThat(transactions.getContent())
-				.extracting(PointTransactionResponse::adjustmentReason)
-				.containsExactlyInAnyOrder(
-						AdminPointAdjustmentReason.OUTSTANDING_MEMBER,
-						AdminPointAdjustmentReason.SPECIAL_EVENT);
 	}
 
 	@Test
-	void legacyAdminAdjustmentWithoutReasonRemainsReadableFromAllHistoryApis() {
+	void pointActivitiesKeepRepeatedMarketEscrowsAsSeparateEvents() {
+		walletService.applyDelta(
+				userId,
+				PointTxType.MARKET_ESCROW,
+				CurrencyType.PAID,
+				-100L,
+				PointRefType.MARKET_OFFER,
+				601L
+		);
+		walletService.applyDelta(
+				userId,
+				PointTxType.MARKET_ESCROW,
+				CurrencyType.PAID,
+				-200L,
+				PointRefType.MARKET_OFFER,
+				601L
+		);
+
+		Page<PointActivityResponse> activities = pointTransactionService.getActivities(
+				userId,
+				PointTxType.MARKET_ESCROW,
+				PointRefType.MARKET_OFFER,
+				null,
+				null,
+				PageRequest.of(0, 20)
+		);
+
+		assertThat(activities.getTotalElements()).isEqualTo(2);
+		assertThat(activities.getContent())
+				.extracting(PointActivityResponse::amount)
+				.containsExactly(-200L, -100L);
+		assertThat(activities.getContent())
+				.extracting(PointActivityResponse::refId)
+				.containsOnly(601L);
+	}
+
+	@Test
+	void legacyAdminAdjustmentWithoutReasonRemainsReadableFromActivityAndAdminHistory() {
 		Wallet wallet = walletRepository.findByUserId(userId).orElseThrow();
 		pointTransactionRepository.saveAndFlush(PointTransaction.builder()
 				.wallet(wallet)
@@ -413,14 +441,11 @@ class WalletServiceMySqlIntegrationTest {
 
 		Page<PointActivityResponse> activities = pointTransactionService.getActivities(
 				userId, PointTxType.ADMIN_ADJUST, null, null, null, PageRequest.of(0, 20));
-		Page<PointTransactionResponse> transactions = pointTransactionService.getTransactions(
-				userId, PointTxType.ADMIN_ADJUST, null, null, PageRequest.of(0, 20));
 		Page<AdminPointAdjustmentHistoryResponse> history =
 				adminPointAdjustmentHistoryService.getAdjustments(
 						userId, null, null, null, null, PageRequest.of(0, 20));
 
 		assertThat(activities.getContent().getFirst().adjustmentReason()).isNull();
-		assertThat(transactions.getContent().getFirst().adjustmentReason()).isNull();
 		assertThat(history.getContent().getFirst().adjustmentReason()).isNull();
 	}
 

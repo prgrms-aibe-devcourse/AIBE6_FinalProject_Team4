@@ -23,6 +23,10 @@ const ICON: Record<PointTransactionType, [string, string]> = {
   RESTORE: ['undo', 'bg-brand-soft'],
   REFUND: ['currency_exchange', 'bg-[#fff1eb]'],
   ADMIN_ADJUST: ['tune', 'bg-[#f4f0eb]'],
+  MARKET_ESCROW: ['lock', 'bg-[#fff3cc]'],
+  MARKET_RELEASE: ['lock_open', 'bg-brand-soft'],
+  MARKET_PURCHASE: ['shopping_bag', 'bg-brand-soft'],
+  MARKET_SALE: ['sell', 'bg-gold-soft'],
 };
 
 function toExclusiveEndDate(date: string): string | undefined {

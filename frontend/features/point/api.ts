@@ -1,4 +1,4 @@
-import { request } from '@/lib/api';
+import { request, type SpringPage } from '@/lib/api';
 
 export interface WalletData {
   userId: number;
@@ -14,7 +14,11 @@ export type PointTransactionType =
   | 'PURCHASE'
   | 'RESTORE'
   | 'REFUND'
-  | 'ADMIN_ADJUST';
+  | 'ADMIN_ADJUST'
+  | 'MARKET_ESCROW'
+  | 'MARKET_RELEASE'
+  | 'MARKET_PURCHASE'
+  | 'MARKET_SALE';
 
 export type PointCurrencyType = 'FREE' | 'PAID';
 
@@ -76,32 +80,9 @@ export type PointReferenceType =
   | 'PAYMENT'
   | 'PAYMENT_REFUND'
   | 'JOURNAL_COMPLETION'
-  | 'ADMIN';
-
-export interface PointTransaction {
-  id: number;
-  walletId: number;
-  type: PointTransactionType;
-  currencyType: PointCurrencyType;
-  amount: number;
-  balanceAfter: number;
-  refType: PointReferenceType | null;
-  refId: number | null;
-  adjustmentReason: AdminPointAdjustmentReason | null;
-  createdAt: string;
-}
-
-export interface PointTransactionPage {
-  content: PointTransaction[];
-  number: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  numberOfElements: number;
-  first: boolean;
-  last: boolean;
-  empty: boolean;
-}
+  | 'ADMIN'
+  | 'MARKET_OFFER'
+  | 'MARKET_TRADE';
 
 export interface PointActivity {
   id: number;
@@ -117,23 +98,10 @@ export interface PointActivity {
   createdAt: string;
 }
 
-export type PointActivityPage = Omit<PointTransactionPage, 'content'> & {
-  content: PointActivity[];
-};
+export type PointActivityPage = SpringPage<PointActivity>;
 
-export type AdminPointAdjustmentHistoryPage = Omit<PointTransactionPage, 'content'> & {
-  content: AdminPointAdjustmentHistoryData[];
-};
-
-interface PointTransactionParams {
-  accessToken: string;
-  type?: PointTransactionType;
-  from?: string;
-  to?: string;
-  page: number;
-  size?: number;
-  signal?: AbortSignal;
-}
+export type AdminPointAdjustmentHistoryPage =
+  SpringPage<AdminPointAdjustmentHistoryData>;
 
 interface PointActivityParams {
   accessToken: string;
@@ -149,31 +117,6 @@ interface PointActivityParams {
 export function getWallet(accessToken: string): Promise<WalletData> {
   return request<WalletData>('/api/v1/points/wallet', {
     accessToken,
-  });
-}
-
-export function getPointTransactions({
-  accessToken,
-  type,
-  from,
-  to,
-  page,
-  size = 20,
-  signal,
-}: PointTransactionParams): Promise<PointTransactionPage> {
-  const query = new URLSearchParams({
-    page: String(page),
-    size: String(size),
-  });
-  query.append('sort', 'createdAt,desc');
-  query.append('sort', 'id,desc');
-  if (type) query.set('type', type);
-  if (from) query.set('from', from);
-  if (to) query.set('to', to);
-
-  return request<PointTransactionPage>(`/api/v1/points/transactions?${query.toString()}`, {
-    accessToken,
-    signal,
   });
 }
 
@@ -207,7 +150,7 @@ export function adjustPointByAdmin(
   payload: AdminPointAdjustmentInput,
   idempotencyKey: string,
 ): Promise<AdminPointAdjustmentData> {
-  return request<AdminPointAdjustmentData>('/api/v1/admin/point/adjust', {
+  return request<AdminPointAdjustmentData>('/api/v1/admin/points/adjust', {
     method: 'POST',
     accessToken,
     headers: { 'Idempotency-Key': idempotencyKey },
@@ -219,7 +162,7 @@ export function getWalletByAdmin(
   accessToken: string,
   userId: number,
 ): Promise<WalletData> {
-  return request<WalletData>(`/api/v1/admin/point/user/${userId}/wallet`, {
+  return request<WalletData>(`/api/v1/admin/points/user/${userId}/wallet`, {
     accessToken,
   });
 }
@@ -243,7 +186,7 @@ export function getAdminPointAdjustments({
   if (to) query.set('to', to);
 
   return request<AdminPointAdjustmentHistoryPage>(
-    `/api/v1/admin/point/adjustments?${query.toString()}`,
+    `/api/v1/admin/points/adjustments?${query.toString()}`,
     { accessToken, signal },
   );
 }
