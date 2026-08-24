@@ -87,11 +87,32 @@ export default function AdminReportPanel({
   const [preview, setPreview] = useState<TargetPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  const [openingCommentId, setOpeningCommentId] = useState<number | null>(null);
   // openReport가 빠르게 여러 번 클릭되면(다른 행을 연달아 열면) 먼저 보낸 조회가 나중에
   // 응답할 수 있다 — requestId로 가장 최근에 연 신고의 응답인지 확인해 뒤처진 응답이
   // 엉뚱한 신고의 미리보기를 덮어쓰지 않도록 막는다.
   const previewRequestId = useRef(0);
   const sectionRef = useRef<HTMLElement>(null);
+
+  // 댓글 신고는 목록 응답에 postId가 없어(어느 게시글의 댓글인지는 댓글 자체를 조회해야
+  // 알 수 있다), 클릭 시점에 댓글을 조회해 postId를 얻은 뒤 해당 게시글로 이동시킨다.
+  const openCommentBoard = async (commentId: number) => {
+    if (openingCommentId !== null) return;
+    setOpeningCommentId(commentId);
+    try {
+      const comment = await getBoardCommentAsAdmin(commentId, accessToken);
+      window.open(`/board/${comment.postId}`, "_blank");
+    } catch (requestError) {
+      showToast(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "댓글이 속한 게시글을 찾지 못했어요.",
+        "err",
+      );
+    } finally {
+      setOpeningCommentId(null);
+    }
+  };
 
   // 처리 완료/반려된 신고는 이미 끝난 건이라 최신순으로, 그 외(검토 대기 등)는 아직
   // 처리해야 할 오래된 신고가 먼저 보이도록 오래된순으로 조회한다.
@@ -329,6 +350,20 @@ export default function AdminReportPanel({
                         >
                           {TARGET[report.targetType]} #{report.targetId}
                         </Link>
+                      ) : report.targetType === "COMMENT" ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openCommentBoard(report.targetId);
+                          }}
+                          disabled={openingCommentId === report.targetId}
+                          className="text-brand hover:text-brand-dark hover:underline disabled:cursor-wait disabled:opacity-60"
+                        >
+                          {openingCommentId === report.targetId
+                            ? "게시글 찾는 중..."
+                            : `${TARGET[report.targetType]} #${report.targetId}`}
+                        </button>
                       ) : (
                         <>
                           {TARGET[report.targetType]} #{report.targetId}
