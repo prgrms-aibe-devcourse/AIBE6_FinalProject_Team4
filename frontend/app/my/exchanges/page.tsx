@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ApiError } from '@/lib/api';
 import { couponName } from '@/lib/coupon-label';
-import { CardData, getMyCards } from '@/lib/card-api';
+import { CardData, getCard, getMyCards } from '@/lib/card-api';
 import { cancelExchange, ExchangeOrderData, ExchangeStatus, getMyExchanges } from '@/lib/exchange-api';
 import { useStore } from '@/lib/store';
 import { useUI } from '@/lib/ui';
@@ -28,6 +28,7 @@ export default function MyExchanges({
   const { showToast, askConfirm } = useUI();
   const [exchanges, setExchanges] = useState<ExchangeOrderData[]>([]);
   const [myCards, setMyCards] = useState<CardData[]>([]);
+  const [cardImages, setCardImages] = useState<Record<number, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [cardsLoading, setCardsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -74,6 +75,36 @@ export default function MyExchanges({
 
     return () => controller.abort();
   }, [hydrated, page, state.accessToken]);
+
+  // 교환 내역 아이콘에 쓸 쿠폰 이미지를 카드ID별로 가져온다. 이미 다 써버려 myCards(보유
+  // 목록)에는 안 남아있는 카드도 있을 수 있어, /api/v1/card/{id}로 개별 조회한다.
+  useEffect(() => {
+    if (!hydrated || exchanges.length === 0) return;
+    const accessToken = state.accessToken;
+    const missingCardIds = Array.from(new Set(exchanges.map((x) => x.cardId))).filter(
+      (cardId) => !(cardId in cardImages),
+    );
+    if (missingCardIds.length === 0) return;
+
+    const controller = new AbortController();
+    Promise.all(
+      missingCardIds.map((cardId) =>
+        getCard(cardId, accessToken, controller.signal)
+          .then((card): [number, string | null] => [cardId, card.imageUrl])
+          .catch(() => [cardId, null] as [number, string | null]),
+      ),
+    ).then((results) => {
+      if (controller.signal.aborted) return;
+      setCardImages((prev) => {
+        const next = { ...prev };
+        for (const [cardId, imageUrl] of results) next[cardId] = imageUrl;
+        return next;
+      });
+    });
+
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, exchanges, state.accessToken]);
 
   const changePage = (nextPage: number) => {
     setPage(nextPage);
@@ -192,7 +223,14 @@ export default function MyExchanges({
             return (
               <div key={x.id} id={`exchange-${x.id}`} className="rounded-[18px] bg-white p-5 shadow-card">
                 <div className="flex flex-wrap items-center gap-3.5">
-                  <span className="material-symbols-outlined flex h-14 w-14 items-center justify-center rounded-[13px] bg-brand-soft text-[28px]">redeem</span>
+                  {cardImages[x.cardId] ? (
+                    <div
+                      className="h-14 w-14 flex-none rounded-[13px] bg-brand-soft bg-cover bg-center"
+                      style={{ backgroundImage: `url("${cardImages[x.cardId]}")` }}
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined flex h-14 w-14 items-center justify-center rounded-[13px] bg-brand-soft text-[28px]">redeem</span>
+                  )}
                   <div className="min-w-[160px] flex-1">
                     <div className="font-extrabold">
                       {x.exchangeProductName} <span className="text-[12px] font-semibold text-faint">#{x.id}</span>
