@@ -7,12 +7,12 @@ import { couponName } from '@/lib/coupon-label';
 import { fmt } from '@/lib/store';
 
 const CONFETTI = [
-  { left: '10%', dur: '1.5s', delay: '0s', icon: 'celebration' },
-  { left: '28%', dur: '1.8s', delay: '.2s', icon: 'auto_awesome' },
-  { left: '48%', dur: '1.4s', delay: '.1s', icon: 'nutrition' },
-  { left: '66%', dur: '1.9s', delay: '.3s', icon: 'nutrition' },
-  { left: '82%', dur: '1.6s', delay: '.15s', icon: 'auto_awesome' },
-  { left: '92%', dur: '1.7s', delay: '.25s', icon: 'celebration' },
+  { left: '10%', dur: '1.5s', delay: '0s', icon: 'leaf' },
+  { left: '28%', dur: '1.8s', delay: '.2s', icon: 'sparkle' },
+  { left: '48%', dur: '1.4s', delay: '.1s', icon: 'watermelon' },
+  { left: '66%', dur: '1.9s', delay: '.3s', icon: 'seedling' },
+  { left: '82%', dur: '1.6s', delay: '.15s', icon: 'sparkle' },
+  { left: '92%', dur: '1.7s', delay: '.25s', icon: 'heart' },
 ];
 
 export default function CardDetail({
@@ -224,13 +224,13 @@ export default function CardDetail({
             {CONFETTI.map((c, i) => (
               <span
                 key={i}
-                className="absolute -top-2 animate-confettiFall text-base"
+                className="absolute -top-2 animate-confettiFall"
                 style={{ left: c.left, animationDuration: c.dur, animationDelay: c.delay, animationIterationCount: 'infinite' }}
               >
-                <span className="material-symbols-outlined text-base">{c.icon}</span>
+                <img src={`/icons/${c.icon}.svg`} alt="" className="h-4 w-4" />
               </span>
             ))}
-            <span className="material-symbols-outlined text-[66px]">celebration</span>
+            <img src="/icons/party.svg" alt="" className="mx-auto h-[66px] w-[66px]" />
             <h3 className="mb-2 mt-3.5 text-xl font-extrabold">축하해요!</h3>
             <p className="mb-6 leading-[1.6] text-[#6d7a68]">{couponName(card.name)}이 모두 모였어요.<br />지금 바로 교환할 수 있어요</p>
             <div className="flex gap-2.5">

@@ -76,7 +76,7 @@ function ExchangeNewInner() {
     return (
       <div className="container">
         <div className="mx-auto my-10 max-w-[480px] animate-pop rounded-[22px] bg-white px-[30px] py-11 text-center shadow-[0_8px_30px_rgba(124,179,66,.12)]">
-          <span className="material-symbols-outlined text-[70px]">nutrition</span>
+          <img src="/icons/watermelon.svg" alt="" className="mx-auto h-[70px] w-[70px]" />
           <h1 className="mb-2 mt-4 text-2xl font-extrabold">신청이 접수됐어요!</h1>
           <p className="mb-[26px] leading-[1.6] text-[#6d7a68]">밭에서 가장 좋은 아이로 골라 보내드릴게요</p>
           <div className="flex flex-wrap justify-center gap-2.5">

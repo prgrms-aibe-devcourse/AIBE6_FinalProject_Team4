@@ -93,7 +93,7 @@ export function useCouponDetail({
       return;
     }
     askConfirm({
-      icon: "eco",
+      iconSrc: "/icons/seedling.svg",
       title: "쿠폰을 구매할까요?",
       ok: "구매하기",
       body: `${couponName(card.name)} ${qty}장 · 보너스 포인트 ${fmt(usedFreePoint)}P${usedPaidPoint > 0 ? `와 충전 포인트 ${fmt(usedPaidPoint)}P` : ""}를 사용해요.`,

@@ -9,6 +9,8 @@ interface Toast {
 
 interface ConfirmOpts {
   icon?: string;
+  // 구글 폰트 아이콘 대신 자체 svg를 쓰고 싶을 때. 지정되면 icon보다 우선한다.
+  iconSrc?: string;
   title?: string;
   body?: string;
   ok?: string;
@@ -50,7 +52,11 @@ export function UIProvider({ children }: { children: ReactNode }) {
         <div onClick={() => setConfirm(null)} className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(46,54,42,.4)] p-5">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[380px] rounded-[20px] bg-white p-6">
             <div className="mb-2 text-[38px]">
-              <span className="material-symbols-outlined text-[40px]">{confirm.icon || 'eco'}</span>
+              {confirm.iconSrc ? (
+                <img src={confirm.iconSrc} alt="" className="h-10 w-10" />
+              ) : (
+                <span className="material-symbols-outlined text-[40px]">{confirm.icon || 'eco'}</span>
+              )}
             </div>
             <h3 className="mb-2 text-lg font-extrabold">{confirm.title}</h3>
             <p className="mb-5 text-sm leading-[1.6] text-[#6d7a68]">{confirm.body}</p>
