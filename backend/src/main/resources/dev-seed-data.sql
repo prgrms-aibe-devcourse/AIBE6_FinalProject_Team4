@@ -359,26 +359,10 @@ INSERT IGNORE INTO plant_profile (id, user_id, species_name, plant_name, start_d
 --    일지 1개 + 대표 이미지 1개씩이다.
 -- ------------------------------------------------------------------
 INSERT IGNORE INTO plant_journals (id, plant_profile_id, user_id, content, written_date, created_at, updated_at, deleted_at) VALUES
-	(1, 1, 2, '오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.',
-		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '08:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '08:00:00'), NULL),
-	(2, 1, 2, '물을 듬뿍 줬더니 훨씬 생기가 도네요. 내일은 지지대를 세워줘야겠어요.',
-		CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '09:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '09:00:00'), NULL),
-	(3, 2, 2, '새잎이 세 장이나 났어요. 곧 첫 수확 할 수 있을 것 같아요.',
-		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '10:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '10:00:00'), NULL),
-	(4, 2, 2, '오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.',
-		CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '11:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '11:00:00'), NULL),
-	(5, 3, 2, '물을 듬뿍 줬더니 훨씬 생기가 도네요. 내일은 지지대를 세워줘야겠어요.',
-		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '12:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '12:00:00'), NULL),
-	(6, 3, 2, '새잎이 세 장이나 났어요. 곧 첫 수확 할 수 있을 것 같아요.',
-		CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '13:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '13:00:00'), NULL),
 	(7, 4, 2, '오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.',
 		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '14:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '14:00:00'), NULL),
 	(8, 4, 2, '물을 듬뿍 줬더니 훨씬 생기가 도네요. 내일은 지지대를 세워줘야겠어요.',
 		CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '15:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '15:00:00'), NULL),
-	(9, 5, 2, '새잎이 세 장이나 났어요. 곧 첫 수확 할 수 있을 것 같아요.',
-		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '16:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '16:00:00'), NULL),
-	(10, 5, 2, '오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.',
-		CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '17:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '17:00:00'), NULL),
 	(11, 6, 10, '오늘도 잎이 한 뼘 더 자랐어요. 아침마다 조금씩 커지는 게 신기해요.',
 		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '08:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '08:00:00'), NULL),
 	(12, 7, 11, '물을 듬뿍 줬더니 훨씬 생기가 도네요. 내일은 지지대를 세워줘야겠어요.',
@@ -465,16 +449,8 @@ INSERT IGNORE INTO plant_journals (id, plant_profile_id, user_id, content, writt
 		CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '09:00:00'), TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '09:00:00'), NULL);
 
 INSERT IGNORE INTO journals_images (id, journal_id, user_id, image_url, image_hash, is_representative, written_date, created_at, updated_at) VALUES
-	(1, 1, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=토실이', 'seed-0', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '08:00:00'), NULL),
-	(2, 2, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=토실이', 'seed-1', true, CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '09:00:00'), NULL),
-	(3, 3, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=바질이', 'seed-2', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '10:00:00'), NULL),
-	(4, 4, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=바질이', 'seed-3', true, CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '11:00:00'), NULL),
-	(5, 5, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=쌈싸리', 'seed-4', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '12:00:00'), NULL),
-	(6, 6, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=쌈싸리', 'seed-5', true, CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '13:00:00'), NULL),
 	(7, 7, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=딸기공주', 'seed-6', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '14:00:00'), NULL),
 	(8, 8, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=딸기공주', 'seed-7', true, CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '15:00:00'), NULL),
-	(9, 9, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=로즈랑이', 'seed-8', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '16:00:00'), NULL),
-	(10, 10, 2, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=로즈랑이', 'seed-9', true, CURRENT_DATE - INTERVAL 2 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 2 DAY, '17:00:00'), NULL),
 	(11, 11, 10, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=토망이', 'seed-u10', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '08:00:00'), NULL),
 	(12, 12, 11, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=바질순이', 'seed-u11', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '09:00:00'), NULL),
 	(13, 13, 12, 'https://placehold.co/800x800/E8F3D8/4B7A1E?text=상추돌이', 'seed-u12', true, CURRENT_DATE - INTERVAL 1 DAY, TIMESTAMP(CURRENT_DATE - INTERVAL 1 DAY, '10:00:00'), NULL),
